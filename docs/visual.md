@@ -1,0 +1,93 @@
+# Kelasverse — Desain Visual
+
+Referensi visual untuk implementasi frontend. Mockup interaktif ada di kanvas desain
+(https://claude.ai/artifact/91wACgcSRmyC7kD4Kqswve, hanya bisa dibuka pemilik); screenshot-nya ada di `docs/screens/`.
+Mockup adalah acuan tampilan dan alur, bukan kode: bangun ulang dengan komponen Vue dan token di `tokens.css`.
+
+## Arah visual: "kelas yang hangat"
+
+Lucu dan ramah untuk semua usia, tapi tidak kekanak-kanakan untuk mahasiswa. Bentuk membulat, warna lembut,
+tanpa gradien, tanpa emoji di UI. Satu warna utama (Nila) untuk aksi, satu aksen (Mangga) untuk zona dan sorotan.
+
+| Token | Nilai | Dipakai untuk |
+| --- | --- | --- |
+| Nila `--color-primary` | `#4F46E5` | Tombol utama, bubble chat sendiri, nav aktif |
+| Mangga `--color-accent` | `#F5A524` | Zona/meja, chip zona aktif, jadwal |
+| Tinta `--color-ink` | `#23203A` | Teks utama, tombol mikrofon |
+| Kabut `--color-bg` | `#F7F5FF` | Latar aplikasi |
+
+Tipografi: **Fredoka 600** untuk judul dan nama ruang/gedung, **Nunito** 400/600/700 untuk semua teks lain.
+Teks isi minimal 15 px. Font di-host sendiri (lisensi SIL OFL), tanpa Google Fonts.
+
+## Alur layar
+
+```
+Login → (pilih organisasi) → Peta sekolah → jalan ke pintu gedung → pilih ruang → Ruang kelas
+                                   ↑                                                   │
+                                   └──────────── keluar ruang (kembali ke pintu gedung) ┘
+Pengajar/admin juga punya: Peta sekolah ⇄ Kelola ruang
+HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
+```
+
+| Layar | Screenshot | Isi utama |
+| --- | --- | --- |
+| Style guide | `01-style-guide.png` | Warna, tipografi, avatar preset, komponen dasar |
+| Peta sekolah (desktop) | `02-peta-sekolah.png` | Peta 2D dengan gedung, alun-alun spawn, avatar lain; panel daftar gedung |
+| Ruang kelas (desktop) | `03-ruang-kelas.png` | Peta kelas: papan tulis, 5 meja sebagai zona, radius proximity; toolbar pengajar; panel chat bertab |
+| Kelola ruang (pengajar) | `04-kelola-ruang.png` | Kartu ruang per gedung dengan status live/terjadwal, buat ruang, undang anggota |
+| HP: peta sekolah | `05-hp-peta-sekolah.png` | "Di dekatmu", daftar gedung yang bisa dibuka, input chat dekat |
+| HP: di ruang | `06-hp-di-ruang.png` | Broadcast pengajar, pilih zona, teman semeja, chat zona, mic |
+
+## Peta (Phaser)
+
+- Gaya top-down, flat, sudut membulat; palet `--map-*` dan `--roof-*` di `tokens.css`.
+- Peta sekolah: jalan berbentuk salib dengan alun-alun bertiang bendera di tengah (titik spawn).
+  Gedung: Kelas A, Kelas B (atap Nila), Ruang Guru (bergembok, khusus pengajar), Perpustakaan (zona hening, chat saja),
+  Aula, Kantin, Taman diskusi, Lapangan.
+- Setiap gedung punya label mengambang (nama + badge jumlah/status) dan satu pintu sebagai titik `travel`.
+- Ruang kelas: lantai kayu dengan grid tile, papan tulis di atas, meja diskusi sebagai zona bergaris putus-putus Mangga;
+  zona tempat pemain berada diberi garis solid dan isi lebih tebal.
+- Radius proximity pemain: lingkaran putus-putus Nila tipis. Pembicara aktif (M2): cincin `--color-speaking`.
+- Name tag: pill putih teks 12 px; pemain sendiri pill Tinta, pengajar pill Nila.
+
+## Avatar
+
+Enam preset di `assets/avatars/` (viewBox 64×64), satu bentuk badan yang sama dengan aksesori berbeda:
+
+| File | Nama | Warna badan |
+| --- | --- | --- |
+| `round.svg` | Bulat | `#7C83FD` |
+| `cap.svg` | Topi | `#FFB547` |
+| `glasses.svg` | Kacamata | `#2FB58A` |
+| `headset.svg` | Headset | `#5BB8F0` |
+| `bun.svg` | Sanggul | `#F48FB1` |
+| `beret.svg` | Baret | `#A78BFA` |
+
+Spec meminta minimal 12 kombinasi: 6 aksesori × pilihan warna badan. Nilai `avatar_key` di database berbentuk
+`<aksesori>-<warna>`, misalnya `cap-mango`. Untuk Phaser, avatar ini jadi acuan sprite sheet (arah jalan) yang dibuat di Fase 4.
+
+## Komponen dasar
+
+| Komponen | Spesifikasi |
+| --- | --- |
+| Tombol utama | Tinggi 48, radius 16, latar Nila, teks putih Nunito 700 15–16 px |
+| Tombol sekunder | Tinggi 44–48, border 2 px `--color-border`, latar putih, teks Tinta |
+| Tombol ikon (mic, kirim) | 44×44 (52 di toolbar ruang), wajib `aria-label`; mic bulat Tinta, ikon garis |
+| Chip zona | Pill tinggi 36–44, aktif: latar `--color-accent-soft`, border Mangga, teks `--color-accent-ink` |
+| Badge | Pill kecil 12–13 px: live (hijau), jadwal (Mangga), info (Nila lembut) |
+| Bubble chat | Orang lain: `--color-surface-alt`, sudut kiri-bawah 6 px; sendiri: Nila, teks putih, sudut kanan-bawah 6 px; nama pengirim 13 px di atasnya |
+| Banner broadcast | Latar `--color-primary-soft`, teks `--color-primary-strong` 600, di atas chat |
+| Kartu | Putih, radius 24 (20 di HP), padding 14–28 |
+| Input chat | Tinggi 44, border 2 px `--color-input-border`, radius 14, label tersembunyi untuk screen reader |
+
+## Aturan aksesibilitas
+
+- Semua yang bisa diketuk minimal 44×44 px.
+- Kontras teks minimal 4.5:1, termasuk label abu-abu kecil (`--color-ink-muted` sudah lolos di atas putih dan Kabut).
+- Pakai elemen asli (`<button>`, `<a>`, `<input>` + `<label>`), bukan `div` yang diberi click handler.
+- Warna yang harus dibedakan juga berbeda terang-gelapnya, bukan hanya hue.
+- Gerak di peta bisa dengan keyboard (WASD/panah) dan klik; mode HP tidak butuh gerak sama sekali.
+
+## Di luar MVP
+
+Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung detail dibuat saat implementasi peta di Fase 4.
