@@ -21,20 +21,36 @@ Jika kode dan dokumen bertentangan, berhenti dan tanyakan; jangan mengubah keput
 
 ## Struktur
 
+Monorepo dengan dua project yang berdiri sendiri, agar nanti bisa dipisah menjadi repo terpisah:
+
 ```
-cmd/server/          wiring: config, db, router, hub; tidak ada logika bisnis
-internal/<fitur>/    auth, org, invite, room, realtime, moderation, voice
-    handler.go       HTTP/WS: decode, validasi bentuk input, panggil service, encode
-    service.go       aturan bisnis dan otorisasi
-    store.go         akses database lewat query sqlc
-internal/platform/   config, db, httpx, logx — hanya hal lintas fitur yang kecil
-db/migrations/       goose, SQL murni
-db/queries/          query sqlc per fitur (users.sql, orgs.sql, ...)
-maps/                file Tiled
-web/                 frontend Vue
+docs/                        dokumen produk & teknis bersama (spec, design, visual, tasks)
+CLAUDE.md                    instruksi ini
+
+classverse-backend/          Go module github.com/FajarsMuhammad/class-verse/classverse-backend
+    cmd/server/              wiring: config, db, router, hub; tidak ada logika bisnis
+    internal/<fitur>/        auth, org, invite, room, realtime, moderation, voice
+        handler.go           HTTP/WS: decode, validasi bentuk input, panggil service, encode
+        service.go           aturan bisnis dan otorisasi
+        store.go             akses database lewat query sqlc
+    internal/platform/       config, db, httpx, logx — hanya hal lintas fitur yang kecil
+    internal/platform/db/query/  hasil generate sqlc (jangan diedit)
+    db/migrations/           goose, SQL murni
+    db/queries/              query sqlc per fitur (users.sql, orgs.sql, ...)
+    maps/                    file Tiled
+    compose.yaml, Makefile, .env.example, sqlc.yaml, .golangci.yml
+
+classverse-frontend/         Vue 3 + Vite + Phaser
+    src/styles/tokens.css    design token
+    src/assets/fonts/        font self-hosted
+    src/assets/avatars/      avatar preset
+    src/realtime/messages.ts cermin tipe pesan WebSocket
 ```
 
 Aturan:
+
+- Kedua project tidak saling mengimpor file; kontraknya hanya HTTP API, protokol WebSocket, dan `docs/`.
+  Setiap project punya `README.md`, `.gitignore`, dan konfigurasinya sendiri.
 
 - Package-by-feature. Fitur tidak mengimpor `store` fitur lain; pakai interface yang didefinisikan di sisi pemakai.
 - Nama package satu kata, sesuai domain. Jangan buat package bernama `infra`, `common`, `utils`, atau `helpers`.
@@ -53,9 +69,9 @@ Aturan:
 
 ## Konvensi frontend
 
-- Semua warna, font, ukuran teks, radius, dan spacing diambil dari `web/src/styles/tokens.css`. Jangan menulis hex atau ukuran font langsung di komponen.
-- Font di-host sendiri dari `web/src/assets/fonts/`; jangan memuat Google Fonts.
-- Avatar preset di `web/src/assets/avatars/`. UI shell (lobby, panel, chat) di Vue; peta dan avatar yang bergerak di Phaser.
+- Semua warna, font, ukuran teks, radius, dan spacing diambil dari `classverse-frontend/src/styles/tokens.css`. Jangan menulis hex atau ukuran font langsung di komponen.
+- Font di-host sendiri dari `classverse-frontend/src/assets/fonts/`; jangan memuat Google Fonts.
+- Avatar preset di `classverse-frontend/src/assets/avatars/`. UI shell (lobby, panel, chat) di Vue; peta dan avatar yang bergerak di Phaser.
 - Elemen interaktif minimal 44×44 px, pakai `<button>`/`<a>`/`<input>` asli, ikon-only wajib `aria-label`.
 
 ## Keamanan (wajib, lihat spec bagian Keamanan)
@@ -70,9 +86,11 @@ Aturan:
 
 - Server-authoritative. Satu goroutine per room (inbox channel + ticker 100 ms), state room tanpa mutex.
 - Satu koneksi WebSocket per user sepanjang sesi; pindah room lewat pesan `travel`.
-- Envelope pesan: `{"t": "...", "seq": n, "d": {...}}`. Tipe pesan didefinisikan sekali di `internal/realtime/message.go` dan dicerminkan di `web/src/realtime/messages.ts`.
+- Envelope pesan: `{"t": "...", "seq": n, "d": {...}}`. Tipe pesan didefinisikan sekali di `classverse-backend/internal/realtime/message.go` dan dicerminkan di `classverse-frontend/src/realtime/messages.ts`.
 
 ## Perintah
+
+Backend, dijalankan dari `classverse-backend/`:
 
 ```
 make up          # jalankan Postgres + Mailpit
@@ -82,6 +100,18 @@ make sqlc        # generate query
 make run         # jalankan server
 make test        # semua test
 make lint        # golangci-lint
+make migrate-down              # rollback satu migration
+make migrate-new name=add_foo  # buat migration baru
+```
+
+Frontend, dijalankan dari `classverse-frontend/` (Vite mem-proxy `/api` dan `/ws` ke `localhost:8080`):
+
+```
+npm install
+npm run dev        # dev server di localhost:5173
+npm run test:unit  # vitest
+npm run lint
+npm run build
 ```
 
 ## Cara kerja
