@@ -33,13 +33,29 @@ Browser  --WebRTC audio--> LiveKit (M2)
 
 Browser hanya bicara ke satu domain lewat Caddy; audio voice di M2 mengalir langsung antara browser dan LiveKit, sementara server Go hanya menerbitkan token dan memanggil API LiveKit untuk mute dan kick.
 
+## Struktur repo
+
+Monorepo dengan dua project yang berdiri sendiri agar nanti bisa dipisah menjadi dua repo (ADR-010). Keduanya tidak saling mengimpor file; kontraknya hanya HTTP API, protokol WebSocket, dan dokumen di `docs/`.
+
+```
+class-verse/
+├── docs/                     # spec, design, visual, screens, tasks (bersama)
+├── CLAUDE.md
+├── classverse-backend/       # Go module github.com/FajarsMuhammad/class-verse/classverse-backend
+└── classverse-frontend/      # Vue 3 + Vite + Phaser
+```
+
+Dev lokal: server Go jalan di host (`make run`, port 8080), Postgres dan Mailpit lewat `classverse-backend/compose.yaml`, dan Vite dev server (port 5173) mem-proxy `/api`, `/ws`, dan `/healthz` ke server Go sehingga browser tetap melihat satu origin, sama seperti di belakang Caddy saat produksi.
+
 ## Struktur package Go
 
 Setiap fitur adalah satu package dengan tiga lapis yang konsisten: `handler` (HTTP/WS), `service` (aturan bisnis), dan `store` (akses database). Package fitur tidak saling mengimpor store milik fitur lain; komunikasi lewat interface service.
 
 ```
-kelasverse/
-├── cmd/server/main.go        # wiring: config, db, router, room manager
+classverse-backend/
+├── cmd/server/
+│   ├── main.go               # wiring: config, db, router, room manager; graceful shutdown
+│   └── router.go             # chi + middleware, /healthz, /readyz
 ├── internal/
 │   ├── auth/                 # login, Google OAuth, JWT, refresh token
 │   │   ├── handler.go
@@ -60,14 +76,37 @@ kelasverse/
 │   └── platform/             # hal lintas fitur yang kecil saja
 │       ├── config/
 │       ├── db/               # pool pgx, transaksi
+│       │   └── query/        # hasil generate sqlc (jangan diedit)
 │       ├── httpx/            # error response, middleware
 │       └── logx/             # slog setup
 ├── db/
 │   ├── migrations/           # goose
 │   └── queries/              # sqlc
 ├── maps/                     # file Tiled (.tmj)
-└── web/                      # Vue + Phaser
+├── compose.yaml              # Postgres + Mailpit untuk dev
+├── Makefile                  # up, down, migrate, sqlc, run, test, lint
+└── sqlc.yaml
 ```
+
+Struktur frontend:
+
+```
+classverse-frontend/
+├── src/
+│   ├── api/                  # pemanggil REST (fetch), satu file per fitur
+│   ├── assets/avatars/       # avatar preset (SVG)
+│   ├── assets/fonts/         # Fredoka, Nunito (SIL OFL, self-hosted)
+│   ├── realtime/             # klien WebSocket; messages.ts mencerminkan internal/realtime/message.go
+│   ├── router/
+│   ├── stores/               # Pinia (access token hanya di memory)
+│   ├── styles/tokens.css     # design token, satu-satunya sumber warna/font/ukuran
+│   └── views/
+└── vite.config.ts            # proxy dev ke :8080
+```
+
+**Endpoint operasional.** `GET /healthz` selalu `{"status":"ok"}` selama proses hidup; `GET /readyz` mem-ping database dan mengembalikan 503 `unavailable` jika gagal. Keduanya di luar `/api` dan tanpa auth.
+
+**IP klien.** Router memakai `middleware.ClientIPFromXFF` (bukan `RealIP` yang rentan spoofing): `X-Forwarded-For` hanya dipercaya dari peer di loopback atau jaringan privat (Caddy di VPS yang sama). IP dibaca dengan `middleware.GetClientIP`, misalnya untuk rate limit login.
 
 Aturan konsistensi: nama package satu kata dan sesuai domain, error dibungkus dengan `fmt.Errorf("...: %w", err)`, dan semua handler mengembalikan error lewat satu helper di `httpx`.
 
@@ -181,6 +220,7 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-007 | JSON untuk protokol WS | Mudah di-debug selama MVP | Bandwidth `snapshot` jadi masalah |
 | ADR-008 | `sqlc` + `pgx`, bukan GORM | Query eksplisit, performa terprediksi, konsisten dengan prinsip kode sederhana | — |
 | ADR-009 | Peta sekolah adalah room biasa (`map_key = campus`) dengan area of interest | Memakai ulang hub dan protokol yang sama, tanpa service terpisah | Satu sekolah butuh lebih dari 200 orang di peta bersamaan |
+| ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
 
 ## Data model
 
@@ -343,7 +383,7 @@ Catatan desain: status ruang terkunci dan daftar peserta di-mute hanya hidup di 
 
 ## API contract
 
-Kontrak REST ditulis lebih dulu di `api/openapi.yaml`; tipe TypeScript di-generate dengan `openapi-typescript`, dan tipe Go (model saja) dengan `oapi-codegen`, sehingga frontend dan backend memakai satu sumber kebenaran.
+Kontrak REST ditulis lebih dulu di `api/openapi.yaml` (lokasi di monorepo masih pertanyaan terbuka, lihat bagian Berikutnya); tipe TypeScript di-generate dengan `openapi-typescript`, dan tipe Go (model saja) dengan `oapi-codegen`, sehingga frontend dan backend memakai satu sumber kebenaran.
 
 **Konvensi**
 
@@ -365,6 +405,8 @@ Kontrak REST ditulis lebih dulu di `api/openapi.yaml`; tipe TypeScript di-genera
 | 409 | `conflict` | Slug terpakai, sudah menjadi anggota |
 | 410 | `invite_expired` | Undangan kedaluwarsa atau dicabut |
 | 429 | `rate_limited` | Melewati batas request |
+| 500 | `internal_error` | Error tak terduga; detail hanya di log server, tidak ke client |
+| 503 | `unavailable` | Dependensi (database) belum siap, dipakai `/readyz` |
 
 **Endpoint**
 
@@ -421,3 +463,10 @@ Status Fase 2:
 - [x] Data model: ERD + skema PostgreSQL (user, organisasi, membership, undangan, ruang, sesi, pesan, refresh token, log moderasi)
 - [x] API contract: OpenAPI untuk endpoint REST di luar auth
 - [x] Desain visual: style guide, konsep avatar, tile map, wireframe (termasuk mode HP)
+
+Status Fase 3: kerangka repo selesai (lihat `docs/tasks/phase-3.md`).
+
+Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhkannya:
+
+- [ ] Lokasi `openapi.yaml` (dibutuhkan mulai slice 2). Usulan: `classverse-backend/api/openapi.yaml` sebagai sumber, frontend men-generate tipe dari file itu (path relatif di monorepo, URL/artefak setelah repo dipisah).
+- [ ] Cara frontend mendapat file peta Tiled (dibutuhkan mulai slice 3). Server membaca `maps/` untuk collision dan zona, Phaser juga butuh file yang sama untuk render. Usulan: backend menyajikan `GET /api/maps/{map_key}` dari `maps/`, sehingga satu sumber dan tetap jalan setelah repo dipisah.

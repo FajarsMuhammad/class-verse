@@ -65,7 +65,7 @@ Aturan:
 - `context.Context` selalu parameter pertama untuk operasi I/O.
 - Logging hanya `slog`, structured, tanpa data pribadi (email, isi chat) di log.
 - Waktu selalu UTC; untuk logika yang bergantung waktu, injeksi `clock` agar bisa dites.
-- Test: table-driven untuk service, integration test store dengan Postgres asli (testcontainers atau database dari compose). Jalankan `make test` sebelum menyatakan selesai.
+- Test: table-driven untuk service, integration test store dengan Postgres asli (testcontainers atau database dari compose). Jalankan `make test` dan `make lint` (backend) serta `npm run lint`, `npm run test:unit -- --run`, `npm run build` (frontend) sebelum menyatakan selesai.
 
 ## Konvensi frontend
 
@@ -113,6 +113,41 @@ npm run test:unit  # vitest
 npm run lint
 npm run build
 ```
+
+## Skills
+
+Semua skill project ada di `.agents/skills/` (file asli, di-commit, dibaca juga oleh agent lain) dan tercatat di
+`skills-lock.json`. `.claude/skills/` hanya berisi symlink relatif ke sana agar terbaca Claude Code.
+
+- Tambah skill: `npx skills add <owner/repo> -a codex -y -s <skill>` (target `codex` menulis ke `.agents/skills`
+  dan lock), lalu `ln -s ../../.agents/skills/<skill> .claude/skills/<skill>`.
+- Hapus skill: `npx skills remove -y -s <skill>`, lalu hapus symlink-nya di `.claude/skills/`.
+- Update: `npx skills update -p -y`.
+
+- Sebelum mengerjakan tugas, cek skill yang relevan dan pakai; sebutkan skill yang dipakai di rencana singkat.
+- Aturan di file ini dan di `docs/` lebih tinggi dari isi skill. Jika skill bertentangan dengan dokumen
+  (misalnya menyarankan library, struktur, atau alur lain), ikuti dokumen dan sebutkan konfliknya.
+- Paket superpowers hanya terpasang `using-superpowers`. Ganti `superpowers:brainstorming` dengan
+  `spec-driven-development` / `planning-and-task-breakdown`, dan `superpowers:systematic-debugging` dengan
+  `debugging-and-error-recovery`.
+
+| Situasi | Skill |
+| --- | --- |
+| Mulai slice atau story baru | `spec-driven-development`, `planning-and-task-breakdown`, lalu `incremental-implementation` |
+| Pakai library atau API eksternal (chi, pgx, goose, sqlc, coder/websocket, LiveKit, Phaser, Vite) | `source-driven-development`, `golang-popular-libraries`, `golang-pkg-go-dev` |
+| Kode Go | `golang-code-style`, `golang-naming`, `golang-error-handling`, `golang-context`, `golang-structs-interfaces` |
+| Database, migration, query sqlc | `golang-database` |
+| Realtime (room goroutine, hub, WebSocket) | `golang-concurrency`, `golang-safety`, `golang-performance` |
+| Test Go | `golang-testing` |
+| Lint, modernisasi, refactor Go | `golang-lint`, `golang-modernize`, `golang-refactoring` |
+| Endpoint REST, OpenAPI, protokol WS | `api-and-interface-design` |
+| Auth, token, OTP, input pengguna, moderasi | `security-and-hardening`, `golang-security` |
+| Logging dan metrik | `observability-and-instrumentation`, `golang-observability` |
+| UI Vue | `frontend-design`, `frontend-ui-engineering` (tetap patuhi `tokens.css` dan `docs/visual.md`) |
+| Cek tampilan atau alur di browser | `browser-testing-with-devtools` |
+| Bug atau test gagal | `debugging-and-error-recovery`, `golang-troubleshooting` |
+| Keputusan desain baru, ADR, README | `documentation-and-adrs` |
+| Branch, commit, PR | `git-workflow-and-versioning` |
 
 ## Cara kerja
 
