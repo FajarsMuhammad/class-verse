@@ -35,6 +35,10 @@ type joinCmd struct {
 }
 
 type leaveCmd struct{ c *conn }
+type profileCmd struct {
+	p    ProfileUpdatedMsg
+	done chan struct{}
+}
 
 // probeCmd runs fn inside the room goroutine (tests only inspect state this way).
 type probeCmd struct{ fn func(*room) }
@@ -119,6 +123,12 @@ func (r *room) handle(cmd any) {
 		r.leave(c.c)
 	case moveCmd:
 		r.move(c.c, c.seq, c.m)
+	case profileCmd:
+		if m := r.members[c.p.ID]; m != nil {
+			m.p.Name, m.p.Avatar = c.p.Name, c.p.Avatar
+			r.broadcast(newOut(TypeProfileUpdated, c.p), uuid.Nil)
+		}
+		close(c.done)
 	case probeCmd:
 		c.fn(r)
 	}

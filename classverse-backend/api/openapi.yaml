@@ -391,9 +391,13 @@ components:
           items: { $ref: "#/components/schemas/OrgSummary" }
     UpdateMeRequest:
       type: object
+      additionalProperties: false
       properties:
-        display_name: { type: string }
+        display_name: { type: string, minLength: 3, maxLength: 24, description: "NFC, trimmed, repeated spaces collapsed; prohibited words rejected" }
         birth_date: { type: string, format: date }
+        avatar_key:
+          type: string
+          enum: [default, round-nila, round-mangga, cap-nila, cap-mangga, glasses-nila, glasses-mangga, headset-nila, headset-mangga, bun-nila, bun-mangga, beret-nila, beret-mangga]
 
     CreateOrgRequest:
       type: object

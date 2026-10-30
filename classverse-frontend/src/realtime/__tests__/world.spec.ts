@@ -27,6 +27,27 @@ function welcomed() {
 }
 
 describe('World', () => {
+  it('updates self and remote identity without moving or unhiding avatars', () => {
+    const w = welcomed()
+    const before = { ...w.self! }
+    w.apply(
+      { t: 'profile_updated', seq: 2, d: { id: 'me', name: 'Ani Baru', avatar: 'bun-nila' } },
+      100,
+    )
+    w.apply({ t: 'snapshot', seq: 3, d: { p: [], out: ['b'] } }, 100)
+    w.apply(
+      { t: 'profile_updated', seq: 4, d: { id: 'b', name: 'Budi Baru', avatar: 'cap-mangga' } },
+      100,
+    )
+    expect(w.selfName).toBe('Ani Baru')
+    expect(w.selfAvatar).toBe('bun-nila')
+    expect(w.self).toEqual(before)
+    expect(w.avatars.get('b')).toMatchObject({
+      name: 'Budi Baru',
+      avatar: 'cap-mangga',
+      hidden: true,
+    })
+  })
   it('separates self from others', () => {
     const w = welcomed()
     expect(w.self).toEqual({ x: 5, y: 0, dir: 'down' })

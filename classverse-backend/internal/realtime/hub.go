@@ -108,6 +108,34 @@ func (h *Hub) tryRemove(r *room) bool {
 	return true
 }
 
+// PublishProfile sends committed identity through each room owner, including
+// disconnected avatars held for reconnect. Never reads room state directly.
+func (h *Hub) PublishProfile(ctx context.Context, id uuid.UUID, name, avatar string) error {
+	h.mu.Lock()
+	rooms := make([]*room, 0, len(h.rooms))
+	for _, r := range h.rooms {
+		rooms = append(rooms, r)
+	}
+	h.mu.Unlock()
+	for _, r := range rooms {
+		done := make(chan struct{})
+		select {
+		case r.inbox <- profileCmd{p: ProfileUpdatedMsg{ID: id, Name: name, Avatar: avatar}, done: done}:
+		case <-r.done:
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		select {
+		case <-done:
+		case <-r.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
 // Shutdown closes every connection with 1001 (going away), stops all rooms,
 // and waits for them until ctx expires.
 func (h *Hub) Shutdown(ctx context.Context) error {

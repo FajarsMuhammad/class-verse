@@ -64,7 +64,11 @@ Enam preset di `assets/avatars/` (viewBox 64×64), satu bentuk badan yang sama d
 | `beret.svg` | Baret | `#A78BFA` |
 
 Spec meminta minimal 12 kombinasi: 6 aksesori × pilihan warna badan. Nilai `avatar_key` di database berbentuk
-`<aksesori>-<warna>`, misalnya `cap-mango`. Untuk Phaser, avatar ini jadi acuan sprite sheet (arah jalan) yang dibuat di Fase 4.
+`<aksesori>-<warna>`. Slice 4: enam aksesori × `nila`/`mangga` = 12 preset,
+misalnya `cap-mangga`. Warna badan memakai token `--avatar-nila` dan `--avatar-mangga`;
+aksesori mengikuti aset asli. Key `default` memakai Bulat lama. Dialog Profil dari header memuat
+preview, nama, radio grid 12 pilihan, Simpan/Batal; label pilihan menyebut aksesori dan warna,
+status terpilih memakai radio/border selain warna. Phaser memakai aset yang sama dengan preview.
 
 ## Komponen dasar
 

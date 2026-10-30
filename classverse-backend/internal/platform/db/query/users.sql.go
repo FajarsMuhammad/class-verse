@@ -269,14 +269,16 @@ const updateProfile = `-- name: UpdateProfile :one
 UPDATE users
 SET display_name = coalesce($1, display_name),
     birth_date   = coalesce($2, birth_date),
-    updated_at   = $3
-WHERE id = $4
+    avatar_key   = coalesce($3, avatar_key),
+    updated_at   = $4
+WHERE id = $5
 RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at
 `
 
 type UpdateProfileParams struct {
 	DisplayName pgtype.Text
 	BirthDate   pgtype.Date
+	AvatarKey   pgtype.Text
 	Now         pgtype.Timestamptz
 	ID          uuid.UUID
 }
@@ -285,6 +287,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (U
 	row := q.db.QueryRow(ctx, updateProfile,
 		arg.DisplayName,
 		arg.BirthDate,
+		arg.AvatarKey,
 		arg.Now,
 		arg.ID,
 	)

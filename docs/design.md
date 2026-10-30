@@ -483,6 +483,21 @@ Contoh potongan OpenAPI untuk satu endpoint:
       "410": { $ref: "#/components/responses/InviteExpired" }
 ```
 
+## Slice 4 — Profil dan avatar (P4-01…P4-05 disetujui)
+
+- Nama: Unicode NFC, trim dan gabungkan whitespace; 3–24 code point, tolak karakter kontrol/format.
+  Nama lama tidak dimigrasi; validasi berlaku saat nama dikirim. Registrasi memakai validator sama;
+  nama OAuth tidak valid diganti `Pengguna`. Filter awal daftar kecil milik proyek Indonesia/English,
+  case-insensitive kata utuh (huruf/angka sebagai batas), bukan substring; belum mendeteksi semua obfuscation.
+- `PATCH /api/me`: `display_name?`, `avatar_key?`, `birth_date?`; omitted tidak berubah, null ditolak,
+  validasi atomik sebelum update. Avatar allowlist enam aksesori × `nila`/`mangga`, key `<aksesori>-<warna>`;
+  `default` tetap sah dan fallback renderer. Tidak ada upload/URL bebas.
+- Setelah DB commit, publish identitas melalui inbox room: `profile_updated {id, name, avatar}`.
+  DB sumber kebenaran; publish gagal tidak mengubah sukses simpan. Reconnect membaca identitas terbaru.
+  Room hanya memperbarui peserta yang ada, tanpa mengubah posisi/kehadiran.
+- Header membuka dialog Profil: preview, nama, 12 radio avatar, Simpan/Batal; fokus native dialog,
+  loading, error per field dan status sukses. Nilai tersimpan hanya diganti respons server.
+
 ## Berikutnya
 
 Status Fase 2:

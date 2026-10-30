@@ -122,6 +122,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 		return nil, fmt.Errorf("load maps: %w", err)
 	}
 	hub := realtime.NewHub(mapData, now, log)
+	authHandler.SetProfilePublisher(hub)
 	gateway, err := realtime.NewGateway(hub, tokens, realtime.NewStore(pool), cfg.FrontendURL, log)
 	if err != nil {
 		return nil, err

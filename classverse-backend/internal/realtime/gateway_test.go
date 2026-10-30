@@ -227,6 +227,24 @@ func TestGatewayTwoUsersSeeEachOther(t *testing.T) {
 	}
 }
 
+func TestGatewayProfilePublish(t *testing.T) {
+	e := newWSEnv(t)
+	a := e.connect(t, "tok-ani")
+	b := e.connect(t, "tok-budi")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := e.hub.PublishProfile(ctx, e.ani, "Ani Baru", "cap-mangga"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []*websocket.Conn{a, b} {
+		env, err := next(t, c, TypeProfileUpdated)
+		var p ProfileUpdatedMsg
+		if err != nil || json.Unmarshal(env.D, &p) != nil || p.ID != e.ani || p.Avatar != "cap-mangga" {
+			t.Fatal("profile event not delivered")
+		}
+	}
+}
+
 func TestGatewayReplacedConnection(t *testing.T) {
 	e := newWSEnv(t)
 	first := e.connect(t, "tok-ani")

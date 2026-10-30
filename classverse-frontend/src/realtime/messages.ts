@@ -82,6 +82,7 @@ export interface ServerMessages {
   welcome: WelcomeMsg
   snapshot: SnapshotMsg
   joined: Participant
+  profile_updated: { id: string; name: string; avatar: string }
   left: LeftMsg
   pong: PongMsg
   error: ErrorMsg

@@ -5,7 +5,7 @@ import { directionOf, moveToward, SEND_INTERVAL_MS, step, type Vec } from '@/rea
 import type { Direction, MoveMsg } from '@/realtime/messages'
 import { findPath } from '@/realtime/pathfind'
 import type { World } from '@/realtime/world'
-import avatarUrl from '@/assets/avatars/round.svg?no-inline'
+import { avatarChoices, avatarKey, avatarURL } from './avatars'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
 
@@ -18,6 +18,7 @@ export interface SceneDeps {
 interface Sprite {
   body: Phaser.GameObjects.Image
   tag: Phaser.GameObjects.Container
+  name: string
 }
 
 const AVATAR_SIZE = 36
@@ -48,7 +49,9 @@ export class CampusScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.svg('avatar-default', avatarUrl, { width: 64, height: 64 })
+    for (const key of ['default', ...avatarChoices.map((a) => a.key)]) {
+      this.load.svg(`avatar-${key}`, avatarURL(key), { width: 128, height: 128 })
+    }
   }
 
   create() {
@@ -156,6 +159,12 @@ export class CampusScene extends Phaser.Scene {
         this.sprites.delete(id)
         continue
       }
+      s.body.setTexture(`avatar-${avatarKey(a.avatar)}`)
+      if (s.name !== a.name) {
+        s.tag.destroy()
+        s.tag = this.makeTag(a.name, a.role === 'participant' ? 'other' : 'teacher')
+        s.name = a.name
+      }
       s.body.setVisible(!a.hidden).setPosition(a.x, a.y).setDepth(a.y)
       s.tag
         .setVisible(!a.hidden)
@@ -165,13 +174,19 @@ export class CampusScene extends Phaser.Scene {
     for (const a of world.avatars.values()) {
       if (this.sprites.has(a.id)) continue
       const tagKind = a.role === 'teacher' || a.role === 'admin' ? 'teacher' : 'other'
-      this.sprites.set(a.id, this.makeSprite(a.name, tagKind, a.x, a.y))
+      this.sprites.set(a.id, this.makeSprite(a.name, tagKind, a.x, a.y, a.avatar))
     }
     const self = world.self
     if (self) {
       if (!this.self) {
-        this.self = this.makeSprite('Kamu', 'self', self.x, self.y)
+        this.self = this.makeSprite(world.selfName, 'self', self.x, self.y, world.selfAvatar)
         this.fitCamera()
+      }
+      this.self.body.setTexture(`avatar-${avatarKey(world.selfAvatar)}`)
+      if (this.self.name !== world.selfName) {
+        this.self.tag.destroy()
+        this.self.tag = this.makeTag(world.selfName, 'self')
+        this.self.name = world.selfName
       }
       this.self.body.setPosition(self.x, self.y).setDepth(self.y)
       this.self.tag.setPosition(self.x, self.y + 6).setDepth(self.y + 1)
@@ -183,17 +198,24 @@ export class CampusScene extends Phaser.Scene {
     kind: 'self' | 'teacher' | 'other',
     x: number,
     y: number,
+    avatar = 'default',
   ): Sprite {
     const body = this.add
-      .image(x, y, 'avatar-default')
+      .image(x, y, `avatar-${avatarKey(avatar)}`)
       .setOrigin(0.5, 0.9)
       .setDisplaySize(AVATAR_SIZE / this.cameras.main.zoom, AVATAR_SIZE / this.cameras.main.zoom)
+    const tag = this.makeTag(name, kind)
+    tag.setPosition(x, y + 6)
+    return { body, tag, name }
+  }
+
+  private makeTag(name: string, kind: 'self' | 'teacher' | 'other') {
     const bg =
       kind === 'self' ? '--color-ink' : kind === 'teacher' ? '--color-primary' : '--color-surface'
     const fg = kind === 'other' ? '--color-ink' : '--color-surface'
     const tag = this.pill(name, cssToken(bg), cssToken(fg), cssToken('--text-xs'))
-    tag.setPosition(x, y + 6).setScale(1 / this.cameras.main.zoom)
-    return { body, tag }
+    tag.setScale(1 / this.cameras.main.zoom)
+    return tag
   }
 
   private buildingLabel(name: string, x: number, y: number, locked: boolean) {

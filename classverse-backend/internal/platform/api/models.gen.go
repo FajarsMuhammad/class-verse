@@ -48,6 +48,57 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for UpdateMeRequestAvatarKey.
+const (
+	BeretMangga   UpdateMeRequestAvatarKey = "beret-mangga"
+	BeretNila     UpdateMeRequestAvatarKey = "beret-nila"
+	BunMangga     UpdateMeRequestAvatarKey = "bun-mangga"
+	BunNila       UpdateMeRequestAvatarKey = "bun-nila"
+	CapMangga     UpdateMeRequestAvatarKey = "cap-mangga"
+	CapNila       UpdateMeRequestAvatarKey = "cap-nila"
+	Default       UpdateMeRequestAvatarKey = "default"
+	GlassesMangga UpdateMeRequestAvatarKey = "glasses-mangga"
+	GlassesNila   UpdateMeRequestAvatarKey = "glasses-nila"
+	HeadsetMangga UpdateMeRequestAvatarKey = "headset-mangga"
+	HeadsetNila   UpdateMeRequestAvatarKey = "headset-nila"
+	RoundMangga   UpdateMeRequestAvatarKey = "round-mangga"
+	RoundNila     UpdateMeRequestAvatarKey = "round-nila"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMeRequestAvatarKey enum.
+func (e UpdateMeRequestAvatarKey) Valid() bool {
+	switch e {
+	case BeretMangga:
+		return true
+	case BeretNila:
+		return true
+	case BunMangga:
+		return true
+	case BunNila:
+		return true
+	case CapMangga:
+		return true
+	case CapNila:
+		return true
+	case Default:
+		return true
+	case GlassesMangga:
+		return true
+	case GlassesNila:
+		return true
+	case HeadsetMangga:
+		return true
+	case HeadsetNila:
+		return true
+	case RoundMangga:
+		return true
+	case RoundNila:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessTokenResponse defines model for AccessTokenResponse.
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -169,9 +220,15 @@ type Role string
 
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
-	BirthDate   *openapi_types.Date `json:"birth_date,omitempty"`
-	DisplayName *string             `json:"display_name,omitempty"`
+	AvatarKey *UpdateMeRequestAvatarKey `json:"avatar_key,omitempty"`
+	BirthDate *openapi_types.Date       `json:"birth_date,omitempty"`
+
+	// DisplayName NFC, trimmed, repeated spaces collapsed; prohibited words rejected
+	DisplayName *string `json:"display_name,omitempty"`
 }
+
+// UpdateMeRequestAvatarKey defines model for UpdateMeRequest.AvatarKey.
+type UpdateMeRequestAvatarKey string
 
 // VerifyEmailRequest defines model for VerifyEmailRequest.
 type VerifyEmailRequest struct {

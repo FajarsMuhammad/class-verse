@@ -4,7 +4,10 @@ import (
 	"net/mail"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -41,7 +44,13 @@ func validatePassword(v *ValidationError, password string) {
 }
 
 func validateDisplayName(v *ValidationError, name string) string {
-	name = strings.TrimSpace(name)
+	for _, r := range name {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			v.add("display_name", "Nama tidak boleh mengandung karakter kontrol")
+			break
+		}
+	}
+	name = norm.NFC.String(strings.Join(strings.Fields(name), " "))
 	n := utf8.RuneCountInString(name)
 	switch {
 	case n < minDisplayNameLen:
@@ -49,7 +58,40 @@ func validateDisplayName(v *ValidationError, name string) string {
 	case n > maxDisplayNameLen:
 		v.add("display_name", "Nama tampilan maksimal 24 karakter")
 	}
+	if prohibitedName(name) {
+		v.add("display_name", "Nama mengandung kata yang tidak diperbolehkan")
+	}
 	return name
+}
+
+// prohibitedName uses a small project-authored whole-word list. It is not a
+// comprehensive language classifier and intentionally avoids substring matches.
+func prohibitedName(name string) bool {
+	for _, word := range strings.FieldsFunc(strings.ToLower(name), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	}) {
+		switch word {
+		case "anjing", "bangsat", "bajingan", "kontol", "memek", "ngentot", "fuck", "shit", "bitch", "asshole":
+			return true
+		}
+	}
+	return false
+}
+
+func validAvatar(key string) bool {
+	if key == "default" {
+		return true
+	}
+	accessory, color, ok := strings.Cut(key, "-")
+	if !ok || (color != "nila" && color != "mangga") {
+		return false
+	}
+	switch accessory {
+	case "round", "cap", "glasses", "headset", "bun", "beret":
+		return true
+	default:
+		return false
+	}
 }
 
 // validateBirthDate parses a YYYY-MM-DD date that is not in the future

@@ -60,6 +60,10 @@
   --roof-canteen: #f5a524;
   --roof-staff: #5a5672;
 
+  /* Avatar body palette (slice 4) */
+  --avatar-nila: #7c83fd;
+  --avatar-mangga: #ffb547;
+
   /* Typography */
   --font-display: 'Fredoka', system-ui, sans-serif; /* headings, room and building names */
   --font-body: 'Nunito', system-ui, sans-serif; /* everything else */

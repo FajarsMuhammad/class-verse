@@ -23,6 +23,6 @@ export const authApi = {
     }),
   logout: () => api<void>('/api/auth/logout', { method: 'POST', auth: false }),
   me: () => api<Me>('/api/me'),
-  updateMe: (patch: { display_name?: string; birth_date?: string }) =>
+  updateMe: (patch: { display_name?: string; birth_date?: string; avatar_key?: string }) =>
     api<Me>('/api/me', { method: 'PATCH', body: patch }),
 }

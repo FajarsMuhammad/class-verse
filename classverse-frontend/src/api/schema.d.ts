@@ -333,9 +333,12 @@ export interface components {
             orgs: components["schemas"]["OrgSummary"][];
         };
         UpdateMeRequest: {
+            /** @description NFC, trimmed, repeated spaces collapsed; prohibited words rejected */
             display_name?: string;
             /** Format: date */
             birth_date?: string;
+            /** @enum {string} */
+            avatar_key?: "default" | "round-nila" | "round-mangga" | "cap-nila" | "cap-mangga" | "glasses-nila" | "glasses-mangga" | "headset-nila" | "headset-mangga" | "bun-nila" | "bun-mangga" | "beret-nila" | "beret-mangga";
         };
         CreateOrgRequest: {
             name: string;

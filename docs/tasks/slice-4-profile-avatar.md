@@ -1,6 +1,6 @@
 # Slice 4 — Profil & avatar (US-04)
 
-Status: **draft rencana; belum diimplementasikan**. Branch implementasi: `slice-4-profile-avatar`.
+Status: **implementasi selesai, menunggu review manusia**. Branch implementasi: `slice-4-profile-avatar`.
 Prasyarat: checklist slice 3 selesai dan direview, lalu branch dibuat dari hasil slice 3 tersebut.
 Slice 5 belum boleh dimulai sebelum slice ini selesai dan direview.
 
@@ -12,10 +12,9 @@ Slice 5 belum boleh dimulai sebelum slice ini selesai dan direview.
 - Screenshot: `docs/screens/01-style-guide.png`, `02-peta-sekolah.png`, `03-ruang-kelas.png`.
 - `docs/tasks/phase-4.md`: batas slice 1/4 dan aturan satu branch per slice.
 
-Saat rencana ditulis, checkout aktif `phase-3-setup`, working tree bersih, hanya kerangka aplikasi dan
-`docs/tasks/slice-1-auth.md` terlihat. Implementasi slice 1–3 yang disebut pengguna belum tersedia di checkout ini.
-Path di bawah adalah target awal, bukan klaim tentang struktur hasil slice 3. Cocokkan dahulu; jangan menimpa
-handler, store, route, atau tipe yang sudah ada di branch tersebut. Push bukan bagian tugas perencanaan ini.
+Baseline implementasi: commit slice 3 `47a920e`, sudah direview dan di-push pengguna.
+Branch `slice-4-profile-avatar` dibuat dari working tree bersih. Auth profil dan query update sudah ada;
+implementasi memperluasnya tanpa migration. Commit/push tidak dilakukan oleh agent.
 
 ## Hasil dan batas scope
 
@@ -26,10 +25,13 @@ Nama 3–24 karakter serta lolos filter kata kasar; validasi wajib di server, bu
 Tidak mencakup unggah avatar, avatar kustom, DM, filter chat slice 6, moderasi slice 7, atau voice.
 Tanggal lahir dan kontrak profil slice 1 tetap berfungsi; perubahan parsial tidak menghapus field lain.
 
-## Keputusan yang perlu disetujui sebelum kode
+## Keputusan disetujui
 
-Usulan berikut **belum menjadi keputusan desain**. Setelah disetujui, catat di `docs/design.md`
-(dan `docs/visual.md` untuk katalog/tampilan), baru implementasikan.
+P4-01…P4-05 disetujui pengguna sebelum kode. Keputusan final di `docs/design.md` dan `docs/visual.md`:
+NFC, spasi digabung, kontrol/format ditolak, code point 3–24; PATCH omitted tidak berubah dan null ditolak;
+filter kecil milik proyek kata utuh Indonesia/English; enam aksesori × nila/mangga; `default` kompatibel;
+event `profile_updated {id,name,avatar}` sesudah DB commit; dialog native Profil dari header.
+Tabel di bawah menyimpan usulan awal; ketentuan final di atas dan desain yang berlaku.
 
 | ID | Pertanyaan | Usulan untuk direview |
 | --- | --- | --- |
@@ -63,18 +65,18 @@ Jangan log nama pengguna, tanggal lahir, isi input filter, atau token. Error fie
 
 ### 4.0 — Pastikan baseline dan setujui kontrak
 
-- [ ] Temukan branch/commit lokal slice 3; cek checklist dan hasil review slice 1–3. Jangan checkout atau memindahkan perubahan pengguna tanpa konfirmasi.
-- [ ] Petakan handler profil, generated types, registry avatar, dan renderer aktual; perbarui path rencana ini.
-- [ ] Selesaikan P4-01 sampai P4-05 dan dokumentasikan; perluas OpenAPI/payload real-time sesuai keputusan.
+- [x] Baseline slice 3 `47a920e`, review pengguna selesai, working tree bersih sebelum branch baru.
+- [x] Handler auth, query users, generated models, CampusScene dan World dipetakan dan diperluas.
+- [x] P4-01 sampai P4-05 disetujui, desain/OpenAPI/WS kedua sisi diperbarui.
 
 Verifikasi: review diff kontrak, contoh PATCH parsial, contoh key valid/tidak valid, dan kompatibilitas `default`.
 Dependensi: hasil slice 3. Ukuran: kecil, dokumentasi/kontrak.
 
 ### 4.1 — Nama tampilan tersimpan lewat API
 
-- [ ] Tambahkan validasi panjang/normalisasi dan filter server sesuai P4-01/P4-02, termasuk jalur lain yang menerima nama (registrasi/profil) tanpa merusak OAuth/onboarding.
-- [ ] Perluas query update parsial tanpa menghapus avatar/tanggal lahir; update profil tetap atomik jika satu field gagal.
-- [ ] Tambahkan test service table-driven dan handler; update tipe hasil generate.
+- [x] Validator NFC, panjang, kontrol/format dan filter dipakai profil/registrasi; OAuth memakai fallback aman.
+- [x] Query update parsial menjaga field lain; invalid field membatalkan seluruh update.
+- [x] Test validator table-driven, service/store/handler, generated Go/TS sinkron.
 
 File: handler/service profil, validator/filter, query users, test terkait; pecah perubahan query dan handler menjadi subtask bila melampaui satu sesi.
 Verifikasi: test batas 2/3/24/25 karakter, Unicode, whitespace, kata terlarang, false positive,
@@ -83,31 +85,31 @@ Dependensi: 4.0. Ukuran: sedang per subtask.
 
 ### 4.2 — Pilihan avatar melalui API dan aset
 
-- [ ] Tetapkan minimal 12 key sah beserta texture/preview yang cocok; seluruh kombinasi dapat dirender.
-- [ ] Validasi allowlist di server; key/path/URL bebas ditolak, `default` lama tetap aman dirender.
-- [ ] Integration test PostgreSQL membuktikan nama/avatar bertahan dan field lain tidak berubah.
+- [x] 12 key allowlist dan SVG preview/texture dari enam aset asli.
+- [x] Allowlist server menolak URL/path; `default`/unknown fallback aman di renderer.
+- [x] Integration test PostgreSQL membuktikan persistensi/atomisitas dan birth_date tidak berubah.
 
 File: katalog/validator, query/store, aset avatar dan test. Verifikasi: seluruh key dalam kontrak punya aset,
 key tidak dikenal ditolak, reload profil menghasilkan nilai tersimpan. Dependensi: 4.1. Ukuran: sedang per kelompok aset/API.
 
 ### Checkpoint — Data dan kontrak
 
-- [ ] Test backend profil dan integration test PostgreSQL lulus; generated types sinkron.
-- [ ] Review katalog, lisensi filter, normalisasi, serta kompatibilitas akun lama sebelum UI.
+- [x] Test backend profil/integrasi lulus; generated types sinkron.
+- [x] Katalog/normalisasi disetujui, filter authored proyek, kompatibilitas default dites sebelum demo UI.
 
 ### 4.3 — Form profil dan pemilihan avatar
 
-- [ ] Buat form sesuai P4-05: preview, nama, pilihan aksesori/warna, simpan/batal, status loading/sukses/error.
-- [ ] Pilihan minimal 44×44 px; label, fokus keyboard, status terpilih selain warna, error per field; tombol simpan mencegah submit ganda.
-- [ ] Hasil simpan memperbarui state dari respons server; batal/gagal tidak mengubah profil tersimpan.
+- [x] Dialog native: preview, nama, radio preset, simpan/batal, loading/sukses/error.
+- [x] Target pilihan >44 px, native radio, label/fokus, error field, submit ganda dicegah.
+- [x] Store hanya diperbarui respons sukses; batal/gagal tidak mengubah data tersimpan.
 
 File: komponen form/selector, client API, store yang ada, unit test. Verifikasi: Vitest untuk pilihan,
 validasi, simpan/gagal/batal; browser untuk fokus, layout, dan reload. Dependensi: 4.2. Ukuran: sedang per komponen/integrasi.
 
 ### 4.4 — Identitas di peta dan sinkronisasi online
 
-- [ ] Renderer memakai `avatar_key` dan nama server, dengan fallback `default`/key tidak dikenal.
-- [ ] Terapkan perilaku online P4-04 yang disetujui melalui owner room, tanpa state room lintas goroutine.
+- [x] Renderer memakai avatar/nama server, fallback default/unknown.
+- [x] `profile_updated` dikirim melalui owner room; state tidak diakses lintas goroutine.
 - [ ] Uji dua browser, reconnect, dan perpindahan scene; tidak ada identitas lama atau sprite hilang.
 
 File: renderer hasil slice 3, registry texture, pesan real-time kedua sisi, jalur inbox, test.
@@ -115,9 +117,9 @@ Verifikasi: test payload/state, `go test -race ./...`, demo dua akun. Dependensi
 
 ### 4.5 — Review dan penutupan
 
-- [ ] Jalankan seluruh pemeriksaan di bawah, catat hasil aktual; jangan centang berdasarkan rencana.
-- [ ] Demo: buka profil → pilih avatar/nama → simpan → terlihat di peta → reload/login ulang → tetap sama.
-- [ ] Demo penolakan nama/key tidak valid, pembaruan peserta lain sesuai P4-04, dan akun legacy `default`.
+- [x] Pemeriksaan wajib dijalankan; hasil aktual tercatat di bawah.
+- [x] Demo profil, simpan, peta, reload/login ulang tetap sama.
+- [x] Browser membuktikan penolakan nama, update remote dan legacy default; key ilegal dites handler/server.
 - [ ] Review manusia selesai sebelum mulai slice 5; commit implementasi menyebut `US-04`.
 
 ## Pemeriksaan wajib saat implementasi
@@ -134,4 +136,27 @@ npm run dev
 
 Store test memakai PostgreSQL asli. Demo browser memakai backend berjalan dan minimal dua akun.
 Laporan akhir memuat perubahan, perintah/hasil, keputusan yang disetujui, dan penundaan.
-Saat rencana ini dibuat, pemeriksaan aplikasi belum dijalankan karena tidak ada perubahan kode.
+## Hasil aktual
+
+- `make test` dengan `-race` dan PostgreSQL asli lulus; `make lint` 0 issues.
+- Frontend lint, 55 unit test (9 file), type-check dan build lulus.
+  Peringatan ukuran chunk Phaser tetap ada seperti slice 3.
+- Backend test: batas nama 2/3/24/25 code point, NFC, spasi, kontrol/format, kata utuh,
+  false positive substring, 12 key, URL/path ditolak, null per field, tanpa auth,
+  update parsial menjaga birth_date, atomisitas invalid avatar. Publisher gagal tetap sukses simpan;
+  gateway/room mengirim identitas ke pengirim dan peserta lain tanpa mengubah posisi.
+- Frontend test: katalog 12 SVG dengan warna, fallback default, dialog simpan/gagal/batal,
+  World memperbarui identitas tanpa memindahkan atau menampilkan avatar di luar AOI.
+- Chrome + Vite `npm run dev`, dua akun: Dimas mengganti nama menjadi `Dimas Baru`
+  (spasi dinormalisasi) dan `glasses-mangga`; browser Bu Rina menerima satu `profile_updated`
+  dan merender identitas baru. Reload membuka profil dengan nama/avatar tersimpan.
+  Nama terlarang ditolak dengan error field; Batal menutup dialog tanpa menyimpan draft.
+  Akun legacy `default` tetap terlihat. Tidak ada exception aplikasi; HTTP 400 penolakan disengaja.
+- Bukti lokal: `/tmp/kv-e2e/s4-profile.png`, `s4-map.png`, `s4-remote.png`,
+  `/tmp/kv-p4-browser-final.txt`; skrip `/tmp/kv-e2e/slice4.mjs`.
+- Demo tambahan: offline/reconnect memuat `glasses-mangga`; logout/login ulang mempertahankan
+  `Dimas Baru` dan `glasses-mangga`. Escape menutup dialog dan mengembalikan fokus ke tombol Profil.
+  Pengubahan profil bersamaan lintas tab dan audit screen reader lengkap belum diuji manual.
+- Filter authored di `internal/auth/validate.go`, tanpa daftar eksternal; tidak menjamin mendeteksi
+  semua ejaan tersamar. Tidak ada upload avatar, sprite animasi arah, atau perubahan moderasi/chat.
+- Review manusia tetap pending; slice 5 belum dimulai.

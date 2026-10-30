@@ -223,6 +223,27 @@ func TestWelcomeHidesStationaryAvatarOutsideAOI(t *testing.T) {
 	}
 }
 
+func TestRoomProfileUpdate(t *testing.T) {
+	r, _ := newTestRoom(t, "campus", 200)
+	a, b := r.testJoin(t, "Ani"), r.testJoin(t, "Budi")
+	drain(a)
+	drain(b)
+	before := r.members[a.userID].p
+	done := make(chan struct{})
+	r.handle(profileCmd{p: ProfileUpdatedMsg{ID: a.userID, Name: "Ani Baru", Avatar: "bun-nila"}, done: done})
+	<-done
+	for _, c := range []*conn{a, b} {
+		var p ProfileUpdatedMsg
+		msgs := drain(c)[TypeProfileUpdated]
+		if len(msgs) != 1 || json.Unmarshal(msgs[0], &p) != nil || p.Name != "Ani Baru" || p.Avatar != "bun-nila" {
+			t.Fatal("identity event missing")
+		}
+	}
+	if r.members[a.userID].p.X != before.X || r.members[a.userID].p.Y != before.Y {
+		t.Fatal("profile moved participant")
+	}
+}
+
 func TestSlowConsumerClosed(t *testing.T) {
 	c := newConn(uuid.New())
 	for range outBuffer {

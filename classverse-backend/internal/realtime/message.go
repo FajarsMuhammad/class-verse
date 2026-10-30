@@ -24,12 +24,13 @@ const (
 
 // Server → client message types.
 const (
-	TypeWelcome  = "welcome"
-	TypeSnapshot = "snapshot"
-	TypeJoined   = "joined"
-	TypeLeft     = "left"
-	TypePong     = "pong"
-	TypeError    = "error"
+	TypeWelcome        = "welcome"
+	TypeSnapshot       = "snapshot"
+	TypeJoined         = "joined"
+	TypeLeft           = "left"
+	TypePong           = "pong"
+	TypeError          = "error"
+	TypeProfileUpdated = "profile_updated"
 )
 
 // Direction an avatar faces.
@@ -86,6 +87,13 @@ type WelcomeMsg struct {
 	RoomID       uuid.UUID     `json:"room_id"`
 	MapKey       string        `json:"map_key"`
 	Participants []Participant `json:"participants"`
+}
+
+// ProfileUpdatedMsg changes identity without altering presence or position.
+type ProfileUpdatedMsg struct {
+	ID     uuid.UUID `json:"id"`
+	Name   string    `json:"name"`
+	Avatar string    `json:"avatar"`
 }
 
 // LeftMsg tells that a participant left the room.

@@ -36,6 +36,8 @@ export class World {
   mapKey: string | null = null
   readonly avatars = new Map<string, Avatar>()
   self: SelfState | null = null
+  selfName = 'Kamu'
+  selfAvatar = 'default'
   // Bumped whenever avatars are added or removed (for UI lists and counts).
   version = 0
 
@@ -47,8 +49,11 @@ export class World {
         this.mapKey = d.map_key
         this.avatars.clear()
         for (const p of d.participants) {
-          if (p.id === d.self_id) this.self = { x: p.x, y: p.y, dir: p.dir }
-          else this.upsert(p, now)
+          if (p.id === d.self_id) {
+            this.self = { x: p.x, y: p.y, dir: p.dir }
+            this.selfName = p.name
+            this.selfAvatar = p.avatar
+          } else this.upsert(p, now)
         }
         this.version++
         break
@@ -59,6 +64,20 @@ export class World {
           this.version++
         }
         break
+      case 'profile_updated': {
+        const p = msg.d!
+        if (p.id === this.selfId) {
+          this.selfName = p.name
+          this.selfAvatar = p.avatar
+        }
+        const a = this.avatars.get(p.id)
+        if (a) {
+          a.name = p.name
+          a.avatar = p.avatar
+        }
+        this.version++
+        break
+      }
       case 'left':
         if (this.avatars.delete(msg.d!.id)) this.version++
         break

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, useRouter } from 'vue-router'
+import { nextTick, ref, useTemplateRef } from 'vue'
+import ProfileDialog from './ProfileDialog.vue'
 
 import logoUrl from '@/assets/avatars/round.svg'
 import { useAuthStore } from '@/stores/auth'
@@ -8,6 +10,14 @@ import { useOrgStore } from '@/stores/org'
 const auth = useAuthStore()
 const org = useOrgStore()
 const router = useRouter()
+const profileButton = useTemplateRef<HTMLButtonElement>('profileButton')
+const profileOpen = ref(false)
+async function closeProfile() {
+  profileOpen.value = false
+  await nextTick()
+  profileButton.value?.focus()
+}
+const profileStatus = ref('')
 
 async function logout() {
   await auth.logout()
@@ -37,10 +47,24 @@ async function logout() {
         </RouterLink>
       </nav>
       <div class="user">
+        <button
+          ref="profileButton"
+          type="button"
+          class="btn-secondary small"
+          @click="profileOpen = true"
+        >
+          Profil
+        </button>
         <span class="name">{{ auth.me?.display_name }}</span>
         <button type="button" class="btn-secondary small" @click="logout">Keluar</button>
       </div>
     </header>
+    <ProfileDialog
+      v-if="profileOpen"
+      @close="closeProfile"
+      @saved="profileStatus = 'Profil berhasil disimpan.'"
+    />
+    <p v-if="profileStatus" role="status" class="profile-status">{{ profileStatus }}</p>
     <main class="content">
       <slot />
     </main>
@@ -48,6 +72,10 @@ async function logout() {
 </template>
 
 <style scoped>
+.profile-status {
+  margin: var(--space-2) var(--space-8);
+  color: var(--color-primary-strong);
+}
 .shell {
   min-height: 100vh;
   display: flex;
