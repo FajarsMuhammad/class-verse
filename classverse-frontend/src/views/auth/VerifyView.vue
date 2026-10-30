@@ -25,7 +25,7 @@ async function submit() {
   notice.value = ''
   try {
     await auth.verifyEmail(email.value, code.value.trim())
-    await router.push(auth.needsProfile ? { name: 'complete-profile' } : { name: 'home' })
+    await router.push(auth.needsProfile ? { name: 'complete-profile' } : (pending.takeRedirect() ?? '/'))
   } catch (e) {
     error.value = errorMessage(e)
   } finally {

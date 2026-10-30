@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 
 import AuthCard from '@/components/AuthCard.vue'
 import { useAuthStore } from '@/stores/auth'
+import { usePendingStore } from '@/stores/pending'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const pending = usePendingStore()
 
 onMounted(async () => {
   const error = route.query.error
@@ -25,7 +27,7 @@ onMounted(async () => {
     await router.replace({ name: 'login', query: { error: 'google_failed' } })
     return
   }
-  await router.replace(auth.needsProfile ? { name: 'complete-profile' } : { name: 'home' })
+  await router.replace(auth.needsProfile ? { name: 'complete-profile' } : (pending.takeRedirect() ?? '/'))
 })
 </script>
 

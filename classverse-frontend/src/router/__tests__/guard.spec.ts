@@ -9,6 +9,9 @@ function route(name: string, meta: Record<string, boolean> = {}, fullPath = '/x'
   return { name, meta, fullPath } as unknown as RouteLocationNormalized
 }
 
+const orgA = { id: 'a', name: 'SMA A', slug: 'sma-a', role: 'participant' }
+const orgB = { id: 'b', name: 'SMA B', slug: 'sma-b', role: 'teacher' }
+
 function stubBackend(me: object | null) {
   vi.stubGlobal(
     'fetch',
@@ -25,8 +28,13 @@ function stubBackend(me: object | null) {
   )
 }
 
+const home = route('home', { requiresAuth: true, requiresOrg: true }, '/')
+
 describe('authGuard', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
   afterEach(() => {
     vi.unstubAllGlobals()
     setAccessToken(null)
@@ -34,26 +42,42 @@ describe('authGuard', () => {
 
   it('sends guests to login', async () => {
     stubBackend(null)
-    expect(await authGuard(route('home', { requiresAuth: true }, '/'))).toEqual({
-      name: 'login',
-      query: {},
-    })
+    expect(await authGuard(home)).toEqual({ name: 'login', query: {} })
   })
 
   it('sends users without birth date to complete profile', async () => {
-    stubBackend({ id: 'u', needs_profile: true })
-    expect(await authGuard(route('home', { requiresAuth: true }, '/'))).toEqual({
-      name: 'complete-profile',
-    })
+    stubBackend({ id: 'u', needs_profile: true, orgs: [] })
+    expect(await authGuard(home)).toEqual({ name: 'complete-profile' })
   })
 
   it('sends logged-in users away from guest pages', async () => {
-    stubBackend({ id: 'u', needs_profile: false })
+    stubBackend({ id: 'u', needs_profile: false, orgs: [orgA] })
     expect(await authGuard(route('login', { guestOnly: true }))).toEqual({ name: 'home' })
   })
 
-  it('lets complete users through', async () => {
-    stubBackend({ id: 'u', needs_profile: false })
-    expect(await authGuard(route('home', { requiresAuth: true }, '/'))).toBe(true)
+  it('sends users without organizations to start', async () => {
+    stubBackend({ id: 'u', needs_profile: false, orgs: [] })
+    expect(await authGuard(home)).toEqual({ name: 'start' })
+  })
+
+  it('lets a single-org user straight in', async () => {
+    stubBackend({ id: 'u', needs_profile: false, orgs: [orgA] })
+    expect(await authGuard(home)).toBe(true)
+  })
+
+  it('asks multi-org users to pick, unless one was stored', async () => {
+    stubBackend({ id: 'u', needs_profile: false, orgs: [orgA, orgB] })
+    expect(await authGuard(home)).toEqual({ name: 'select-org' })
+
+    localStorage.setItem('kv-active-org', 'b')
+    setActivePinia(createPinia())
+    setAccessToken(null)
+    expect(await authGuard(home)).toBe(true)
+  })
+
+  it('keeps participants out of teacher pages', async () => {
+    stubBackend({ id: 'u', needs_profile: false, orgs: [orgA] })
+    const manage = route('manage-rooms', { requiresAuth: true, requiresOrg: true, teacherOnly: true })
+    expect(await authGuard(manage)).toEqual({ name: 'home' })
   })
 })

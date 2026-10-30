@@ -6,9 +6,11 @@ import { ApiError, errorMessage } from '@/api/client'
 import AuthCard from '@/components/AuthCard.vue'
 import FormField from '@/components/FormField.vue'
 import { useAuthStore } from '@/stores/auth'
+import { usePendingStore } from '@/stores/pending'
 
 const router = useRouter()
 const auth = useAuthStore()
+const pending = usePendingStore()
 
 const birthDate = ref(auth.me?.birth_date ?? '')
 const fields = ref<Record<string, string>>({})
@@ -21,7 +23,7 @@ async function submit() {
   fields.value = {}
   try {
     await auth.updateProfile({ birth_date: birthDate.value })
-    await router.push({ name: 'home' })
+    await router.push(pending.takeRedirect() ?? '/')
   } catch (e) {
     if (e instanceof ApiError) fields.value = e.fields
     error.value = errorMessage(e)

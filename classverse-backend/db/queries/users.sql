@@ -52,3 +52,9 @@ SET display_name = coalesce(sqlc.narg(display_name), display_name),
     updated_at   = sqlc.arg(now)
 WHERE id = sqlc.arg(id)
 RETURNING *;
+
+-- name: CreateTestUser :one
+-- Test helper: a verified user with an optional birth date.
+INSERT INTO users (email, email_verified_at, display_name, birth_date)
+VALUES (sqlc.arg(email), now(), sqlc.arg(display_name), sqlc.narg(birth_date))
+RETURNING *;

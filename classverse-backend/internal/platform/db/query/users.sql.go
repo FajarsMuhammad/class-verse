@@ -48,6 +48,37 @@ func (q *Queries) CreateGoogleUser(ctx context.Context, arg CreateGoogleUserPara
 	return i, err
 }
 
+const createTestUser = `-- name: CreateTestUser :one
+INSERT INTO users (email, email_verified_at, display_name, birth_date)
+VALUES ($1, now(), $2, $3)
+RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at
+`
+
+type CreateTestUserParams struct {
+	Email       string
+	DisplayName string
+	BirthDate   pgtype.Date
+}
+
+// Test helper: a verified user with an optional birth date.
+func (q *Queries) CreateTestUser(ctx context.Context, arg CreateTestUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createTestUser, arg.Email, arg.DisplayName, arg.BirthDate)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.EmailVerifiedAt,
+		&i.PasswordHash,
+		&i.GoogleSub,
+		&i.DisplayName,
+		&i.BirthDate,
+		&i.AvatarKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, display_name, birth_date)
 VALUES ($1, $2, $3, $4)

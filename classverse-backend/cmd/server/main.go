@@ -16,6 +16,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/invite"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/config"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/logx"
@@ -47,12 +49,9 @@ func run() error {
 	}
 	defer pool.Close()
 
-	authHandler, err := newAuth(ctx, cfg, pool, log)
+	api, err := newAPI(ctx, cfg, pool, log)
 	if err != nil {
 		return err
-	}
-	api := func(r chi.Router) {
-		authHandler.Routes(r)
 	}
 
 	srv := &http.Server{
@@ -89,26 +88,49 @@ func run() error {
 	return nil
 }
 
-func newAuth(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (*auth.Handler, error) {
+// newAPI wires every feature and returns the /api route tree.
+func newAPI(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (func(chi.Router), error) {
 	now := func() time.Time { return time.Now().UTC() }
-	mailer, err := mail.NewSMTPSender(cfg.SMTPAddr, cfg.SMTPFrom)
+
+	orgSvc := org.NewService(org.NewStore(pool), now, log)
+	inviteSvc := invite.NewService(invite.NewStore(pool), orgSvc, now, log)
+
+	authHandler, tokens, err := newAuth(ctx, cfg, pool, orgSvc, now, log)
 	if err != nil {
 		return nil, err
+	}
+	orgHandler := org.NewHandler(orgSvc, log)
+	inviteHandler := invite.NewHandler(inviteSvc, cfg.FrontendURL, now, log)
+
+	return func(r chi.Router) {
+		authHandler.Routes(r)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireUser(tokens, log))
+			orgHandler.Routes(r)
+			inviteHandler.Routes(r)
+		})
+	}, nil
+}
+
+func newAuth(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, orgs auth.OrgLister, now func() time.Time, log *slog.Logger) (*auth.Handler, *auth.Tokens, error) {
+	mailer, err := mail.NewSMTPSender(cfg.SMTPAddr, cfg.SMTPFrom)
+	if err != nil {
+		return nil, nil, err
 	}
 	tokens := auth.NewTokens(cfg.JWTPrivateKey, now)
 	svc, err := auth.NewService(auth.NewStore(pool), tokens, mailer, cfg.OTPHMACKey, now, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var google auth.Google
 	if cfg.Google.Enabled() {
 		gc, err := auth.NewGoogleClientForGoogle(ctx, cfg.Google.ClientID, cfg.Google.ClientSecret, cfg.Google.RedirectURL)
 		if err != nil {
-			return nil, fmt.Errorf("google login: %w", err)
+			return nil, nil, fmt.Errorf("google login: %w", err)
 		}
 		google = gc
 	} else {
 		log.Warn("google login disabled: GOOGLE_* not set")
 	}
-	return auth.NewHandler(svc, tokens, google, cfg.FrontendURL, now, log), nil
+	return auth.NewHandler(svc, tokens, google, orgs, cfg.FrontendURL, now, log), tokens, nil
 }

@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func TestHandle(t *testing.T) {
@@ -106,5 +108,24 @@ func assertJSONEqual(t *testing.T, got []byte, want string) {
 	}
 	if !reflect.DeepEqual(g, w) {
 		t.Errorf("body = %s, want %s", got, want)
+	}
+}
+
+func TestRequestLoggerHidesPathValues(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, nil))
+	r := chi.NewRouter()
+	r.Use(RequestLogger(log))
+	r.Get("/api/invites/{code}", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/invites/SECRET12?x=token", http.NoBody))
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/nope/SECRET34", http.NoBody))
+
+	out := buf.String()
+	if strings.Contains(out, "SECRET") || strings.Contains(out, "token") {
+		t.Errorf("log leaks path values: %s", out)
+	}
+	if !strings.Contains(out, "route=/api/invites/{code}") || !strings.Contains(out, "route=unmatched") {
+		t.Errorf("log lacks route pattern: %s", out)
 	}
 }

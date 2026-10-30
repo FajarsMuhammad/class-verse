@@ -148,6 +148,15 @@ export function errorMessage(err: unknown): string {
       return 'Terlalu banyak percobaan. Minta kode baru.'
     case 'rate_limited':
       return 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.'
+    case 'not_found':
+      return 'Data tidak ditemukan.'
+    case 'forbidden':
+      return err.message || 'Kamu tidak punya akses untuk ini.'
+    case 'conflict':
+    case 'invite_expired':
+      return err.message
+    case 'profile_incomplete':
+      return 'Lengkapi profil terlebih dahulu.'
     case 'unauthenticated':
     case 'session_revoked':
       return 'Sesi berakhir. Silakan masuk lagi.'

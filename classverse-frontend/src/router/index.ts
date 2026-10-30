@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { useOrgStore } from '@/stores/org'
 import HomeView from '../views/HomeView.vue'
 
 declare module 'vue-router' {
@@ -9,13 +10,52 @@ declare module 'vue-router' {
     requiresAuth?: boolean
     // guestOnly: logged-in users are sent home (login, register).
     guestOnly?: boolean
+    // requiresOrg: page needs an active organization.
+    requiresOrg?: boolean
+    // teacherOnly: page needs role teacher or admin in the active organization.
+    teacherOnly?: boolean
   }
 }
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', name: 'home', component: HomeView, meta: { requiresAuth: true } },
+    {
+      path: '/',
+      name: 'home',
+      component: HomeView,
+      meta: { requiresAuth: true, requiresOrg: true },
+    },
+    {
+      path: '/kelola-ruang',
+      name: 'manage-rooms',
+      component: () => import('../views/org/ManageRoomsView.vue'),
+      meta: { requiresAuth: true, requiresOrg: true, teacherOnly: true },
+    },
+    {
+      path: '/mulai',
+      name: 'start',
+      component: () => import('../views/org/StartView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/sekolah/baru',
+      name: 'create-org',
+      component: () => import('../views/org/CreateOrgView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/gabung/:code?',
+      name: 'join',
+      component: () => import('../views/org/JoinView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/pilih-sekolah',
+      name: 'select-org',
+      component: () => import('../views/org/SelectOrgView.vue'),
+      meta: { requiresAuth: true },
+    },
     {
       path: '/masuk',
       name: 'login',
@@ -61,6 +101,12 @@ export async function authGuard(to: RouteLocationNormalized) {
   }
   if (auth.loggedIn && !auth.needsProfile && to.name === 'complete-profile') {
     return { name: 'home' }
+  }
+  if (to.meta.requiresOrg) {
+    const org = useOrgStore()
+    if (org.orgs.length === 0) return { name: 'start' }
+    if (!org.active) return { name: 'select-org' }
+    if (to.meta.teacherOnly && !org.isTeacher) return { name: 'home' }
   }
   return true
 }

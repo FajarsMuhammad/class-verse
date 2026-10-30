@@ -1,30 +1,42 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import AppShell from '@/components/AppShell.vue'
+import { useOrgStore } from '@/stores/org'
 
-import AuthCard from '@/components/AuthCard.vue'
-import { useAuthStore } from '@/stores/auth'
-
-const auth = useAuthStore()
-const router = useRouter()
-
-async function logout() {
-  await auth.logout()
-  await router.push({ name: 'login' })
-}
+const org = useOrgStore()
 </script>
 
 <template>
-  <AuthCard :title="`Halo, ${auth.me?.display_name ?? ''}`" subtitle="Kamu sudah masuk.">
-    <p class="info" data-testid="home-info">
-      Gabung ke sekolah lewat kode undangan akan tersedia di langkah berikutnya.
-    </p>
-    <button type="button" class="btn-secondary" @click="logout">Keluar</button>
-  </AuthCard>
+  <AppShell>
+    <section class="placeholder" aria-labelledby="map-title">
+      <h1 id="map-title" class="title">{{ org.active?.name }}</h1>
+      <p class="sub" data-testid="home-info">
+        Peta sekolah akan muncul di sini. Kamu masuk sebagai
+        {{
+          { admin: 'admin', teacher: 'pengajar', participant: 'peserta' }[
+            org.active?.role ?? 'participant'
+          ]
+        }}.
+      </p>
+    </section>
+  </AppShell>
 </template>
 
 <style scoped>
-.info {
-  margin: var(--space-6) 0;
-  font-size: var(--text-md);
+.placeholder {
+  padding: var(--space-10) var(--space-8);
+  border-radius: var(--radius-2xl);
+  background: var(--map-grass);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-3xl);
+}
+
+.sub {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-lg);
 }
 </style>

@@ -23,7 +23,7 @@ const testFrontend = "http://localhost:5173"
 
 func newTestServer(t *testing.T, e *env, google Google) http.Handler {
 	t.Helper()
-	h := NewHandler(e.svc, e.tokens, google, testFrontend, e.clock.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h := NewHandler(e.svc, e.tokens, google, nil, testFrontend, e.clock.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	r := chi.NewRouter()
 	r.Route("/api", h.Routes)
 	return r

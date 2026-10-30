@@ -2,22 +2,21 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"golang.org/x/oauth2"
 
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/api"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/httpx"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/ratelimit"
 )
@@ -28,7 +27,6 @@ const (
 	oauthCookie    = "kv_oauth"
 	oauthPath      = "/api/auth/google"
 	oauthCookieTTL = 10 * time.Minute
-	maxBodyBytes   = 16 << 10
 )
 
 // Google is the OAuth client used by the handler. Nil disables Google login.
@@ -52,8 +50,15 @@ func newLimiters(now func() time.Time) limiters {
 	}
 }
 
+// OrgLister lists the organizations of a user for GET /api/me
+// (implemented by the org feature, wired in cmd/server).
+type OrgLister interface {
+	ListOrgSummaries(ctx context.Context, userID uuid.UUID) ([]api.OrgSummary, error)
+}
+
 // Handler serves /api/auth/* and /api/me.
 type Handler struct {
+	orgs        OrgLister
 	svc         *Service
 	tokens      *Tokens
 	google      Google
@@ -62,9 +67,9 @@ type Handler struct {
 	limit       limiters
 }
 
-// NewHandler wires the HTTP layer. google may be nil.
-func NewHandler(svc *Service, tokens *Tokens, google Google, frontendURL string, now func() time.Time, log *slog.Logger) *Handler {
-	return &Handler{svc: svc, tokens: tokens, google: google, frontendURL: frontendURL, log: log, limit: newLimiters(now)}
+// NewHandler wires the HTTP layer. google and orgs may be nil.
+func NewHandler(svc *Service, tokens *Tokens, google Google, orgs OrgLister, frontendURL string, now func() time.Time, log *slog.Logger) *Handler {
+	return &Handler{svc: svc, tokens: tokens, google: google, orgs: orgs, frontendURL: frontendURL, log: log, limit: newLimiters(now)}
 }
 
 // Routes mounts the auth endpoints under /api.
@@ -277,23 +282,25 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.frontendURL+"/auth/callback", http.StatusFound)
 }
 
-type meResponse struct {
-	ID           string  `json:"id"`
-	Email        string  `json:"email"`
-	DisplayName  string  `json:"display_name"`
-	BirthDate    *string `json:"birth_date"`
-	AvatarKey    string  `json:"avatar_key"`
-	NeedsProfile bool    `json:"needs_profile"`
-	Orgs         []any   `json:"orgs"`
-}
-
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) error {
 	id, _ := UserID(r.Context())
 	p, err := h.svc.Me(r.Context(), id)
 	if err != nil {
 		return err
 	}
-	httpx.JSON(w, http.StatusOK, toMeResponse(p))
+	return h.writeMe(w, r, p)
+}
+
+func (h *Handler) writeMe(w http.ResponseWriter, r *http.Request, p Profile) error {
+	resp := toMeResponse(p)
+	if h.orgs != nil {
+		orgs, err := h.orgs.ListOrgSummaries(r.Context(), p.ID)
+		if err != nil {
+			return fmt.Errorf("list orgs: %w", err)
+		}
+		resp.Orgs = orgs
+	}
+	httpx.JSON(w, http.StatusOK, resp)
 	return nil
 }
 
@@ -312,22 +319,20 @@ func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	httpx.JSON(w, http.StatusOK, toMeResponse(p))
-	return nil
+	return h.writeMe(w, r, p)
 }
 
-func toMeResponse(p Profile) meResponse {
-	resp := meResponse{
-		ID:           p.ID.String(),
+func toMeResponse(p Profile) api.Me {
+	resp := api.Me{
+		Id:           p.ID,
 		Email:        p.Email,
 		DisplayName:  p.DisplayName,
 		AvatarKey:    p.AvatarKey,
 		NeedsProfile: p.NeedsProfile,
-		Orgs:         []any{},
+		Orgs:         []api.OrgSummary{},
 	}
 	if p.BirthDate != nil {
-		s := p.BirthDate.Format(dateLayout)
-		resp.BirthDate = &s
+		resp.BirthDate = &openapi_types.Date{Time: *p.BirthDate}
 	}
 	return resp
 }
@@ -379,12 +384,7 @@ func (h *Handler) checkOrigin(r *http.Request) error {
 }
 
 func (h *Handler) allow(w http.ResponseWriter, l *ratelimit.Limiter, key string) error {
-	ok, retry := l.Allow(key)
-	if ok {
-		return nil
-	}
-	w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retry.Seconds()))))
-	return &httpx.Error{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "Terlalu banyak percobaan. Coba lagi sebentar lagi."}
+	return httpx.RateLimit(w, l, key)
 }
 
 func clientIP(r *http.Request) string {
@@ -394,15 +394,8 @@ func clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-var errBadJSON = &httpx.Error{Status: http.StatusBadRequest, Code: "validation_failed", Message: "Format permintaan tidak valid"}
-
 func decodeJSON(r *http.Request, v any) error {
-	dec := json.NewDecoder(io.LimitReader(r.Body, maxBodyBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		return errBadJSON
-	}
-	return nil
+	return httpx.DecodeJSON(r, v)
 }
 
 // toAPIError maps domain errors to the API error shape.
@@ -412,7 +405,7 @@ func toAPIError(err error) error {
 	}
 	var verr *ValidationError
 	if errors.As(err, &verr) {
-		return &httpx.Error{Status: http.StatusBadRequest, Code: "validation_failed", Message: "Periksa kembali isian kamu", Fields: verr.Fields}
+		return httpx.ValidationFailed(verr.Fields)
 	}
 	type mapping struct {
 		target  error

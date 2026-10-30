@@ -30,3 +30,4 @@ satu origin (dibutuhkan cookie refresh `SameSite=Strict`, tanpa CORS).
 | `npm run lint` | oxlint + ESLint |
 | `npm run format` | Prettier |
 | `npm run build` | Type-check + build produksi ke `dist/` |
+| `npm run api` | Generate `src/api/schema.d.ts` dari `../classverse-backend/api/openapi.yaml` (jangan diedit manual) |

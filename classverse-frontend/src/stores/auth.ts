@@ -61,6 +61,11 @@ export const useAuthStore = defineStore('auth', () => {
     await startSession(access_token)
   }
 
+  // reload fetches /api/me again, e.g. after joining or creating an organization.
+  async function reload() {
+    await loadMe()
+  }
+
   async function updateProfile(patch: { display_name?: string; birth_date?: string }) {
     me.value = await authApi.updateMe(patch)
   }
@@ -84,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
     verifyEmail,
     completeGoogleLogin,
     updateProfile,
+    reload,
     logout,
   }
 })

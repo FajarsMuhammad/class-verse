@@ -5,7 +5,7 @@ export
 MIGRATIONS := db/migrations
 GOOSE      := go tool goose -dir $(MIGRATIONS)
 
-.PHONY: up down migrate migrate-down migrate-new sqlc run test lint keys
+.PHONY: up down migrate migrate-down migrate-new sqlc api run test lint keys
 
 up: ## Start Postgres and Mailpit, wait until Postgres is healthy
 	docker compose up -d --wait
@@ -25,6 +25,9 @@ migrate-new: ## Create a new SQL migration: make migrate-new name=add_foo
 
 sqlc: ## Generate Go code from db/queries
 	go tool sqlc generate
+
+api: ## Generate Go models from api/openapi.yaml
+	go tool oapi-codegen -config api/oapi-codegen.yaml api/openapi.yaml
 
 run: ## Run the server on the host
 	go run ./cmd/server

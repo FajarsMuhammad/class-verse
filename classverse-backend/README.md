@@ -34,6 +34,7 @@ Jika port 5432, 1025, atau 8025 sudah dipakai di mesinmu, ubah `POSTGRES_PORT`, 
 | `make migrate` | Terapkan semua migration (goose up) |
 | `make migrate-down` | Rollback satu migration |
 | `make migrate-new name=...` | Buat file migration SQL baru |
+| `make api` | Generate model Go dari `api/openapi.yaml` ke `internal/platform/api` |
 | `make sqlc` | Generate kode Go dari `db/queries` ke `internal/platform/db/query` |
 | `make run` | Jalankan server di host |
 | `make test` | Semua test (dengan `-race`) |

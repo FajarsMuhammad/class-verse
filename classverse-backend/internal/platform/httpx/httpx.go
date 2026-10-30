@@ -56,7 +56,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, log *slog.Logger, err er
 		log.ErrorContext(r.Context(), "unhandled error",
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
+			slog.String("route", routePattern(r)),
 			slog.Any("err", err),
 		)
 		apiErr = errInternal

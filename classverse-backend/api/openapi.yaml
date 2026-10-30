@@ -1,0 +1,441 @@
+openapi: 3.0.3
+info:
+  title: Kelasverse API
+  version: 0.2.0
+  description: |
+    REST API Kelasverse. Semua path di bawah `/api`, JSON `snake_case`, waktu ISO 8601 UTC.
+    Lihat docs/design.md bagian API contract.
+servers:
+  - url: /
+security:
+  - bearer: []
+
+paths:
+  /api/auth/register:
+    post:
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "202": { description: "OTP dikirim (jawaban sama walau email sudah terdaftar)" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/auth/verify-email:
+    post:
+      operationId: verifyEmail
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyEmailRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/AccessToken" }
+        "400": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/auth/resend-otp:
+    post:
+      operationId: resendOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmailRequest" }
+      responses:
+        "202": { description: "OTP dikirim jika akun belum terverifikasi" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/auth/login:
+    post:
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/AccessToken" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/auth/refresh:
+    post:
+      operationId: refresh
+      description: Memakai cookie `kv_refresh`; header Origin wajib sama dengan FRONTEND_URL.
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/AccessToken" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/auth/logout:
+    post:
+      operationId: logout
+      security: []
+      responses:
+        "204": { description: "Family refresh token dicabut" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/auth/google/start:
+    get:
+      operationId: googleStart
+      security: []
+      responses:
+        "302": { description: "Redirect ke Google" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/auth/google/callback:
+    get:
+      operationId: googleCallback
+      security: []
+      responses:
+        "302": { description: "Redirect ke FRONTEND_URL/auth/callback (atau ?error=<code>)" }
+
+  /api/me:
+    get:
+      operationId: getMe
+      responses:
+        "200":
+          description: Profil dan organisasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    patch:
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateMeRequest" }
+      responses:
+        "200":
+          description: Profil setelah diubah
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /api/orgs:
+    post:
+      operationId: createOrg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOrgRequest" }
+      responses:
+        "201":
+          description: Organisasi dibuat; pembuat jadi admin; peta sekolah dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: getOrg
+      responses:
+        "200":
+          description: Detail organisasi dan role pemanggil
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/invites:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listInvites
+      description: Undangan aktif (belum kedaluwarsa, dicabut, atau habis), terbaru dulu.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Daftar undangan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createInvite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateInviteRequest" }
+      responses:
+        "201":
+          description: Undangan dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invite" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/invites/{invite_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: invite_id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      operationId: revokeInvite
+      responses:
+        "204": { description: "Undangan dicabut" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/invites/{code}:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    get:
+      operationId: previewInvite
+      responses:
+        "200":
+          description: Nama organisasi dan role
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitePreview" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/invites/{code}/accept:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    post:
+      operationId: acceptInvite
+      responses:
+        "200":
+          description: Bergabung ke organisasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Membership" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    OrgID:
+      name: org_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    InviteCode:
+      name: code
+      in: path
+      required: true
+      description: Tidak peka huruf besar; `-` dan spasi diabaikan.
+      schema: { type: string }
+
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ValidationFailed:
+      description: validation_failed, detail di error.fields
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Unauthenticated:
+      description: unauthenticated
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: forbidden atau profile_incomplete
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    NotFound:
+      description: not_found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Conflict:
+      description: conflict
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    InviteExpired:
+      description: invite_expired (kedaluwarsa, dicabut, atau kuota habis)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    RateLimited:
+      description: rate_limited; lihat header Retry-After
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    AccessToken:
+      description: Access token; cookie kv_refresh disetel
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AccessTokenResponse" }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields:
+              type: object
+              additionalProperties: { type: string }
+
+    AccessTokenResponse:
+      type: object
+      required: [access_token]
+      properties:
+        access_token: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, display_name, birth_date]
+      properties:
+        email: { type: string }
+        password: { type: string }
+        display_name: { type: string }
+        birth_date: { type: string, format: date }
+    VerifyEmailRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email: { type: string }
+        code: { type: string }
+    EmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    Role:
+      type: string
+      enum: [admin, teacher, participant]
+    InviteRole:
+      type: string
+      enum: [teacher, participant]
+
+    OrgSummary:
+      type: object
+      required: [id, name, slug, role]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+
+    Me:
+      type: object
+      required: [id, email, display_name, birth_date, avatar_key, needs_profile, orgs]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        display_name: { type: string }
+        birth_date: { type: string, format: date, nullable: true }
+        avatar_key: { type: string }
+        needs_profile: { type: boolean }
+        orgs:
+          type: array
+          items: { $ref: "#/components/schemas/OrgSummary" }
+    UpdateMeRequest:
+      type: object
+      properties:
+        display_name: { type: string }
+        birth_date: { type: string, format: date }
+
+    CreateOrgRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 80 }
+        slug: { type: string, pattern: "^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])$" }
+        logo_url: { type: string, nullable: true, description: "URL https opsional" }
+    Organization:
+      type: object
+      required: [id, name, slug, logo_url, role, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        logo_url: { type: string, nullable: true }
+        role: { $ref: "#/components/schemas/Role" }
+        created_at: { type: string, format: date-time }
+
+    CreateInviteRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: "#/components/schemas/InviteRole" }
+        expires_in_days: { type: integer, minimum: 1, maximum: 7, default: 7 }
+        max_uses: { type: integer, minimum: 1, maximum: 500, nullable: true }
+    Invite:
+      type: object
+      required: [id, code, link, role, max_uses, used_count, expires_at, created_by, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, description: Bentuk tampilan ABCD-EFGH }
+        link: { type: string }
+        role: { $ref: "#/components/schemas/InviteRole" }
+        max_uses: { type: integer, nullable: true }
+        used_count: { type: integer }
+        expires_at: { type: string, format: date-time }
+        created_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+    InviteList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Invite" }
+        next_cursor: { type: string, nullable: true }
+    InvitePreview:
+      type: object
+      required: [org_name, role]
+      properties:
+        org_name: { type: string }
+        role: { $ref: "#/components/schemas/InviteRole" }
+    Membership:
+      type: object
+      required: [org_id, user_id, role, joined_at]
+      properties:
+        org_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        role: { $ref: "#/components/schemas/Role" }
+        joined_at: { type: string, format: date-time }

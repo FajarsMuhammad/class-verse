@@ -106,6 +106,8 @@ classverse-frontend/
 
 **Endpoint operasional.** `GET /healthz` selalu `{"status":"ok"}` selama proses hidup; `GET /readyz` mem-ping database dan mengembalikan 503 `unavailable` jika gagal. Keduanya di luar `/api` dan tanpa auth.
 
+**Log request.** Satu baris per request dengan pola route chi (misalnya `/api/invites/{code}`), bukan path mentah, dan tanpa query string atau header, sehingga kode undangan, token, dan data pribadi tidak masuk log.
+
 **IP klien.** Router memakai `middleware.ClientIPFromXFF` (bukan `RealIP` yang rentan spoofing): `X-Forwarded-For` hanya dipercaya dari peer di loopback atau jaringan privat (Caddy di VPS yang sama). IP dibaca dengan `middleware.GetClientIP`, misalnya untuk rate limit login.
 
 Aturan konsistensi: nama package satu kata dan sesuai domain, error dibungkus dengan `fmt.Errorf("...: %w", err)`, dan semua handler mengembalikan error lewat satu helper di `httpx`.
@@ -384,7 +386,7 @@ Catatan desain: status ruang terkunci dan daftar peserta di-mute hanya hidup di 
 
 ## API contract
 
-Kontrak REST ditulis lebih dulu di `api/openapi.yaml` (lokasi di monorepo masih pertanyaan terbuka, lihat bagian Berikutnya); tipe TypeScript di-generate dengan `openapi-typescript`, dan tipe Go (model saja) dengan `oapi-codegen`, sehingga frontend dan backend memakai satu sumber kebenaran.
+Kontrak REST ditulis lebih dulu di `classverse-backend/api/openapi.yaml`. Tipe TypeScript di-generate dengan `openapi-typescript` ke `classverse-frontend/src/api/schema.d.ts` dari path relatif `../classverse-backend/api/openapi.yaml` (setelah repo dipisah: URL atau artefak rilis), dan tipe Go (model saja) dengan `oapi-codegen` ke `internal/platform/api/`, sehingga frontend dan backend memakai satu sumber kebenaran. Hasil generate tidak diedit manual.
 
 **Konvensi**
 
@@ -439,6 +441,17 @@ Kontrak REST ditulis lebih dulu di `api/openapi.yaml` (lokasi di monorepo masih 
 
 Sesi ruang tidak punya endpoint start/stop: sesi dibuka otomatis saat orang pertama masuk lewat WebSocket dan ditutup setelah ruang kosong selama 5 menit.
 
+**Organisasi dan undangan (slice 2).**
+
+- Membuat organisasi: email terverifikasi, tanggal lahir terisi, dan usia minimal 18 tahun; selain itu 403 `forbidden`. Pengguna di bawah 18 tahun hanya masuk lewat undangan sekolah (Keamanan 7). Bergabung lewat undangan boleh untuk semua usia, tetapi tanggal lahir wajib terisi (403 `profile_incomplete`). Usia dihitung dari tanggal UTC hari ini.
+- Nama organisasi 3–80 karakter. Slug dibuat dari nama dan bisa diubah: `^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])$`, unik (409 `conflict`). Logo hanya `logo_url` https opsional; unggah file ditunda.
+- Organisasi, membership admin pembuat, dan room peta sekolah (`map_key='campus'`, nama "Peta sekolah", kapasitas 200) dibuat dalam satu transaksi.
+- Kode undangan 8 karakter dari `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (`crypto/rand`), ditampilkan `ABCD-EFGH`; input tidak peka huruf besar dan mengabaikan `-`/spasi. Link: `FRONTEND_URL/gabung/{code}`.
+- Undangan berisi `role` (`teacher`/`participant`), `expires_in_days` 1–7 (default 7), `max_uses` opsional 1–500. Pengajar hanya membuat undangan `participant` dan hanya mencabut undangan buatannya; admin mencabut semua.
+- Kode tidak ada → 404 `not_found`; kedaluwarsa, dicabut, atau kuota habis → 410 `invite_expired`; sudah anggota → 409 `conflict` tanpa mengubah role atau kuota. Pratinjau hanya berisi nama organisasi dan role. Pratinjau dan accept dibatasi 10/menit per user.
+- Non-anggota mendapat 404 `not_found` untuk resource organisasi (tidak membocorkan keberadaannya); anggota dengan role kurang 403 `forbidden`. Role dibaca dari database setiap request.
+- `GET /api/me` mengembalikan `orgs: [{id, name, slug, role}]`. Frontend menyimpan id organisasi aktif di `localStorage` (bukan data pribadi); server tetap memeriksa membership.
+
 Contoh potongan OpenAPI untuk satu endpoint:
 
 ```yaml
@@ -469,5 +482,5 @@ Status Fase 3: kerangka repo selesai (lihat `docs/tasks/phase-3.md`).
 
 Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhkannya:
 
-- [ ] Lokasi `openapi.yaml` (dibutuhkan mulai slice 2). Usulan: `classverse-backend/api/openapi.yaml` sebagai sumber, frontend men-generate tipe dari file itu (path relatif di monorepo, URL/artefak setelah repo dipisah).
+- [x] Lokasi `openapi.yaml`: `classverse-backend/api/openapi.yaml` (diputuskan untuk slice 2, lihat API contract).
 - [ ] Cara frontend mendapat file peta Tiled (dibutuhkan mulai slice 3). Server membaca `maps/` untuk collision dan zona, Phaser juga butuh file yang sama untuk render. Usulan: backend menyajikan `GET /api/maps/{map_key}` dari `maps/`, sehingga satu sumber dan tetap jalan setelah repo dipisah.
