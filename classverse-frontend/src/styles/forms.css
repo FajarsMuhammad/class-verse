@@ -1,0 +1,96 @@
+/* Shared form and button classes for the app shell. Values come from tokens.css. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.btn-primary,
+.btn-secondary {
+  min-height: 48px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-lg);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.btn-primary {
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+
+.btn-secondary {
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.link:focus-visible {
+  outline: 3px solid var(--color-primary-strong);
+  outline-offset: 2px;
+}
+
+.link {
+  color: var(--color-primary-strong);
+  font-weight: var(--weight-bold);
+}
+
+.alert {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+  font-size: var(--text-md);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: var(--color-border-soft);
+}
+
+.footnote {
+  margin: var(--space-6) 0 0;
+  text-align: center;
+  font-size: var(--text-md);
+  color: var(--color-ink-muted);
+}

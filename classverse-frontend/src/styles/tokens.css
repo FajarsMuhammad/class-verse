@@ -1,0 +1,110 @@
+/*
+ * Kelasverse design tokens.
+ * Source of truth for colors, type, radius, spacing. Components use these variables only;
+ * never hard-code hex values in components.
+ * Fonts are self-hosted (SIL OFL), see ../assets/fonts.
+ */
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('../assets/fonts/Nunito-Variable.ttf') format('truetype');
+  font-weight: 200 1000;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fredoka';
+  src: url('../assets/fonts/Fredoka-Variable.ttf') format('truetype');
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+:root {
+  /* Brand */
+  --color-primary: #4f46e5; /* Nila: primary actions, own chat bubble, active nav */
+  --color-primary-strong: #3730a3; /* text on primary-soft, hover */
+  --color-primary-soft: #e7e5ff; /* teacher badge, broadcast banner, active tab */
+  --color-accent: #f5a524; /* Mangga: zones, highlights */
+  --color-accent-soft: #fdebc8; /* active zone chip, schedule badge */
+  --color-accent-ink: #7a4b00; /* text on accent-soft */
+  --color-accent-line: #d18e1a; /* dashed zone outline */
+
+  /* Neutrals */
+  --color-ink: #23203a; /* Tinta: main text, mic button */
+  --color-ink-muted: #5a5672; /* secondary text (passes 4.5:1 on white and bg) */
+  --color-bg: #f7f5ff; /* Kabut: app background */
+  --color-surface: #ffffff;
+  --color-surface-alt: #f1effb; /* other people's chat bubbles, inactive tabs */
+  --color-border: #d6d1ee; /* secondary button border */
+  --color-border-soft: #ece9f7; /* dividers */
+  --color-input-border: #e3dff5;
+
+  /* Status */
+  --color-live-soft: #d7f3e5; /* "Live" badge background */
+  --color-live-ink: #0f5b3e; /* "Live" badge text */
+  --color-speaking: #2fb58a; /* speaking ring around avatar */
+
+  /* Map palette (Phaser tiles and map previews) */
+  --map-grass: #cdefd9;
+  --map-grass-dark: #9ed9b4;
+  --map-path: #f3e3c7;
+  --map-wood: #c9a877;
+  --map-water: #d9e8fb;
+  --map-carpet: #fbdce3;
+  --map-board: #2f5d50;
+
+  /* Building roofs on the campus map */
+  --roof-classroom: #4f46e5;
+  --roof-library: #2f5d50;
+  --roof-hall: #f06a5f;
+  --roof-canteen: #f5a524;
+  --roof-staff: #5a5672;
+
+  /* Typography */
+  --font-display: 'Fredoka', system-ui, sans-serif; /* headings, room and building names */
+  --font-body: 'Nunito', system-ui, sans-serif; /* everything else */
+  --text-xs: 12px; /* name tags on the map */
+  --text-sm: 13px; /* meta, sender names */
+  --text-md: 15px; /* chat messages, list items (minimum for body copy) */
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px; /* screen titles in headers */
+  --text-2xl: 24px; /* section headings */
+  --text-3xl: 34px; /* page titles */
+  --text-4xl: 44px; /* wordmark */
+  --weight-regular: 400;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --line-tight: 1.1;
+  --line-normal: 1.4;
+  --line-relaxed: 1.5;
+
+  /* Shape */
+  --radius-sm: 10px;
+  --radius-md: 14px; /* buttons, inputs */
+  --radius-lg: 16px;
+  --radius-xl: 20px; /* cards on mobile */
+  --radius-2xl: 24px; /* cards, panels, map frame */
+  --radius-pill: 999px;
+  --shadow-raise: 0 6px 0 rgba(35, 32, 58, 0.12); /* buildings and floating labels only */
+
+  /* Spacing (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+
+  /* Interaction */
+  --touch-min: 44px; /* minimum height/width of anything tappable */
+}
+
+html {
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  background: var(--color-bg);
+}

@@ -1,0 +1,7 @@
+# Models only; handlers are written by hand on chi (docs/design.md, API contract).
+package: api
+output: internal/platform/api/models.gen.go
+generate:
+  models: true
+output-options:
+  skip-prune: true

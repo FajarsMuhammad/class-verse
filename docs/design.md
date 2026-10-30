@@ -33,13 +33,29 @@ Browser  --WebRTC audio--> LiveKit (M2)
 
 Browser hanya bicara ke satu domain lewat Caddy; audio voice di M2 mengalir langsung antara browser dan LiveKit, sementara server Go hanya menerbitkan token dan memanggil API LiveKit untuk mute dan kick.
 
+## Struktur repo
+
+Monorepo dengan dua project yang berdiri sendiri agar nanti bisa dipisah menjadi dua repo (ADR-010). Keduanya tidak saling mengimpor file; kontraknya hanya HTTP API, protokol WebSocket, dan dokumen di `docs/`.
+
+```
+class-verse/
+├── docs/                     # spec, design, visual, screens, tasks (bersama)
+├── CLAUDE.md
+├── classverse-backend/       # Go module github.com/FajarsMuhammad/class-verse/classverse-backend
+└── classverse-frontend/      # Vue 3 + Vite + Phaser
+```
+
+Dev lokal: server Go jalan di host (`make run`, port 8080), Postgres dan Mailpit lewat `classverse-backend/compose.yaml`, dan Vite dev server (port 5173) mem-proxy `/api`, `/ws`, dan `/healthz` ke server Go sehingga browser tetap melihat satu origin, sama seperti di belakang Caddy saat produksi.
+
 ## Struktur package Go
 
 Setiap fitur adalah satu package dengan tiga lapis yang konsisten: `handler` (HTTP/WS), `service` (aturan bisnis), dan `store` (akses database). Package fitur tidak saling mengimpor store milik fitur lain; komunikasi lewat interface service.
 
 ```
-kelasverse/
-├── cmd/server/main.go        # wiring: config, db, router, room manager
+classverse-backend/
+├── cmd/server/
+│   ├── main.go               # wiring: config, db, router, room manager; graceful shutdown
+│   └── router.go             # chi + middleware, /healthz, /readyz
 ├── internal/
 │   ├── auth/                 # login, Google OAuth, JWT, refresh token
 │   │   ├── handler.go
@@ -60,14 +76,39 @@ kelasverse/
 │   └── platform/             # hal lintas fitur yang kecil saja
 │       ├── config/
 │       ├── db/               # pool pgx, transaksi
+│       │   └── query/        # hasil generate sqlc (jangan diedit)
 │       ├── httpx/            # error response, middleware
 │       └── logx/             # slog setup
 ├── db/
 │   ├── migrations/           # goose
 │   └── queries/              # sqlc
 ├── maps/                     # file Tiled (.tmj)
-└── web/                      # Vue + Phaser
+├── compose.yaml              # Postgres + Mailpit untuk dev
+├── Makefile                  # up, down, migrate, sqlc, run, test, lint
+└── sqlc.yaml
 ```
+
+Struktur frontend:
+
+```
+classverse-frontend/
+├── src/
+│   ├── api/                  # pemanggil REST (fetch), satu file per fitur
+│   ├── assets/avatars/       # avatar preset (SVG)
+│   ├── assets/fonts/         # Fredoka, Nunito (SIL OFL, self-hosted)
+│   ├── realtime/             # klien WebSocket; messages.ts mencerminkan internal/realtime/message.go
+│   ├── router/
+│   ├── stores/               # Pinia (access token hanya di memory)
+│   ├── styles/tokens.css     # design token, satu-satunya sumber warna/font/ukuran
+│   └── views/
+└── vite.config.ts            # proxy dev ke :8080
+```
+
+**Endpoint operasional.** `GET /healthz` selalu `{"status":"ok"}` selama proses hidup; `GET /readyz` mem-ping database dan mengembalikan 503 `unavailable` jika gagal. Keduanya di luar `/api` dan tanpa auth.
+
+**Log request.** Satu baris per request dengan pola route chi (misalnya `/api/invites/{code}`), bukan path mentah, dan tanpa query string atau header, sehingga kode undangan, token, dan data pribadi tidak masuk log.
+
+**IP klien.** Router memakai `middleware.ClientIPFromXFF` (bukan `RealIP` yang rentan spoofing): `X-Forwarded-For` hanya dipercaya dari peer di loopback atau jaringan privat (Caddy di VPS yang sama). IP dibaca dengan `middleware.GetClientIP`, misalnya untuk rate limit login.
 
 Aturan konsistensi: nama package satu kata dan sesuai domain, error dibungkus dengan `fmt.Errorf("...: %w", err)`, dan semua handler mengembalikan error lewat satu helper di `httpx`.
 
@@ -130,7 +171,7 @@ Access token berumur pendek di memory browser, refresh token panjang di cookie H
 | Token | Bentuk | Umur | Disimpan di |
 | --- | --- | --- | --- |
 | Access token | JWT, ditandatangani Ed25519 | 15 menit | Memory frontend (state Pinia), bukan localStorage |
-| Refresh token | String acak 32 byte (opaque) | 30 hari, geser saat dipakai | Cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`; di database hanya hash SHA-256 |
+| Refresh token | String acak 32 byte (opaque) | 30 hari, geser saat dipakai | Cookie `kv_refresh` dengan `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`; di database hanya hash SHA-256 |
 
 Claim JWT dibuat minimal: `sub` (user id), `iat`, `exp`, `jti`. Role tidak dimasukkan ke token karena role berbeda per organisasi dan bisa dicabut kapan saja; role dicek dari database (dengan cache singkat) pada setiap request yang butuh otorisasi.
 
@@ -139,7 +180,7 @@ Claim JWT dibuat minimal: `sub` (user id), `iat`, `exp`, `jti`. Role tidak dimas
 **Login Google (Authorization Code + PKCE)**
 
 1. Frontend memanggil `GET /api/auth/google/start`.
-2. Server membuat `state` dan `code_verifier`, menyimpannya di cookie singkat (10 menit), lalu redirect ke Google.
+2. Server membuat `state` dan `code_verifier`, menyimpannya di cookie `kv_oauth` (`HttpOnly; Secure; SameSite=Lax; Path=/api/auth/google`, 10 menit; `Lax` agar ikut terkirim saat Google me-redirect kembali), lalu redirect ke Google.
 3. Google redirect ke `GET /api/auth/google/callback?code=...&state=...`.
 4. Server mencocokkan `state`, menukar `code` dengan token Google, lalu memverifikasi ID token (`iss`, `aud`, `exp`, `email_verified`) memakai `coreos/go-oidc`.
 5. Server mencari user berdasarkan `google_sub`; jika belum ada, mencocokkan email terverifikasi untuk menautkan akun, atau membuat user baru.
@@ -154,7 +195,8 @@ User baru dari Google tetap wajib mengisi tanggal lahir sebelum bisa bergabung k
 | Method | Path | Fungsi |
 | --- | --- | --- |
 | POST | `/api/auth/register` | Daftar dengan email + password |
-| POST | `/api/auth/verify-email` | Verifikasi OTP |
+| POST | `/api/auth/verify-email` | Verifikasi OTP, langsung login |
+| POST | `/api/auth/resend-otp` | Kirim ulang OTP (selalu 202, cooldown 60 detik) |
 | POST | `/api/auth/login` | Login email, menyetel cookie refresh |
 | GET | `/api/auth/google/start` | Mulai OAuth Google |
 | GET | `/api/auth/google/callback` | Callback OAuth Google |
@@ -181,6 +223,7 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-007 | JSON untuk protokol WS | Mudah di-debug selama MVP | Bandwidth `snapshot` jadi masalah |
 | ADR-008 | `sqlc` + `pgx`, bukan GORM | Query eksplisit, performa terprediksi, konsisten dengan prinsip kode sederhana | — |
 | ADR-009 | Peta sekolah adalah room biasa (`map_key = campus`) dengan area of interest | Memakai ulang hub dan protokol yang sama, tanpa service terpisah | Satu sekolah butuh lebih dari 200 orang di peta bersamaan |
+| ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
 
 ## Data model
 
@@ -343,7 +386,7 @@ Catatan desain: status ruang terkunci dan daftar peserta di-mute hanya hidup di 
 
 ## API contract
 
-Kontrak REST ditulis lebih dulu di `api/openapi.yaml`; tipe TypeScript di-generate dengan `openapi-typescript`, dan tipe Go (model saja) dengan `oapi-codegen`, sehingga frontend dan backend memakai satu sumber kebenaran.
+Kontrak REST ditulis lebih dulu di `classverse-backend/api/openapi.yaml`. Tipe TypeScript di-generate dengan `openapi-typescript` ke `classverse-frontend/src/api/schema.d.ts` dari path relatif `../classverse-backend/api/openapi.yaml` (setelah repo dipisah: URL atau artefak rilis), dan tipe Go (model saja) dengan `oapi-codegen` ke `internal/platform/api/`, sehingga frontend dan backend memakai satu sumber kebenaran. Hasil generate tidak diedit manual.
 
 **Konvensi**
 
@@ -365,6 +408,8 @@ Kontrak REST ditulis lebih dulu di `api/openapi.yaml`; tipe TypeScript di-genera
 | 409 | `conflict` | Slug terpakai, sudah menjadi anggota |
 | 410 | `invite_expired` | Undangan kedaluwarsa atau dicabut |
 | 429 | `rate_limited` | Melewati batas request |
+| 500 | `internal_error` | Error tak terduga; detail hanya di log server, tidak ke client |
+| 503 | `unavailable` | Dependensi (database) belum siap, dipakai `/readyz` |
 
 **Endpoint**
 
@@ -396,6 +441,17 @@ Kontrak REST ditulis lebih dulu di `api/openapi.yaml`; tipe TypeScript di-genera
 
 Sesi ruang tidak punya endpoint start/stop: sesi dibuka otomatis saat orang pertama masuk lewat WebSocket dan ditutup setelah ruang kosong selama 5 menit.
 
+**Organisasi dan undangan (slice 2).**
+
+- Membuat organisasi: email terverifikasi, tanggal lahir terisi, dan usia minimal 18 tahun; selain itu 403 `forbidden`. Pengguna di bawah 18 tahun hanya masuk lewat undangan sekolah (Keamanan 7). Bergabung lewat undangan boleh untuk semua usia, tetapi tanggal lahir wajib terisi (403 `profile_incomplete`). Usia dihitung dari tanggal UTC hari ini.
+- Nama organisasi 3–80 karakter. Slug dibuat dari nama dan bisa diubah: `^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])$`, unik (409 `conflict`). Logo hanya `logo_url` https opsional; unggah file ditunda.
+- Organisasi, membership admin pembuat, dan room peta sekolah (`map_key='campus'`, nama "Peta sekolah", kapasitas 200) dibuat dalam satu transaksi.
+- Kode undangan 8 karakter dari `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (`crypto/rand`), ditampilkan `ABCD-EFGH`; input tidak peka huruf besar dan mengabaikan `-`/spasi. Link: `FRONTEND_URL/gabung/{code}`.
+- Undangan berisi `role` (`teacher`/`participant`), `expires_in_days` 1–7 (default 7), `max_uses` opsional 1–500. Pengajar hanya membuat undangan `participant` dan hanya mencabut undangan buatannya; admin mencabut semua.
+- Kode tidak ada → 404 `not_found`; kedaluwarsa, dicabut, atau kuota habis → 410 `invite_expired`; sudah anggota → 409 `conflict` tanpa mengubah role atau kuota. Pratinjau hanya berisi nama organisasi dan role. Pratinjau dan accept dibatasi 10/menit per user.
+- Non-anggota mendapat 404 `not_found` untuk resource organisasi (tidak membocorkan keberadaannya); anggota dengan role kurang 403 `forbidden`. Role dibaca dari database setiap request.
+- `GET /api/me` mengembalikan `orgs: [{id, name, slug, role}]`. Frontend menyimpan id organisasi aktif di `localStorage` (bukan data pribadi); server tetap memeriksa membership.
+
 Contoh potongan OpenAPI untuk satu endpoint:
 
 ```yaml
@@ -421,3 +477,10 @@ Status Fase 2:
 - [x] Data model: ERD + skema PostgreSQL (user, organisasi, membership, undangan, ruang, sesi, pesan, refresh token, log moderasi)
 - [x] API contract: OpenAPI untuk endpoint REST di luar auth
 - [x] Desain visual: style guide, konsep avatar, tile map, wireframe (termasuk mode HP)
+
+Status Fase 3: kerangka repo selesai (lihat `docs/tasks/phase-3.md`).
+
+Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhkannya:
+
+- [x] Lokasi `openapi.yaml`: `classverse-backend/api/openapi.yaml` (diputuskan untuk slice 2, lihat API contract).
+- [ ] Cara frontend mendapat file peta Tiled (dibutuhkan mulai slice 3). Server membaca `maps/` untuk collision dan zona, Phaser juga butuh file yang sama untuk render. Usulan: backend menyajikan `GET /api/maps/{map_key}` dari `maps/`, sehingga satu sumber dan tetap jalan setelah repo dipisah.
