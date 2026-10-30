@@ -169,7 +169,7 @@ Access token berumur pendek di memory browser, refresh token panjang di cookie H
 | Token | Bentuk | Umur | Disimpan di |
 | --- | --- | --- | --- |
 | Access token | JWT, ditandatangani Ed25519 | 15 menit | Memory frontend (state Pinia), bukan localStorage |
-| Refresh token | String acak 32 byte (opaque) | 30 hari, geser saat dipakai | Cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`; di database hanya hash SHA-256 |
+| Refresh token | String acak 32 byte (opaque) | 30 hari, geser saat dipakai | Cookie `kv_refresh` dengan `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`; di database hanya hash SHA-256 |
 
 Claim JWT dibuat minimal: `sub` (user id), `iat`, `exp`, `jti`. Role tidak dimasukkan ke token karena role berbeda per organisasi dan bisa dicabut kapan saja; role dicek dari database (dengan cache singkat) pada setiap request yang butuh otorisasi.
 
@@ -178,7 +178,7 @@ Claim JWT dibuat minimal: `sub` (user id), `iat`, `exp`, `jti`. Role tidak dimas
 **Login Google (Authorization Code + PKCE)**
 
 1. Frontend memanggil `GET /api/auth/google/start`.
-2. Server membuat `state` dan `code_verifier`, menyimpannya di cookie singkat (10 menit), lalu redirect ke Google.
+2. Server membuat `state` dan `code_verifier`, menyimpannya di cookie `kv_oauth` (`HttpOnly; Secure; SameSite=Lax; Path=/api/auth/google`, 10 menit; `Lax` agar ikut terkirim saat Google me-redirect kembali), lalu redirect ke Google.
 3. Google redirect ke `GET /api/auth/google/callback?code=...&state=...`.
 4. Server mencocokkan `state`, menukar `code` dengan token Google, lalu memverifikasi ID token (`iss`, `aud`, `exp`, `email_verified`) memakai `coreos/go-oidc`.
 5. Server mencari user berdasarkan `google_sub`; jika belum ada, mencocokkan email terverifikasi untuk menautkan akun, atau membuat user baru.
@@ -193,7 +193,8 @@ User baru dari Google tetap wajib mengisi tanggal lahir sebelum bisa bergabung k
 | Method | Path | Fungsi |
 | --- | --- | --- |
 | POST | `/api/auth/register` | Daftar dengan email + password |
-| POST | `/api/auth/verify-email` | Verifikasi OTP |
+| POST | `/api/auth/verify-email` | Verifikasi OTP, langsung login |
+| POST | `/api/auth/resend-otp` | Kirim ulang OTP (selalu 202, cooldown 60 detik) |
 | POST | `/api/auth/login` | Login email, menyetel cookie refresh |
 | GET | `/api/auth/google/start` | Mulai OAuth Google |
 | GET | `/api/auth/google/callback` | Callback OAuth Google |

@@ -5,7 +5,7 @@ export
 MIGRATIONS := db/migrations
 GOOSE      := go tool goose -dir $(MIGRATIONS)
 
-.PHONY: up down migrate migrate-down migrate-new sqlc run test lint
+.PHONY: up down migrate migrate-down migrate-new sqlc run test lint keys
 
 up: ## Start Postgres and Mailpit, wait until Postgres is healthy
 	docker compose up -d --wait
@@ -29,8 +29,12 @@ sqlc: ## Generate Go code from db/queries
 run: ## Run the server on the host
 	go run ./cmd/server
 
-test: ## Run all tests
+test: ## Run all tests (PostgreSQL integration tests need TEST_DATABASE_URL)
 	go test -race ./...
 
 lint: ## Run golangci-lint
 	golangci-lint run ./...
+
+keys: ## Print random values for JWT_PRIVATE_KEY and OTP_HMAC_KEY
+	@echo "JWT_PRIVATE_KEY=$$(openssl rand -base64 32)"
+	@echo "OTP_HMAC_KEY=$$(openssl rand -base64 32)"

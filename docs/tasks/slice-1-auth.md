@@ -136,14 +136,16 @@ dan `S256ChallengeOption` untuk PKCE), `coreos/go-oidc/v3`. Jangan menambah libr
 
 ## Selesai jika
 
-- [ ] Daftar → OTP muncul di Mailpit (http://localhost:8025) → verifikasi → langsung masuk.
-- [ ] Login email, logout, login lagi.
+- [x] Daftar → OTP muncul di Mailpit (http://localhost:8025) → verifikasi → langsung masuk.
+- [x] Login email, logout, login lagi.
 - [ ] Login Google dengan OAuth client mode testing berhasil, termasuk user baru yang diarahkan ke lengkapi profil.
-- [ ] Reload halaman tetap login; dua tab terbuka tidak saling mengeluarkan.
-- [ ] Memakai refresh token lama secara manual (curl) mencabut sesi.
-- [ ] Rate limit login terlihat bekerja (percobaan ke-6 dalam semenit → 429).
-- [ ] `docs/design.md` diperbarui dengan `resend-otp` dan nama cookie.
-- [ ] `make test` dan `make lint` lulus.
+  Alur sudah diuji otomatis dengan fake OIDC provider; uji dengan Google asli butuh `GOOGLE_*` di `.env`.
+- [x] Reload halaman tetap login; dua tab terbuka tidak saling mengeluarkan.
+- [x] Memakai refresh token lama secara manual (curl) mencabut sesi.
+- [x] Rate limit login terlihat bekerja (percobaan ke-6 dalam semenit → 429).
+- [x] `docs/design.md` diperbarui dengan `resend-otp` dan nama cookie.
+- [x] `make test` dan `make lint` lulus.
+- [ ] Review manusia sebelum slice 2.
 
 Catatan setup Google: buat OAuth client tipe "Web application" di Google Cloud Console dengan redirect URI
 `http://localhost:5173/api/auth/google/callback` (lewat proxy Vite), lalu isi tiga variabel `GOOGLE_*` di `.env`.

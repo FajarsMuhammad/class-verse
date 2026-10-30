@@ -12,9 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/config"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/logx"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/mail"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -42,9 +47,17 @@ func run() error {
 	}
 	defer pool.Close()
 
+	authHandler, err := newAuth(ctx, cfg, pool, log)
+	if err != nil {
+		return err
+	}
+	api := func(r chi.Router) {
+		authHandler.Routes(r)
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           newRouter(log, pool),
+		Handler:           newRouter(log, pool, api),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// No global WriteTimeout: WebSocket connections are long-lived.
@@ -74,4 +87,28 @@ func run() error {
 	}
 	log.Info("server stopped")
 	return nil
+}
+
+func newAuth(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (*auth.Handler, error) {
+	now := func() time.Time { return time.Now().UTC() }
+	mailer, err := mail.NewSMTPSender(cfg.SMTPAddr, cfg.SMTPFrom)
+	if err != nil {
+		return nil, err
+	}
+	tokens := auth.NewTokens(cfg.JWTPrivateKey, now)
+	svc, err := auth.NewService(auth.NewStore(pool), tokens, mailer, cfg.OTPHMACKey, now, log)
+	if err != nil {
+		return nil, err
+	}
+	var google auth.Google
+	if cfg.Google.Enabled() {
+		gc, err := auth.NewGoogleClientForGoogle(ctx, cfg.Google.ClientID, cfg.Google.ClientSecret, cfg.Google.RedirectURL)
+		if err != nil {
+			return nil, fmt.Errorf("google login: %w", err)
+		}
+		google = gc
+	} else {
+		log.Warn("google login disabled: GOOGLE_* not set")
+	}
+	return auth.NewHandler(svc, tokens, google, cfg.FrontendURL, now, log), nil
 }

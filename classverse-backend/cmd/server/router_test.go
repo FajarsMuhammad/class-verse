@@ -31,7 +31,7 @@ func TestRouterHealth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log := slog.New(slog.NewTextHandler(io.Discard, nil))
-			h := newRouter(log, fakePinger{err: tt.pingErr})
+			h := newRouter(log, fakePinger{err: tt.pingErr}, nil)
 			rec := httptest.NewRecorder()
 
 			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tt.path, http.NoBody))

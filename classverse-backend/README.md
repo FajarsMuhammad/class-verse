@@ -13,6 +13,7 @@ Desain dan aturan ada di `../docs/` dan `../CLAUDE.md`.
 
 ```sh
 cp .env.example .env
+make keys            # salin dua baris hasilnya ke .env (JWT_PRIVATE_KEY, OTP_HMAC_KEY)
 make up && make migrate && make sqlc && make run
 
 curl localhost:8080/healthz   # {"status":"ok"}
@@ -37,5 +38,18 @@ Jika port 5432, 1025, atau 8025 sudah dipakai di mesinmu, ubah `POSTGRES_PORT`, 
 | `make run` | Jalankan server di host |
 | `make test` | Semua test (dengan `-race`) |
 | `make lint` | golangci-lint |
+| `make keys` | Cetak nilai acak untuk `JWT_PRIVATE_KEY` dan `OTP_HMAC_KEY` |
 
 Semua target membaca variabel dari `.env`.
+
+## Test integrasi PostgreSQL
+
+Test store dan service auth memakai PostgreSQL asli. `dbtest.New` membuat database sementara
+(`kv_test_*`), menjalankan semua migration, lalu menghapusnya. Test ini di-skip jika `TEST_DATABASE_URL`
+kosong; nilainya sudah ada di `.env.example` (user `kelasverse` dari compose boleh membuat database).
+
+## Login Google
+
+Opsional di dev. Buat OAuth client tipe "Web application" di Google Cloud Console dengan redirect URI
+`http://localhost:5173/api/auth/google/callback` (lewat proxy Vite), lalu isi ketiga `GOOGLE_*` di `.env`.
+Jika kosong, tombol Google mengarah kembali ke halaman masuk dengan pesan "belum diaktifkan".

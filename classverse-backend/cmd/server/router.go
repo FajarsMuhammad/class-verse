@@ -22,7 +22,7 @@ type pinger interface {
 	Ping(ctx context.Context) error
 }
 
-func newRouter(log *slog.Logger, db pinger) http.Handler {
+func newRouter(log *slog.Logger, db pinger, api func(chi.Router)) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	// Replaces the deprecated middleware.RealIP, which trusts client-supplied
@@ -47,5 +47,8 @@ func newRouter(log *slog.Logger, db pinger) http.Handler {
 		return nil
 	}))
 
+	if api != nil {
+		r.Route("/api", api)
+	}
 	return r
 }

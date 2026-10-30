@@ -8,6 +8,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -188,8 +189,8 @@ func (ns NullReportStatus) Value() (driver.Value, error) {
 
 type ChatMessage struct {
 	ID        int64
-	SessionID pgtype.UUID
-	SenderID  pgtype.UUID
+	SessionID uuid.UUID
+	SenderID  uuid.UUID
 	Scope     ChatScope
 	ZoneKey   pgtype.Text
 	Body      string
@@ -197,8 +198,8 @@ type ChatMessage struct {
 }
 
 type EmailOtp struct {
-	ID         pgtype.UUID
-	UserID     pgtype.UUID
+	ID         uuid.UUID
+	UserID     uuid.UUID
 	CodeHash   []byte
 	Attempts   int32
 	ExpiresAt  pgtype.Timestamptz
@@ -206,48 +207,48 @@ type EmailOtp struct {
 }
 
 type Invite struct {
-	ID        pgtype.UUID
-	OrgID     pgtype.UUID
+	ID        uuid.UUID
+	OrgID     uuid.UUID
 	Code      string
 	Role      OrgRole
 	MaxUses   pgtype.Int4
 	UsedCount int32
-	CreatedBy pgtype.UUID
+	CreatedBy uuid.UUID
 	ExpiresAt pgtype.Timestamptz
 	RevokedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
 }
 
 type Membership struct {
-	OrgID    pgtype.UUID
-	UserID   pgtype.UUID
+	OrgID    uuid.UUID
+	UserID   uuid.UUID
 	Role     OrgRole
 	JoinedAt pgtype.Timestamptz
 }
 
 type ModerationAction struct {
-	ID        pgtype.UUID
-	RoomID    pgtype.UUID
-	ActorID   pgtype.UUID
-	TargetID  pgtype.UUID
+	ID        uuid.UUID
+	RoomID    uuid.UUID
+	ActorID   uuid.UUID
+	TargetID  uuid.NullUUID
 	Action    ModAction
 	Reason    pgtype.Text
 	CreatedAt pgtype.Timestamptz
 }
 
 type Organization struct {
-	ID        pgtype.UUID
+	ID        uuid.UUID
 	Name      string
 	Slug      string
 	LogoUrl   pgtype.Text
-	CreatedBy pgtype.UUID
+	CreatedBy uuid.UUID
 	CreatedAt pgtype.Timestamptz
 }
 
 type RefreshToken struct {
-	ID        pgtype.UUID
-	UserID    pgtype.UUID
-	FamilyID  pgtype.UUID
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	FamilyID  uuid.UUID
 	TokenHash []byte
 	ExpiresAt pgtype.Timestamptz
 	UsedAt    pgtype.Timestamptz
@@ -256,49 +257,49 @@ type RefreshToken struct {
 }
 
 type Report struct {
-	ID           pgtype.UUID
-	OrgID        pgtype.UUID
-	RoomID       pgtype.UUID
-	ReporterID   pgtype.UUID
-	TargetUserID pgtype.UUID
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	RoomID       uuid.NullUUID
+	ReporterID   uuid.UUID
+	TargetUserID uuid.UUID
 	MessageID    pgtype.Int8
 	Reason       string
 	Status       ReportStatus
-	ReviewedBy   pgtype.UUID
+	ReviewedBy   uuid.NullUUID
 	ReviewedAt   pgtype.Timestamptz
 	CreatedAt    pgtype.Timestamptz
 }
 
 type Room struct {
-	ID             pgtype.UUID
-	OrgID          pgtype.UUID
+	ID             uuid.UUID
+	OrgID          uuid.UUID
 	Name           string
 	MapKey         string
 	BuildingKey    pgtype.Text
 	Capacity       int32
 	AllChatEnabled bool
 	ScheduledAt    pgtype.Timestamptz
-	CreatedBy      pgtype.UUID
+	CreatedBy      uuid.UUID
 	CreatedAt      pgtype.Timestamptz
 	ArchivedAt     pgtype.Timestamptz
 }
 
 type RoomSession struct {
-	ID        pgtype.UUID
-	RoomID    pgtype.UUID
+	ID        uuid.UUID
+	RoomID    uuid.UUID
 	StartedAt pgtype.Timestamptz
 	EndedAt   pgtype.Timestamptz
 }
 
 type SessionAttendance struct {
-	SessionID pgtype.UUID
-	UserID    pgtype.UUID
+	SessionID uuid.UUID
+	UserID    uuid.UUID
 	JoinedAt  pgtype.Timestamptz
 	LeftAt    pgtype.Timestamptz
 }
 
 type User struct {
-	ID              pgtype.UUID
+	ID              uuid.UUID
 	Email           string
 	EmailVerifiedAt pgtype.Timestamptz
 	PasswordHash    pgtype.Text
