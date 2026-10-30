@@ -70,7 +70,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
 func ToAPI(o Organization) api.Organization {
 	return api.Organization{
 		Id: o.ID, Name: o.Name, Slug: o.Slug, LogoUrl: o.LogoURL,
-		Role: api.Role(o.Role), CreatedAt: o.CreatedAt.UTC(),
+		Role: api.Role(o.Role), CampusRoomId: o.CampusRoomID, CreatedAt: o.CreatedAt.UTC(),
 	}
 }
 

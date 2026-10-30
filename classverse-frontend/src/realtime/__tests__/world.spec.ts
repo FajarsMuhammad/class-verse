@@ -1,0 +1,73 @@
+import { describe, expect, it } from 'vitest'
+
+import type { ServerMessage } from '../messages'
+import { RENDER_DELAY_MS, World } from '../world'
+
+const p = (id: string, x: number, y = 0) => ({
+  id,
+  name: id,
+  avatar: 'default',
+  role: 'participant',
+  x,
+  y,
+  dir: 'down' as const,
+})
+
+function welcomed() {
+  const w = new World()
+  w.apply(
+    {
+      t: 'welcome',
+      seq: 1,
+      d: { self_id: 'me', room_id: 'r', map_key: 'campus', participants: [p('me', 5), p('b', 0)] },
+    },
+    0,
+  )
+  return w
+}
+
+describe('World', () => {
+  it('separates self from others', () => {
+    const w = welcomed()
+    expect(w.self).toEqual({ x: 5, y: 0, dir: 'down' })
+    expect([...w.avatars.keys()]).toEqual(['b'])
+    expect(w.count).toBe(2)
+  })
+
+  it('interpolates between snapshots with a render delay', () => {
+    const w = welcomed()
+    w.apply(
+      {
+        t: 'snapshot',
+        seq: 2,
+        d: { p: [{ id: 'b', x: 100, y: 0, dir: 'right' }] },
+      } as ServerMessage,
+      100,
+    )
+    w.sample(50 + RENDER_DELAY_MS)
+    expect(w.avatars.get('b')!.x).toBeCloseTo(50)
+    w.sample(200 + RENDER_DELAY_MS)
+    expect(w.avatars.get('b')!.x).toBe(100)
+  })
+
+  it('hides avatars that leave the area of interest and snaps them back', () => {
+    const w = welcomed()
+    w.apply({ t: 'snapshot', seq: 2, d: { p: [], out: ['b'] } }, 100)
+    expect(w.avatars.get('b')!.hidden).toBe(true)
+    w.apply({ t: 'snapshot', seq: 3, d: { p: [{ id: 'b', x: 900, y: 0, dir: 'left' }] } }, 200)
+    const b = w.avatars.get('b')!
+    expect(b.hidden).toBe(false)
+    expect(b.x).toBe(900)
+  })
+
+  it('handles joined, left, and rejected moves', () => {
+    const w = welcomed()
+    w.apply({ t: 'joined', seq: 2, d: p('c', 1) }, 0)
+    w.apply({ t: 'joined', seq: 3, d: p('me', 1) }, 0)
+    w.apply({ t: 'left', seq: 4, d: { id: 'b' } }, 0)
+    expect([...w.avatars.keys()]).toEqual(['c'])
+    w.self!.x = 400
+    w.apply({ t: 'error', seq: 5, d: { code: 'move_rejected', message: '', x: 7, y: 8 } }, 0)
+    expect(w.self).toMatchObject({ x: 7, y: 8 })
+  })
+})

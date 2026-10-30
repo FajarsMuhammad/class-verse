@@ -48,12 +48,13 @@ func (e *ValidationError) Error() string { return errInvalidFields.Error() }
 
 // Organization is an organization as seen by one member.
 type Organization struct {
-	ID        uuid.UUID
-	Name      string
-	Slug      string
-	LogoURL   *string
-	Role      Role
-	CreatedAt time.Time
+	ID           uuid.UUID
+	Name         string
+	Slug         string
+	LogoURL      *string
+	Role         Role
+	CampusRoomID uuid.UUID
+	CreatedAt    time.Time
 }
 
 // Summary is one entry of the user's organization list.
@@ -108,7 +109,10 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in CreateInput) 
 	}
 
 	now := s.now()
-	var org query.Organization
+	var (
+		org    query.Organization
+		campus uuid.UUID
+	)
 	err := s.store.InTx(ctx, func(q *query.Queries) error {
 		u, err := q.GetUserEligibility(ctx, userID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -135,9 +139,10 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in CreateInput) 
 		if err != nil {
 			return fmt.Errorf("create admin membership: %w", err)
 		}
-		if _, err := q.CreateCampusRoom(ctx, query.CreateCampusRoomParams{
+		campus, err = q.CreateCampusRoom(ctx, query.CreateCampusRoomParams{
 			OrgID: org.ID, CreatedBy: userID, CreatedAt: pgTime(now),
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("create campus room: %w", err)
 		}
 		return nil
@@ -153,7 +158,7 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in CreateInput) 
 	s.log.InfoContext(ctx, "org created", slog.String("org_id", org.ID.String()), slog.String("user_id", userID.String()))
 	return Organization{
 		ID: org.ID, Name: org.Name, Slug: org.Slug, LogoURL: textPtr(org.LogoUrl),
-		Role: RoleAdmin, CreatedAt: org.CreatedAt.Time,
+		Role: RoleAdmin, CampusRoomID: campus, CreatedAt: org.CreatedAt.Time,
 	}, nil
 }
 
@@ -168,7 +173,7 @@ func (s *Service) Get(ctx context.Context, userID, orgID uuid.UUID) (Organizatio
 	}
 	return Organization{
 		ID: row.ID, Name: row.Name, Slug: row.Slug, LogoURL: textPtr(row.LogoUrl),
-		Role: Role(row.Role), CreatedAt: row.CreatedAt.Time,
+		Role: Role(row.Role), CampusRoomID: row.CampusRoomID, CreatedAt: row.CreatedAt.Time,
 	}, nil
 }
 

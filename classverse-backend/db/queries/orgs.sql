@@ -16,10 +16,11 @@ VALUES (sqlc.arg(org_id), 'Peta sekolah', 'campus', 200, sqlc.arg(created_by), s
 RETURNING id;
 
 -- name: GetOrgForMember :one
--- Organization plus the caller's role; no row when the user is not a member.
-SELECT o.id, o.name, o.slug, o.logo_url, o.created_at, m.role
+-- Organization plus the caller's role and campus room; no row when the user is not a member.
+SELECT o.id, o.name, o.slug, o.logo_url, o.created_at, m.role, r.id AS campus_room_id
 FROM organizations o
 JOIN memberships m ON m.org_id = o.id
+JOIN rooms r ON r.org_id = o.id AND r.map_key = 'campus'
 WHERE o.id = sqlc.arg(org_id) AND m.user_id = sqlc.arg(user_id);
 
 -- name: GetMemberRole :one

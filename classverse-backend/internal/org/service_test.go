@@ -111,6 +111,10 @@ func TestCreateAndAuthorize(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM rooms WHERE org_id=$1 AND map_key='campus' AND capacity=200", orgID).Scan(&campus); err != nil || campus != 1 {
 		t.Errorf("campus rooms = %d, %v", campus, err)
 	}
+	got, err := svc.Get(ctx, adult, orgID)
+	if err != nil || got.CampusRoomID == uuid.Nil {
+		t.Errorf("Get().CampusRoomID = %v, %v", got.CampusRoomID, err)
+	}
 	var orgs int
 	_ = pool.QueryRow(ctx, "SELECT count(*) FROM organizations").Scan(&orgs)
 	if orgs != 1 {

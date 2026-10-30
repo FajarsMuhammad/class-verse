@@ -149,6 +149,23 @@ export interface paths {
         patch: operations["updateMe"];
         trace?: never;
     };
+    "/api/maps/{map_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description File peta Tiled (.tmj). Publik; ETag untuk revalidasi. */
+        get: operations["getMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs": {
         parameters: {
             query?: never;
@@ -329,6 +346,11 @@ export interface components {
         Organization: {
             /** Format: uuid */
             id: string;
+            /**
+             * Format: uuid
+             * @description Room peta sekolah; dibuka lewat /ws/rooms/{campus_room_id}
+             */
+            campus_room_id: string;
             name: string;
             slug: string;
             logo_url: string | null;
@@ -670,6 +692,38 @@ export interface operations {
             };
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
+        };
+    };
+    getMap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                map_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Peta Tiled JSON */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Tidak berubah (If-None-Match) */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     createOrg: {

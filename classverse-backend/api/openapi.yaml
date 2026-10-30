@@ -120,6 +120,22 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
 
+  /api/maps/{map_key}:
+    get:
+      operationId: getMap
+      description: File peta Tiled (.tmj). Publik; ETag untuk revalidasi.
+      security: []
+      parameters:
+        - { name: map_key, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Peta Tiled JSON
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "304": { description: "Tidak berubah (If-None-Match)" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/orgs:
     post:
       operationId: createOrg
@@ -388,9 +404,10 @@ components:
         logo_url: { type: string, nullable: true, description: "URL https opsional" }
     Organization:
       type: object
-      required: [id, name, slug, logo_url, role, created_at]
+      required: [id, name, slug, logo_url, role, campus_room_id, created_at]
       properties:
         id: { type: string, format: uuid }
+        campus_room_id: { type: string, format: uuid, description: "Room peta sekolah; dibuka lewat /ws/rooms/{campus_room_id}" }
         name: { type: string }
         slug: { type: string }
         logo_url: { type: string, nullable: true }

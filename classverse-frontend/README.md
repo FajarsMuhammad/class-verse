@@ -21,6 +21,17 @@ satu origin (dibutuhkan cookie refresh `SameSite=Strict`, tanpa CORS).
 > npm 10.9 bisa crash (`Cannot read properties of null (reading 'edgesOut')`) saat me-resolve dependency
 > baru. `npm install` dari lockfile aman; untuk menambah paket pakai `npx npm@11 install <paket>`.
 
+## Peta sekolah (slice 3)
+
+Pilih sekolah lalu buka `/`. Fokus peta dengan klik atau Tab; WASD/panah untuk berjalan,
+klik tujuan untuk mencari jalur. Keyboard membatalkan jalur klik. Daftar gedung belum membuka ruang
+(travel menyusul slice 5). Tab kedua menggantikan tab pertama, tanpa reconnect otomatis di tab lama.
+
+Backend menyajikan peta `/api/maps/campus`; Phaser menggambar tileset sementara dari CSS tokens.
+`src/realtime/messages.ts` mencerminkan kontrak Go; ubah kedua sisi saat protokol berubah.
+SVG avatar memakai `?no-inline`: loader SVG Phaser 3 menganggap URL data sebagai Base64,
+sedangkan Vite dapat menghasilkan URL data SVG percent-encoded.
+
 ## Perintah
 
 | Perintah | Fungsi |

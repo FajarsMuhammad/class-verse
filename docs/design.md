@@ -160,6 +160,19 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 **Peta sekolah.** Setiap organisasi punya satu room dengan `map_key = 'campus'`, dibuat otomatis saat organisasi dibuat; semua peserta muncul di sini setelah masuk. Kapasitasnya 200, jadi `snapshot` hanya berisi avatar dalam radius 24 tile dari penerima (area of interest berbasis grid sel 8×8 tile), agar bandwidth per peserta tetap kecil. Gedung dan pintunya didefinisikan di layer objek file Tiled peta sekolah; setiap ruang menyimpan `building_key` gedungnya. Satu koneksi WebSocket dipakai sepanjang sesi: `travel` memindahkan peserta antar room di dalam hub, dan keluar dari ruang mengembalikannya ke pintu gedung asal.
 
+**Detail slice 3 (real-time inti).**
+
+- *Peta.* File Tiled `.tmj` ada di `classverse-backend/maps/`, di-embed ke binary, dan disajikan `GET /api/maps/{map_key}` (publik, bukan data organisasi; `ETag` + `Cache-Control: no-cache`). Server dan Phaser membaca file yang sama. Tile 32 px. Layer tile `ground`, layer tile `collision` (tile ≠ 0 tidak bisa dilewati), layer objek `spawn` (persegi) dan `buildings` (persegi per gedung dengan properti `key`, `name`, `roof`, `staff_only`, plus objek titik `door` yang properti `building`-nya menunjuk `key`). Urutan id tile adalah kontrak di `maps/README.md`. Revisi D3-02 disetujui sesudah review visual: frontend menggambar ilustrasi flat utuh beresolusi 2× dari token `--map-*`/`--roof-*` dan bounds gedung Tiled, bukan atlas tile untuk tampilan gedung. Collision/spawn/pintu tetap mengikuti Tiled. Kamera overview menampilkan seluruh sekolah dan menyesuaikan resize; avatar dan label mempertahankan ukuran layar.
+- *Room peta sekolah.* `GET /api/orgs/{org_id}` mengembalikan `campus_room_id`; client membuka `/ws/rooms/{campus_room_id}`.
+- *Auth WebSocket.* Upgrade hanya dari Origin `FRONTEND_URL`. Pesan pertama wajib `auth {token}` dalam 5 detik; server memverifikasi JWT dan membership organisasi pemilik room lalu mengirim `welcome`. Gagal → `error` lalu close 4401 (token), 4403 (tidak boleh), 4404 (room tidak ada/bukan anggota).
+- *Satu koneksi per user.* Koneksi baru user yang sama menggantikan yang lama; yang lama ditutup dengan 4409 `replaced` dan client tidak reconnect otomatis.
+- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum 160 px/detik, ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah 160 × 1,25 px per detik, maksimal 100 px (setengah detik), dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi.
+- *Pesan.* `welcome {self_id, room_id, map_key, participants: [{id, name, avatar, role, x, y, dir}]}`; `joined` = satu participant; `left {id}`; `snapshot {p: [{id, x, y, dir}], out: [id]}` dengan `out` = id yang keluar dari area of interest penerima; `ping {ts}` → `pong {ts}`. `seq` server naik per koneksi.
+- *Area of interest* hanya di peta sekolah: grid sel 8×8 tile, radius 24 tile; penerima mendapat avatar yang berubah di radius dan avatar yang baru masuk radius. `joined`/`left` dikirim ke seluruh room.
+- *Reconnect.* Putus → avatar ditahan 30 detik dan tetap terlihat. Kembali ke room yang sama dalam 30 detik → posisi lama tanpa `left`/`joined`. Client backoff 1, 2, 4, 8 detik (8 berulang).
+- *Siklus room.* Hub (registry, satu mutex) membuat goroutine room saat orang pertama masuk dan menghentikannya setelah kosong 60 detik. Shutdown menutup koneksi dengan 1001. Sesi/kehadiran menyusul di slice 5.
+- *Client.* Klik untuk berjalan memakai A* di grid collision di client; server tetap memvalidasi setiap `move`. Avatar lain diinterpolasi dengan jeda render 100 ms. Name tag: pill putih, diri sendiri Tinta, pengajar/admin Nila.
+
 JSON dipilih untuk MVP karena mudah di-debug. Jika bandwidth jadi masalah, `snapshot` bisa dipindah ke format biner tanpa mengubah tipe pesan lain.
 
 ## Auth: JWT + refresh token + Google OAuth
@@ -483,4 +496,4 @@ Status Fase 3: kerangka repo selesai (lihat `docs/tasks/phase-3.md`).
 Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhkannya:
 
 - [x] Lokasi `openapi.yaml`: `classverse-backend/api/openapi.yaml` (diputuskan untuk slice 2, lihat API contract).
-- [ ] Cara frontend mendapat file peta Tiled (dibutuhkan mulai slice 3). Server membaca `maps/` untuk collision dan zona, Phaser juga butuh file yang sama untuk render. Usulan: backend menyajikan `GET /api/maps/{map_key}` dari `maps/`, sehingga satu sumber dan tetap jalan setelah repo dipisah.
+- [x] Cara frontend mendapat file peta Tiled: backend menyajikan `GET /api/maps/{map_key}` dari `maps/` yang di-embed ke binary (diputuskan untuk slice 3, lihat Protokol real-time).

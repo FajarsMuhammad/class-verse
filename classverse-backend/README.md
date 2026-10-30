@@ -49,6 +49,14 @@ Test store dan service auth memakai PostgreSQL asli. `dbtest.New` membuat databa
 (`kv_test_*`), menjalankan semua migration, lalu menghapusnya. Test ini di-skip jika `TEST_DATABASE_URL`
 kosong; nilainya sudah ada di `.env.example` (user `kelasverse` dari compose boleh membuat database).
 
+## Real-time (slice 3)
+
+`GET /api/maps/campus` publik menyajikan `.tmj` embed (ETag, revalidasi 304).
+`GET /ws/rooms/{room_id}` hanya menerima Origin yang sama persis dengan origin `FRONTEND_URL`;
+konfigurasi dev harus `http://localhost:5173`, bukan `127.0.0.1` jika browser memakai `localhost`.
+Pesan pertama `auth` wajib dalam 5 detik. JWT dan membership diperiksa sebelum join.
+Kontrak envelope dan close codes ada di `../docs/design.md`, aturan peta di `maps/README.md`.
+
 ## Login Google
 
 Opsional di dev. Buat OAuth client tipe "Web application" di Google Cloud Console dengan redirect URI

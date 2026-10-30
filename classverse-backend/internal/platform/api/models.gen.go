@@ -146,12 +146,14 @@ type OrgSummary struct {
 
 // Organization defines model for Organization.
 type Organization struct {
-	CreatedAt time.Time          `json:"created_at"`
-	Id        openapi_types.UUID `json:"id"`
-	LogoUrl   *string            `json:"logo_url"`
-	Name      string             `json:"name"`
-	Role      Role               `json:"role"`
-	Slug      string             `json:"slug"`
+	// CampusRoomId Room peta sekolah; dibuka lewat /ws/rooms/{campus_room_id}
+	CampusRoomId openapi_types.UUID `json:"campus_room_id"`
+	CreatedAt    time.Time          `json:"created_at"`
+	Id           openapi_types.UUID `json:"id"`
+	LogoUrl      *string            `json:"logo_url"`
+	Name         string             `json:"name"`
+	Role         Role               `json:"role"`
+	Slug         string             `json:"slug"`
 }
 
 // RegisterRequest defines model for RegisterRequest.

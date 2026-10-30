@@ -22,6 +22,7 @@ import (
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/logx"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/mail"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/realtime"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -49,14 +50,14 @@ func run() error {
 	}
 	defer pool.Close()
 
-	api, err := newAPI(ctx, cfg, pool, log)
+	a, err := newApp(ctx, cfg, pool, log)
 	if err != nil {
 		return err
 	}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           newRouter(log, pool, api),
+		Handler:           newRouter(log, pool, a.api, a.ws),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// No global WriteTimeout: WebSocket connections are long-lived.
@@ -78,6 +79,11 @@ func run() error {
 	log.Info("shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+	// Shutdown does not track hijacked WebSocket connections; the hub closes
+	// them (1001) and stops the rooms.
+	if err := a.hub.Shutdown(shutdownCtx); err != nil {
+		log.Warn("realtime shutdown incomplete", slog.Any("err", err))
+	}
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}
@@ -88,8 +94,16 @@ func run() error {
 	return nil
 }
 
-// newAPI wires every feature and returns the /api route tree.
-func newAPI(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (func(chi.Router), error) {
+// app holds the wired features: the /api and /ws route trees and the
+// realtime hub that must be shut down explicitly.
+type app struct {
+	api func(chi.Router)
+	ws  func(chi.Router)
+	hub *realtime.Hub
+}
+
+// newApp wires every feature.
+func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (*app, error) {
 	now := func() time.Time { return time.Now().UTC() }
 
 	orgSvc := org.NewService(org.NewStore(pool), now, log)
@@ -101,14 +115,30 @@ func newAPI(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	}
 	orgHandler := org.NewHandler(orgSvc, log)
 	inviteHandler := invite.NewHandler(inviteSvc, cfg.FrontendURL, now, log)
+	mapHandler := realtime.NewMapHandler(log)
 
-	return func(r chi.Router) {
-		authHandler.Routes(r)
-		r.Group(func(r chi.Router) {
-			r.Use(auth.RequireUser(tokens, log))
-			orgHandler.Routes(r)
-			inviteHandler.Routes(r)
-		})
+	mapData, err := realtime.LoadMaps("campus")
+	if err != nil {
+		return nil, fmt.Errorf("load maps: %w", err)
+	}
+	hub := realtime.NewHub(mapData, now, log)
+	gateway, err := realtime.NewGateway(hub, tokens, realtime.NewStore(pool), cfg.FrontendURL, log)
+	if err != nil {
+		return nil, err
+	}
+
+	return &app{
+		api: func(r chi.Router) {
+			authHandler.Routes(r)
+			mapHandler.Routes(r)
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireUser(tokens, log))
+				orgHandler.Routes(r)
+				inviteHandler.Routes(r)
+			})
+		},
+		ws:  gateway.Routes,
+		hub: hub,
 	}, nil
 }
 
