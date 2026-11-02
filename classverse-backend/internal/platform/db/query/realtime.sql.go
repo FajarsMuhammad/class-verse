@@ -25,7 +25,7 @@ func (q *Queries) GetCampusRoomID(ctx context.Context, orgID uuid.UUID) (uuid.UU
 
 const getRoomAdmission = `-- name: GetRoomAdmission :one
 SELECT r.id AS room_id, r.org_id, r.map_key, r.capacity, r.name AS room_name,
-       r.building_key, r.scheduled_at,
+       r.building_key, r.scheduled_at, r.all_chat_enabled,
        m.role, u.display_name, u.avatar_key
 FROM rooms r
 JOIN memberships m ON m.org_id = r.org_id AND m.user_id = $1
@@ -39,16 +39,17 @@ type GetRoomAdmissionParams struct {
 }
 
 type GetRoomAdmissionRow struct {
-	RoomID      uuid.UUID
-	OrgID       uuid.UUID
-	MapKey      string
-	Capacity    int32
-	RoomName    string
-	BuildingKey pgtype.Text
-	ScheduledAt pgtype.Timestamptz
-	Role        OrgRole
-	DisplayName string
-	AvatarKey   string
+	RoomID         uuid.UUID
+	OrgID          uuid.UUID
+	MapKey         string
+	Capacity       int32
+	RoomName       string
+	BuildingKey    pgtype.Text
+	ScheduledAt    pgtype.Timestamptz
+	AllChatEnabled bool
+	Role           OrgRole
+	DisplayName    string
+	AvatarKey      string
 }
 
 // The room plus the caller's membership and profile; no row when the room
@@ -64,9 +65,57 @@ func (q *Queries) GetRoomAdmission(ctx context.Context, arg GetRoomAdmissionPara
 		&i.RoomName,
 		&i.BuildingKey,
 		&i.ScheduledAt,
+		&i.AllChatEnabled,
 		&i.Role,
 		&i.DisplayName,
 		&i.AvatarKey,
 	)
 	return i, err
+}
+
+const insertChatMessage = `-- name: InsertChatMessage :one
+INSERT INTO chat_messages (session_id, sender_id, scope, zone_key, body, created_at)
+SELECT s.id, $1, $2, $3, $4, $5
+FROM room_sessions s
+WHERE s.room_id = $6 AND s.ended_at IS NULL
+RETURNING id
+`
+
+type InsertChatMessageParams struct {
+	SenderID uuid.UUID
+	Scope    ChatScope
+	ZoneKey  pgtype.Text
+	Body     string
+	Now      pgtype.Timestamptz
+	RoomID   uuid.UUID
+}
+
+// Stores a filtered chat message in the open session of a room; no row when
+// the room has no open session.
+func (q *Queries) InsertChatMessage(ctx context.Context, arg InsertChatMessageParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertChatMessage,
+		arg.SenderID,
+		arg.Scope,
+		arg.ZoneKey,
+		arg.Body,
+		arg.Now,
+		arg.RoomID,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const purgeChatMessages = `-- name: PurgeChatMessages :execrows
+DELETE FROM chat_messages WHERE created_at < $1
+`
+
+// Retention: chat content older than the cutoff is deleted (reports keep a
+// null message_id through ON DELETE SET NULL).
+func (q *Queries) PurgeChatMessages(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeChatMessages, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

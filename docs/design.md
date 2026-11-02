@@ -527,6 +527,33 @@ Contoh potongan OpenAPI untuk satu endpoint:
 - *WS.* `travel {room_id}`; error `room_full`, `scheduled`, `not_at_door`, `forbidden`, `not_found`, `travel_in_progress`.
   `buildings {items:[{building_key,people,live_rooms}]}` setiap 5 detik hanya untuk room campus dan sesudah filter role.
 
+## Slice 6 — Chat dan zona (C6-01…C6-10 disetujui)
+
+- *Dekat.* Penerima `near` = avatar terhubung dengan jarak Euclid titik kaki ≤ 160 px (5 tile) saat pesan diterima server;
+  pengirim selalu menerima salinannya. Berlaku di peta sekolah juga. Avatar dalam grace reconnect tidak menerima.
+- *Zona.* Layer objek `zones` pada classroom/garden: persegi dengan properti `key` unik, nama objek = label. Zona aktif =
+  persegi yang memuat titik kaki, dihitung server tiap tick; perubahan dikirim `zone {key, name}` hanya ke pemiliknya
+  (`key` kosong = keluar zona). Peta sekolah tanpa zona.
+- *Scope.* Tab Zona (hanya saat di zona) / Dekat / Semua. `zone` ditolak `not_in_zone` jika pengirim tidak di zona saat
+  diterima. `broadcast` untuk slice 7.
+- *Payload.* Client `chat {text, scope}`. Server `chat {id?, from:{id,name,role}, text, scope, zone?, at}`; `id` ada bila
+  pesan tersimpan. Riwayat tidak dikirim saat masuk/reconnect.
+- *Batas.* 1–500 code point setelah NFC + trim; karakter kontrol ditolak kecuali baris baru (dipadatkan maks 2 berturut).
+  3 pesan/detik, burst 5 (token bucket) → `rate_limited`.
+- *Filter.* Disamarkan, bukan ditolak: kata kasar (daftar proyek yang sama dengan nama tampilan, kata utuh) → `****`;
+  nomor HP Indonesia (`08…`, `+62…`, `62…`, 9–13 digit, boleh dipisah spasi/titik/strip) dan email → `[disembunyikan]`.
+  Alamat belum disaring otomatis (keterbatasan tercatat). Yang disimpan dan disiarkan hanya hasil filter.
+- *Penyimpanan.* Pesan di classroom/garden disimpan ke `chat_messages` (sesi terbuka) oleh worker hub, tanpa memblokir
+  room. Chat peta sekolah tidak disimpan (tidak ada sesi). Purge harian `created_at` > 30 hari dari `cmd/server`
+  (sekali saat start lalu tiap 24 jam). Log tanpa isi chat.
+- *Chat semua ruangan.* PATCH `/api/rooms/{room_id}` menerima `all_chat_enabled` (teacher/admin). Hub meneruskan ke room;
+  room menyiarkan `room_state {all_chat_enabled}`. Saat mati, scope `room` ditolak `all_chat_disabled`. Peta sekolah
+  selalu aktif. `welcome`/`traveled` membawa `all_chat_enabled`.
+- *Tampilan.* Zona: border putus-putus `--color-accent-line` + isi `--color-accent-soft` tipis; zona sendiri solid lebih
+  tebal + label "· kamu di sini". Lingkaran radius dekat putus-putus Nila di avatar sendiri. Panel kanan berisi tab chat.
+- *Aksesibilitas.* Log `role="log"` `aria-live="polite"`, input berlabel tersembunyi, Enter kirim / Shift+Enter baris baru,
+  tombol kirim 44×44 `aria-label`. Maks 200 pesan per tab di memori.
+
 ## Berikutnya
 
 Status Fase 2:

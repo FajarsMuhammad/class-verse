@@ -3,7 +3,8 @@ import { onBeforeUnmount, ref, shallowRef, type Ref } from 'vue'
 import { getAccessToken, refreshAccessToken } from '@/api/client'
 import { RealtimeClient, roomSocketURL, type ConnectionStatus } from './client'
 import { fetchMap, type MapData } from './mapdata'
-import type { BuildingCount, MoveMsg, WelcomeMsg } from './messages'
+import { ChatState } from './chat'
+import type { BuildingCount, ChatScope, MoveMsg, WelcomeMsg } from './messages'
 import { World } from './world'
 
 export interface RoomHandle {
@@ -16,6 +17,11 @@ export interface RoomHandle {
   buildings: Ref<BuildingCount[]>
   traveling: Ref<boolean>
   travel: (roomId: string) => void
+  chat: ChatState
+  // chatVersion changes whenever chat state does (ChatState itself is not reactive).
+  chatVersion: Ref<number>
+  chatError: Ref<string>
+  sendChat: (text: string, scope: ChatScope) => boolean
   sendMove: (m: MoveMsg) => void
   start: (roomId: string, mapKey: string) => Promise<void>
 }
@@ -32,6 +38,11 @@ export function useRoom(): RoomHandle {
   const buildings = ref<BuildingCount[]>([])
   const traveling = ref(false)
   let mapVersion = 0
+  const chat = new ChatState()
+  const chatVersion = ref(0)
+  const chatError = ref('')
+  const chatErrors = new Set(['rate_limited', 'not_in_zone', 'all_chat_disabled'])
+  let lastChatSeq = -1
   let client: RealtimeClient | null = null
   let lastVersion = -1
   const abort = new AbortController()
@@ -55,6 +66,8 @@ export function useRoom(): RoomHandle {
       },
       onMessage: (msg) => {
         world.apply(msg, performance.now())
+        chat.apply(msg)
+        if (chat.version !== chatVersion.value) chatVersion.value = chat.version
         if (msg.t === 'welcome' || msg.t === 'traveled') {
           current.value = msg.d!
           traveling.value = false
@@ -71,7 +84,13 @@ export function useRoom(): RoomHandle {
                 error.value = 'Peta gagal dimuat. Muat ulang halaman.'
             })
         } else if (msg.t === 'buildings') buildings.value = msg.d!.items
-        else if (msg.t === 'error' && msg.d!.code !== 'move_rejected') {
+        else if (
+          msg.t === 'error' &&
+          (chatErrors.has(msg.d!.code) ||
+            (msg.d!.code === 'bad_message' && msg.d!.seq === lastChatSeq))
+        ) {
+          chatError.value = msg.d!.message
+        } else if (msg.t === 'error' && msg.d!.code !== 'move_rejected') {
           traveling.value = false
           error.value = msg.d!.message
         }
@@ -109,6 +128,17 @@ export function useRoom(): RoomHandle {
       if (self)
         client?.send('move', { x: Math.round(self.x), y: Math.round(self.y), dir: self.dir })
       if (!client?.send('travel', { room_id: roomId })) traveling.value = false
+    },
+    chat,
+    chatVersion,
+    chatError,
+    sendChat: (text, scope) => {
+      if (status.value !== 'open' || !client) return false
+      chatError.value = ''
+      const seq = client.sendSeq('chat', { text, scope })
+      if (seq === null) return false
+      lastChatSeq = seq
+      return true
     },
     sendMove: (m) => {
       if (!traveling.value && map.value) void client?.send('move', m)

@@ -18,7 +18,10 @@ const (
 	buildingsEvery   = 50               // ticks (5 s)
 	inboxSize        = 256
 	campusKey        = "campus"
-	doorRadius       = 48.0 // px from a door or exit point
+	doorRadius       = 48.0  // px from a door or exit point
+	nearRadius       = 160.0 // px (5 tiles) for near chat
+	chatRate         = 3.0   // messages per second
+	chatBurst        = 5.0   // messages
 	staffBuildingKey = "ruang-guru"
 )
 
@@ -31,6 +34,7 @@ type Admission struct {
 	RoomName    string
 	BuildingKey string
 	ScheduledAt *time.Time
+	AllChat     bool
 	UserID      uuid.UUID
 	Name        string
 	Avatar      string
@@ -60,6 +64,17 @@ type moveCmd struct {
 	seq uint64
 	m   MoveMsg
 }
+
+// chatCmd is a chat message whose text has already been filtered.
+type chatCmd struct {
+	c     *conn
+	seq   uint64
+	text  string
+	scope string
+}
+
+// roomStateCmd changes settings that teachers can toggle during a session.
+type roomStateCmd struct{ allChat bool }
 
 // reserveCmd holds one capacity slot for a travelling user.
 type reserveCmd struct {
@@ -98,6 +113,28 @@ type member struct {
 	moves     moveBudget
 	dirty     bool
 	seen      map[uuid.UUID]bool // ids the client currently shows (area of interest)
+	zone      Zone               // zone the avatar stands in, zero when none
+	chat      chatBudget
+}
+
+// chatBudget is a token bucket: chatRate per second, at most chatBurst.
+type chatBudget struct {
+	tokens float64
+	at     time.Time
+}
+
+func (b *chatBudget) allow(now time.Time) bool {
+	if b.at.IsZero() {
+		b.tokens = chatBurst
+	} else if d := now.Sub(b.at).Seconds(); d > 0 {
+		b.tokens = math.Min(chatBurst, b.tokens+d*chatRate)
+	}
+	b.at = now
+	if b.tokens < 1 {
+		return false
+	}
+	b.tokens--
+	return true
 }
 
 // room owns the state of one room. Only its goroutine touches the fields
@@ -123,6 +160,7 @@ type room struct {
 	spawnN      int
 	emptySince  time.Time
 	sessionOpen bool
+	allChat     bool
 	ticks       int
 	lastStats   roomStats
 }
@@ -131,7 +169,8 @@ func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *
 	return &room{
 		id: adm.RoomID, orgID: adm.OrgID, name: adm.RoomName, buildingKey: adm.BuildingKey,
 		mapd: mapd, campus: mapd.Key == campusKey, capacity: adm.Capacity, now: now, log: log, hub: hub,
-		inbox: make(chan any, inboxSize), done: make(chan struct{}),
+		allChat: adm.AllChat || mapd.Key == campusKey,
+		inbox:   make(chan any, inboxSize), done: make(chan struct{}),
 		members: make(map[uuid.UUID]*member), reserved: make(map[uuid.UUID]bool),
 	}
 }
@@ -200,6 +239,16 @@ func (r *room) handle(cmd any) {
 			r.broadcast(newOut(TypeProfileUpdated, c.p), uuid.Nil)
 		}
 		close(c.done)
+	case chatCmd:
+		r.chat(c)
+	case deliverCmd:
+		c.msg.ID = c.id
+		r.deliverChat(c.msg, c.to)
+	case roomStateCmd:
+		if !r.campus && r.allChat != c.allChat {
+			r.allChat = c.allChat
+			r.broadcast(newOut(TypeRoomState, RoomStateMsg{AllChatEnabled: c.allChat}), uuid.Nil)
+		}
 	case probeCmd:
 		c.fn(r)
 	}
@@ -281,7 +330,7 @@ func (r *room) add(c *conn, adm Admission, x, y int, typ string) error {
 func (r *room) sendWelcome(m *member, typ string) {
 	w := WelcomeMsg{
 		SelfID: m.p.ID, RoomID: r.id, MapKey: r.mapd.Key, RoomName: r.name, BuildingKey: r.buildingKey,
-		Participants: make([]Participant, 0, len(r.members)),
+		Participants: make([]Participant, 0, len(r.members)), AllChatEnabled: r.allChat,
 	}
 	for id, o := range r.members {
 		w.Participants = append(w.Participants, o.p)
@@ -290,6 +339,10 @@ func (r *room) sendWelcome(m *member, typ string) {
 		}
 	}
 	m.conn.send(newOut(typ, w))
+	// A (re)connected client starts without a zone; tell it the current one.
+	if m.zone.Key != "" {
+		m.conn.send(newOut(TypeZone, ZoneMsg{Key: m.zone.Key, Name: m.zone.Name}))
+	}
 	if r.campus {
 		r.sendBuildings(m)
 	}
@@ -397,6 +450,8 @@ func (r *room) tick(now time.Time) (stopped bool) {
 		}
 	}
 
+	r.updateZones()
+
 	for _, recv := range r.members {
 		if recv.conn == nil {
 			continue
@@ -475,6 +530,111 @@ func (r *room) broadcast(m outMsg, skip uuid.UUID) {
 	for id, o := range r.members {
 		if id != skip && o.conn != nil {
 			o.conn.send(m)
+		}
+	}
+}
+
+// updateZones recomputes each avatar's zone and tells its owner on change.
+func (r *room) updateZones() {
+	if len(r.mapd.Zones) == 0 {
+		return
+	}
+	for _, m := range r.members {
+		z := r.mapd.ZoneAt(m.p.X, m.p.Y)
+		if z.Key == m.zone.Key {
+			continue
+		}
+		m.zone = z
+		if m.conn != nil {
+			m.conn.send(newOut(TypeZone, ZoneMsg{Key: z.Key, Name: z.Name}))
+		}
+	}
+}
+
+// chat routes a filtered message by scope. Recipients are decided from the
+// authoritative positions at the moment the room handles the command.
+func (r *room) chat(c chatCmd) {
+	m, ok := r.members[c.c.userID]
+	if !ok || m.conn != c.c {
+		return
+	}
+	now := r.now()
+	reject := func(code, msg string) {
+		c.c.sendError(ErrorMsg{Code: code, Message: msg, Seq: c.seq})
+	}
+	if !m.chat.allow(now) {
+		reject(CodeRateLimited, "Terlalu cepat. Tunggu sebentar sebelum mengirim lagi.")
+		return
+	}
+	// The zone may have changed since the last tick.
+	if len(r.mapd.Zones) > 0 {
+		m.zone = r.mapd.ZoneAt(m.p.X, m.p.Y)
+	}
+	out := ChatOutMsg{
+		From: ChatSender{ID: m.p.ID, Name: m.p.Name, Role: m.p.Role}, Text: c.text, Scope: c.scope, At: now.UTC(),
+	}
+	var to []*member
+	switch c.scope {
+	case ScopeNear:
+		for _, o := range r.members {
+			if o == m || (o.conn != nil && math.Hypot(float64(o.p.X-m.p.X), float64(o.p.Y-m.p.Y)) <= nearRadius) {
+				to = append(to, o)
+			}
+		}
+	case ScopeZone:
+		if m.zone.Key == "" {
+			reject(CodeNotInZone, "Kamu sedang tidak berada di meja diskusi")
+			return
+		}
+		out.Zone = m.zone.Key
+		for _, o := range r.members {
+			if o == m || (o.conn != nil && o.zone.Key == m.zone.Key) {
+				to = append(to, o)
+			}
+		}
+	case ScopeRoom:
+		if !r.allChat {
+			reject(CodeAllChatDisabled, "Chat semua ruangan sedang dimatikan pengajar")
+			return
+		}
+		for _, o := range r.members {
+			if o.conn != nil {
+				to = append(to, o)
+			}
+		}
+	default:
+		reject(CodeBadMessage, "Jenis chat tidak dikenal")
+		return
+	}
+	if r.campus {
+		r.deliverChat(out, to)
+		return
+	}
+	// Store first so recipients get the id; the worker answers on deliver and
+	// the room goroutine never blocks on the database.
+	r.hub.storeChat(chatJob{roomID: r.id, msg: out, deliver: func(id int64) {
+		// Runs on the hub worker: never block it on a busy or stopped room.
+		select {
+		case r.inbox <- deliverCmd{msg: out, id: id, to: to}:
+		case <-r.done:
+		default:
+			r.log.Warn("chat dropped: room inbox full", slog.String("room_id", r.id.String()))
+		}
+	}})
+}
+
+// deliverCmd sends a chat message once it was stored (or storing failed).
+type deliverCmd struct {
+	msg ChatOutMsg
+	id  int64
+	to  []*member
+}
+
+func (r *room) deliverChat(msg ChatOutMsg, to []*member) {
+	o := newOut(TypeChat, msg)
+	for _, m := range to {
+		if m.conn != nil && r.members[m.p.ID] == m {
+			m.conn.send(o)
 		}
 	}
 }

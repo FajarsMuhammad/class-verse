@@ -246,10 +246,11 @@ type Role string
 
 // Room defines model for Room.
 type Room struct {
-	BuildingKey string             `json:"building_key"`
-	Capacity    int                `json:"capacity"`
-	CreatedAt   time.Time          `json:"created_at"`
-	Id          openapi_types.UUID `json:"id"`
+	AllChatEnabled bool               `json:"all_chat_enabled"`
+	BuildingKey    string             `json:"building_key"`
+	Capacity       int                `json:"capacity"`
+	CreatedAt      time.Time          `json:"created_at"`
+	Id             openapi_types.UUID `json:"id"`
 
 	// Live Sesi terbuka dengan people > 0
 	Live   bool               `json:"live"`
@@ -285,8 +286,10 @@ type UpdateMeRequestAvatarKey string
 
 // UpdateRoomRequest defines model for UpdateRoomRequest.
 type UpdateRoomRequest struct {
-	Name        *string    `json:"name,omitempty"`
-	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
+	// AllChatEnabled Tab chat "Semua" boleh dipakai
+	AllChatEnabled *bool      `json:"all_chat_enabled,omitempty"`
+	Name           *string    `json:"name,omitempty"`
+	ScheduledAt    *time.Time `json:"scheduled_at,omitempty"`
 }
 
 // VerifyEmailRequest defines model for VerifyEmailRequest.

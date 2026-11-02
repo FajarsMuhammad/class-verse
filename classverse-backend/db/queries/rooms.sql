@@ -27,7 +27,8 @@ WHERE r.id = sqlc.arg(id) AND r.archived_at IS NULL;
 -- name: UpdateRoom :one
 UPDATE rooms
 SET name = coalesce(sqlc.narg(name), name),
-    scheduled_at = CASE WHEN sqlc.arg(set_schedule)::boolean THEN sqlc.narg(scheduled_at) ELSE scheduled_at END
+    scheduled_at = CASE WHEN sqlc.arg(set_schedule)::boolean THEN sqlc.narg(scheduled_at) ELSE scheduled_at END,
+    all_chat_enabled = coalesce(sqlc.narg(all_chat_enabled), all_chat_enabled)
 WHERE id = sqlc.arg(id) AND org_id = sqlc.arg(org_id) AND archived_at IS NULL AND map_key <> 'campus'
 RETURNING *;
 

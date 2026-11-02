@@ -23,6 +23,8 @@ type MapData struct {
 	// is false on the campus.
 	ExitX, ExitY int
 	HasExit      bool
+	// Zones are discussion tables (classroom/garden); empty on the campus.
+	Zones []Zone
 	// WalkSpeed is the maximum walking speed in px per second (map property
 	// walk_speed). The client reads the same property for prediction.
 	WalkSpeed int
@@ -40,6 +42,26 @@ func (m *MapData) Building(key string) (Building, bool) {
 
 // Rect is an axis-aligned rectangle in pixels.
 type Rect struct{ X, Y, W, H int }
+
+// Contains reports whether the pixel point lies inside r (right/bottom open).
+func (r Rect) Contains(x, y int) bool { return x >= r.X && y >= r.Y && x < r.X+r.W && y < r.Y+r.H }
+
+// Zone is a discussion area: everyone inside shares zone chat.
+type Zone struct {
+	Key  string
+	Name string
+	Area Rect
+}
+
+// ZoneAt returns the zone containing (x, y), or the zero Zone.
+func (m *MapData) ZoneAt(x, y int) Zone {
+	for _, z := range m.Zones {
+		if z.Area.Contains(x, y) {
+			return z
+		}
+	}
+	return Zone{}
+}
 
 // Building is a building on the campus map with its door point.
 type Building struct {
@@ -71,6 +93,7 @@ type tmjLayer struct {
 }
 
 type tmjObject struct {
+	Name       string        `json:"name"`
 	Type       string        `json:"type"`
 	X          float64       `json:"x"`
 	Y          float64       `json:"y"`
@@ -156,6 +179,13 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 					doors[o.str("building")] = [2]int{int(math.Round(o.X)), int(math.Round(o.Y))}
 				}
 			}
+		case "zones":
+			for _, o := range l.Objects {
+				md.Zones = append(md.Zones, Zone{
+					Key: o.str("key"), Name: o.Name,
+					Area: Rect{X: int(o.X), Y: int(o.Y), W: int(o.Width), H: int(o.Height)},
+				})
+			}
 		case "exit":
 			if len(l.Objects) != 1 {
 				return nil, fmt.Errorf("parse map %s: exit layer must have one point", key)
@@ -181,6 +211,15 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 			return nil, fmt.Errorf("parse map %s: door of %q is not walkable", key, b.Key)
 		}
 		b.DoorX, b.DoorY = d[0], d[1]
+	}
+	zoneKeys := map[string]bool{}
+	for _, z := range md.Zones {
+		a := z.Area
+		if z.Key == "" || zoneKeys[z.Key] || a.W <= 0 || a.H <= 0 || a.X < 0 || a.Y < 0 ||
+			a.X+a.W > md.PixelWidth() || a.Y+a.H > md.PixelHeight() {
+			return nil, fmt.Errorf("parse map %s: zone %q invalid, duplicated, or outside the map", key, z.Key)
+		}
+		zoneKeys[z.Key] = true
 	}
 	if md.HasExit && md.Blocked(md.ExitX, md.ExitY) {
 		return nil, fmt.Errorf("parse map %s: exit is not walkable", key)

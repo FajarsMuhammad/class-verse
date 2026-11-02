@@ -72,6 +72,8 @@ type Occupancy interface {
 	// Lock blocks travel into roomID while fn runs, so archive cannot race
 	// with an admission. fn runs only when the room is empty.
 	WhileEmpty(ctx context.Context, roomID uuid.UUID, fn func() error) error
+	// SetAllChat tells a running room that the "Semua" chat tab was toggled.
+	SetAllChat(roomID uuid.UUID, enabled bool)
 }
 
 // Room is a room as returned by the API.
@@ -86,6 +88,7 @@ type Room struct {
 	CreatedAt   time.Time
 	People      int
 	Live        bool
+	AllChat     bool
 }
 
 // CreateInput is the body of POST /api/orgs/{org_id}/rooms.
@@ -102,6 +105,7 @@ type UpdateInput struct {
 	Name        *string
 	SetSchedule bool
 	ScheduledAt *time.Time
+	AllChat     *bool
 }
 
 // Page is one page of rooms.
@@ -217,6 +221,9 @@ func (s *Service) Update(ctx context.Context, userID, roomID uuid.UUID, in Updat
 		}
 		params.ScheduledAt = pgTimePtr(in.ScheduledAt)
 	}
+	if in.AllChat != nil {
+		params.AllChatEnabled = pgtype.Bool{Bool: *in.AllChat, Valid: true}
+	}
 	if v.Fields != nil {
 		return Room{}, &v
 	}
@@ -226,6 +233,9 @@ func (s *Service) Update(ctx context.Context, userID, roomID uuid.UUID, in Updat
 	}
 	if err != nil {
 		return Room{}, fmt.Errorf("update room: %w", err)
+	}
+	if in.AllChat != nil {
+		s.live.SetAllChat(roomID, row.AllChatEnabled)
 	}
 	return s.withLive(toRoom(row)), nil
 }
@@ -267,6 +277,7 @@ func (s *Service) load(ctx context.Context, userID, roomID uuid.UUID, minRole or
 	r := s.withLive(Room{
 		ID: row.ID, OrgID: row.OrgID, Name: row.Name, MapKey: row.MapKey, BuildingKey: row.BuildingKey.String,
 		Capacity: int(row.Capacity), ScheduledAt: timePtr(row.ScheduledAt), CreatedAt: row.CreatedAt.Time,
+		AllChat: row.AllChatEnabled,
 	})
 	return r, role, nil
 }
@@ -298,6 +309,7 @@ func toRoom(r query.Room) Room {
 	return Room{
 		ID: r.ID, OrgID: r.OrgID, Name: r.Name, MapKey: r.MapKey, BuildingKey: r.BuildingKey.String,
 		Capacity: int(r.Capacity), ScheduledAt: timePtr(r.ScheduledAt), CreatedAt: r.CreatedAt.Time,
+		AllChat: r.AllChatEnabled,
 	}
 }
 

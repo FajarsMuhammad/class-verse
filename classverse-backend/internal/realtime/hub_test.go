@@ -131,6 +131,11 @@ func (f failingSessions) Leave(context.Context, uuid.UUID, uuid.UUID, time.Time)
 	return errors.New("db down")
 }
 
+func (f failingSessions) SaveChat(context.Context, uuid.UUID, ChatOutMsg) (int64, bool, error) {
+	f.calls <- "chat"
+	return 0, false, errors.New("db down")
+}
+
 func TestHubSessionWriteFailureDoesNotBlock(t *testing.T) {
 	campus := loadCampus(t)
 	interior := *campus

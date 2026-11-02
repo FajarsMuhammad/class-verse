@@ -14,7 +14,12 @@ export interface SceneDeps {
   map: MapData
   world: World
   sendMove: (m: MoveMsg) => void
+  // currentZone returns the server-reported zone key of the local avatar.
+  currentZone?: () => string
 }
+
+// Near-chat radius (docs/design.md, slice 6): 5 tiles.
+const NEAR_RADIUS = 160
 
 interface Sprite {
   body: Phaser.GameObjects.Image
@@ -39,6 +44,10 @@ export class CampusScene extends Phaser.Scene {
   private lastSent = 0
   private lastSentPos: { x: number; y: number; dir: Direction } | null = null
   private labels: Phaser.GameObjects.Container[] = []
+  private zoneLayer: Phaser.GameObjects.Graphics | null = null
+  private zoneLabels: Phaser.GameObjects.Text[] = []
+  private drawnZone = '?'
+  private radius: Phaser.GameObjects.Graphics | null = null
   private focused = false
 
   constructor() {
@@ -70,6 +79,22 @@ export class CampusScene extends Phaser.Scene {
 
     for (const b of map.buildings)
       this.labels.push(this.buildingLabel(b.name, b.x + b.w / 2, b.y, b.staffOnly))
+    if (map.zones.length) {
+      this.zoneLayer = this.add.graphics().setDepth(1)
+      for (const z of map.zones) {
+        const label = this.add
+          .text(z.x + 8, z.y + 6, z.name, {
+            fontFamily: cssToken('--font-body'),
+            fontSize: cssToken('--text-sm'),
+            fontStyle: '700',
+            color: cssToken('--color-accent-ink'),
+          })
+          .setResolution(Math.min(window.devicePixelRatio || 1, 2) * 2)
+          .setDepth(2)
+        this.zoneLabels.push(label)
+      }
+    }
+    this.radius = this.add.graphics().setDepth(1.5)
 
     this.cameras.main.setBackgroundColor(cssToken('--map-grass'))
 
@@ -132,6 +157,53 @@ export class CampusScene extends Phaser.Scene {
 
     world.sample(performance.now())
     this.syncSprites()
+    this.drawZones()
+    this.drawRadius()
+  }
+
+  // drawZones outlines discussion tables: dashed Mangga, the player's own zone
+  // solid and thicker (docs/visual.md). Redrawn only when the zone changes.
+  private drawZones() {
+    const g = this.zoneLayer
+    if (!g) return
+    const mine = this.deps.currentZone?.() ?? ''
+    if (mine === this.drawnZone) return
+    this.drawnZone = mine
+    g.clear()
+    const line = Phaser.Display.Color.HexStringToColor(cssToken('--color-accent-line')).color
+    const fill = Phaser.Display.Color.HexStringToColor(cssToken('--color-accent-soft')).color
+    const strong = Phaser.Display.Color.HexStringToColor(cssToken('--color-accent')).color
+    this.deps.map.zones.forEach((z, i) => {
+      const own = z.key === mine
+      g.fillStyle(fill, own ? 0.75 : 0.35)
+      g.fillRoundedRect(z.x, z.y, z.w, z.h, 16)
+      if (own) {
+        g.lineStyle(4, strong, 1)
+        g.strokeRoundedRect(z.x, z.y, z.w, z.h, 16)
+      } else {
+        dashedRect(g, z.x, z.y, z.w, z.h, line)
+      }
+      this.zoneLabels[i]?.setText(own ? `${z.name} · kamu di sini` : z.name)
+    })
+  }
+
+  // drawRadius shows the near-chat range around the local avatar.
+  private drawRadius() {
+    const g = this.radius
+    const self = this.deps.world.self
+    if (!g) return
+    g.clear()
+    if (!self) return
+    const c = Phaser.Display.Color.HexStringToColor(cssToken('--color-primary')).color
+    const segments = 48
+    g.lineStyle(2 / this.cameras.main.zoom, c, 0.6)
+    for (let i = 0; i < segments; i += 2) {
+      const a0 = (i / segments) * Math.PI * 2
+      const a1 = ((i + 1) / segments) * Math.PI * 2
+      g.beginPath()
+      g.arc(self.x, self.y, NEAR_RADIUS, a0, a1)
+      g.strokePath()
+    }
   }
 
   private fitCamera() {
@@ -277,4 +349,35 @@ export class CampusScene extends Phaser.Scene {
     }
     return this.add.container(0, 0, parts)
   }
+}
+
+// dashedRect strokes a dashed rectangle (Phaser Graphics has no dash style).
+function dashedRect(
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  color: number,
+) {
+  const dash = 10
+  const gap = 7
+  g.lineStyle(3, color, 1)
+  const edge = (x0: number, y0: number, x1: number, y1: number) => {
+    const len = Math.hypot(x1 - x0, y1 - y0)
+    for (let d = 0; d < len; d += dash + gap) {
+      const t0 = d / len
+      const t1 = Math.min(len, d + dash) / len
+      g.lineBetween(
+        x0 + (x1 - x0) * t0,
+        y0 + (y1 - y0) * t0,
+        x0 + (x1 - x0) * t1,
+        y0 + (y1 - y0) * t1,
+      )
+    }
+  }
+  edge(x, y, x + w, y)
+  edge(x + w, y, x + w, y + h)
+  edge(x + w, y + h, x, y + h)
+  edge(x, y + h, x, y)
 }

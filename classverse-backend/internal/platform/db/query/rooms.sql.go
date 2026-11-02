@@ -291,17 +291,19 @@ func (q *Queries) StartAttendance(ctx context.Context, arg StartAttendanceParams
 const updateRoom = `-- name: UpdateRoom :one
 UPDATE rooms
 SET name = coalesce($1, name),
-    scheduled_at = CASE WHEN $2::boolean THEN $3 ELSE scheduled_at END
-WHERE id = $4 AND org_id = $5 AND archived_at IS NULL AND map_key <> 'campus'
+    scheduled_at = CASE WHEN $2::boolean THEN $3 ELSE scheduled_at END,
+    all_chat_enabled = coalesce($4, all_chat_enabled)
+WHERE id = $5 AND org_id = $6 AND archived_at IS NULL AND map_key <> 'campus'
 RETURNING id, org_id, name, map_key, building_key, capacity, all_chat_enabled, scheduled_at, created_by, created_at, archived_at
 `
 
 type UpdateRoomParams struct {
-	Name        pgtype.Text
-	SetSchedule bool
-	ScheduledAt pgtype.Timestamptz
-	ID          uuid.UUID
-	OrgID       uuid.UUID
+	Name           pgtype.Text
+	SetSchedule    bool
+	ScheduledAt    pgtype.Timestamptz
+	AllChatEnabled pgtype.Bool
+	ID             uuid.UUID
+	OrgID          uuid.UUID
 }
 
 func (q *Queries) UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, error) {
@@ -309,6 +311,7 @@ func (q *Queries) UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, e
 		arg.Name,
 		arg.SetSchedule,
 		arg.ScheduledAt,
+		arg.AllChatEnabled,
 		arg.ID,
 		arg.OrgID,
 	)

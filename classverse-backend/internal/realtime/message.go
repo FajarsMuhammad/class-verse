@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -21,6 +22,7 @@ const (
 	TypeMove   = "move"
 	TypePing   = "ping"
 	TypeTravel = "travel"
+	TypeChat   = "chat" // both directions
 )
 
 // Server → client message types.
@@ -34,6 +36,8 @@ const (
 	TypeProfileUpdated = "profile_updated"
 	TypeTraveled       = "traveled"
 	TypeBuildings      = "buildings"
+	TypeZone           = "zone"
+	TypeRoomState      = "room_state"
 )
 
 // Direction an avatar faces.
@@ -93,6 +97,50 @@ type WelcomeMsg struct {
 	RoomName     string        `json:"room_name,omitempty"`
 	BuildingKey  string        `json:"building_key,omitempty"`
 	Participants []Participant `json:"participants"`
+	// AllChatEnabled tells whether the "Semua" tab may send (always true on the campus).
+	AllChatEnabled bool `json:"all_chat_enabled"`
+}
+
+// Chat scopes. Broadcast is reserved for teachers (slice 7).
+const (
+	ScopeNear = "near"
+	ScopeZone = "zone"
+	ScopeRoom = "room"
+)
+
+// ChatInMsg is a chat message sent by a client.
+type ChatInMsg struct {
+	Text  string `json:"text"`
+	Scope string `json:"scope"`
+}
+
+// ChatSender identifies who wrote a chat message.
+type ChatSender struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Role string    `json:"role"`
+}
+
+// ChatOutMsg is a filtered chat message delivered to its recipients. ID is
+// set only when the message was stored.
+type ChatOutMsg struct {
+	ID    int64      `json:"id,omitempty"`
+	From  ChatSender `json:"from"`
+	Text  string     `json:"text"`
+	Scope string     `json:"scope"`
+	Zone  string     `json:"zone,omitempty"`
+	At    time.Time  `json:"at"`
+}
+
+// ZoneMsg tells a client which zone its avatar is in; an empty Key means none.
+type ZoneMsg struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+// RoomStateMsg carries room settings that can change during a session.
+type RoomStateMsg struct {
+	AllChatEnabled bool `json:"all_chat_enabled"`
 }
 
 // TravelMsg asks to move to another room of the same organization.
@@ -162,4 +210,7 @@ const (
 	CodeNotAtDoor        = "not_at_door"
 	CodeScheduled        = "scheduled"
 	CodeTravelInProgress = "travel_in_progress"
+	CodeRateLimited      = "rate_limited"
+	CodeNotInZone        = "not_in_zone"
+	CodeAllChatDisabled  = "all_chat_disabled"
 )

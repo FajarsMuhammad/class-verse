@@ -20,6 +20,7 @@ beforeEach(() => {
         live: false,
         scheduled_at: null,
         created_at: '',
+        all_chat_enabled: true,
       },
     ],
     next_cursor: null,

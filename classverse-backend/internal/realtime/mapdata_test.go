@@ -71,6 +71,30 @@ func TestMapWalkSpeeds(t *testing.T) {
 	}
 }
 
+func TestMapZones(t *testing.T) {
+	raw, err := maps.Read("classroom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := ParseMap("classroom", raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Zones) != 6 {
+		t.Fatalf("zones = %d, want 6", len(m.Zones))
+	}
+	z := m.Zones[0]
+	if got := m.ZoneAt(z.Area.X+1, z.Area.Y+1); got.Key != z.Key || got.Name == "" {
+		t.Errorf("ZoneAt inside = %+v", got)
+	}
+	if got := m.ZoneAt(z.Area.X+z.Area.W, z.Area.Y); got.Key == z.Key {
+		t.Error("right edge must be outside")
+	}
+	if got := loadCampus(t).ZoneAt(1000, 600); got.Key != "" {
+		t.Errorf("campus has zone %+v", got)
+	}
+}
+
 func TestParseMapErrors(t *testing.T) {
 	tests := map[string]string{
 		"not json":     `{`,
@@ -83,6 +107,15 @@ func TestParseMapErrors(t *testing.T) {
 			{"name":"collision","type":"tilelayer","data":[0,0]},
 			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]},
 			{"name":"buildings","objects":[{"type":"building","x":32,"y":0,"width":32,"height":32,"properties":[{"name":"key","value":"a"}]}]}]}`,
+		"duplicate zone": `{"width":4,"height":4,"tilewidth":32,"tileheight":32,"layers":[
+			{"name":"collision","type":"tilelayer","data":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},
+			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]},
+			{"name":"zones","objects":[{"x":0,"y":0,"width":32,"height":32,"properties":[{"name":"key","value":"m"}]},
+			{"x":32,"y":0,"width":32,"height":32,"properties":[{"name":"key","value":"m"}]}]}]}`,
+		"zone outside": `{"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[
+			{"name":"collision","type":"tilelayer","data":[0]},
+			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]},
+			{"name":"zones","objects":[{"x":0,"y":0,"width":64,"height":32,"properties":[{"name":"key","value":"m"}]}]}]}`,
 		"walk_speed too fast": `{"properties":[{"name":"walk_speed","value":900}],"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[
 			{"name":"collision","type":"tilelayer","data":[0]},
 			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]}]}`,

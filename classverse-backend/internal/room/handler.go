@@ -132,6 +132,12 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) error {
 				}
 				in.ScheduledAt = &t
 			}
+		case "all_chat_enabled":
+			var b bool
+			if json.Unmarshal(raw, &b) != nil {
+				return httpx.ValidationFailed(map[string]string{"all_chat_enabled": "Nilai harus true atau false"})
+			}
+			in.AllChat = &b
 		default:
 			return httpx.ValidationFailed(map[string]string{key: "Field tidak bisa diubah"})
 		}
@@ -162,6 +168,7 @@ func ToAPI(r Room) api.Room {
 	return api.Room{
 		Id: r.ID, OrgId: r.OrgID, Name: r.Name, MapKey: api.RoomMap(r.MapKey), BuildingKey: r.BuildingKey,
 		Capacity: r.Capacity, ScheduledAt: r.ScheduledAt, CreatedAt: r.CreatedAt.UTC(), People: r.People, Live: r.Live,
+		AllChatEnabled: r.AllChat,
 	}
 }
 

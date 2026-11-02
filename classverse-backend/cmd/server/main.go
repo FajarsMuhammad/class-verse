@@ -149,6 +149,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 		return nil, err
 	}
 	hub := realtime.NewHub(mapData, rtStore, now, log)
+	go runChatRetention(ctx, rtStore, now, purgeInterval, log)
 	authHandler.SetProfilePublisher(hub)
 	gateway, err := realtime.NewGateway(hub, tokens, rtStore, cfg.FrontendURL, log)
 	if err != nil {

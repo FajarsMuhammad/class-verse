@@ -5,7 +5,10 @@ import DoorRooms from '@/components/DoorRooms.vue'
 import { useOrgStore } from '@/stores/org'
 import type { Building } from '@/realtime/mapdata'
 
+import ChatPanel from '@/components/ChatPanel.vue'
 import GameCanvas from '@/components/GameCanvas.vue'
+import { roomApi } from '@/api/rooms'
+import { errorMessage } from '@/api/client'
 import { useRoom } from '@/realtime/useRoom'
 
 const props = defineProps<{ roomId: string; schoolName: string }>()
@@ -21,6 +24,10 @@ const {
   buildings,
   travel,
   traveling,
+  chat,
+  chatVersion,
+  chatError,
+  sendChat,
 } = useRoom()
 const org = useOrgStore()
 const route = useRoute()
@@ -42,6 +49,25 @@ const canEnter = computed(
   () => !!panelBuilding.value && panelBuilding.value.key === nearDoor.value?.key,
 )
 let timer: ReturnType<typeof setInterval> | undefined
+
+const allChat = computed(() => {
+  void chatVersion.value
+  return chat.allChatEnabled
+})
+const toggling = ref(false)
+const toggleError = ref('')
+async function toggleAllChat() {
+  if (!current.value || toggling.value) return
+  toggling.value = true
+  toggleError.value = ''
+  try {
+    await roomApi.update(current.value.room_id, { all_chat_enabled: !allChat.value })
+  } catch (e) {
+    toggleError.value = errorMessage(e)
+  } finally {
+    toggling.value = false
+  }
+}
 const statusText = computed(
   () =>
     ({
@@ -91,7 +117,7 @@ onBeforeUnmount(() => clearInterval(timer))
           <GameCanvas
             v-if="map"
             :key="current?.room_id"
-            :deps="{ map, world, sendMove }"
+            :deps="{ map, world, sendMove, currentZone: () => chat.zone.key }"
             :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
           />
           <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
@@ -110,6 +136,16 @@ onBeforeUnmount(() => clearInterval(timer))
             >Tujuan: {{ selectedBuilding.name }}. Jalan ke pintunya; tidak ada teleport.</span
           >
         </p>
+        <div v-if="campus" class="campus-chat">
+          <ChatPanel
+            :chat="chat"
+            :version="chatVersion"
+            :error="chatError"
+            :disabled="status !== 'open'"
+            :campus="true"
+            @send="sendChat"
+          />
+        </div>
       </div>
       <aside class="buildings" aria-labelledby="buildings-title">
         <h2 id="buildings-title">{{ campus ? 'Gedung' : 'Ruang' }}</h2>
@@ -141,15 +177,62 @@ onBeforeUnmount(() => clearInterval(timer))
             >
           </li>
         </ul>
-        <p v-if="!campus">
-          {{ online }} orang di ruang. Chat dan zona diskusi hadir pada slice berikutnya.
-        </p>
+        <template v-if="!campus">
+          <p class="room-meta">{{ online }} orang di ruang</p>
+          <div v-if="org.isTeacher" class="teacher">
+            <button
+              type="button"
+              class="btn-secondary toggle"
+              role="switch"
+              :aria-checked="allChat"
+              :disabled="toggling || status !== 'open'"
+              @click="toggleAllChat"
+            >
+              Chat semua ruangan: {{ allChat ? 'aktif' : 'mati' }}
+            </button>
+            <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
+          </div>
+          <ChatPanel
+            class="side-chat"
+            :chat="chat"
+            :version="chatVersion"
+            :error="chatError"
+            :disabled="status !== 'open'"
+            :campus="false"
+            @send="sendChat"
+          />
+        </template>
       </aside>
     </div>
   </section>
 </template>
 
 <style scoped>
+.room-meta {
+  margin: 0 0 var(--space-3);
+  color: var(--color-ink-muted);
+}
+.teacher {
+  margin-bottom: var(--space-4);
+}
+.toggle {
+  width: 100%;
+}
+.toggle-error {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+.side-chat {
+  min-height: 360px;
+}
+.campus-chat {
+  margin-top: var(--space-5);
+  background: var(--color-surface);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-5);
+  height: 340px;
+  box-sizing: border-box;
+}
 .building-choice {
   width: 100%;
   min-height: var(--touch-min);

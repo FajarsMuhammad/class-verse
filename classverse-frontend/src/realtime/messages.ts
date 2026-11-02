@@ -27,6 +27,13 @@ export interface ClientMessages {
   move: MoveMsg
   ping: PingMsg
   travel: { room_id: string }
+  chat: ChatInMsg
+}
+
+export type ChatScope = 'near' | 'zone' | 'room'
+export interface ChatInMsg {
+  text: string
+  scope: ChatScope
 }
 
 // Server → client
@@ -46,6 +53,7 @@ export interface WelcomeMsg {
   room_name?: string
   building_key?: string
   participants: Participant[]
+  all_chat_enabled: boolean
 }
 export interface LeftMsg {
   id: string
@@ -83,6 +91,9 @@ export type ErrorCode =
   | 'not_at_door'
   | 'scheduled'
   | 'travel_in_progress'
+  | 'rate_limited'
+  | 'not_in_zone'
+  | 'all_chat_disabled'
 
 export interface BuildingCount {
   building_key: string
@@ -90,10 +101,29 @@ export interface BuildingCount {
   live_rooms: number
 }
 
+export interface ChatOutMsg {
+  id?: number
+  from: { id: string; name: string; role: string }
+  text: string
+  scope: ChatScope
+  zone?: string
+  at: string
+}
+export interface ZoneMsg {
+  key: string
+  name: string
+}
+export interface RoomStateMsg {
+  all_chat_enabled: boolean
+}
+
 export interface ServerMessages {
   welcome: WelcomeMsg
   traveled: WelcomeMsg
   buildings: { items: BuildingCount[] }
+  chat: ChatOutMsg
+  zone: ZoneMsg
+  room_state: RoomStateMsg
   snapshot: SnapshotMsg
   joined: Participant
   profile_updated: { id: string; name: string; avatar: string }

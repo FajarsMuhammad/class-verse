@@ -361,3 +361,27 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+func TestGatewayChatFiltered(t *testing.T) {
+	e := newWSEnv(t)
+	ani := e.connect(t, "tok-ani")
+	budi := e.connect(t, "tok-budi")
+	send(t, ani, TypeChat, 2, ChatInMsg{Text: "  wa bangsat 0812-3456-7890  ", Scope: ScopeRoom})
+	env, err := next(t, budi, TypeChat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m ChatOutMsg
+	if err := json.Unmarshal(env.D, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Text != "wa **** [disembunyikan]" || m.From.ID != e.ani || m.From.Name != "Ani" || m.At.IsZero() {
+		t.Fatalf("chat = %+v", m)
+	}
+	send(t, ani, TypeChat, 3, ChatInMsg{Text: "   ", Scope: ScopeNear})
+	env, err = next(t, ani, TypeError)
+	var em ErrorMsg
+	if err != nil || json.Unmarshal(env.D, &em) != nil || em.Code != CodeBadMessage || em.Seq != 3 {
+		t.Fatalf("empty chat error = %+v %v", em, err)
+	}
+}

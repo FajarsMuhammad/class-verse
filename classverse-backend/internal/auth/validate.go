@@ -8,6 +8,8 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
+
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/moderation"
 )
 
 const (
@@ -64,19 +66,8 @@ func validateDisplayName(v *ValidationError, name string) string {
 	return name
 }
 
-// prohibitedName uses a small project-authored whole-word list. It is not a
-// comprehensive language classifier and intentionally avoids substring matches.
-func prohibitedName(name string) bool {
-	for _, word := range strings.FieldsFunc(strings.ToLower(name), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
-	}) {
-		switch word {
-		case "anjing", "bangsat", "bajingan", "kontol", "memek", "ngentot", "fuck", "shit", "bitch", "asshole":
-			return true
-		}
-	}
-	return false
-}
+// prohibitedName uses the project's whole-word list shared with chat.
+func prohibitedName(name string) bool { return moderation.ContainsProfanity(name) }
 
 func validAvatar(key string) bool {
 	if key == "default" {

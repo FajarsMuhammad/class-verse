@@ -36,7 +36,7 @@ func (s *Store) Admit(ctx context.Context, roomID, userID uuid.UUID) (Admission,
 	}
 	adm := Admission{
 		RoomID: row.RoomID, OrgID: row.OrgID, MapKey: row.MapKey, Capacity: int(row.Capacity),
-		RoomName: row.RoomName, BuildingKey: row.BuildingKey.String,
+		RoomName: row.RoomName, BuildingKey: row.BuildingKey.String, AllChat: row.AllChatEnabled,
 		UserID: userID, Name: row.DisplayName, Avatar: row.AvatarKey, Role: string(row.Role),
 	}
 	if row.ScheduledAt.Valid {
@@ -77,6 +77,32 @@ func (s *Store) Leave(ctx context.Context, sessionID, userID uuid.UUID, at time.
 		return fmt.Errorf("end attendance: %w", err)
 	}
 	return nil
+}
+
+// SaveChat stores msg in the open session of roomID. ok is false when the
+// room has no open session (nothing is stored).
+func (s *Store) SaveChat(ctx context.Context, roomID uuid.UUID, msg ChatOutMsg) (int64, bool, error) {
+	zone := pgtype.Text{String: msg.Zone, Valid: msg.Zone != ""}
+	id, err := s.q.InsertChatMessage(ctx, query.InsertChatMessageParams{
+		SenderID: msg.From.ID, Scope: query.ChatScope(msg.Scope), ZoneKey: zone, Body: msg.Text,
+		Now: pgTime(msg.At), RoomID: roomID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("save chat: %w", err)
+	}
+	return id, true, nil
+}
+
+// PurgeChat deletes chat messages created before cutoff (30-day retention).
+func (s *Store) PurgeChat(ctx context.Context, cutoff time.Time) (int64, error) {
+	n, err := s.q.PurgeChatMessages(ctx, pgTime(cutoff))
+	if err != nil {
+		return 0, fmt.Errorf("purge chat: %w", err)
+	}
+	return n, nil
 }
 
 // CloseOpenSessions ends sessions left open by a previous process.

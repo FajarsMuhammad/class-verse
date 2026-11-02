@@ -74,9 +74,14 @@ export class RealtimeClient {
   // send returns false when not connected and authenticated; callers drop
   // the message (positions are re-sent on the next step anyway).
   send<K extends keyof ClientMessages>(t: K, d: ClientMessages[K]): boolean {
-    if (!this.socket || !this.authed || this.socket.readyState !== WebSocket.OPEN) return false
+    return this.sendSeq(t, d) !== null
+  }
+
+  // sendSeq is send that returns the envelope seq (to match a later error), or null.
+  sendSeq<K extends keyof ClientMessages>(t: K, d: ClientMessages[K]): number | null {
+    if (!this.socket || !this.authed || this.socket.readyState !== WebSocket.OPEN) return null
     this.socket.send(JSON.stringify({ t, seq: ++this.seq, d }))
-    return true
+    return this.seq
   }
 
   private open() {

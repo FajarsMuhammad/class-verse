@@ -23,9 +23,14 @@ import (
 )
 
 // busyRooms reports a busy room the way the hub adapter does.
-type busyRooms struct{ busy bool }
+type busyRooms struct {
+	busy    bool
+	toggled []bool
+}
 
 func (busyRooms) Occupancy(uuid.UUID) (int, bool) { return 0, false }
+
+func (b *busyRooms) SetAllChat(_ uuid.UUID, on bool) { b.toggled = append(b.toggled, on) }
 
 func (b busyRooms) WhileEmpty(_ context.Context, _ uuid.UUID, fn func() error) error {
 	if b.busy {
@@ -134,6 +139,23 @@ func TestHandler(t *testing.T) {
 				t.Fatalf("status=%d code=%q body=%v", status, errCode(body), body)
 			}
 		})
+	}
+
+	if status, _ := call(participant, http.MethodPatch, roomPath, `{"all_chat_enabled":false}`); status != http.StatusForbidden {
+		t.Fatalf("participant toggle = %d", status)
+	}
+	if status, _ := call(teacher, http.MethodPatch, roomPath, `{"all_chat_enabled":"no"}`); status != http.StatusBadRequest {
+		t.Fatalf("bad toggle = %d", status)
+	}
+	status, body = call(teacher, http.MethodPatch, roomPath, `{"all_chat_enabled":false}`)
+	if status != http.StatusOK || body["all_chat_enabled"] != false || body["name"] != "Biologi" {
+		t.Fatalf("toggle = %d %v", status, body)
+	}
+	if len(live.toggled) != 1 || live.toggled[0] {
+		t.Fatalf("hub not told: %v", live.toggled)
+	}
+	if _, got := call(teacher, http.MethodGet, roomPath, ""); got["all_chat_enabled"] != false {
+		t.Fatalf("toggle not persisted: %v", got)
 	}
 
 	_, list := call(participant, http.MethodGet, orgRooms, "")

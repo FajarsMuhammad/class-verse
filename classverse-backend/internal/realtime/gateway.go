@@ -14,6 +14,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/moderation"
 )
 
 const (
@@ -242,6 +244,20 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur
 				continue
 			}
 			cur.Store(to)
+		case TypeChat:
+			var m ChatInMsg
+			if json.Unmarshal(env.D, &m) != nil {
+				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Pesan tidak valid", Seq: env.Seq})
+				continue
+			}
+			text, err := moderation.FilterChat(m.Text)
+			if err != nil {
+				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: chatTextError(err), Seq: env.Seq})
+				continue
+			}
+			if !cur.Load().post(chatCmd{c: c, seq: env.Seq, text: text, scope: m.Scope}) {
+				return
+			}
 		case TypePing:
 			var p PingMsg
 			_ = json.Unmarshal(env.D, &p)
@@ -270,6 +286,16 @@ func (g *Gateway) travel(ctx context.Context, c *conn, from *room, roomID uuid.U
 		return nil, &roomError{code: CodeScheduled, msg: "Ruang belum dibuka. Tunggu jadwalnya."}
 	}
 	return g.hub.travel(c, from, dest)
+}
+
+func chatTextError(err error) string {
+	switch {
+	case errors.Is(err, moderation.ErrEmpty):
+		return "Pesan kosong"
+	case errors.Is(err, moderation.ErrTooLong):
+		return "Pesan maksimal 500 karakter"
+	}
+	return "Pesan mengandung karakter yang tidak diperbolehkan"
 }
 
 func travelError(err error, seq uint64) ErrorMsg {

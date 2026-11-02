@@ -84,6 +84,7 @@
   --line-relaxed: 1.5;
 
   /* Shape */
+  --radius-xs: 6px; /* chat bubble tail corner */
   --radius-sm: 10px;
   --radius-md: 14px; /* buttons, inputs */
   --radius-lg: 16px;

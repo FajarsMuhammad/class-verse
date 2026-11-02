@@ -1,0 +1,79 @@
+import type { ChatOutMsg, ChatScope, ServerMessage, ZoneMsg } from './messages'
+
+// Messages kept per tab; older ones are dropped (docs/design.md, slice 6).
+export const MAX_PER_TAB = 200
+
+export interface ChatLine {
+  key: string
+  fromId: string
+  fromName: string
+  role: string
+  text: string
+  at: string
+  mine: boolean
+}
+
+// ChatState is plain TypeScript (unit-tested); Vue wraps it in a reactive ref.
+export class ChatState {
+  selfId: string | null = null
+  roomId: string | null = null
+  zone: ZoneMsg = { key: '', name: '' }
+  allChatEnabled = true
+  readonly lines: Record<ChatScope, ChatLine[]> = { near: [], zone: [], room: [] }
+  // Bumped on any change so Vue can re-render cheaply.
+  version = 0
+  private n = 0
+
+  apply(msg: ServerMessage) {
+    switch (msg.t) {
+      case 'welcome':
+      case 'traveled': {
+        // A new room (or reconnect) starts with an empty history: the server
+        // never replays chat. Same room after reconnect keeps what we saw.
+        const sameRoom = msg.t === 'welcome' && this.roomId === msg.d!.room_id
+        this.selfId = msg.d!.self_id
+        this.allChatEnabled = msg.d!.all_chat_enabled
+        if (!sameRoom) {
+          this.lines.near = []
+          this.lines.zone = []
+          this.lines.room = []
+        }
+        this.zone = { key: '', name: '' }
+        this.roomId = msg.d!.room_id
+        break
+      }
+      case 'zone':
+        this.zone = msg.d!
+        break
+      case 'room_state':
+        this.allChatEnabled = msg.d!.all_chat_enabled
+        break
+      case 'chat':
+        this.add(msg.d!)
+        break
+      default:
+        return
+    }
+    this.version++
+  }
+
+  private add(m: ChatOutMsg) {
+    const list = this.lines[m.scope]
+    if (!list) return
+    list.push({
+      key: m.id ? `id-${m.id}` : `n-${++this.n}`,
+      fromId: m.from.id,
+      fromName: m.from.name,
+      role: m.from.role,
+      text: m.text,
+      at: m.at,
+      mine: m.from.id === this.selfId,
+    })
+    if (list.length > MAX_PER_TAB) list.splice(0, list.length - MAX_PER_TAB)
+  }
+
+  // defaultTab is the zone tab while inside a zone, otherwise near.
+  defaultTab(): ChatScope {
+    return this.zone.key ? 'zone' : 'near'
+  }
+}

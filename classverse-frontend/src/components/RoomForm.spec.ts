@@ -19,6 +19,7 @@ const room = {
   live: false,
   org_id: 'org-1',
   created_at: '',
+  all_chat_enabled: true,
 }
 
 beforeEach(() => {

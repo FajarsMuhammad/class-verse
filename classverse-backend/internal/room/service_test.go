@@ -26,6 +26,7 @@ func (testBuildings) Building(key string) (bool, bool) {
 type emptyRooms struct{}
 
 func (emptyRooms) Occupancy(uuid.UUID) (int, bool)                                  { return 0, false }
+func (emptyRooms) SetAllChat(uuid.UUID, bool)                                       {}
 func (emptyRooms) WhileEmpty(_ context.Context, _ uuid.UUID, fn func() error) error { return fn() }
 
 func TestValidateName(t *testing.T) {

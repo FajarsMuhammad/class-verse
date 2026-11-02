@@ -56,11 +56,21 @@ export interface Building {
   doorY: number
 }
 
+export interface Zone {
+  key: string
+  name: string
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export class MapData {
   readonly width: number
   readonly height: number
   readonly tileSize: number
   readonly buildings: Building[]
+  readonly zones: Zone[]
   // Max walking speed in px/s from the map property walk_speed (same rule as
   // the server, internal/realtime/mapdata.go).
   readonly walkSpeed: number
@@ -76,6 +86,14 @@ export class MapData {
     }
     this.blocked = Uint8Array.from(coll.data, (g) => (g !== 0 ? 1 : 0))
     this.buildings = parseBuildings(raw)
+    this.zones = (raw.layers.find((l) => l.name === 'zones')?.objects ?? []).map((o) => ({
+      key: prop(o, 'key', ''),
+      name: o.name ?? '',
+      x: o.x,
+      y: o.y,
+      w: o.width,
+      h: o.height,
+    }))
     const speed = raw.properties?.find((p) => p.name === 'walk_speed')?.value
     this.walkSpeed = typeof speed === 'number' ? speed : Movement.maxSpeed
   }

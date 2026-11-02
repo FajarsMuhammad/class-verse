@@ -19,7 +19,13 @@ function welcomed() {
     {
       t: 'welcome',
       seq: 1,
-      d: { self_id: 'me', room_id: 'r', map_key: 'campus', participants: [p('me', 5), p('b', 0)] },
+      d: {
+        self_id: 'me',
+        room_id: 'r',
+        map_key: 'campus',
+        participants: [p('me', 5), p('b', 0)],
+        all_chat_enabled: true,
+      },
     },
     0,
   )
@@ -43,6 +49,7 @@ describe('World', () => {
           room_name: 'Biologi',
           building_key: 'kelas-a',
           participants: [p('me', 480, 520), p('teacher', 100)],
+          all_chat_enabled: true,
         },
       },
       20,

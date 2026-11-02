@@ -23,6 +23,9 @@ type SessionRecorder interface {
 	CloseSession(ctx context.Context, roomID uuid.UUID, at time.Time) error
 	Attend(ctx context.Context, sessionID, userID uuid.UUID, at time.Time) error
 	Leave(ctx context.Context, sessionID, userID uuid.UUID, at time.Time) error
+	// SaveChat stores a filtered message in the room's open session and
+	// returns its id; ok is false when the room has no open session.
+	SaveChat(ctx context.Context, roomID uuid.UUID, msg ChatOutMsg) (id int64, ok bool, err error)
 }
 
 type jobKind int
@@ -32,6 +35,7 @@ const (
 	jobAttend
 	jobLeave
 	jobClose
+	jobChat
 )
 
 type sessionJob struct {
@@ -39,6 +43,31 @@ type sessionJob struct {
 	roomID uuid.UUID
 	userID uuid.UUID
 	at     time.Time
+	chat   *chatJob
+}
+
+// chatJob stores one message; deliver runs on the worker with the stored id
+// (0 when not stored) and must not block.
+type chatJob struct {
+	roomID  uuid.UUID
+	msg     ChatOutMsg
+	deliver func(id int64)
+}
+
+// storeChat queues a chat message behind the room's session jobs, so it is
+// written after the session that it belongs to was opened. When storing is
+// unavailable the message is still delivered, without an id.
+func (h *Hub) storeChat(j chatJob) {
+	if h.sessions == nil {
+		j.deliver(0)
+		return
+	}
+	select {
+	case h.jobs <- sessionJob{kind: jobChat, roomID: j.roomID, chat: &j}:
+	default:
+		h.log.Warn("chat store queue full", slog.String("room_id", j.roomID.String()))
+		j.deliver(0)
+	}
 }
 
 // roomStats is what the campus needs to know about a classroom or garden.
@@ -446,6 +475,14 @@ func (h *Hub) recordLoop() {
 		case jobClose:
 			err = h.sessions.CloseSession(ctx, j.roomID, j.at)
 			delete(open, j.roomID)
+		case jobChat:
+			var id int64
+			var ok bool
+			id, ok, err = h.sessions.SaveChat(ctx, j.roomID, j.chat.msg)
+			if !ok {
+				id = 0
+			}
+			j.chat.deliver(id)
 		}
 		if err != nil {
 			h.log.Error("session record failed", slog.String("room_id", j.roomID.String()), slog.Any("err", err))
@@ -453,6 +490,17 @@ func (h *Hub) recordLoop() {
 	}
 	for j := range h.jobs {
 		do(j)
+	}
+}
+
+// SetAllChat tells a running room that its "Semua" tab was toggled. A room
+// that is not running reads the value from the database on its next start.
+func (h *Hub) SetAllChat(roomID uuid.UUID, enabled bool) {
+	h.mu.Lock()
+	r := h.rooms[roomID]
+	h.mu.Unlock()
+	if r != nil {
+		r.post(roomStateCmd{allChat: enabled})
 	}
 }
 
