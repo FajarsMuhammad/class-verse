@@ -4,862 +4,1146 @@
  */
 
 export interface paths {
-    "/api/auth/register": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["register"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/verify-email": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["verifyEmail"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/resend-otp": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["resendOtp"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Memakai cookie `kv_refresh`; header Origin wajib sama dengan FRONTEND_URL. */
-        post: operations["refresh"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["logout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/google/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["googleStart"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/google/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["googleCallback"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMe"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["updateMe"];
-        trace?: never;
-    };
-    "/api/orgs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createOrg"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/orgs/{org_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                org_id: components["parameters"]["OrgID"];
-            };
-            cookie?: never;
-        };
-        get: operations["getOrg"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/orgs/{org_id}/invites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                org_id: components["parameters"]["OrgID"];
-            };
-            cookie?: never;
-        };
-        /** @description Undangan aktif (belum kedaluwarsa, dicabut, atau habis), terbaru dulu. */
-        get: operations["listInvites"];
-        put?: never;
-        post: operations["createInvite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/orgs/{org_id}/invites/{invite_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                org_id: components["parameters"]["OrgID"];
-                invite_id: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["revokeInvite"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/invites/{code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
-                code: components["parameters"]["InviteCode"];
-            };
-            cookie?: never;
-        };
-        get: operations["previewInvite"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/invites/{code}/accept": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
-                code: components["parameters"]["InviteCode"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["acceptInvite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-}
-export type webhooks = Record<string, never>;
-export interface components {
-    schemas: {
-        ErrorResponse: {
-            error: {
-                code: string;
-                message: string;
-                fields?: {
-                    [key: string]: string;
-                };
-            };
-        };
-        AccessTokenResponse: {
-            access_token: string;
-        };
-        RegisterRequest: {
-            email: string;
-            password: string;
-            display_name: string;
-            /** Format: date */
-            birth_date: string;
-        };
-        VerifyEmailRequest: {
-            email: string;
-            code: string;
-        };
-        EmailRequest: {
-            email: string;
-        };
-        LoginRequest: {
-            email: string;
-            password: string;
-        };
-        /** @enum {string} */
-        Role: "admin" | "teacher" | "participant";
-        /** @enum {string} */
-        InviteRole: "teacher" | "participant";
-        OrgSummary: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            slug: string;
-            role: components["schemas"]["Role"];
-        };
-        Me: {
-            /** Format: uuid */
-            id: string;
-            email: string;
-            display_name: string;
-            /** Format: date */
-            birth_date: string | null;
-            avatar_key: string;
-            needs_profile: boolean;
-            orgs: components["schemas"]["OrgSummary"][];
-        };
-        UpdateMeRequest: {
-            display_name?: string;
-            /** Format: date */
-            birth_date?: string;
-        };
-        CreateOrgRequest: {
-            name: string;
-            slug: string;
-            /** @description URL https opsional */
-            logo_url?: string | null;
-        };
-        Organization: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            slug: string;
-            logo_url: string | null;
-            role: components["schemas"]["Role"];
-            /** Format: date-time */
-            created_at: string;
-        };
-        CreateInviteRequest: {
-            role: components["schemas"]["InviteRole"];
-            /** @default 7 */
-            expires_in_days: number;
-            max_uses?: number | null;
-        };
-        Invite: {
-            /** Format: uuid */
-            id: string;
-            /** @description Bentuk tampilan ABCD-EFGH */
-            code: string;
-            link: string;
-            role: components["schemas"]["InviteRole"];
-            max_uses: number | null;
-            used_count: number;
-            /** Format: date-time */
-            expires_at: string;
-            /** Format: uuid */
-            created_by: string;
-            /** Format: date-time */
-            created_at: string;
-        };
-        InviteList: {
-            items: components["schemas"]["Invite"][];
-            next_cursor: string | null;
-        };
-        InvitePreview: {
-            org_name: string;
-            role: components["schemas"]["InviteRole"];
-        };
-        Membership: {
-            /** Format: uuid */
-            org_id: string;
-            /** Format: uuid */
-            user_id: string;
-            role: components["schemas"]["Role"];
-            /** Format: date-time */
-            joined_at: string;
-        };
-    };
-    responses: {
-        /** @description Error */
-        Error: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description validation_failed, detail di error.fields */
-        ValidationFailed: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description unauthenticated */
-        Unauthenticated: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description forbidden atau profile_incomplete */
-        Forbidden: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description not_found */
-        NotFound: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description conflict */
-        Conflict: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description invite_expired (kedaluwarsa, dicabut, atau kuota habis) */
-        InviteExpired: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description rate_limited; lihat header Retry-After */
-        RateLimited: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
-        /** @description Access token; cookie kv_refresh disetel */
-        AccessToken: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["AccessTokenResponse"];
-            };
-        };
-    };
+  '/api/auth/register': {
     parameters: {
-        OrgID: string;
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['register']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/auth/verify-email': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['verifyEmail']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/auth/resend-otp': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['resendOtp']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/auth/login': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['login']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/auth/refresh': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Memakai cookie `kv_refresh`; header Origin wajib sama dengan FRONTEND_URL. */
+    post: operations['refresh']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/auth/logout': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['logout']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/auth/google/start': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['googleStart']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/auth/google/callback': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['googleCallback']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/me': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get: operations['getMe']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch: operations['updateMe']
+    trace?: never
+  }
+  '/api/maps/{map_key}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** @description File peta Tiled (.tmj). Publik; ETag untuk revalidasi. */
+    get: operations['getMap']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/orgs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['createOrg']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/orgs/{org_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    get: operations['getOrg']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/orgs/{org_id}/invites': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    /** @description Undangan aktif (belum kedaluwarsa, dicabut, atau habis), terbaru dulu. */
+    get: operations['listInvites']
+    put?: never
+    post: operations['createInvite']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/orgs/{org_id}/invites/{invite_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+        invite_id: string
+      }
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete: operations['revokeInvite']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/invites/{code}': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
         /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
-        InviteCode: string;
-    };
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+        code: components['parameters']['InviteCode']
+      }
+      cookie?: never
+    }
+    get: operations['previewInvite']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/invites/{code}/accept': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+        code: components['parameters']['InviteCode']
+      }
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations['acceptInvite']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/orgs/{org_id}/rooms': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    /** @description Ruang non-arsip selain peta sekolah, terbaru dulu. Ruang Guru hanya untuk pengajar/admin. */
+    get: operations['listRooms']
+    put?: never
+    post: operations['createRoom']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/rooms/{room_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        room_id: string
+      }
+      cookie?: never
+    }
+    get: operations['getRoom']
+    put?: never
+    post?: never
+    delete: operations['archiveRoom']
+    options?: never
+    head?: never
+    /** @description Hanya nama dan jadwal. `scheduled_at` null membuka ruang sekarang. */
+    patch: operations['updateRoom']
+    trace?: never
+  }
 }
-export type $defs = Record<string, never>;
+export type webhooks = Record<string, never>
+export interface components {
+  schemas: {
+    ErrorResponse: {
+      error: {
+        code: string
+        message: string
+        fields?: {
+          [key: string]: string
+        }
+      }
+    }
+    AccessTokenResponse: {
+      access_token: string
+    }
+    RegisterRequest: {
+      email: string
+      password: string
+      display_name: string
+      /** Format: date */
+      birth_date: string
+    }
+    VerifyEmailRequest: {
+      email: string
+      code: string
+    }
+    EmailRequest: {
+      email: string
+    }
+    LoginRequest: {
+      email: string
+      password: string
+    }
+    /** @enum {string} */
+    Role: 'admin' | 'teacher' | 'participant'
+    /** @enum {string} */
+    InviteRole: 'teacher' | 'participant'
+    OrgSummary: {
+      /** Format: uuid */
+      id: string
+      name: string
+      slug: string
+      role: components['schemas']['Role']
+    }
+    Me: {
+      /** Format: uuid */
+      id: string
+      email: string
+      display_name: string
+      /** Format: date */
+      birth_date: string | null
+      avatar_key: string
+      needs_profile: boolean
+      orgs: components['schemas']['OrgSummary'][]
+    }
+    UpdateMeRequest: {
+      /** @description NFC, trimmed, repeated spaces collapsed; prohibited words rejected */
+      display_name?: string
+      /** Format: date */
+      birth_date?: string
+      /** @enum {string} */
+      avatar_key?:
+        | 'default'
+        | 'round-nila'
+        | 'round-mangga'
+        | 'cap-nila'
+        | 'cap-mangga'
+        | 'glasses-nila'
+        | 'glasses-mangga'
+        | 'headset-nila'
+        | 'headset-mangga'
+        | 'bun-nila'
+        | 'bun-mangga'
+        | 'beret-nila'
+        | 'beret-mangga'
+    }
+    CreateOrgRequest: {
+      name: string
+      slug: string
+      /** @description URL https opsional */
+      logo_url?: string | null
+    }
+    Organization: {
+      /** Format: uuid */
+      id: string
+      /**
+       * Format: uuid
+       * @description Room peta sekolah; dibuka lewat /ws/rooms/{campus_room_id}
+       */
+      campus_room_id: string
+      name: string
+      slug: string
+      logo_url: string | null
+      role: components['schemas']['Role']
+      /** Format: date-time */
+      created_at: string
+    }
+    CreateInviteRequest: {
+      role: components['schemas']['InviteRole']
+      /** @default 7 */
+      expires_in_days: number
+      max_uses?: number | null
+    }
+    Invite: {
+      /** Format: uuid */
+      id: string
+      /** @description Bentuk tampilan ABCD-EFGH */
+      code: string
+      link: string
+      role: components['schemas']['InviteRole']
+      max_uses: number | null
+      used_count: number
+      /** Format: date-time */
+      expires_at: string
+      /** Format: uuid */
+      created_by: string
+      /** Format: date-time */
+      created_at: string
+    }
+    /** @enum {string} */
+    RoomMap: 'classroom' | 'garden'
+    CreateRoomRequest: {
+      name: string
+      map_key: components['schemas']['RoomMap']
+      building_key: string
+      /** Format: date-time */
+      scheduled_at?: string | null
+    }
+    UpdateRoomRequest: {
+      name?: string
+      /** Format: date-time */
+      scheduled_at?: string | null
+      /** @description Tab chat "Semua" boleh dipakai */
+      all_chat_enabled?: boolean
+    }
+    Room: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      org_id: string
+      name: string
+      map_key: components['schemas']['RoomMap']
+      building_key: string
+      capacity: number
+      /** Format: date-time */
+      scheduled_at: string | null
+      /** Format: date-time */
+      created_at: string
+      /** @description Terhubung + grace reconnect + reservasi travel */
+      people: number
+      /** @description Sesi terbuka dengan people > 0 */
+      live: boolean
+      all_chat_enabled: boolean
+    }
+    RoomList: {
+      items: components['schemas']['Room'][]
+      next_cursor: string | null
+    }
+    InviteList: {
+      items: components['schemas']['Invite'][]
+      next_cursor: string | null
+    }
+    InvitePreview: {
+      org_name: string
+      role: components['schemas']['InviteRole']
+    }
+    Membership: {
+      /** Format: uuid */
+      org_id: string
+      /** Format: uuid */
+      user_id: string
+      role: components['schemas']['Role']
+      /** Format: date-time */
+      joined_at: string
+    }
+  }
+  responses: {
+    /** @description Error */
+    Error: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description validation_failed, detail di error.fields */
+    ValidationFailed: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description unauthenticated */
+    Unauthenticated: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description forbidden atau profile_incomplete */
+    Forbidden: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description not_found */
+    NotFound: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description conflict */
+    Conflict: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description invite_expired (kedaluwarsa, dicabut, atau kuota habis) */
+    InviteExpired: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description rate_limited; lihat header Retry-After */
+    RateLimited: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['ErrorResponse']
+      }
+    }
+    /** @description Access token; cookie kv_refresh disetel */
+    AccessToken: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        'application/json': components['schemas']['AccessTokenResponse']
+      }
+    }
+  }
+  parameters: {
+    OrgID: string
+    /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+    InviteCode: string
+  }
+  requestBodies: never
+  headers: never
+  pathItems: never
+}
+export type $defs = Record<string, never>
 export interface operations {
-    register: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegisterRequest"];
-            };
-        };
-        responses: {
-            /** @description OTP dikirim (jawaban sama walau email sudah terdaftar) */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    verifyEmail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VerifyEmailRequest"];
-            };
-        };
-        responses: {
-            200: components["responses"]["AccessToken"];
-            400: components["responses"]["Error"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    resendOtp: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmailRequest"];
-            };
-        };
-        responses: {
-            /** @description OTP dikirim jika akun belum terverifikasi */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    login: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginRequest"];
-            };
-        };
-        responses: {
-            200: components["responses"]["AccessToken"];
-            401: components["responses"]["Error"];
-            403: components["responses"]["Error"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    refresh: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: components["responses"]["AccessToken"];
-            401: components["responses"]["Error"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    logout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Family refresh token dicabut */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    googleStart: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Redirect ke Google */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    googleCallback: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Redirect ke FRONTEND_URL/auth/callback (atau ?error=<code>) */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getMe: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Profil dan organisasi */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Me"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-        };
-    };
-    updateMe: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateMeRequest"];
-            };
-        };
-        responses: {
-            /** @description Profil setelah diubah */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Me"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            401: components["responses"]["Unauthenticated"];
-        };
-    };
-    createOrg: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateOrgRequest"];
-            };
-        };
-        responses: {
-            /** @description Organisasi dibuat; pembuat jadi admin; peta sekolah dibuat */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Organization"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    getOrg: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                org_id: components["parameters"]["OrgID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Detail organisasi dan role pemanggil */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Organization"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    listInvites: {
-        parameters: {
-            query?: {
-                limit?: number;
-                cursor?: string;
-            };
-            header?: never;
-            path: {
-                org_id: components["parameters"]["OrgID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Daftar undangan */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InviteList"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    createInvite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                org_id: components["parameters"]["OrgID"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateInviteRequest"];
-            };
-        };
-        responses: {
-            /** @description Undangan dibuat */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Invite"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    revokeInvite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                org_id: components["parameters"]["OrgID"];
-                invite_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Undangan dicabut */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    previewInvite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
-                code: components["parameters"]["InviteCode"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Nama organisasi dan role */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvitePreview"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            404: components["responses"]["NotFound"];
-            410: components["responses"]["InviteExpired"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    acceptInvite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
-                code: components["parameters"]["InviteCode"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Bergabung ke organisasi */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Membership"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            410: components["responses"]["InviteExpired"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
+  register: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RegisterRequest']
+      }
+    }
+    responses: {
+      /** @description OTP dikirim (jawaban sama walau email sudah terdaftar) */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: components['responses']['ValidationFailed']
+      429: components['responses']['RateLimited']
+    }
+  }
+  verifyEmail: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VerifyEmailRequest']
+      }
+    }
+    responses: {
+      200: components['responses']['AccessToken']
+      400: components['responses']['Error']
+      429: components['responses']['RateLimited']
+    }
+  }
+  resendOtp: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmailRequest']
+      }
+    }
+    responses: {
+      /** @description OTP dikirim jika akun belum terverifikasi */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: components['responses']['ValidationFailed']
+      429: components['responses']['RateLimited']
+    }
+  }
+  login: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LoginRequest']
+      }
+    }
+    responses: {
+      200: components['responses']['AccessToken']
+      401: components['responses']['Error']
+      403: components['responses']['Error']
+      429: components['responses']['RateLimited']
+    }
+  }
+  refresh: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: components['responses']['AccessToken']
+      401: components['responses']['Error']
+      403: components['responses']['Forbidden']
+    }
+  }
+  logout: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Family refresh token dicabut */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: components['responses']['Forbidden']
+    }
+  }
+  googleStart: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Redirect ke Google */
+      302: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      404: components['responses']['NotFound']
+    }
+  }
+  googleCallback: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Redirect ke FRONTEND_URL/auth/callback (atau ?error=<code>) */
+      302: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  getMe: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Profil dan organisasi */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Me']
+        }
+      }
+      401: components['responses']['Unauthenticated']
+    }
+  }
+  updateMe: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateMeRequest']
+      }
+    }
+    responses: {
+      /** @description Profil setelah diubah */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Me']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+    }
+  }
+  getMap: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        map_key: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Peta Tiled JSON */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+      /** @description Tidak berubah (If-None-Match) */
+      304: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      404: components['responses']['NotFound']
+    }
+  }
+  createOrg: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateOrgRequest']
+      }
+    }
+    responses: {
+      /** @description Organisasi dibuat; pembuat jadi admin; peta sekolah dibuat */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Organization']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      409: components['responses']['Conflict']
+    }
+  }
+  getOrg: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Detail organisasi dan role pemanggil */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Organization']
+        }
+      }
+      401: components['responses']['Unauthenticated']
+      404: components['responses']['NotFound']
+    }
+  }
+  listInvites: {
+    parameters: {
+      query?: {
+        limit?: number
+        cursor?: string
+      }
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Daftar undangan */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InviteList']
+        }
+      }
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
+  createInvite: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateInviteRequest']
+      }
+    }
+    responses: {
+      /** @description Undangan dibuat */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Invite']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
+  revokeInvite: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+        invite_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Undangan dicabut */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
+  previewInvite: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+        code: components['parameters']['InviteCode']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Nama organisasi dan role */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InvitePreview']
+        }
+      }
+      401: components['responses']['Unauthenticated']
+      404: components['responses']['NotFound']
+      410: components['responses']['InviteExpired']
+      429: components['responses']['RateLimited']
+    }
+  }
+  acceptInvite: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+        code: components['parameters']['InviteCode']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Bergabung ke organisasi */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Membership']
+        }
+      }
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+      409: components['responses']['Conflict']
+      410: components['responses']['InviteExpired']
+      429: components['responses']['RateLimited']
+    }
+  }
+  listRooms: {
+    parameters: {
+      query?: {
+        building?: string
+        limit?: number
+        cursor?: string
+      }
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Daftar ruang */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RoomList']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      404: components['responses']['NotFound']
+    }
+  }
+  createRoom: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateRoomRequest']
+      }
+    }
+    responses: {
+      /** @description Ruang dibuat */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Room']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
+  getRoom: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        room_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Detail ruang */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Room']
+        }
+      }
+      401: components['responses']['Unauthenticated']
+      404: components['responses']['NotFound']
+    }
+  }
+  archiveRoom: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        room_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Ruang diarsipkan */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+      409: components['responses']['Conflict']
+    }
+  }
+  updateRoom: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        room_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateRoomRequest']
+      }
+    }
+    responses: {
+      /** @description Ruang diperbarui */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Room']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
 }

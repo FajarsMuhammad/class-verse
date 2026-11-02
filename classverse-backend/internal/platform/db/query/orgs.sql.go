@@ -115,9 +115,10 @@ func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (O
 }
 
 const getOrgForMember = `-- name: GetOrgForMember :one
-SELECT o.id, o.name, o.slug, o.logo_url, o.created_at, m.role
+SELECT o.id, o.name, o.slug, o.logo_url, o.created_at, m.role, r.id AS campus_room_id
 FROM organizations o
 JOIN memberships m ON m.org_id = o.id
+JOIN rooms r ON r.org_id = o.id AND r.map_key = 'campus'
 WHERE o.id = $1 AND m.user_id = $2
 `
 
@@ -127,15 +128,16 @@ type GetOrgForMemberParams struct {
 }
 
 type GetOrgForMemberRow struct {
-	ID        uuid.UUID
-	Name      string
-	Slug      string
-	LogoUrl   pgtype.Text
-	CreatedAt pgtype.Timestamptz
-	Role      OrgRole
+	ID           uuid.UUID
+	Name         string
+	Slug         string
+	LogoUrl      pgtype.Text
+	CreatedAt    pgtype.Timestamptz
+	Role         OrgRole
+	CampusRoomID uuid.UUID
 }
 
-// Organization plus the caller's role; no row when the user is not a member.
+// Organization plus the caller's role and campus room; no row when the user is not a member.
 func (q *Queries) GetOrgForMember(ctx context.Context, arg GetOrgForMemberParams) (GetOrgForMemberRow, error) {
 	row := q.db.QueryRow(ctx, getOrgForMember, arg.OrgID, arg.UserID)
 	var i GetOrgForMemberRow
@@ -146,6 +148,7 @@ func (q *Queries) GetOrgForMember(ctx context.Context, arg GetOrgForMemberParams
 		&i.LogoUrl,
 		&i.CreatedAt,
 		&i.Role,
+		&i.CampusRoomID,
 	)
 	return i, err
 }

@@ -48,6 +48,75 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for RoomMap.
+const (
+	Classroom RoomMap = "classroom"
+	Garden    RoomMap = "garden"
+)
+
+// Valid indicates whether the value is a known member of the RoomMap enum.
+func (e RoomMap) Valid() bool {
+	switch e {
+	case Classroom:
+		return true
+	case Garden:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateMeRequestAvatarKey.
+const (
+	BeretMangga   UpdateMeRequestAvatarKey = "beret-mangga"
+	BeretNila     UpdateMeRequestAvatarKey = "beret-nila"
+	BunMangga     UpdateMeRequestAvatarKey = "bun-mangga"
+	BunNila       UpdateMeRequestAvatarKey = "bun-nila"
+	CapMangga     UpdateMeRequestAvatarKey = "cap-mangga"
+	CapNila       UpdateMeRequestAvatarKey = "cap-nila"
+	Default       UpdateMeRequestAvatarKey = "default"
+	GlassesMangga UpdateMeRequestAvatarKey = "glasses-mangga"
+	GlassesNila   UpdateMeRequestAvatarKey = "glasses-nila"
+	HeadsetMangga UpdateMeRequestAvatarKey = "headset-mangga"
+	HeadsetNila   UpdateMeRequestAvatarKey = "headset-nila"
+	RoundMangga   UpdateMeRequestAvatarKey = "round-mangga"
+	RoundNila     UpdateMeRequestAvatarKey = "round-nila"
+)
+
+// Valid indicates whether the value is a known member of the UpdateMeRequestAvatarKey enum.
+func (e UpdateMeRequestAvatarKey) Valid() bool {
+	switch e {
+	case BeretMangga:
+		return true
+	case BeretNila:
+		return true
+	case BunMangga:
+		return true
+	case BunNila:
+		return true
+	case CapMangga:
+		return true
+	case CapNila:
+		return true
+	case Default:
+		return true
+	case GlassesMangga:
+		return true
+	case GlassesNila:
+		return true
+	case HeadsetMangga:
+		return true
+	case HeadsetNila:
+		return true
+	case RoundMangga:
+		return true
+	case RoundNila:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessTokenResponse defines model for AccessTokenResponse.
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -66,6 +135,14 @@ type CreateOrgRequest struct {
 	LogoUrl *string `json:"logo_url,omitempty"`
 	Name    string  `json:"name"`
 	Slug    string  `json:"slug"`
+}
+
+// CreateRoomRequest defines model for CreateRoomRequest.
+type CreateRoomRequest struct {
+	BuildingKey string     `json:"building_key"`
+	MapKey      RoomMap    `json:"map_key"`
+	Name        string     `json:"name"`
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 }
 
 // EmailRequest defines model for EmailRequest.
@@ -146,12 +223,14 @@ type OrgSummary struct {
 
 // Organization defines model for Organization.
 type Organization struct {
-	CreatedAt time.Time          `json:"created_at"`
-	Id        openapi_types.UUID `json:"id"`
-	LogoUrl   *string            `json:"logo_url"`
-	Name      string             `json:"name"`
-	Role      Role               `json:"role"`
-	Slug      string             `json:"slug"`
+	// CampusRoomId Room peta sekolah; dibuka lewat /ws/rooms/{campus_room_id}
+	CampusRoomId openapi_types.UUID `json:"campus_room_id"`
+	CreatedAt    time.Time          `json:"created_at"`
+	Id           openapi_types.UUID `json:"id"`
+	LogoUrl      *string            `json:"logo_url"`
+	Name         string             `json:"name"`
+	Role         Role               `json:"role"`
+	Slug         string             `json:"slug"`
 }
 
 // RegisterRequest defines model for RegisterRequest.
@@ -165,10 +244,52 @@ type RegisterRequest struct {
 // Role defines model for Role.
 type Role string
 
+// Room defines model for Room.
+type Room struct {
+	AllChatEnabled bool               `json:"all_chat_enabled"`
+	BuildingKey    string             `json:"building_key"`
+	Capacity       int                `json:"capacity"`
+	CreatedAt      time.Time          `json:"created_at"`
+	Id             openapi_types.UUID `json:"id"`
+
+	// Live Sesi terbuka dengan people > 0
+	Live   bool               `json:"live"`
+	MapKey RoomMap            `json:"map_key"`
+	Name   string             `json:"name"`
+	OrgId  openapi_types.UUID `json:"org_id"`
+
+	// People Terhubung + grace reconnect + reservasi travel
+	People      int        `json:"people"`
+	ScheduledAt *time.Time `json:"scheduled_at"`
+}
+
+// RoomList defines model for RoomList.
+type RoomList struct {
+	Items      []Room  `json:"items"`
+	NextCursor *string `json:"next_cursor"`
+}
+
+// RoomMap defines model for RoomMap.
+type RoomMap string
+
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
-	BirthDate   *openapi_types.Date `json:"birth_date,omitempty"`
-	DisplayName *string             `json:"display_name,omitempty"`
+	AvatarKey *UpdateMeRequestAvatarKey `json:"avatar_key,omitempty"`
+	BirthDate *openapi_types.Date       `json:"birth_date,omitempty"`
+
+	// DisplayName NFC, trimmed, repeated spaces collapsed; prohibited words rejected
+	DisplayName *string `json:"display_name,omitempty"`
+}
+
+// UpdateMeRequestAvatarKey defines model for UpdateMeRequest.AvatarKey.
+type UpdateMeRequestAvatarKey string
+
+// UpdateRoomRequest defines model for UpdateRoomRequest.
+type UpdateRoomRequest struct {
+	// AllChatEnabled Tab chat "Semua" boleh dipakai
+	AllChatEnabled *bool      `json:"all_chat_enabled,omitempty"`
+	Name           *string    `json:"name,omitempty"`
+	ScheduledAt    *time.Time `json:"scheduled_at,omitempty"`
 }
 
 // VerifyEmailRequest defines model for VerifyEmailRequest.
@@ -216,6 +337,13 @@ type ListInvitesParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ListRoomsParams defines parameters for ListRooms.
+type ListRoomsParams struct {
+	Building *string `form:"building,omitempty" json:"building,omitempty"`
+	Limit    *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor   *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -236,3 +364,9 @@ type CreateOrgJSONRequestBody = CreateOrgRequest
 
 // CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
 type CreateInviteJSONRequestBody = CreateInviteRequest
+
+// CreateRoomJSONRequestBody defines body for CreateRoom for application/json ContentType.
+type CreateRoomJSONRequestBody = CreateRoomRequest
+
+// UpdateRoomJSONRequestBody defines body for UpdateRoom for application/json ContentType.
+type UpdateRoomJSONRequestBody = UpdateRoomRequest

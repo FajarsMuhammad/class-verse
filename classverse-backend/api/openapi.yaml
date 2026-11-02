@@ -120,6 +120,22 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
 
+  /api/maps/{map_key}:
+    get:
+      operationId: getMap
+      description: File peta Tiled (.tmj). Publik; ETag untuk revalidasi.
+      security: []
+      parameters:
+        - { name: map_key, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Peta Tiled JSON
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "304": { description: "Tidak berubah (If-None-Match)" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/orgs:
     post:
       operationId: createOrg
@@ -229,6 +245,81 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "410": { $ref: "#/components/responses/InviteExpired" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/orgs/{org_id}/rooms:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listRooms
+      description: Ruang non-arsip selain peta sekolah, terbaru dulu. Ruang Guru hanya untuk pengajar/admin.
+      parameters:
+        - { name: building, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Daftar ruang
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoomList" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createRoom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRoomRequest" }
+      responses:
+        "201":
+          description: Ruang dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{room_id}:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getRoom
+      responses:
+        "200":
+          description: Detail ruang
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateRoom
+      description: Hanya nama dan jadwal. `scheduled_at` null membuka ruang sekarang.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRoomRequest" }
+      responses:
+        "200":
+          description: Ruang diperbarui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Room" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: archiveRoom
+      responses:
+        "204": { description: "Ruang diarsipkan" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
 components:
   securitySchemes:
@@ -375,9 +466,13 @@ components:
           items: { $ref: "#/components/schemas/OrgSummary" }
     UpdateMeRequest:
       type: object
+      additionalProperties: false
       properties:
-        display_name: { type: string }
+        display_name: { type: string, minLength: 3, maxLength: 24, description: "NFC, trimmed, repeated spaces collapsed; prohibited words rejected" }
         birth_date: { type: string, format: date }
+        avatar_key:
+          type: string
+          enum: [default, round-nila, round-mangga, cap-nila, cap-mangga, glasses-nila, glasses-mangga, headset-nila, headset-mangga, bun-nila, bun-mangga, beret-nila, beret-mangga]
 
     CreateOrgRequest:
       type: object
@@ -388,9 +483,10 @@ components:
         logo_url: { type: string, nullable: true, description: "URL https opsional" }
     Organization:
       type: object
-      required: [id, name, slug, logo_url, role, created_at]
+      required: [id, name, slug, logo_url, role, campus_room_id, created_at]
       properties:
         id: { type: string, format: uuid }
+        campus_room_id: { type: string, format: uuid, description: "Room peta sekolah; dibuka lewat /ws/rooms/{campus_room_id}" }
         name: { type: string }
         slug: { type: string }
         logo_url: { type: string, nullable: true }
@@ -417,6 +513,48 @@ components:
         expires_at: { type: string, format: date-time }
         created_by: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
+    RoomMap:
+      type: string
+      enum: [classroom, garden]
+    CreateRoomRequest:
+      type: object
+      additionalProperties: false
+      required: [name, map_key, building_key]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 60 }
+        map_key: { $ref: "#/components/schemas/RoomMap" }
+        building_key: { type: string }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+    UpdateRoomRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 3, maxLength: 60 }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+        all_chat_enabled: { type: boolean, description: Tab chat "Semua" boleh dipakai }
+    Room:
+      type: object
+      required: [id, org_id, name, map_key, building_key, capacity, scheduled_at, created_at, people, live, all_chat_enabled]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        name: { type: string }
+        map_key: { $ref: "#/components/schemas/RoomMap" }
+        building_key: { type: string }
+        capacity: { type: integer }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        people: { type: integer, description: "Terhubung + grace reconnect + reservasi travel" }
+        live: { type: boolean, description: "Sesi terbuka dengan people > 0" }
+        all_chat_enabled: { type: boolean }
+    RoomList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Room" }
+        next_cursor: { type: string, nullable: true }
     InviteList:
       type: object
       required: [items, next_cursor]

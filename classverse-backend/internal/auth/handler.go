@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -304,16 +305,39 @@ func (h *Handler) writeMe(w http.ResponseWriter, r *http.Request, p Profile) err
 	return nil
 }
 
+// SetProfilePublisher wires realtime notifications before requests are served.
+func (h *Handler) SetProfilePublisher(p ProfilePublisher) { h.svc.SetProfilePublisher(p) }
+
 type updateMeRequest struct {
 	DisplayName *string `json:"display_name"`
 	BirthDate   *string `json:"birth_date"`
+	AvatarKey   *string `json:"avatar_key"`
 }
 
 func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) error {
 	id, _ := UserID(r.Context())
-	var req updateMeRequest
-	if err := decodeJSON(r, &req); err != nil {
+	var fields map[string]json.RawMessage
+	if err := decodeJSON(r, &fields); err != nil {
 		return err
+	}
+	if fields == nil {
+		return httpx.ValidationFailed(map[string]string{"profile": "Profil harus berupa objek"})
+	}
+	for key, value := range fields {
+		if key != "display_name" && key != "birth_date" && key != "avatar_key" {
+			return httpx.ValidationFailed(map[string]string{key: "Field tidak dikenal"})
+		}
+		if string(value) == "null" {
+			return httpx.ValidationFailed(map[string]string{key: "Nilai tidak boleh null"})
+		}
+	}
+	data, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	var req updateMeRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return httpx.ValidationFailed(map[string]string{"profile": "Format profil tidak valid"})
 	}
 	p, err := h.svc.UpdateProfile(r.Context(), id, ProfileInput(req))
 	if err != nil {

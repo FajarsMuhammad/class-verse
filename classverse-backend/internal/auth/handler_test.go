@@ -128,6 +128,28 @@ func TestHandlerRegisterVerifyRefreshFlow(t *testing.T) {
 	}
 }
 
+func TestHandlerProfilePartial(t *testing.T) {
+	e := newEnv(t)
+	h := newTestServer(t, e, nil)
+	session, err := e.svc.GoogleLogin(context.Background(), GoogleIdentity{Subject: "profile", Email: "profile@b.co", EmailVerified: true, Name: "Ani"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{`{"display_name":null}`, `{"avatar_key":null}`, `{"birth_date":null}`, `{"avatar_key":"../file"}`, `{"display_name":"bangsat"}`} {
+		rec := do(h, http.MethodPatch, "/api/me", body, withBearer(session.AccessToken))
+		if rec.Code != http.StatusBadRequest || errorCode(t, rec) != "validation_failed" {
+			t.Fatalf("invalid profile status %d", rec.Code)
+		}
+	}
+	rec := do(h, http.MethodPatch, "/api/me", `{"avatar_key":"cap-mangga"}`, withBearer(session.AccessToken))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"display_name":"Ani"`) || !strings.Contains(rec.Body.String(), `"avatar_key":"cap-mangga"`) {
+		t.Fatal("partial profile update failed")
+	}
+	if rec := do(h, http.MethodPatch, "/api/me", `{}`); rec.Code != http.StatusUnauthorized {
+		t.Fatal("unauthenticated patch accepted")
+	}
+}
+
 func TestHandlerErrors(t *testing.T) {
 	e := newEnv(t)
 	h := newTestServer(t, e, nil)

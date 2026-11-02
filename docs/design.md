@@ -160,6 +160,19 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 **Peta sekolah.** Setiap organisasi punya satu room dengan `map_key = 'campus'`, dibuat otomatis saat organisasi dibuat; semua peserta muncul di sini setelah masuk. Kapasitasnya 200, jadi `snapshot` hanya berisi avatar dalam radius 24 tile dari penerima (area of interest berbasis grid sel 8×8 tile), agar bandwidth per peserta tetap kecil. Gedung dan pintunya didefinisikan di layer objek file Tiled peta sekolah; setiap ruang menyimpan `building_key` gedungnya. Satu koneksi WebSocket dipakai sepanjang sesi: `travel` memindahkan peserta antar room di dalam hub, dan keluar dari ruang mengembalikannya ke pintu gedung asal.
 
+**Detail slice 3 (real-time inti).**
+
+- *Peta.* File Tiled `.tmj` ada di `classverse-backend/maps/`, di-embed ke binary, dan disajikan `GET /api/maps/{map_key}` (publik, bukan data organisasi; `ETag` + `Cache-Control: no-cache`). Server dan Phaser membaca file yang sama. Tile 32 px. Layer tile `ground`, layer tile `collision` (tile ≠ 0 tidak bisa dilewati), layer objek `spawn` (persegi) dan `buildings` (persegi per gedung dengan properti `key`, `name`, `roof`, `staff_only`, plus objek titik `door` yang properti `building`-nya menunjuk `key`). Urutan id tile adalah kontrak di `maps/README.md`. Revisi D3-02 disetujui sesudah review visual: frontend menggambar ilustrasi flat utuh beresolusi 2× dari token `--map-*`/`--roof-*` dan bounds gedung Tiled, bukan atlas tile untuk tampilan gedung. Collision/spawn/pintu tetap mengikuti Tiled. Kamera overview menampilkan seluruh sekolah dan menyesuaikan resize; avatar dan label mempertahankan ukuran layar.
+- *Room peta sekolah.* `GET /api/orgs/{org_id}` mengembalikan `campus_room_id`; client membuka `/ws/rooms/{campus_room_id}`.
+- *Auth WebSocket.* Upgrade hanya dari Origin `FRONTEND_URL`. Pesan pertama wajib `auth {token}` dalam 5 detik; server memverifikasi JWT dan membership organisasi pemilik room lalu mengirim `welcome`. Gagal → `error` lalu close 4401 (token), 4403 (tidak boleh), 4404 (room tidak ada/bukan anggota).
+- *Satu koneksi per user.* Koneksi baru user yang sama menggantikan yang lama; yang lama ditutup dengan 4409 `replaced` dan client tidak reconnect otomatis.
+- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum per peta dari properti peta Tiled `walk_speed` (px/detik, bilangan bulat 80–400, default 160; disetujui setelah review slice 5 karena peta sekolah tampil di zoom ±0,4 sehingga 160 px/detik terasa lambat): `campus` 320, `classroom`/`garden` 160. Server dan client membaca angka yang sama dari file peta. Kecepatan ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah `walk_speed` × 1,25 px per detik, maksimal setengah detik gerak, dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi.
+- *Pesan.* `welcome {self_id, room_id, map_key, participants: [{id, name, avatar, role, x, y, dir}]}`; `joined` = satu participant; `left {id}`; `snapshot {p: [{id, x, y, dir}], out: [id]}` dengan `out` = id yang keluar dari area of interest penerima; `ping {ts}` → `pong {ts}`. `seq` server naik per koneksi.
+- *Area of interest* hanya di peta sekolah: grid sel 8×8 tile, radius 24 tile; penerima mendapat avatar yang berubah di radius dan avatar yang baru masuk radius. `joined`/`left` dikirim ke seluruh room.
+- *Reconnect.* Putus → avatar ditahan 30 detik dan tetap terlihat. Kembali ke room yang sama dalam 30 detik → posisi lama tanpa `left`/`joined`. Client backoff 1, 2, 4, 8 detik (8 berulang).
+- *Siklus room.* Hub (registry, satu mutex) membuat goroutine room saat orang pertama masuk dan menghentikannya setelah kosong 60 detik. Shutdown menutup koneksi dengan 1001. Sesi/kehadiran menyusul di slice 5.
+- *Client.* Klik untuk berjalan memakai A* di grid collision di client; server tetap memvalidasi setiap `move`. Avatar lain diinterpolasi dengan jeda render 100 ms. Name tag: pill putih, diri sendiri Tinta, pengajar/admin Nila.
+
 JSON dipilih untuk MVP karena mudah di-debug. Jika bandwidth jadi masalah, `snapshot` bisa dipindah ke format biner tanpa mengubah tipe pesan lain.
 
 ## Auth: JWT + refresh token + Google OAuth
@@ -470,6 +483,77 @@ Contoh potongan OpenAPI untuk satu endpoint:
       "410": { $ref: "#/components/responses/InviteExpired" }
 ```
 
+## Slice 4 — Profil dan avatar (P4-01…P4-05 disetujui)
+
+- Nama: Unicode NFC, trim dan gabungkan whitespace; 3–24 code point, tolak karakter kontrol/format.
+  Nama lama tidak dimigrasi; validasi berlaku saat nama dikirim. Registrasi memakai validator sama;
+  nama OAuth tidak valid diganti `Pengguna`. Filter awal daftar kecil milik proyek Indonesia/English,
+  case-insensitive kata utuh (huruf/angka sebagai batas), bukan substring; belum mendeteksi semua obfuscation.
+- `PATCH /api/me`: `display_name?`, `avatar_key?`, `birth_date?`; omitted tidak berubah, null ditolak,
+  validasi atomik sebelum update. Avatar allowlist enam aksesori × `nila`/`mangga`, key `<aksesori>-<warna>`;
+  `default` tetap sah dan fallback renderer. Tidak ada upload/URL bebas.
+- Setelah DB commit, publish identitas melalui inbox room: `profile_updated {id, name, avatar}`.
+  DB sumber kebenaran; publish gagal tidak mengubah sukses simpan. Reconnect membaca identitas terbaru.
+  Room hanya memperbarui peserta yang ada, tanpa mengubah posisi/kehadiran.
+- Header membuka dialog Profil: preview, nama, 12 radio avatar, Simpan/Batal; fokus native dialog,
+  loading, error per field dan status sukses. Nilai tersimpan hanya diganti respons server.
+
+## Slice 5 — Ruang dan travel (R5-01…R5-08 disetujui)
+
+- *Akses masuk.* Semua role wajib berdiri di pintu gedung; tidak ada teleport dari daftar/kelola ruang.
+  CTA kelola memakai **Lihat di peta**. Server memakai posisi resmi room asal, radius 48 px dari titik `door`.
+  Ruang Guru (`staff_only`) hanya teacher/admin. Non-member dan room organisasi lain tetap `not_found`.
+- *Jadwal.* `scheduled_at` null bisa dimasuki sekarang. Jadwal masa depan menolak participant (`scheduled`);
+  teacher/admin boleh masuk lebih awal. **Buka sekarang** = PATCH `scheduled_at: null`. Sesi dimulai saat kedatangan
+  pertama yang berhasil, bukan saat jam jadwal.
+- *Peta ruang.* `classroom` dan `garden` punya layer `ground`, `collision`, `spawn`, dan objek `exit`.
+  Kembali campus ke titik pintu gedung asal. Map/gedung ditetapkan saat create dan tidak bisa diubah.
+- *Travel atomik.* Travel per user diserialkan; DB admission dilakukan sebelum perubahan room. Hub memesan slot tujuan,
+  lalu meminta room asal melepas peserta setelah validasi posisi. Bila asal menolak/berhenti, reservasi dibatalkan dan
+  peserta tetap di asal. Commit memindahkan owner koneksi ke tujuan, observer asal menerima `left`, observer tujuan
+  menerima `joined`, client menerima `traveled` dengan payload `welcome` + `building_key`/`room_name`.
+  Kapasitas menghitung peserta terhubung, avatar grace, dan reservasi.
+- *Reconnect.* Hub menyimpan room terakhir yang sudah commit selama grace 30 detik. Reconnect apa pun dari room ID
+  organisasi yang sama memulihkan room itu bila masih sah; selain itu fallback ke campus. Cold WS langsung ke non-campus
+  ditolak `not_at_door`; URL WS tidak menjadi bypass.
+- *Sesi dan live.* Jumlah = terhubung + grace + reservasi. Live = sesi terbuka dengan jumlah > 0. Sesi kosong
+  ditutup setelah 5 menit; masuk kembali sebelum itu meneruskan sesi. Kehadiran dicatat sesudah commit dan ditutup saat
+  pindah/grace habis. Penulisan DB dilakukan worker hub; kegagalan dicatat tanpa memblokir room loop.
+  Index unik parsial menjamin satu sesi terbuka per room.
+- *REST.* Nama ruang 3–60 code point (NFC/trim). `GET /api/orgs/{org_id}/rooms?building=&cursor=&limit=`, POST,
+  GET/PATCH/DELETE `/api/rooms/{room_id}`. Kapasitas create selalu 40. PATCH hanya `name` dan `scheduled_at`.
+  DELETE soft archive hanya bila tidak ada peserta/reservasi/sesi terbuka (`409 room_busy`). Campus tidak bisa dibuat,
+  diubah, atau diarsip lewat endpoint ini. List/detail hanya untuk member; Ruang Guru disembunyikan dari participant.
+- *WS.* `travel {room_id}`; error `room_full`, `scheduled`, `not_at_door`, `forbidden`, `not_found`, `travel_in_progress`.
+  `buildings {items:[{building_key,people,live_rooms}]}` setiap 5 detik hanya untuk room campus dan sesudah filter role.
+
+## Slice 6 — Chat dan zona (C6-01…C6-10 disetujui)
+
+- *Dekat.* Penerima `near` = avatar terhubung dengan jarak Euclid titik kaki ≤ 160 px (5 tile) saat pesan diterima server;
+  pengirim selalu menerima salinannya. Berlaku di peta sekolah juga. Avatar dalam grace reconnect tidak menerima.
+- *Zona.* Layer objek `zones` pada classroom/garden: persegi dengan properti `key` unik, nama objek = label. Zona aktif =
+  persegi yang memuat titik kaki, dihitung server tiap tick; perubahan dikirim `zone {key, name}` hanya ke pemiliknya
+  (`key` kosong = keluar zona). Peta sekolah tanpa zona.
+- *Scope.* Tab Zona (hanya saat di zona) / Dekat / Semua. `zone` ditolak `not_in_zone` jika pengirim tidak di zona saat
+  diterima. `broadcast` untuk slice 7.
+- *Payload.* Client `chat {text, scope}`. Server `chat {id?, from:{id,name,role}, text, scope, zone?, at}`; `id` ada bila
+  pesan tersimpan. Riwayat tidak dikirim saat masuk/reconnect.
+- *Batas.* 1–500 code point setelah NFC + trim; karakter kontrol ditolak kecuali baris baru (dipadatkan maks 2 berturut).
+  3 pesan/detik, burst 5 (token bucket) → `rate_limited`.
+- *Filter.* Disamarkan, bukan ditolak: kata kasar (daftar proyek yang sama dengan nama tampilan, kata utuh) → `****`;
+  nomor HP Indonesia (`08…`, `+62…`, `62…`, 9–13 digit, boleh dipisah spasi/titik/strip) dan email → `[disembunyikan]`.
+  Alamat belum disaring otomatis (keterbatasan tercatat). Yang disimpan dan disiarkan hanya hasil filter.
+- *Penyimpanan.* Pesan di classroom/garden disimpan ke `chat_messages` (sesi terbuka) oleh worker hub, tanpa memblokir
+  room. Chat peta sekolah tidak disimpan (tidak ada sesi). Purge harian `created_at` > 30 hari dari `cmd/server`
+  (sekali saat start lalu tiap 24 jam). Log tanpa isi chat.
+- *Chat semua ruangan.* PATCH `/api/rooms/{room_id}` menerima `all_chat_enabled` (teacher/admin). Hub meneruskan ke room;
+  room menyiarkan `room_state {all_chat_enabled}`. Saat mati, scope `room` ditolak `all_chat_disabled`. Peta sekolah
+  selalu aktif. `welcome`/`traveled` membawa `all_chat_enabled`.
+- *Tampilan.* Zona: border putus-putus `--color-accent-line` + isi `--color-accent-soft` tipis; zona sendiri solid lebih
+  tebal + label "· kamu di sini". Lingkaran radius dekat putus-putus Nila di avatar sendiri. Panel kanan berisi tab chat.
+- *Aksesibilitas.* Log `role="log"` `aria-live="polite"`, input berlabel tersembunyi, Enter kirim / Shift+Enter baris baru,
+  tombol kirim 44×44 `aria-label`. Maks 200 pesan per tab di memori.
+
 ## Berikutnya
 
 Status Fase 2:
@@ -483,4 +567,4 @@ Status Fase 3: kerangka repo selesai (lihat `docs/tasks/phase-3.md`).
 Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhkannya:
 
 - [x] Lokasi `openapi.yaml`: `classverse-backend/api/openapi.yaml` (diputuskan untuk slice 2, lihat API contract).
-- [ ] Cara frontend mendapat file peta Tiled (dibutuhkan mulai slice 3). Server membaca `maps/` untuk collision dan zona, Phaser juga butuh file yang sama untuk render. Usulan: backend menyajikan `GET /api/maps/{map_key}` dari `maps/`, sehingga satu sumber dan tetap jalan setelah repo dipisah.
+- [x] Cara frontend mendapat file peta Tiled: backend menyajikan `GET /api/maps/{map_key}` dari `maps/` yang di-embed ke binary (diputuskan untuk slice 3, lihat Protokol real-time).

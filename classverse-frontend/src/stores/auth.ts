@@ -66,7 +66,11 @@ export const useAuthStore = defineStore('auth', () => {
     await loadMe()
   }
 
-  async function updateProfile(patch: { display_name?: string; birth_date?: string }) {
+  async function updateProfile(patch: {
+    display_name?: string
+    birth_date?: string
+    avatar_key?: string
+  }) {
     me.value = await authApi.updateMe(patch)
   }
 

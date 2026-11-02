@@ -49,6 +49,7 @@ RETURNING *;
 UPDATE users
 SET display_name = coalesce(sqlc.narg(display_name), display_name),
     birth_date   = coalesce(sqlc.narg(birth_date), birth_date),
+    avatar_key   = coalesce(sqlc.narg(avatar_key), avatar_key),
     updated_at   = sqlc.arg(now)
 WHERE id = sqlc.arg(id)
 RETURNING *;

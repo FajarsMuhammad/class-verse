@@ -2,7 +2,6 @@ import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vu
 
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
-import HomeView from '../views/HomeView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -23,7 +22,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView,
+      component: () => import('../views/HomeView.vue'),
       meta: { requiresAuth: true, requiresOrg: true },
     },
     {

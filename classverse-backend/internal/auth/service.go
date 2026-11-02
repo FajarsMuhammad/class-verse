@@ -64,6 +64,7 @@ type RegisterInput struct {
 type ProfileInput struct {
 	DisplayName *string
 	BirthDate   *string
+	AvatarKey   *string
 }
 
 // GoogleIdentity is the verified subset of a Google ID token.
@@ -83,7 +84,16 @@ type Service struct {
 	now       func() time.Time
 	log       *slog.Logger
 	dummyHash string
+	profiles  ProfilePublisher
 }
+
+// ProfilePublisher notifies online participants after a committed profile update.
+type ProfilePublisher interface {
+	PublishProfile(ctx context.Context, userID uuid.UUID, name, avatar string) error
+}
+
+// SetProfilePublisher wires the optional realtime publisher before serving requests.
+func (s *Service) SetProfilePublisher(p ProfilePublisher) { s.profiles = p }
 
 // NewService wires the auth service.
 func NewService(store *Store, tokens *Tokens, mailer Mailer, otpKey []byte, now func() time.Time, log *slog.Logger) (*Service, error) {
@@ -503,6 +513,12 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, in Profil
 	if in.BirthDate != nil {
 		params.BirthDate = pgDate(validateBirthDate(&v, *in.BirthDate, s.now()))
 	}
+	if in.AvatarKey != nil {
+		if !validAvatar(*in.AvatarKey) {
+			v.add("avatar_key", "Pilih avatar yang tersedia")
+		}
+		params.AvatarKey = pgtype.Text{String: *in.AvatarKey, Valid: true}
+	}
 	if err := v.orNil(); err != nil {
 		return Profile{}, err
 	}
@@ -512,6 +528,11 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, in Profil
 	}
 	if err != nil {
 		return Profile{}, fmt.Errorf("update profile: %w", err)
+	}
+	if s.profiles != nil && (in.DisplayName != nil || in.AvatarKey != nil) {
+		if err := s.profiles.PublishProfile(ctx, u.ID, u.DisplayName, u.AvatarKey); err != nil {
+			s.log.WarnContext(ctx, "profile publish deferred until reconnect")
+		}
 	}
 	return toProfile(u), nil
 }
@@ -562,12 +583,15 @@ func hashToken(raw string) []byte {
 }
 
 func googleDisplayName(name, email string) string {
-	name = truncateRunes(strings.TrimSpace(name), maxDisplayNameLen)
-	if utf8.RuneCountInString(name) >= minDisplayNameLen {
+	var v ValidationError
+	name = validateDisplayName(&v, truncateRunes(name, maxDisplayNameLen))
+	if v.orNil() == nil {
 		return name
 	}
 	local := truncateRunes(email[:strings.IndexByte(email, '@')], maxDisplayNameLen)
-	if utf8.RuneCountInString(local) >= minDisplayNameLen {
+	var localValidation ValidationError
+	local = validateDisplayName(&localValidation, local)
+	if localValidation.orNil() == nil {
 		return local
 	}
 	return "Pengguna"

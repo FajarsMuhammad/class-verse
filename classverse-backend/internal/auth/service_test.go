@@ -448,6 +448,13 @@ func TestGoogleLinking(t *testing.T) {
 	})
 }
 
+type failedProfilePublisher struct{ calls int }
+
+func (p *failedProfilePublisher) PublishProfile(context.Context, uuid.UUID, string, string) error {
+	p.calls++
+	return errors.New("publisher unavailable")
+}
+
 func TestUpdateProfile(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
@@ -464,6 +471,25 @@ func TestUpdateProfile(t *testing.T) {
 	}
 	if p.NeedsProfile || p.BirthDate.Format(time.DateOnly) != birth || p.DisplayName != "Ani" {
 		t.Errorf("profile = %+v", p)
+	}
+
+	publisher := &failedProfilePublisher{}
+	e.svc.SetProfilePublisher(publisher)
+	name, avatar := "  José   Putra ", "cap-mangga"
+	p, err = e.svc.UpdateProfile(ctx, id, ProfileInput{DisplayName: &name, AvatarKey: &avatar})
+	if err != nil || p.DisplayName != "José Putra" || p.AvatarKey != avatar || p.BirthDate.Format(time.DateOnly) != birth {
+		t.Fatalf("identity update failed: %v", err)
+	}
+	if publisher.calls != 1 {
+		t.Fatal("committed identity was not published")
+	}
+	bad, other := "../avatar.svg", "Changed"
+	if _, err := e.svc.UpdateProfile(ctx, id, ProfileInput{DisplayName: &other, AvatarKey: &bad}); !errors.As(err, new(*ValidationError)) {
+		t.Fatal("invalid avatar accepted")
+	}
+	p, err = e.svc.Me(ctx, id)
+	if err != nil || p.DisplayName != "José Putra" || p.AvatarKey != avatar {
+		t.Fatal("invalid partial update was not atomic")
 	}
 
 	short := "Al"
