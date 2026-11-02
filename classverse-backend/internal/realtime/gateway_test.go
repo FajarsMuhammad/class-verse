@@ -39,6 +39,68 @@ func (f fakeAdmitter) Admit(_ context.Context, roomID, userID uuid.UUID) (Admiss
 	return Admission{RoomID: roomID, MapKey: "campus", Capacity: 200, UserID: userID, Name: name, Avatar: "default", Role: "participant"}, nil
 }
 
+type admissionMap map[uuid.UUID]Admission
+
+func (a admissionMap) Admit(_ context.Context, roomID, userID uuid.UUID) (Admission, error) {
+	adm, ok := a[roomID]
+	if !ok {
+		return Admission{}, ErrNoAccess
+	}
+	adm.UserID = userID
+	return adm, nil
+}
+
+func TestGatewayTravelAdmission(t *testing.T) {
+	e := newWSEnv(t)
+	source := Admission{RoomID: e.room, OrgID: uuid.New(), MapKey: campusKey, Capacity: 200, UserID: e.ani, Role: "participant"}
+	c := newConn(e.ani)
+	from, err := e.hub.join(c, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	future := time.Now().Add(time.Hour)
+	for _, tt := range []struct {
+		name     string
+		orgID    uuid.UUID
+		building string
+		schedule *time.Time
+		code     string
+	}{
+		{"other organization", uuid.New(), "kelas-a", nil, CodeNotFound},
+		{"staff room", source.OrgID, staffBuildingKey, nil, CodeForbidden},
+		{"scheduled", source.OrgID, "kelas-a", &future, CodeScheduled},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dest := Admission{RoomID: uuid.New(), OrgID: tt.orgID, MapKey: "classroom", BuildingKey: tt.building, ScheduledAt: tt.schedule, Role: "participant"}
+			g := &Gateway{hub: e.hub, admit: admissionMap{dest.RoomID: dest}}
+			_, err := g.travel(t.Context(), c, from, dest.RoomID)
+			if got := travelError(err, 1).Code; got != tt.code {
+				t.Fatalf("code=%s want=%s", got, tt.code)
+			}
+		})
+	}
+}
+
+func TestGatewayEntryReconnect(t *testing.T) {
+	e := newWSEnv(t)
+	campus := Admission{RoomID: e.room, OrgID: uuid.New(), MapKey: campusKey, Role: "participant"}
+	dest := Admission{RoomID: uuid.New(), OrgID: campus.OrgID, MapKey: "classroom", Role: "participant"}
+	g := &Gateway{hub: e.hub, admit: admissionMap{campus.RoomID: campus, dest.RoomID: dest}}
+	if _, err := g.entry(t.Context(), e.ani, dest); !errors.Is(err, errNotAtDoor) {
+		t.Fatalf("cold entry=%v", err)
+	}
+	e.hub.setLocation(e.ani, dest.RoomID)
+	got, err := g.entry(t.Context(), e.ani, campus)
+	if err != nil || got.RoomID != dest.RoomID {
+		t.Fatalf("resume=%+v err=%v", got, err)
+	}
+	delete(g.admit.(admissionMap), dest.RoomID)
+	got, err = g.entry(t.Context(), e.ani, campus)
+	if err != nil || got.RoomID != campus.RoomID {
+		t.Fatalf("fallback=%+v err=%v", got, err)
+	}
+}
+
 type wsEnv struct {
 	srv    *httptest.Server
 	hub    *Hub
@@ -54,7 +116,7 @@ func newWSEnv(t *testing.T) *wsEnv {
 	t.Helper()
 	md := loadCampus(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	hub := NewHub(map[string]*MapData{"campus": md}, func() time.Time { return time.Now().UTC() }, log)
+	hub := NewHub(map[string]*MapData{"campus": md}, nil, func() time.Time { return time.Now().UTC() }, log)
 	e := &wsEnv{hub: hub, room: uuid.New(), ani: uuid.New(), budi: uuid.New()}
 	e.tokens = fakeTokens{"tok-ani": e.ani, "tok-budi": e.budi, "tok-stranger": uuid.New()}
 	gw, err := NewGateway(hub, e.tokens, fakeAdmitter{room: e.room, members: map[uuid.UUID]string{e.ani: "Ani", e.budi: "Budi"}}, testOrigin, log)
@@ -258,7 +320,7 @@ func TestGatewayReplacedConnection(t *testing.T) {
 func TestHubStopsIdleRoom(t *testing.T) {
 	md := loadCampus(t)
 	clk := &fakeClock{t: time.Now().UTC()}
-	hub := NewHub(map[string]*MapData{"campus": md}, clk.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	hub := NewHub(map[string]*MapData{"campus": md}, nil, clk.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	defer func() { _ = hub.Shutdown(context.Background()) }()
 
 	c := newConn(uuid.New())

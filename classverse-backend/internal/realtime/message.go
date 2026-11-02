@@ -17,9 +17,10 @@ type Envelope struct {
 
 // Client → server message types.
 const (
-	TypeAuth = "auth"
-	TypeMove = "move"
-	TypePing = "ping"
+	TypeAuth   = "auth"
+	TypeMove   = "move"
+	TypePing   = "ping"
+	TypeTravel = "travel"
 )
 
 // Server → client message types.
@@ -31,6 +32,8 @@ const (
 	TypePong           = "pong"
 	TypeError          = "error"
 	TypeProfileUpdated = "profile_updated"
+	TypeTraveled       = "traveled"
+	TypeBuildings      = "buildings"
 )
 
 // Direction an avatar faces.
@@ -81,12 +84,32 @@ type Participant struct {
 	Dir    Direction `json:"dir"`
 }
 
-// WelcomeMsg is sent after a successful auth.
+// WelcomeMsg is sent after a successful auth, and as "traveled" after a
+// successful travel. RoomName and BuildingKey are empty on the campus.
 type WelcomeMsg struct {
 	SelfID       uuid.UUID     `json:"self_id"`
 	RoomID       uuid.UUID     `json:"room_id"`
 	MapKey       string        `json:"map_key"`
+	RoomName     string        `json:"room_name,omitempty"`
+	BuildingKey  string        `json:"building_key,omitempty"`
 	Participants []Participant `json:"participants"`
+}
+
+// TravelMsg asks to move to another room of the same organization.
+type TravelMsg struct {
+	RoomID uuid.UUID `json:"room_id"`
+}
+
+// BuildingCount is the live state of one campus building.
+type BuildingCount struct {
+	BuildingKey string `json:"building_key"`
+	People      int    `json:"people"`
+	LiveRooms   int    `json:"live_rooms"`
+}
+
+// BuildingsMsg is sent every 5 s on the campus only.
+type BuildingsMsg struct {
+	Items []BuildingCount `json:"items"`
 }
 
 // ProfileUpdatedMsg changes identity without altering presence or position.
@@ -128,12 +151,15 @@ type ErrorMsg struct {
 
 // Error codes sent in ErrorMsg.
 const (
-	CodeUnauthenticated = "unauthenticated"
-	CodeForbidden       = "forbidden"
-	CodeNotFound        = "not_found"
-	CodeBadMessage      = "bad_message"
-	CodeMoveRejected    = "move_rejected"
-	CodeRoomFull        = "room_full"
-	CodeReplaced        = "replaced"
-	CodeUnavailable     = "unavailable"
+	CodeUnauthenticated  = "unauthenticated"
+	CodeForbidden        = "forbidden"
+	CodeNotFound         = "not_found"
+	CodeBadMessage       = "bad_message"
+	CodeMoveRejected     = "move_rejected"
+	CodeRoomFull         = "room_full"
+	CodeReplaced         = "replaced"
+	CodeUnavailable      = "unavailable"
+	CodeNotAtDoor        = "not_at_door"
+	CodeScheduled        = "scheduled"
+	CodeTravelInProgress = "travel_in_progress"
 )

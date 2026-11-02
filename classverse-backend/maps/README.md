@@ -4,6 +4,12 @@ File `.tmj` (Tiled JSON, orthogonal, tile 32 px) di folder ini di-embed ke binar
 collision, spawn, dan gedung; frontend mengambil file yang sama lewat `GET /api/maps/{map_key}` untuk render Phaser.
 Nama file = `map_key` (`campus.tmj` → `campus`). Buka dan ubah dengan [Tiled](https://www.mapeditor.org/).
 
+## Properti peta
+
+| Properti | Jenis | Isi |
+| --- | --- | --- |
+| `walk_speed` | int | Kecepatan jalan maksimum px/detik, 80–400, default 160. Server dan frontend memakai angka yang sama. |
+
 ## Layer (wajib)
 
 | Layer | Jenis | Isi |

@@ -1,11 +1,47 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import DoorRooms from '@/components/DoorRooms.vue'
+import { useOrgStore } from '@/stores/org'
+import type { Building } from '@/realtime/mapdata'
 
 import GameCanvas from '@/components/GameCanvas.vue'
 import { useRoom } from '@/realtime/useRoom'
 
 const props = defineProps<{ roomId: string; schoolName: string }>()
-const { status, map, world, online, error, sendMove, start } = useRoom()
+const {
+  status,
+  map,
+  world,
+  online,
+  error,
+  sendMove,
+  start,
+  current,
+  buildings,
+  travel,
+  traveling,
+} = useRoom()
+const org = useOrgStore()
+const route = useRoute()
+const nearDoor = ref<Building | null>(null)
+const campus = computed(() => !current.value || current.value.map_key === 'campus')
+const selectedKey = ref('')
+watch(
+  () => route.query.building,
+  (key) => {
+    selectedKey.value = typeof key === 'string' ? key : ''
+  },
+  { immediate: true },
+)
+const selectedBuilding = computed(() =>
+  map.value?.buildings.find((b) => b.key === selectedKey.value),
+)
+const panelBuilding = computed(() => selectedBuilding.value ?? nearDoor.value)
+const canEnter = computed(
+  () => !!panelBuilding.value && panelBuilding.value.key === nearDoor.value?.key,
+)
+let timer: ReturnType<typeof setInterval> | undefined
 const statusText = computed(
   () =>
     ({
@@ -18,25 +54,45 @@ const statusText = computed(
     })[status.value],
 )
 
-onMounted(() => start(props.roomId, 'campus'))
+onMounted(() => {
+  void start(props.roomId, 'campus')
+  timer = setInterval(() => {
+    const self = world.self
+    nearDoor.value =
+      campus.value && self
+        ? (map.value?.buildings.find((b) => Math.hypot(self.x - b.doorX, self.y - b.doorY) <= 48) ??
+          null)
+        : null
+  }, 150)
+})
+onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
   <section aria-labelledby="map-title">
     <header class="heading">
       <div>
-        <h1 id="map-title">{{ schoolName }}</h1>
+        <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
         <p role="status" data-testid="connection-status">{{ error || statusText }}</p>
       </div>
-      <span class="scope">Peta sekolah</span>
+      <span v-if="campus" class="scope">Peta sekolah</span>
+      <button
+        v-else
+        class="btn-secondary"
+        :disabled="traveling || status !== 'open'"
+        @click="travel(roomId)"
+      >
+        Kembali ke peta sekolah
+      </button>
     </header>
     <div class="layout">
       <div>
         <div class="map-frame">
           <GameCanvas
             v-if="map"
+            :key="current?.room_id"
             :deps="{ map, world, sendMove }"
-            label="Peta sekolah. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan."
+            :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
           />
           <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
           <div v-if="map && status !== 'open'" class="connection-overlay" role="status">
@@ -44,24 +100,74 @@ onMounted(() => start(props.roomId, 'campus'))
           </div>
         </div>
         <p class="hint">
-          Gerak dengan WASD, tombol panah, atau klik tujuan. Masuk gedung tersedia pada tahap
-          berikutnya.
+          Gerak dengan WASD, tombol panah, atau klik tujuan.
+          {{
+            campus
+              ? 'Jalan ke pintu gedung untuk memilih ruang.'
+              : 'Jalan ke pintu keluar sebelum kembali ke peta sekolah.'
+          }}
+          <span v-if="campus && selectedBuilding"
+            >Tujuan: {{ selectedBuilding.name }}. Jalan ke pintunya; tidak ada teleport.</span
+          >
         </p>
       </div>
       <aside class="buildings" aria-labelledby="buildings-title">
-        <h2 id="buildings-title">Gedung</h2>
-        <ul>
+        <h2 id="buildings-title">{{ campus ? 'Gedung' : 'Ruang' }}</h2>
+        <DoorRooms
+          v-if="campus && panelBuilding && org.active"
+          :org-id="org.active.id"
+          :building="panelBuilding"
+          :disabled="!canEnter || traveling || status !== 'open'"
+          :at-door="canEnter"
+          @travel="travel"
+        />
+        <p v-else-if="campus">
+          Pilih gedung untuk melihat ruang, lalu jalan ke pintunya untuk masuk.
+        </p>
+        <ul v-if="campus">
           <li v-for="b in map?.buildings ?? []" :key="b.key" :class="b.key">
-            <strong>{{ b.name }}</strong>
+            <button
+              class="building-choice"
+              :aria-pressed="panelBuilding?.key === b.key"
+              @click="selectedKey = b.key"
+            >
+              {{ b.name }}
+            </button>
             <span>{{ b.staffOnly ? 'Khusus pengajar dan admin' : b.description }}</span>
+            <span v-if="buildings.find((item) => item.building_key === b.key)"
+              >{{ buildings.find((item) => item.building_key === b.key)?.people }} orang ·
+              {{ buildings.find((item) => item.building_key === b.key)?.live_rooms }} ruang
+              live</span
+            >
           </li>
         </ul>
+        <p v-if="!campus">
+          {{ online }} orang di ruang. Chat dan zona diskusi hadir pada slice berikutnya.
+        </p>
       </aside>
     </div>
   </section>
 </template>
 
 <style scoped>
+.building-choice {
+  width: 100%;
+  min-height: var(--touch-min);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  text-align: left;
+  cursor: pointer;
+  padding: var(--space-2);
+}
+.building-choice[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
 .heading {
   display: flex;
   align-items: center;

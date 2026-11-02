@@ -8,6 +8,7 @@ import type { World } from '@/realtime/world'
 import { avatarChoices, avatarKey, avatarURL } from './avatars'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
+import { roomArt } from './roomArt'
 
 export interface SceneDeps {
   map: MapData
@@ -56,7 +57,12 @@ export class CampusScene extends Phaser.Scene {
 
   create() {
     const { map } = this.deps
-    this.textures.addCanvas('campus-art', campusArt(map))
+    this.textures.addCanvas(
+      'campus-art',
+      this.deps.world.mapKey === 'campus'
+        ? campusArt(map)
+        : roomArt(map, this.deps.world.mapKey ?? 'classroom'),
+    )
     this.add.image(0, 0, 'campus-art').setOrigin(0).setDisplaySize(map.pixelWidth, map.pixelHeight)
     this.fitCamera()
     this.scale.on('resize', this.fitCamera, this)

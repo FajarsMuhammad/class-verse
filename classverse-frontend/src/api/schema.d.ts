@@ -276,6 +276,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Ruang non-arsip selain peta sekolah, terbaru dulu. Ruang Guru hanya untuk pengajar/admin. */
+        get: operations["listRooms"];
+        put?: never;
+        post: operations["createRoom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/{room_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getRoom"];
+        put?: never;
+        post?: never;
+        delete: operations["archiveRoom"];
+        options?: never;
+        head?: never;
+        /** @description Hanya nama dan jadwal. `scheduled_at` null membuka ruang sekarang. */
+        patch: operations["updateRoom"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -382,6 +420,42 @@ export interface components {
             created_by: string;
             /** Format: date-time */
             created_at: string;
+        };
+        /** @enum {string} */
+        RoomMap: "classroom" | "garden";
+        CreateRoomRequest: {
+            name: string;
+            map_key: components["schemas"]["RoomMap"];
+            building_key: string;
+            /** Format: date-time */
+            scheduled_at?: string | null;
+        };
+        UpdateRoomRequest: {
+            name?: string;
+            /** Format: date-time */
+            scheduled_at?: string | null;
+        };
+        Room: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            org_id: string;
+            name: string;
+            map_key: components["schemas"]["RoomMap"];
+            building_key: string;
+            capacity: number;
+            /** Format: date-time */
+            scheduled_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Terhubung + grace reconnect + reservasi travel */
+            people: number;
+            /** @description Sesi terbuka dengan people > 0 */
+            live: boolean;
+        };
+        RoomList: {
+            items: components["schemas"]["Room"][];
+            next_cursor: string | null;
         };
         InviteList: {
             items: components["schemas"]["Invite"][];
@@ -917,6 +991,143 @@ export interface operations {
             409: components["responses"]["Conflict"];
             410: components["responses"]["InviteExpired"];
             429: components["responses"]["RateLimited"];
+        };
+    };
+    listRooms: {
+        parameters: {
+            query?: {
+                building?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar ruang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoomRequest"];
+            };
+        };
+        responses: {
+            /** @description Ruang dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Room"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Detail ruang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Room"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ruang diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoomRequest"];
+            };
+        };
+        responses: {
+            /** @description Ruang diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Room"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
 }

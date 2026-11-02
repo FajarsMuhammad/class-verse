@@ -19,6 +19,23 @@ type MapData struct {
 	blocked   []bool
 	Spawn     Rect // pixels
 	Buildings []Building
+	// Exit is the point to stand on to leave a classroom or garden; HasExit
+	// is false on the campus.
+	ExitX, ExitY int
+	HasExit      bool
+	// WalkSpeed is the maximum walking speed in px per second (map property
+	// walk_speed). The client reads the same property for prediction.
+	WalkSpeed int
+}
+
+// Building returns the building with key.
+func (m *MapData) Building(key string) (Building, bool) {
+	for _, b := range m.Buildings {
+		if b.Key == key {
+			return b, true
+		}
+	}
+	return Building{}, false
 }
 
 // Rect is an axis-aligned rectangle in pixels.
@@ -30,16 +47,18 @@ type Building struct {
 	Name      string
 	StaffOnly bool
 	Area      Rect
-	DoorX     int
-	DoorY     int
+	// Door is where travellers stand to enter and where they return.
+	DoorX int
+	DoorY int
 }
 
 type tmjMap struct {
-	Width      int        `json:"width"`
-	Height     int        `json:"height"`
-	TileWidth  int        `json:"tilewidth"`
-	TileHeight int        `json:"tileheight"`
-	Layers     []tmjLayer `json:"layers"`
+	Properties []tmjProperty `json:"properties"`
+	Width      int           `json:"width"`
+	Height     int           `json:"height"`
+	TileWidth  int           `json:"tilewidth"`
+	TileHeight int           `json:"tileheight"`
+	Layers     []tmjLayer    `json:"layers"`
 }
 
 type tmjLayer struct {
@@ -96,7 +115,15 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 	if m.Width <= 0 || m.Height <= 0 || m.TileWidth <= 0 || m.TileWidth != m.TileHeight {
 		return nil, fmt.Errorf("parse map %s: invalid size", key)
 	}
-	md := &MapData{Key: key, Width: m.Width, Height: m.Height, TileSize: m.TileWidth}
+	md := &MapData{Key: key, Width: m.Width, Height: m.Height, TileSize: m.TileWidth, WalkSpeed: defaultWalkSpeed}
+	for _, p := range m.Properties {
+		if p.Name != "walk_speed" {
+			continue
+		}
+		if json.Unmarshal(p.Value, &md.WalkSpeed) != nil || md.WalkSpeed < minWalkSpeed || md.WalkSpeed > maxWalkSpeed {
+			return nil, fmt.Errorf("parse map %s: walk_speed must be an integer %d-%d", key, minWalkSpeed, maxWalkSpeed)
+		}
+	}
 	var haveCollision, haveSpawn bool
 	doors := map[string][2]int{}
 	for _, l := range m.Layers {
@@ -129,6 +156,11 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 					doors[o.str("building")] = [2]int{int(math.Round(o.X)), int(math.Round(o.Y))}
 				}
 			}
+		case "exit":
+			if len(l.Objects) != 1 {
+				return nil, fmt.Errorf("parse map %s: exit layer must have one point", key)
+			}
+			md.ExitX, md.ExitY, md.HasExit = int(math.Round(l.Objects[0].X)), int(math.Round(l.Objects[0].Y)), true
 		}
 	}
 	if !haveCollision || !haveSpawn {
@@ -149,6 +181,12 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 			return nil, fmt.Errorf("parse map %s: door of %q is not walkable", key, b.Key)
 		}
 		b.DoorX, b.DoorY = d[0], d[1]
+	}
+	if md.HasExit && md.Blocked(md.ExitX, md.ExitY) {
+		return nil, fmt.Errorf("parse map %s: exit is not walkable", key)
+	}
+	if key != campusKey && !md.HasExit {
+		return nil, fmt.Errorf("parse map %s: exit layer is required", key)
 	}
 	if _, _, err := md.SpawnPoint(0); err != nil {
 		return nil, fmt.Errorf("parse map %s: %w", key, err)

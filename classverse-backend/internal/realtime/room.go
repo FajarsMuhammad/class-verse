@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"log/slog"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -10,23 +11,33 @@ import (
 )
 
 const (
-	tickInterval = 100 * time.Millisecond
-	holdDuration = 30 * time.Second // reconnect grace period
-	idleTimeout  = 60 * time.Second // empty room lifetime
-	inboxSize    = 256
+	tickInterval     = 100 * time.Millisecond
+	holdDuration     = 30 * time.Second // reconnect grace period
+	idleTimeout      = 60 * time.Second // empty campus room lifetime
+	sessionIdle      = 5 * time.Minute  // empty classroom/garden: session ends, room stops
+	buildingsEvery   = 50               // ticks (5 s)
+	inboxSize        = 256
+	campusKey        = "campus"
+	doorRadius       = 48.0 // px from a door or exit point
+	staffBuildingKey = "ruang-guru"
 )
 
 // Admission is what the gateway learned about a user and the room they want.
 type Admission struct {
-	RoomID   uuid.UUID
-	OrgID    uuid.UUID
-	MapKey   string
-	Capacity int
-	UserID   uuid.UUID
-	Name     string
-	Avatar   string
-	Role     string
+	RoomID      uuid.UUID
+	OrgID       uuid.UUID
+	MapKey      string
+	Capacity    int
+	RoomName    string
+	BuildingKey string
+	ScheduledAt *time.Time
+	UserID      uuid.UUID
+	Name        string
+	Avatar      string
+	Role        string
 }
+
+func (a Admission) staff() bool { return a.Role == "teacher" || a.Role == "admin" }
 
 type joinCmd struct {
 	c      *conn
@@ -35,18 +46,48 @@ type joinCmd struct {
 }
 
 type leaveCmd struct{ c *conn }
+
 type profileCmd struct {
 	p    ProfileUpdatedMsg
 	done chan struct{}
 }
 
-// probeCmd runs fn inside the room goroutine (tests only inspect state this way).
+// probeCmd runs fn inside the room goroutine (tests and the hub inspect state this way).
 type probeCmd struct{ fn func(*room) }
 
 type moveCmd struct {
 	c   *conn
 	seq uint64
 	m   MoveMsg
+}
+
+// reserveCmd holds one capacity slot for a travelling user.
+type reserveCmd struct {
+	userID uuid.UUID
+	result chan error
+}
+
+// cancelCmd releases a reservation after a failed travel.
+type cancelCmd struct{ userID uuid.UUID }
+
+// departCmd removes the user's avatar if check accepts its authoritative position.
+type departCmd struct {
+	c      *conn
+	check  func(Participant) error
+	result chan departResult
+}
+
+type departResult struct {
+	p   Participant
+	err error
+}
+
+// arriveCmd adds a travelling user at (x, y), consuming the reservation.
+type arriveCmd struct {
+	c      *conn
+	adm    Admission
+	x, y   int
+	result chan error
 }
 
 type member struct {
@@ -62,27 +103,36 @@ type member struct {
 // room owns the state of one room. Only its goroutine touches the fields
 // below inbox; other goroutines talk to it through post.
 type room struct {
-	id       uuid.UUID
-	mapd     *MapData
-	aoi      bool
-	capacity int
-	now      func() time.Time
-	log      *slog.Logger
-	hub      *Hub
+	id          uuid.UUID
+	orgID       uuid.UUID
+	name        string
+	buildingKey string
+	mapd        *MapData
+	campus      bool
+	capacity    int
+	now         func() time.Time
+	log         *slog.Logger
+	hub         *Hub
 
 	inbox   chan any
 	done    chan struct{}
-	pending atomic.Int32 // joins posted by the hub but not yet handled
+	pending atomic.Int32 // joins and reservations posted by the hub but not yet settled
 
-	members    map[uuid.UUID]*member
-	spawnN     int
-	emptySince time.Time
+	members     map[uuid.UUID]*member
+	reserved    map[uuid.UUID]bool
+	spawnN      int
+	emptySince  time.Time
+	sessionOpen bool
+	ticks       int
+	lastStats   roomStats
 }
 
-func newRoom(id uuid.UUID, mapd *MapData, capacity int, hub *Hub, now func() time.Time, log *slog.Logger) *room {
+func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *slog.Logger) *room {
 	return &room{
-		id: id, mapd: mapd, aoi: mapd.Key == "campus", capacity: capacity, now: now, log: log, hub: hub,
-		inbox: make(chan any, inboxSize), done: make(chan struct{}), members: make(map[uuid.UUID]*member),
+		id: adm.RoomID, orgID: adm.OrgID, name: adm.RoomName, buildingKey: adm.BuildingKey,
+		mapd: mapd, campus: mapd.Key == campusKey, capacity: adm.Capacity, now: now, log: log, hub: hub,
+		inbox: make(chan any, inboxSize), done: make(chan struct{}),
+		members: make(map[uuid.UUID]*member), reserved: make(map[uuid.UUID]bool),
 	}
 }
 
@@ -98,6 +148,7 @@ func (r *room) post(cmd any) bool {
 
 func (r *room) run(ctx context.Context) {
 	defer close(r.done)
+	defer r.closeSession()
 	t := time.NewTicker(tickInterval)
 	defer t.Stop()
 	for {
@@ -123,6 +174,26 @@ func (r *room) handle(cmd any) {
 		r.leave(c.c)
 	case moveCmd:
 		r.move(c.c, c.seq, c.m)
+	case reserveCmd:
+		err := r.reserve(c.userID)
+		if err != nil {
+			r.pending.Add(-1)
+		}
+		c.result <- err
+	case cancelCmd:
+		if r.reserved[c.userID] {
+			delete(r.reserved, c.userID)
+			r.pending.Add(-1)
+		}
+	case departCmd:
+		p, err := r.depart(c.c, c.check)
+		c.result <- departResult{p: p, err: err}
+	case arriveCmd:
+		if r.reserved[c.c.userID] {
+			delete(r.reserved, c.c.userID)
+			r.pending.Add(-1)
+		}
+		c.result <- r.add(c.c, c.adm, c.x, c.y, TypeTraveled)
 	case profileCmd:
 		if m := r.members[c.p.ID]; m != nil {
 			m.p.Name, m.p.Avatar = c.p.Name, c.p.Avatar
@@ -134,11 +205,18 @@ func (r *room) handle(cmd any) {
 	}
 }
 
-var errRoomFull = &roomError{code: CodeRoomFull, msg: "Ruang sudah penuh"}
+var (
+	errRoomFull  = &roomError{code: CodeRoomFull, msg: "Ruang sudah penuh"}
+	errNotAtDoor = &roomError{code: CodeNotAtDoor, msg: "Berjalanlah ke pintu gedung dulu"}
+	errNotInRoom = &roomError{code: CodeUnavailable, msg: "Kamu belum berada di ruang ini"}
+)
 
 type roomError struct{ code, msg string }
 
 func (e *roomError) Error() string { return e.code }
+
+// people counts avatars (connected and held) plus reservations.
+func (r *room) people() int { return len(r.members) + len(r.reserved) }
 
 func (r *room) join(c *conn, adm Admission) error {
 	select {
@@ -146,7 +224,6 @@ func (r *room) join(c *conn, adm Admission) error {
 		return errUnavailable
 	default:
 	}
-	now := r.now()
 	if m, ok := r.members[c.userID]; ok {
 		// Reconnect within the grace period, or a replacing tab: keep the
 		// avatar where it is and tell nobody else.
@@ -156,11 +233,11 @@ func (r *room) join(c *conn, adm Admission) error {
 		m.conn, m.heldUntil = c, time.Time{}
 		m.p.Name, m.p.Avatar, m.p.Role = adm.Name, adm.Avatar, adm.Role
 		m.seen = map[uuid.UUID]bool{}
-		m.stride = newStride(now)
-		r.sendWelcome(m)
+		m.stride = newStride(r.mapd.WalkSpeed, r.now())
+		r.sendWelcome(m, TypeWelcome)
 		return nil
 	}
-	if len(r.members) >= r.capacity {
+	if r.people() >= r.capacity {
 		return errRoomFull
 	}
 	x, y, err := r.mapd.SpawnPoint(r.spawnN)
@@ -168,10 +245,18 @@ func (r *room) join(c *conn, adm Admission) error {
 		return err
 	}
 	r.spawnN++
+	return r.add(c, adm, x, y, TypeWelcome)
+}
+
+// add places a new avatar, announces it, and greets its client with typ
+// (welcome or traveled).
+func (r *room) add(c *conn, adm Admission, x, y int, typ string) error {
+	// A committed travel must retain its destination even if the socket
+	// disconnects after departure. Keep the avatar for normal reconnect grace.
 	m := &member{
 		p:      Participant{ID: c.userID, Name: adm.Name, Avatar: adm.Avatar, Role: adm.Role, X: x, Y: y, Dir: DirDown},
 		conn:   c,
-		stride: newStride(now),
+		stride: newStride(r.mapd.WalkSpeed, r.now()),
 		seen:   map[uuid.UUID]bool{},
 	}
 	r.members[c.userID] = m
@@ -183,25 +268,97 @@ func (r *room) join(c *conn, adm Admission) error {
 			other.seen[c.userID] = true
 		}
 	}
-	r.sendWelcome(m)
+	r.sendWelcome(m, typ)
+	r.attend(c.userID)
+	select {
+	case <-c.done:
+		r.leave(c)
+	default:
+	}
 	return nil
 }
 
-func (r *room) sendWelcome(m *member) {
-	w := WelcomeMsg{SelfID: m.p.ID, RoomID: r.id, MapKey: r.mapd.Key, Participants: make([]Participant, 0, len(r.members))}
+func (r *room) sendWelcome(m *member, typ string) {
+	w := WelcomeMsg{
+		SelfID: m.p.ID, RoomID: r.id, MapKey: r.mapd.Key, RoomName: r.name, BuildingKey: r.buildingKey,
+		Participants: make([]Participant, 0, len(r.members)),
+	}
 	for id, o := range r.members {
 		w.Participants = append(w.Participants, o.p)
 		if id != m.p.ID {
 			m.seen[id] = true
 		}
 	}
-	m.conn.send(newOut(TypeWelcome, w))
+	m.conn.send(newOut(typ, w))
+	if r.campus {
+		r.sendBuildings(m)
+	}
+}
+
+func (r *room) reserve(userID uuid.UUID) error {
+	if r.reserved[userID] {
+		return &roomError{code: CodeTravelInProgress, msg: "Perpindahan sedang diproses"}
+	}
+	if _, ok := r.members[userID]; ok {
+		return errNotInRoom
+	}
+	if r.people() >= r.capacity {
+		return errRoomFull
+	}
+	r.reserved[userID] = true
+	return nil
+}
+
+func (r *room) depart(c *conn, check func(Participant) error) (Participant, error) {
+	m, ok := r.members[c.userID]
+	if !ok || m.conn != c {
+		return Participant{}, errNotInRoom
+	}
+	if err := check(m.p); err != nil {
+		return Participant{}, err
+	}
+	p := m.p
+	r.remove(c.userID)
+	return p, nil
+}
+
+// remove deletes an avatar and tells everyone else.
+func (r *room) remove(id uuid.UUID) {
+	delete(r.members, id)
+	for _, o := range r.members {
+		delete(o.seen, id)
+	}
+	r.broadcast(newOut(TypeLeft, LeftMsg{ID: id}), uuid.Nil)
+	r.hub.forget(id, r.id)
+	if !r.campus {
+		r.hub.record(sessionJob{kind: jobLeave, roomID: r.id, userID: id, at: r.now()})
+	}
+}
+
+func (r *room) attend(userID uuid.UUID) {
+	if r.campus {
+		return
+	}
+	now := r.now()
+	if !r.sessionOpen {
+		r.sessionOpen = true
+		r.hub.record(sessionJob{kind: jobOpen, roomID: r.id, at: now})
+	}
+	r.hub.record(sessionJob{kind: jobAttend, roomID: r.id, userID: userID, at: now})
+}
+
+func (r *room) closeSession() {
+	if r.sessionOpen {
+		r.sessionOpen = false
+		r.hub.record(sessionJob{kind: jobClose, roomID: r.id, at: r.now()})
+	}
+	r.hub.setStats(r.id, roomStats{})
 }
 
 func (r *room) leave(c *conn) {
 	m, ok := r.members[c.userID]
 	if !ok || m.conn != c {
-		return // a replaced connection; the new one owns the avatar
+		return // a replaced or travelled connection; nothing to hold here
 	}
 	m.conn = nil
 	m.heldUntil = r.now().Add(holdDuration)
@@ -231,16 +388,12 @@ func (r *room) move(c *conn, seq uint64, mv MoveMsg) {
 	}
 }
 
-// tick expires held avatars, sends snapshots, and reports whether the room
-// stopped because it stayed empty.
+// tick expires held avatars, sends snapshots and building counts, and
+// reports whether the room stopped because it stayed empty.
 func (r *room) tick(now time.Time) (stopped bool) {
 	for id, m := range r.members {
 		if m.conn == nil && !now.Before(m.heldUntil) {
-			delete(r.members, id)
-			for _, o := range r.members {
-				delete(o.seen, id)
-			}
-			r.broadcast(newOut(TypeLeft, LeftMsg{ID: id}), uuid.Nil)
+			r.remove(id)
 		}
 	}
 
@@ -253,7 +406,7 @@ func (r *room) tick(now time.Time) (stopped bool) {
 			if id == recv.p.ID {
 				continue
 			}
-			visible := !r.aoi || inAOI(r.mapd, recv.p.X, recv.p.Y, o.p.X, o.p.Y)
+			visible := !r.campus || inAOI(r.mapd, recv.p.X, recv.p.Y, o.p.X, o.p.Y)
 			switch {
 			case visible && (!recv.seen[id] || o.dirty):
 				recv.seen[id] = true
@@ -274,7 +427,24 @@ func (r *room) tick(now time.Time) (stopped bool) {
 		m.dirty = false
 	}
 
-	if len(r.members) > 0 {
+	r.ticks++
+	if r.campus && r.ticks%buildingsEvery == 0 {
+		for _, m := range r.members {
+			r.sendBuildings(m)
+		}
+	}
+
+	stats := roomStats{orgID: r.orgID, buildingKey: r.buildingKey, people: r.people()}
+	stats.live = r.sessionOpen && stats.people > 0
+	if r.campus {
+		stats = roomStats{} // the campus is not counted as a building
+	}
+	if stats != r.lastStats {
+		r.lastStats = stats
+		r.hub.setStats(r.id, stats)
+	}
+
+	if r.people() > 0 {
 		r.emptySince = time.Time{}
 		return false
 	}
@@ -282,10 +452,22 @@ func (r *room) tick(now time.Time) (stopped bool) {
 		r.emptySince = now
 		return false
 	}
-	if now.Sub(r.emptySince) >= idleTimeout && r.hub.tryRemove(r) {
-		return true
+	limit := idleTimeout
+	if !r.campus {
+		limit = sessionIdle
 	}
-	return false
+	if now.Sub(r.emptySince) < limit {
+		return false
+	}
+	r.closeSession()
+	return r.hub.tryRemove(r)
+}
+
+func (r *room) sendBuildings(m *member) {
+	if m.conn == nil {
+		return
+	}
+	m.conn.send(newOut(TypeBuildings, BuildingsMsg{Items: r.hub.buildingCounts(r.orgID, m.p.Role)}))
 }
 
 // broadcast sends m to every connected member except skip.
@@ -294,5 +476,15 @@ func (r *room) broadcast(m outMsg, skip uuid.UUID) {
 		if id != skip && o.conn != nil {
 			o.conn.send(m)
 		}
+	}
+}
+
+// nearPoint returns a check that accepts avatars within doorRadius of (x, y).
+func nearPoint(x, y int) func(Participant) error {
+	return func(p Participant) error {
+		if math.Hypot(float64(p.X-x), float64(p.Y-y)) > doorRadius {
+			return errNotAtDoor
+		}
+		return nil
 	}
 }

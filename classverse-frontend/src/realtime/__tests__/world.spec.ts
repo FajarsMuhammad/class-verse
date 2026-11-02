@@ -27,6 +27,31 @@ function welcomed() {
 }
 
 describe('World', () => {
+  it('replaces origin presence and self position only after traveled', () => {
+    const w = welcomed()
+    w.apply({ t: 'error', seq: 2, d: { code: 'room_full', message: 'Penuh' } }, 10)
+    expect(w.mapKey).toBe('campus')
+    expect(w.avatars.has('b')).toBe(true)
+    w.apply(
+      {
+        t: 'traveled',
+        seq: 3,
+        d: {
+          self_id: 'me',
+          room_id: 'class-1',
+          map_key: 'classroom',
+          room_name: 'Biologi',
+          building_key: 'kelas-a',
+          participants: [p('me', 480, 520), p('teacher', 100)],
+        },
+      },
+      20,
+    )
+    expect(w.mapKey).toBe('classroom')
+    expect(w.self).toEqual({ x: 480, y: 520, dir: 'down' })
+    expect([...w.avatars.keys()]).toEqual(['teacher'])
+    expect(w.count).toBe(2)
+  })
   it('updates self and remote identity without moving or unhiding avatars', () => {
     const w = welcomed()
     const before = { ...w.self! }

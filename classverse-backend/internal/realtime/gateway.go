@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -95,29 +96,59 @@ func (g *Gateway) session(ctx context.Context, ws *websocket.Conn, roomID uuid.U
 	g.hub.claim(c)
 	defer g.hub.release(c)
 
-	rm, err := g.hub.join(c, adm)
+	adm, err = g.entry(ctx, userID, adm)
+	var rm *room
+	if err == nil {
+		rm, err = g.hub.join(c, adm)
+	}
 	if err != nil {
-		code, msg := CodeUnavailable, "Ruang sedang tidak tersedia"
+		code, msg, status := CodeUnavailable, "Ruang sedang tidak tersedia", websocket.StatusTryAgainLater
 		var re *roomError
 		if errors.As(err, &re) {
 			code, msg = re.code, re.msg
+			if re == errNotAtDoor {
+				status = closeForbidden
+			}
 		}
 		writeNow(ctx, ws, newOut(TypeError, ErrorMsg{Code: code, Message: msg}), 1)
-		_ = ws.Close(websocket.StatusTryAgainLater, code)
+		_ = ws.Close(status, code)
 		return
 	}
-	g.log.InfoContext(ctx, "ws connected", slog.String("user_id", userID.String()), slog.String("room_id", roomID.String()))
+	g.log.InfoContext(ctx, "ws connected", slog.String("user_id", userID.String()), slog.String("room_id", rm.id.String()))
 
+	var cur atomic.Pointer[room]
+	cur.Store(rm)
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
-		g.readLoop(ctx, ws, c, rm)
+		g.readLoop(ctx, ws, c, &cur)
 	}()
 	g.writeLoop(ctx, ws, c, readDone)
-	rm.post(leaveCmd{c: c})
 	<-readDone
+	last := cur.Load()
+	last.post(leaveCmd{c: c})
 	g.log.InfoContext(ctx, "ws closed", slog.String("user_id", userID.String()),
-		slog.String("room_id", roomID.String()), slog.Int("code", int(c.code)), slog.String("reason", c.reason))
+		slog.String("room_id", last.id.String()), slog.Int("code", int(c.code)), slog.String("reason", c.reason))
+}
+
+// entry decides which room a new connection joins. A reconnect within the
+// grace period resumes the last committed room of the same organization;
+// otherwise only the campus can be joined directly, so the URL is never a way
+// around doors, schedules, or Ruang Guru.
+func (g *Gateway) entry(ctx context.Context, userID uuid.UUID, requested Admission) (Admission, error) {
+	if last := g.hub.resume(userID); last != uuid.Nil {
+		if last == requested.RoomID {
+			return requested, nil
+		}
+		adm, err := g.admit.Admit(ctx, last, userID)
+		if err == nil && adm.OrgID == requested.OrgID && (adm.BuildingKey != staffBuildingKey || adm.staff()) {
+			return adm, nil
+		}
+	}
+	if requested.MapKey != campusKey {
+		return Admission{}, errNotAtDoor
+	}
+	return requested, nil
 }
 
 // authenticate waits for the auth message and admits the user to the room.
@@ -177,7 +208,7 @@ func (g *Gateway) authenticate(ctx context.Context, ws *websocket.Conn, roomID u
 	return userID, adm, nil
 }
 
-func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, rm *room) {
+func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur *atomic.Pointer[room]) {
 	defer c.close(websocket.StatusNormalClosure, "")
 	for {
 		_, data, err := ws.Read(ctx)
@@ -196,9 +227,21 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, rm 
 				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Pesan tidak valid", Seq: env.Seq})
 				continue
 			}
-			if !rm.post(moveCmd{c: c, seq: env.Seq, m: m}) {
+			if !cur.Load().post(moveCmd{c: c, seq: env.Seq, m: m}) {
 				return
 			}
+		case TypeTravel:
+			var t TravelMsg
+			if json.Unmarshal(env.D, &t) != nil {
+				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Pesan tidak valid", Seq: env.Seq})
+				continue
+			}
+			to, err := g.travel(ctx, c, cur.Load(), t.RoomID)
+			if err != nil {
+				c.sendError(travelError(err, env.Seq))
+				continue
+			}
+			cur.Store(to)
 		case TypePing:
 			var p PingMsg
 			_ = json.Unmarshal(env.D, &p)
@@ -207,6 +250,37 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, rm 
 			c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Tipe pesan tidak dikenal", Seq: env.Seq})
 		}
 	}
+}
+
+// travel admits the user to roomID and asks the hub to move them there.
+func (g *Gateway) travel(ctx context.Context, c *conn, from *room, roomID uuid.UUID) (*room, error) {
+	actx, cancel := context.WithTimeout(ctx, authTimeout)
+	defer cancel()
+	dest, err := g.admit.Admit(actx, roomID, c.userID)
+	if err != nil {
+		return nil, err
+	}
+	if dest.OrgID != from.orgID {
+		return nil, ErrNoAccess // other organizations look like missing rooms
+	}
+	if dest.BuildingKey == staffBuildingKey && !dest.staff() {
+		return nil, &roomError{code: CodeForbidden, msg: "Ruang Guru khusus pengajar dan admin"}
+	}
+	if dest.ScheduledAt != nil && dest.ScheduledAt.After(g.hub.now()) && !dest.staff() {
+		return nil, &roomError{code: CodeScheduled, msg: "Ruang belum dibuka. Tunggu jadwalnya."}
+	}
+	return g.hub.travel(c, from, dest)
+}
+
+func travelError(err error, seq uint64) ErrorMsg {
+	var re *roomError
+	switch {
+	case errors.As(err, &re):
+		return ErrorMsg{Code: re.code, Message: re.msg, Seq: seq}
+	case errors.Is(err, ErrNoAccess):
+		return ErrorMsg{Code: CodeNotFound, Message: "Ruang tidak ditemukan", Seq: seq}
+	}
+	return ErrorMsg{Code: CodeUnavailable, Message: "Ruang sedang tidak tersedia", Seq: seq}
 }
 
 // writeLoop drains the connection's queue until it is closed, then sends the

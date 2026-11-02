@@ -3,7 +3,7 @@ import { onBeforeUnmount, ref, shallowRef, type Ref } from 'vue'
 import { getAccessToken, refreshAccessToken } from '@/api/client'
 import { RealtimeClient, roomSocketURL, type ConnectionStatus } from './client'
 import { fetchMap, type MapData } from './mapdata'
-import type { MoveMsg } from './messages'
+import type { BuildingCount, MoveMsg, WelcomeMsg } from './messages'
 import { World } from './world'
 
 export interface RoomHandle {
@@ -12,6 +12,10 @@ export interface RoomHandle {
   world: World
   online: Ref<number>
   error: Ref<string>
+  current: Ref<WelcomeMsg | null>
+  buildings: Ref<BuildingCount[]>
+  traveling: Ref<boolean>
+  travel: (roomId: string) => void
   sendMove: (m: MoveMsg) => void
   start: (roomId: string, mapKey: string) => Promise<void>
 }
@@ -24,6 +28,10 @@ export function useRoom(): RoomHandle {
   const online = ref(0)
   const error = ref('')
   const world = new World()
+  const current = shallowRef<WelcomeMsg | null>(null)
+  const buildings = ref<BuildingCount[]>([])
+  const traveling = ref(false)
+  let mapVersion = 0
   let client: RealtimeClient | null = null
   let lastVersion = -1
   const abort = new AbortController()
@@ -41,9 +49,32 @@ export function useRoom(): RoomHandle {
     client = new RealtimeClient({
       url: roomSocketURL(roomId),
       getToken: freshToken,
-      onStatus: (s) => (status.value = s),
+      onStatus: (s) => {
+        status.value = s
+        if (s !== 'open') traveling.value = false
+      },
       onMessage: (msg) => {
         world.apply(msg, performance.now())
+        if (msg.t === 'welcome' || msg.t === 'traveled') {
+          current.value = msg.d!
+          traveling.value = false
+          error.value = ''
+          buildings.value = []
+          const version = ++mapVersion
+          map.value = null
+          void fetchMap(msg.d!.map_key, abort.signal)
+            .then((loaded) => {
+              if (!abort.signal.aborted && version === mapVersion) map.value = loaded
+            })
+            .catch(() => {
+              if (!abort.signal.aborted && version === mapVersion)
+                error.value = 'Peta gagal dimuat. Muat ulang halaman.'
+            })
+        } else if (msg.t === 'buildings') buildings.value = msg.d!.items
+        else if (msg.t === 'error' && msg.d!.code !== 'move_rejected') {
+          traveling.value = false
+          error.value = msg.d!.message
+        }
         if (world.version !== lastVersion) {
           lastVersion = world.version
           online.value = world.count
@@ -65,7 +96,23 @@ export function useRoom(): RoomHandle {
     world,
     online,
     error,
-    sendMove: (m) => void client?.send('move', m),
+    current,
+    buildings,
+    traveling,
+    travel: (roomId) => {
+      if (status.value !== 'open' || traveling.value || !map.value) return
+      error.value = ''
+      traveling.value = true
+      // Moves are throttled, so the server may still hold an older position.
+      // Flush the predicted one first; the room handles it before the travel.
+      const self = world.self
+      if (self)
+        client?.send('move', { x: Math.round(self.x), y: Math.round(self.y), dir: self.dir })
+      if (!client?.send('travel', { room_id: roomId })) traveling.value = false
+    },
+    sendMove: (m) => {
+      if (!traveling.value && map.value) void client?.send('move', m)
+    },
     start,
   }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppShell from '@/components/AppShell.vue'
 import InvitePanel from '@/components/InvitePanel.vue'
+import RoomPanel from '@/components/RoomPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
@@ -12,11 +13,9 @@ const org = useOrgStore()
   <AppShell>
     <header class="head">
       <h1 class="title">Kelola ruang</h1>
-      <p class="sub">
-        Atur ruang di setiap gedung. Daftar ruang dan tombol buat ruang hadir di langkah berikutnya;
-        untuk sekarang undang anggota ke sekolahmu.
-      </p>
+      <p class="sub">Atur ruang di setiap gedung. Peserta masuk lewat pintu di peta sekolah.</p>
     </header>
+    <RoomPanel v-if="org.active" :key="org.active.id" :org-id="org.active.id" />
     <InvitePanel
       v-if="org.active && auth.me"
       :key="org.active.id"

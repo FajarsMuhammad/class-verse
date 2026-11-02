@@ -166,7 +166,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 - *Room peta sekolah.* `GET /api/orgs/{org_id}` mengembalikan `campus_room_id`; client membuka `/ws/rooms/{campus_room_id}`.
 - *Auth WebSocket.* Upgrade hanya dari Origin `FRONTEND_URL`. Pesan pertama wajib `auth {token}` dalam 5 detik; server memverifikasi JWT dan membership organisasi pemilik room lalu mengirim `welcome`. Gagal → `error` lalu close 4401 (token), 4403 (tidak boleh), 4404 (room tidak ada/bukan anggota).
 - *Satu koneksi per user.* Koneksi baru user yang sama menggantikan yang lama; yang lama ditutup dengan 4409 `replaced` dan client tidak reconnect otomatis.
-- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum 160 px/detik, ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah 160 × 1,25 px per detik, maksimal 100 px (setengah detik), dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi.
+- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum per peta dari properti peta Tiled `walk_speed` (px/detik, bilangan bulat 80–400, default 160; disetujui setelah review slice 5 karena peta sekolah tampil di zoom ±0,4 sehingga 160 px/detik terasa lambat): `campus` 320, `classroom`/`garden` 160. Server dan client membaca angka yang sama dari file peta. Kecepatan ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah `walk_speed` × 1,25 px per detik, maksimal setengah detik gerak, dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi.
 - *Pesan.* `welcome {self_id, room_id, map_key, participants: [{id, name, avatar, role, x, y, dir}]}`; `joined` = satu participant; `left {id}`; `snapshot {p: [{id, x, y, dir}], out: [id]}` dengan `out` = id yang keluar dari area of interest penerima; `ping {ts}` → `pong {ts}`. `seq` server naik per koneksi.
 - *Area of interest* hanya di peta sekolah: grid sel 8×8 tile, radius 24 tile; penerima mendapat avatar yang berubah di radius dan avatar yang baru masuk radius. `joined`/`left` dikirim ke seluruh room.
 - *Reconnect.* Putus → avatar ditahan 30 detik dan tetap terlihat. Kembali ke room yang sama dalam 30 detik → posisi lama tanpa `left`/`joined`. Client backoff 1, 2, 4, 8 detik (8 berulang).
@@ -497,6 +497,35 @@ Contoh potongan OpenAPI untuk satu endpoint:
   Room hanya memperbarui peserta yang ada, tanpa mengubah posisi/kehadiran.
 - Header membuka dialog Profil: preview, nama, 12 radio avatar, Simpan/Batal; fokus native dialog,
   loading, error per field dan status sukses. Nilai tersimpan hanya diganti respons server.
+
+## Slice 5 — Ruang dan travel (R5-01…R5-08 disetujui)
+
+- *Akses masuk.* Semua role wajib berdiri di pintu gedung; tidak ada teleport dari daftar/kelola ruang.
+  CTA kelola memakai **Lihat di peta**. Server memakai posisi resmi room asal, radius 48 px dari titik `door`.
+  Ruang Guru (`staff_only`) hanya teacher/admin. Non-member dan room organisasi lain tetap `not_found`.
+- *Jadwal.* `scheduled_at` null bisa dimasuki sekarang. Jadwal masa depan menolak participant (`scheduled`);
+  teacher/admin boleh masuk lebih awal. **Buka sekarang** = PATCH `scheduled_at: null`. Sesi dimulai saat kedatangan
+  pertama yang berhasil, bukan saat jam jadwal.
+- *Peta ruang.* `classroom` dan `garden` punya layer `ground`, `collision`, `spawn`, dan objek `exit`.
+  Kembali campus ke titik pintu gedung asal. Map/gedung ditetapkan saat create dan tidak bisa diubah.
+- *Travel atomik.* Travel per user diserialkan; DB admission dilakukan sebelum perubahan room. Hub memesan slot tujuan,
+  lalu meminta room asal melepas peserta setelah validasi posisi. Bila asal menolak/berhenti, reservasi dibatalkan dan
+  peserta tetap di asal. Commit memindahkan owner koneksi ke tujuan, observer asal menerima `left`, observer tujuan
+  menerima `joined`, client menerima `traveled` dengan payload `welcome` + `building_key`/`room_name`.
+  Kapasitas menghitung peserta terhubung, avatar grace, dan reservasi.
+- *Reconnect.* Hub menyimpan room terakhir yang sudah commit selama grace 30 detik. Reconnect apa pun dari room ID
+  organisasi yang sama memulihkan room itu bila masih sah; selain itu fallback ke campus. Cold WS langsung ke non-campus
+  ditolak `not_at_door`; URL WS tidak menjadi bypass.
+- *Sesi dan live.* Jumlah = terhubung + grace + reservasi. Live = sesi terbuka dengan jumlah > 0. Sesi kosong
+  ditutup setelah 5 menit; masuk kembali sebelum itu meneruskan sesi. Kehadiran dicatat sesudah commit dan ditutup saat
+  pindah/grace habis. Penulisan DB dilakukan worker hub; kegagalan dicatat tanpa memblokir room loop.
+  Index unik parsial menjamin satu sesi terbuka per room.
+- *REST.* Nama ruang 3–60 code point (NFC/trim). `GET /api/orgs/{org_id}/rooms?building=&cursor=&limit=`, POST,
+  GET/PATCH/DELETE `/api/rooms/{room_id}`. Kapasitas create selalu 40. PATCH hanya `name` dan `scheduled_at`.
+  DELETE soft archive hanya bila tidak ada peserta/reservasi/sesi terbuka (`409 room_busy`). Campus tidak bisa dibuat,
+  diubah, atau diarsip lewat endpoint ini. List/detail hanya untuk member; Ruang Guru disembunyikan dari participant.
+- *WS.* `travel {room_id}`; error `room_full`, `scheduled`, `not_at_door`, `forbidden`, `not_found`, `travel_in_progress`.
+  `buildings {items:[{building_key,people,live_rooms}]}` setiap 5 detik hanya untuk room campus dan sesudah filter role.
 
 ## Berikutnya
 

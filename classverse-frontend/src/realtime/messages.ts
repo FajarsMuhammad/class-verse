@@ -26,6 +26,7 @@ export interface ClientMessages {
   auth: AuthMsg
   move: MoveMsg
   ping: PingMsg
+  travel: { room_id: string }
 }
 
 // Server → client
@@ -42,6 +43,8 @@ export interface WelcomeMsg {
   self_id: string
   room_id: string
   map_key: string
+  room_name?: string
+  building_key?: string
   participants: Participant[]
 }
 export interface LeftMsg {
@@ -77,9 +80,20 @@ export type ErrorCode =
   | 'room_full'
   | 'replaced'
   | 'unavailable'
+  | 'not_at_door'
+  | 'scheduled'
+  | 'travel_in_progress'
+
+export interface BuildingCount {
+  building_key: string
+  people: number
+  live_rooms: number
+}
 
 export interface ServerMessages {
   welcome: WelcomeMsg
+  traveled: WelcomeMsg
+  buildings: { items: BuildingCount[] }
   snapshot: SnapshotMsg
   joined: Participant
   profile_updated: { id: string; name: string; avatar: string }
@@ -104,7 +118,7 @@ export const CloseCode = {
 
 // Movement rules shared with the server (internal/realtime/movement.go).
 export const Movement = {
-  maxSpeed: 160, // px per second
+  maxSpeed: 160, // px per second, default when a map has no walk_speed
   maxMovesPerSec: 15,
   tickMs: 100,
 } as const

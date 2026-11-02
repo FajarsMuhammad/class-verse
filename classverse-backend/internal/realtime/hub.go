@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -13,25 +14,84 @@ import (
 
 var errUnavailable = errors.New("room unavailable")
 
+const sessionQueue = 1024
+
+// SessionRecorder persists sessions and attendance (implemented by Store).
+// Calls run on the hub worker, never on a room goroutine.
+type SessionRecorder interface {
+	OpenSession(ctx context.Context, roomID uuid.UUID, at time.Time) (uuid.UUID, error)
+	CloseSession(ctx context.Context, roomID uuid.UUID, at time.Time) error
+	Attend(ctx context.Context, sessionID, userID uuid.UUID, at time.Time) error
+	Leave(ctx context.Context, sessionID, userID uuid.UUID, at time.Time) error
+}
+
+type jobKind int
+
+const (
+	jobOpen jobKind = iota
+	jobAttend
+	jobLeave
+	jobClose
+)
+
+type sessionJob struct {
+	kind   jobKind
+	roomID uuid.UUID
+	userID uuid.UUID
+	at     time.Time
+}
+
+// roomStats is what the campus needs to know about a classroom or garden.
+type roomStats struct {
+	orgID       uuid.UUID
+	buildingKey string
+	people      int
+	live        bool
+}
+
+// location is the last committed room of a user, kept for reconnects.
+type location struct {
+	roomID uuid.UUID
+	until  time.Time // zero while connected
+}
+
 // Hub is the registry of running rooms and of the one live connection per
 // user. Rooms are started on first join and stop themselves when idle.
 type Hub struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	maps   map[string]*MapData
-	now    func() time.Time
-	log    *slog.Logger
+	ctx      context.Context
+	cancel   context.CancelFunc
+	maps     map[string]*MapData
+	now      func() time.Time
+	log      *slog.Logger
+	sessions SessionRecorder
+	jobs     chan sessionJob
 
-	mu    sync.Mutex
-	rooms map[uuid.UUID]*room
-	conns map[uuid.UUID]*conn
-	wg    sync.WaitGroup
+	mu        sync.Mutex
+	rooms     map[uuid.UUID]*room
+	conns     map[uuid.UUID]*conn
+	where     map[uuid.UUID]location
+	stats     map[uuid.UUID]roomStats
+	traveling map[uuid.UUID]bool
+	locked    map[uuid.UUID]bool // rooms being archived
+	wg        sync.WaitGroup     // room goroutines
+	worker    chan struct{}      // closed when recordLoop returns
 }
 
-// NewHub returns an empty hub. Call Shutdown to stop it.
-func NewHub(maps map[string]*MapData, now func() time.Time, log *slog.Logger) *Hub {
+// NewHub returns an empty hub. sessions may be nil (tests). Call Shutdown to stop it.
+func NewHub(maps map[string]*MapData, sessions SessionRecorder, now func() time.Time, log *slog.Logger) *Hub {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Hub{ctx: ctx, cancel: cancel, maps: maps, now: now, log: log, rooms: map[uuid.UUID]*room{}, conns: map[uuid.UUID]*conn{}}
+	h := &Hub{
+		ctx: ctx, cancel: cancel, maps: maps, now: now, log: log, sessions: sessions,
+		jobs:  make(chan sessionJob, sessionQueue),
+		rooms: map[uuid.UUID]*room{}, conns: map[uuid.UUID]*conn{}, where: map[uuid.UUID]location{},
+		stats: map[uuid.UUID]roomStats{}, traveling: map[uuid.UUID]bool{}, locked: map[uuid.UUID]bool{},
+	}
+	h.worker = make(chan struct{})
+	go func() {
+		defer close(h.worker)
+		h.recordLoop()
+	}()
+	return h
 }
 
 // claim makes c the user's only live connection, closing any older one.
@@ -50,35 +110,77 @@ func (h *Hub) claim(c *conn) {
 	}
 }
 
+// release forgets c and starts the reconnect grace period for its room.
 func (h *Hub) release(c *conn) {
 	h.mu.Lock()
 	if h.conns[c.userID] == c {
 		delete(h.conns, c.userID)
+		if loc, ok := h.where[c.userID]; ok {
+			loc.until = h.now().Add(holdDuration)
+			h.where[c.userID] = loc
+		}
 	}
 	h.mu.Unlock()
 }
 
-// join adds c to the room of adm, starting the room if needed.
-func (h *Hub) join(c *conn, adm Admission) (*room, error) {
+// Resume returns the room a reconnecting user should rejoin: their last
+// committed room while it is still held, else uuid.Nil.
+func (h *Hub) resume(userID uuid.UUID) uuid.UUID {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	loc, ok := h.where[userID]
+	if !ok || (!loc.until.IsZero() && h.now().After(loc.until)) {
+		return uuid.Nil
+	}
+	return loc.roomID
+}
+
+// forget is called by a room when the user's avatar is gone from it.
+func (h *Hub) forget(userID, roomID uuid.UUID) {
+	h.mu.Lock()
+	if loc, ok := h.where[userID]; ok && loc.roomID == roomID {
+		delete(h.where, userID)
+	}
+	h.mu.Unlock()
+}
+
+func (h *Hub) setLocation(userID, roomID uuid.UUID) {
+	h.mu.Lock()
+	h.where[userID] = location{roomID: roomID}
+	h.mu.Unlock()
+}
+
+// ensure returns the running room for adm, starting it if needed, with one
+// pending slot counted so it cannot stop before the caller posts.
+func (h *Hub) ensure(adm Admission) (*room, error) {
 	mapd := h.maps[adm.MapKey]
 	if mapd == nil {
 		return nil, errUnavailable
 	}
 	h.mu.Lock()
+	defer h.mu.Unlock()
 	if h.ctx.Err() != nil {
-		h.mu.Unlock()
 		return nil, errUnavailable
+	}
+	if h.locked[adm.RoomID] {
+		return nil, ErrNoAccess
 	}
 	r := h.rooms[adm.RoomID]
 	if r == nil {
-		r = newRoom(adm.RoomID, mapd, adm.Capacity, h, h.now, h.log)
+		r = newRoom(adm, mapd, h, h.now, h.log)
 		h.rooms[adm.RoomID] = r
 		h.wg.Go(func() { r.run(h.ctx) })
 	}
-	// Counted under the hub lock so an idle room cannot stop with a join in flight.
 	r.pending.Add(1)
-	h.mu.Unlock()
+	return r, nil
+}
 
+// join adds c to the room of adm, starting the room if needed.
+func (h *Hub) join(c *conn, adm Admission) (*room, error) {
+	r, err := h.ensure(adm)
+	if err != nil {
+		return nil, err
+	}
 	res := make(chan error, 1)
 	if !r.post(joinCmd{c: c, adm: adm, result: res}) {
 		r.pending.Add(-1)
@@ -89,9 +191,110 @@ func (h *Hub) join(c *conn, adm Admission) (*room, error) {
 		if err != nil {
 			return nil, err
 		}
+		h.setLocation(c.userID, adm.RoomID)
 		return r, nil
 	case <-r.done:
 		return nil, errUnavailable
+	}
+}
+
+// travel moves c from room `from` to the room of dest. It never leaves the
+// user without a room: the destination slot is reserved first, the origin
+// releases the avatar only if it stands at the right point, and the
+// reservation is cancelled on any failure.
+func (h *Hub) travel(c *conn, from *room, dest Admission) (*room, error) {
+	h.mu.Lock()
+	if h.traveling[c.userID] {
+		h.mu.Unlock()
+		return nil, &roomError{code: CodeTravelInProgress, msg: "Perpindahan sedang diproses"}
+	}
+	h.traveling[c.userID] = true
+	h.mu.Unlock()
+	defer func() {
+		h.mu.Lock()
+		delete(h.traveling, c.userID)
+		h.mu.Unlock()
+	}()
+
+	if dest.RoomID == from.id {
+		return nil, errNotInRoom
+	}
+	// Where the avatar must stand, and where it appears.
+	var check func(Participant) error
+	var x, y int
+	destMap := h.maps[dest.MapKey]
+	if destMap == nil {
+		return nil, errUnavailable
+	}
+	switch {
+	case from.campus && dest.MapKey != campusKey:
+		b, ok := from.mapd.Building(dest.BuildingKey)
+		if !ok {
+			return nil, ErrNoAccess
+		}
+		check = nearPoint(b.DoorX, b.DoorY)
+		var err error
+		if x, y, err = destMap.SpawnPoint(int(c.userID[0])); err != nil {
+			return nil, err
+		}
+	case !from.campus && dest.MapKey == campusKey:
+		check = nearPoint(from.mapd.ExitX, from.mapd.ExitY)
+		b, ok := destMap.Building(from.buildingKey)
+		if !ok {
+			return nil, errUnavailable
+		}
+		x, y = b.DoorX, b.DoorY
+	default:
+		return nil, errNotAtDoor // room to room goes through the campus
+	}
+
+	to, err := h.ensure(dest)
+	if err != nil {
+		return nil, err
+	}
+	res := make(chan error, 1)
+	if !to.post(reserveCmd{userID: c.userID, result: res}) {
+		to.pending.Add(-1)
+		return nil, errUnavailable
+	}
+	if err := waitErr(res, to.done); err != nil {
+		return nil, err
+	}
+	// The reservation now holds the pending count until arrive or cancel.
+
+	dep := make(chan departResult, 1)
+	if !from.post(departCmd{c: c, check: check, result: dep}) {
+		to.post(cancelCmd{userID: c.userID})
+		return nil, errUnavailable
+	}
+	var d departResult
+	select {
+	case d = <-dep:
+	case <-from.done:
+		d.err = errUnavailable
+	}
+	if d.err != nil {
+		to.post(cancelCmd{userID: c.userID})
+		return nil, d.err
+	}
+
+	h.setLocation(c.userID, to.id)
+	arr := make(chan error, 1)
+	if !to.post(arriveCmd{c: c, adm: dest, x: x, y: y, result: arr}) {
+		return nil, errUnavailable
+	}
+	if err := waitErr(arr, to.done); err != nil {
+		return nil, err
+	}
+	return to, nil
+}
+
+func waitErr(ch <-chan error, done <-chan struct{}) error {
+	select {
+	case err := <-ch:
+		return err
+	case <-done:
+		return errUnavailable
 	}
 }
 
@@ -105,7 +308,152 @@ func (h *Hub) tryRemove(r *room) bool {
 	if h.rooms[r.id] == r {
 		delete(h.rooms, r.id)
 	}
+	delete(h.stats, r.id)
 	return true
+}
+
+func (h *Hub) setStats(roomID uuid.UUID, s roomStats) {
+	h.mu.Lock()
+	if s == (roomStats{}) {
+		delete(h.stats, roomID)
+	} else {
+		h.stats[roomID] = s
+	}
+	h.mu.Unlock()
+}
+
+// Occupancy reports the live state of one room for the REST API.
+func (h *Hub) Occupancy(roomID uuid.UUID) (int, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	s := h.stats[roomID]
+	return s.people, s.live
+}
+
+// buildingCounts aggregates classroom and garden stats of one organization.
+// Ruang Guru is hidden from participants.
+func (h *Hub) buildingCounts(orgID uuid.UUID, role string) []BuildingCount {
+	staff := role == "teacher" || role == "admin"
+	h.mu.Lock()
+	byKey := map[string]*BuildingCount{}
+	for _, s := range h.stats {
+		if s.orgID != orgID || (s.buildingKey == staffBuildingKey && !staff) {
+			continue
+		}
+		b := byKey[s.buildingKey]
+		if b == nil {
+			b = &BuildingCount{BuildingKey: s.buildingKey}
+			byKey[s.buildingKey] = b
+		}
+		b.People += s.people
+		if s.live {
+			b.LiveRooms++
+		}
+	}
+	h.mu.Unlock()
+	out := make([]BuildingCount, 0, len(byKey))
+	for _, b := range byKey {
+		out = append(out, *b)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].BuildingKey < out[j].BuildingKey })
+	return out
+}
+
+// WhileEmpty runs fn while no one can enter roomID, provided nobody is in it.
+// It is used to archive a room without racing a travel.
+func (h *Hub) WhileEmpty(ctx context.Context, roomID uuid.UUID, fn func() error) error {
+	h.mu.Lock()
+	if h.locked[roomID] {
+		h.mu.Unlock()
+		return ErrRoomBusy
+	}
+	h.locked[roomID] = true
+	r := h.rooms[roomID]
+	h.mu.Unlock()
+	archived := false
+	defer func() {
+		if !archived {
+			h.mu.Lock()
+			delete(h.locked, roomID)
+			h.mu.Unlock()
+		}
+	}()
+	if r != nil {
+		// ensure may have returned before its reservation reached the inbox.
+		if r.pending.Load() > 0 {
+			return ErrRoomBusy
+		}
+		res := make(chan int, 1)
+		if r.post(probeCmd{fn: func(r *room) { res <- r.people() }}) {
+			select {
+			case n := <-res:
+				if n > 0 {
+					return ErrRoomBusy
+				}
+			case <-r.done:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+	err := fn()
+	// Keep a tombstone until shutdown so an admission read before the
+	// archive cannot enter after its DB transaction commits.
+	archived = err == nil
+	return err
+}
+
+// ErrRoomBusy means people are still inside or travelling into the room.
+var ErrRoomBusy = errors.New("room busy")
+
+// record queues a session job; when the queue is full the job is dropped and
+// logged rather than blocking a room.
+func (h *Hub) record(j sessionJob) {
+	if h.sessions == nil {
+		return
+	}
+	select {
+	case h.jobs <- j:
+	default:
+		h.log.Warn("session job dropped", slog.String("room_id", j.roomID.String()))
+	}
+}
+
+// recordLoop persists session jobs in order until the queue is closed.
+func (h *Hub) recordLoop() {
+	open := map[uuid.UUID]uuid.UUID{} // room -> session
+	do := func(j sessionJob) {
+		if h.sessions == nil {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var err error
+		switch j.kind {
+		case jobOpen:
+			var id uuid.UUID
+			if id, err = h.sessions.OpenSession(ctx, j.roomID, j.at); err == nil {
+				open[j.roomID] = id
+			}
+		case jobAttend:
+			if id, ok := open[j.roomID]; ok {
+				err = h.sessions.Attend(ctx, id, j.userID, j.at)
+			}
+		case jobLeave:
+			if id, ok := open[j.roomID]; ok {
+				err = h.sessions.Leave(ctx, id, j.userID, j.at)
+			}
+		case jobClose:
+			err = h.sessions.CloseSession(ctx, j.roomID, j.at)
+			delete(open, j.roomID)
+		}
+		if err != nil {
+			h.log.Error("session record failed", slog.String("room_id", j.roomID.String()), slog.Any("err", err))
+		}
+	}
+	for j := range h.jobs {
+		do(j)
+	}
 }
 
 // PublishProfile sends committed identity through each room owner, including
@@ -136,8 +484,9 @@ func (h *Hub) PublishProfile(ctx context.Context, id uuid.UUID, name, avatar str
 	return nil
 }
 
-// Shutdown closes every connection with 1001 (going away), stops all rooms,
-// and waits for them until ctx expires.
+// Shutdown closes every connection with 1001 (going away), stops all rooms
+// (each closes its open session), flushes session writes, and waits until
+// ctx expires.
 func (h *Hub) Shutdown(ctx context.Context) error {
 	h.mu.Lock()
 	h.cancel()
@@ -147,7 +496,9 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 	h.mu.Unlock()
 	done := make(chan struct{})
 	go func() {
-		h.wg.Wait()
+		h.wg.Wait()   // no room can record after this
+		close(h.jobs) // let the worker drain and stop
+		<-h.worker
 		close(done)
 	}()
 	select {

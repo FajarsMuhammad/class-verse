@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { directionOf, moveToward, step, WALK_SPEED } from '../movement'
+import { directionOf, moveToward, PREDICTION_FACTOR, step } from '../movement'
 import { findPath } from '../pathfind'
 import { smallMap } from './fixtures'
 
@@ -23,10 +23,18 @@ describe('MapData', () => {
 })
 
 describe('movement', () => {
+  it('uses the map walk_speed so campus walks faster than default', () => {
+    const fast = smallMap(['......', '......'], 320)
+    expect(fast.walkSpeed).toBe(320)
+    expect(map.walkSpeed).toBe(160)
+    const next = step(fast, { x: 16, y: 16 }, 1, 0, 100)
+    expect(next.x - 16).toBeCloseTo((320 * PREDICTION_FACTOR) / 10)
+  })
+
   it('walks at WALK_SPEED and slides along walls', () => {
     const from = { x: 48, y: 48 }
     const next = step(map, from, 1, 0, 100)
-    expect(next.x - from.x).toBeCloseTo(WALK_SPEED / 10)
+    expect(next.x - from.x).toBeCloseTo((160 * PREDICTION_FACTOR) / 10)
     // Diagonal into the wall below-right slides horizontally.
     const slid = step(map, { x: 112, y: 48 }, 1, 1, 100)
     expect(slid.y).toBeGreaterThan(48)
@@ -37,7 +45,7 @@ describe('movement', () => {
     const free = smallMap(['....................'])
     let pos = { x: 16, y: 16 }
     for (let i = 0; i < 144; i++) pos = step(free, pos, 1, 0, 1000 / 144)
-    expect(pos.x - 16).toBeCloseTo(WALK_SPEED)
+    expect(pos.x - 16).toBeCloseTo(160 * PREDICTION_FACTOR)
   })
 
   it('stays put when the only way is a wall', () => {

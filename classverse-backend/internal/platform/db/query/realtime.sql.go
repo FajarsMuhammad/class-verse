@@ -9,10 +9,23 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getCampusRoomID = `-- name: GetCampusRoomID :one
+SELECT id FROM rooms WHERE org_id = $1 AND map_key = 'campus'
+`
+
+func (q *Queries) GetCampusRoomID(ctx context.Context, orgID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getCampusRoomID, orgID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getRoomAdmission = `-- name: GetRoomAdmission :one
-SELECT r.id AS room_id, r.org_id, r.map_key, r.capacity,
+SELECT r.id AS room_id, r.org_id, r.map_key, r.capacity, r.name AS room_name,
+       r.building_key, r.scheduled_at,
        m.role, u.display_name, u.avatar_key
 FROM rooms r
 JOIN memberships m ON m.org_id = r.org_id AND m.user_id = $1
@@ -30,6 +43,9 @@ type GetRoomAdmissionRow struct {
 	OrgID       uuid.UUID
 	MapKey      string
 	Capacity    int32
+	RoomName    string
+	BuildingKey pgtype.Text
+	ScheduledAt pgtype.Timestamptz
 	Role        OrgRole
 	DisplayName string
 	AvatarKey   string
@@ -45,6 +61,9 @@ func (q *Queries) GetRoomAdmission(ctx context.Context, arg GetRoomAdmissionPara
 		&i.OrgID,
 		&i.MapKey,
 		&i.Capacity,
+		&i.RoomName,
+		&i.BuildingKey,
+		&i.ScheduledAt,
 		&i.Role,
 		&i.DisplayName,
 		&i.AvatarKey,

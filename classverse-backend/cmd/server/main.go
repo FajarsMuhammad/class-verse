@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
@@ -23,6 +24,7 @@ import (
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/logx"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/mail"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/realtime"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/room"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -102,6 +104,26 @@ type app struct {
 	hub *realtime.Hub
 }
 
+// campusBuildings adapts the campus map to room.Buildings.
+type campusBuildings struct{ m *realtime.MapData }
+
+func (c campusBuildings) Building(key string) (staffOnly, ok bool) {
+	b, ok := c.m.Building(key)
+	return b.StaffOnly, ok
+}
+
+// roomOccupancy adapts the hub to room.Occupancy, translating the hub's busy
+// error into the room domain error so the API answers 409, not 500.
+type roomOccupancy struct{ *realtime.Hub }
+
+func (o roomOccupancy) WhileEmpty(ctx context.Context, roomID uuid.UUID, fn func() error) error {
+	err := o.Hub.WhileEmpty(ctx, roomID, fn)
+	if errors.Is(err, realtime.ErrRoomBusy) {
+		return room.ErrBusy
+	}
+	return err
+}
+
 // newApp wires every feature.
 func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (*app, error) {
 	now := func() time.Time { return time.Now().UTC() }
@@ -117,16 +139,23 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	inviteHandler := invite.NewHandler(inviteSvc, cfg.FrontendURL, now, log)
 	mapHandler := realtime.NewMapHandler(log)
 
-	mapData, err := realtime.LoadMaps("campus")
+	mapData, err := realtime.LoadMaps("campus", "classroom", "garden")
 	if err != nil {
 		return nil, fmt.Errorf("load maps: %w", err)
 	}
-	hub := realtime.NewHub(mapData, now, log)
+	rtStore := realtime.NewStore(pool)
+	// Sessions left open by a crash cannot be resumed; end them before serving.
+	if err := rtStore.CloseOpenSessions(ctx, now()); err != nil {
+		return nil, err
+	}
+	hub := realtime.NewHub(mapData, rtStore, now, log)
 	authHandler.SetProfilePublisher(hub)
-	gateway, err := realtime.NewGateway(hub, tokens, realtime.NewStore(pool), cfg.FrontendURL, log)
+	gateway, err := realtime.NewGateway(hub, tokens, rtStore, cfg.FrontendURL, log)
 	if err != nil {
 		return nil, err
 	}
+	roomSvc := room.NewService(room.NewStore(pool), orgSvc, campusBuildings{mapData["campus"]}, roomOccupancy{hub}, now, log)
+	roomHandler := room.NewHandler(roomSvc, log)
 
 	return &app{
 		api: func(r chi.Router) {
@@ -136,6 +165,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				r.Use(auth.RequireUser(tokens, log))
 				orgHandler.Routes(r)
 				inviteHandler.Routes(r)
+				roomHandler.Routes(r)
 			})
 		},
 		ws:  gateway.Routes,

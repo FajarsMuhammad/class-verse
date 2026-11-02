@@ -55,6 +55,22 @@ func TestParseCampus(t *testing.T) {
 	}
 }
 
+func TestMapWalkSpeeds(t *testing.T) {
+	for key, want := range map[string]int{"campus": 320, "classroom": 160, "garden": 160} {
+		raw, err := maps.Read(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, err := ParseMap(key, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.WalkSpeed != want {
+			t.Errorf("%s walk_speed = %d, want %d", key, m.WalkSpeed, want)
+		}
+	}
+}
+
 func TestParseMapErrors(t *testing.T) {
 	tests := map[string]string{
 		"not json":     `{`,
@@ -67,6 +83,12 @@ func TestParseMapErrors(t *testing.T) {
 			{"name":"collision","type":"tilelayer","data":[0,0]},
 			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]},
 			{"name":"buildings","objects":[{"type":"building","x":32,"y":0,"width":32,"height":32,"properties":[{"name":"key","value":"a"}]}]}]}`,
+		"walk_speed too fast": `{"properties":[{"name":"walk_speed","value":900}],"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[
+			{"name":"collision","type":"tilelayer","data":[0]},
+			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]}]}`,
+		"walk_speed not a number": `{"properties":[{"name":"walk_speed","value":"fast"}],"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[
+			{"name":"collision","type":"tilelayer","data":[0]},
+			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]}]}`,
 	}
 	for name, raw := range tests {
 		t.Run(name, func(t *testing.T) {

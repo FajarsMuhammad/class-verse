@@ -1,3 +1,5 @@
+import { Movement } from './messages'
+
 // Client view of a Tiled map, mirroring internal/realtime/mapdata.go so that
 // client-side prediction agrees with the server.
 
@@ -30,6 +32,7 @@ export interface TiledLayer {
 }
 
 export interface TiledMap {
+  properties?: TiledProperty[]
   width: number
   height: number
   tilewidth: number
@@ -58,6 +61,9 @@ export class MapData {
   readonly height: number
   readonly tileSize: number
   readonly buildings: Building[]
+  // Max walking speed in px/s from the map property walk_speed (same rule as
+  // the server, internal/realtime/mapdata.go).
+  readonly walkSpeed: number
   private readonly blocked: Uint8Array
 
   constructor(readonly raw: TiledMap) {
@@ -70,6 +76,8 @@ export class MapData {
     }
     this.blocked = Uint8Array.from(coll.data, (g) => (g !== 0 ? 1 : 0))
     this.buildings = parseBuildings(raw)
+    const speed = raw.properties?.find((p) => p.name === 'walk_speed')?.value
+    this.walkSpeed = typeof speed === 'number' ? speed : Movement.maxSpeed
   }
 
   get pixelWidth() {

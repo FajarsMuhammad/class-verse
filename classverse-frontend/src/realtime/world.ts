@@ -43,11 +43,13 @@ export class World {
 
   apply(msg: ServerMessage, now: number) {
     switch (msg.t) {
-      case 'welcome': {
+      case 'welcome':
+      case 'traveled': {
         const d = msg.d!
         this.selfId = d.self_id
         this.mapKey = d.map_key
         this.avatars.clear()
+        this.self = null
         for (const p of d.participants) {
           if (p.id === d.self_id) {
             this.self = { x: p.x, y: p.y, dir: p.dir }

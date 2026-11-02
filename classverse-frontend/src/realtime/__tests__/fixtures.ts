@@ -1,11 +1,12 @@
 import { MapData, type TiledMap } from '../mapdata'
 
 // smallMap builds a map from rows: '#' blocked, '.' free. Tile size 32.
-export function smallMap(rows: string[]): MapData {
+export function smallMap(rows: string[], walkSpeed?: number): MapData {
   const height = rows.length
   const width = rows[0]!.length
   const data = rows.flatMap((r) => [...r].map((c) => (c === '#' ? 18 : 0)))
   const raw: TiledMap = {
+    properties: walkSpeed ? [{ name: 'walk_speed', type: 'int', value: walkSpeed }] : undefined,
     width,
     height,
     tilewidth: 32,

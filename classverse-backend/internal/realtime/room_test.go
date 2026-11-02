@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -38,9 +39,9 @@ func newTestRoom(t *testing.T, mapKey string, capacity int) (*room, *fakeClock) 
 	md2 := *md
 	md2.Key = mapKey
 	c := &fakeClock{t: time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)}
-	h := NewHub(map[string]*MapData{mapKey: &md2}, c.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	t.Cleanup(func() { h.cancel() })
-	return newRoom(uuid.New(), &md2, capacity, h, c.Now, h.log), c
+	h := NewHub(map[string]*MapData{mapKey: &md2}, nil, c.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { _ = h.Shutdown(context.Background()) })
+	return newRoom(Admission{RoomID: uuid.New(), Capacity: capacity}, &md2, h, c.Now, h.log), c
 }
 
 func (r *room) testJoin(t *testing.T, name string) *conn {

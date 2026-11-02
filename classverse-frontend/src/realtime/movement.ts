@@ -1,9 +1,10 @@
 import type { MapData } from './mapdata'
-import { Movement, type Direction } from './messages'
+import type { Direction } from './messages'
 
-// Local walking speed stays a little under the server limit so prediction
-// never outruns what the server accepts.
-export const WALK_SPEED = Movement.maxSpeed * 0.95
+// Local walking speed stays a little under the map's server limit
+// (walk_speed) so prediction never outruns what the server accepts.
+export const PREDICTION_FACTOR = 0.95
+export const walkSpeed = (map: MapData) => map.walkSpeed * PREDICTION_FACTOR
 // Minimum interval between move messages (server accepts 15 per second).
 export const SEND_INTERVAL_MS = 80
 
@@ -17,7 +18,7 @@ export interface Vec {
 export function step(map: MapData, from: Vec, dx: number, dy: number, dtMs: number): Vec {
   if (dx === 0 && dy === 0) return from
   const len = Math.hypot(dx, dy)
-  const dist = (WALK_SPEED * dtMs) / 1000
+  const dist = (walkSpeed(map) * dtMs) / 1000
   const nx = from.x + (dx / len) * dist
   const ny = from.y + (dy / len) * dist
   const candidates: Vec[] = [
@@ -34,7 +35,7 @@ export function step(map: MapData, from: Vec, dx: number, dy: number, dtMs: numb
 // moveToward walks along a straight line toward target, at most dtMs worth.
 export function moveToward(map: MapData, from: Vec, target: Vec, dtMs: number): Vec {
   const dist = Math.hypot(target.x - from.x, target.y - from.y)
-  const max = (WALK_SPEED * dtMs) / 1000
+  const max = (walkSpeed(map) * dtMs) / 1000
   if (dist <= max) return map.pathClear(from.x, from.y, target.x, target.y) ? target : from
   const t = max / dist
   const next = {
