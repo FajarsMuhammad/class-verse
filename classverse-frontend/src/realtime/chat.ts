@@ -12,6 +12,8 @@ export interface ChatLine {
   at: string
   mine: boolean
   broadcast: boolean
+  // messageId is set when the server stored the message (classroom/garden).
+  messageId?: number
 }
 
 // ChatState is plain TypeScript (unit-tested); Vue wraps it in a reactive ref.
@@ -77,6 +79,7 @@ export class ChatState {
       at: m.at,
       mine: m.from.id === this.selfId,
       broadcast: m.scope === 'broadcast',
+      messageId: m.id,
     }
     const targets = m.scope === 'broadcast' ? Object.values(this.lines) : [list]
     for (const target of targets) {

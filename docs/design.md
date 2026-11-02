@@ -581,3 +581,12 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
 | C7-06 | Muted IDs, bans and lock survive empty-room actor cleanup for the remainder of the open session. Process restart must not bypass session bans: persist bans by session. This requires schema/design extension; do not silently treat room-actor lifetime as session lifetime. |
 | C7-07 | Reports accept a target user, optional room/message, and reason 1–1000 code points. Server derives message sender/room/org from the stored message, validates organization access and target membership; no client-supplied chat copy is stored. Campus or unsaved chat can report user only. |
 | C7-08 | Teacher/admin can list and review reports within organization; admin alone reads audit log. Audit writes must succeed before acknowledging moderation success; return unavailable on persistence failure. Report text is not written to application logs. |
+
+### Slice 7 — implementation notes
+
+- Reports and the audit log live in package `report` (not `moderation`, which stays the pure text filter used by
+  auth and realtime) to avoid mixing HTTP/DB code into a dependency-free package.
+- `allow` was added to `mod_action` (migration 00003) to audit revoking a kick; bans are rows of `session_bans`
+  keyed by session, so they end with the session and survive restarts (sessions are restored on startup).
+- Kick, allow, mute, unmute, lock and unlock take effect only after their audit row commits; a failed write
+  changes nothing and answers `unavailable`.

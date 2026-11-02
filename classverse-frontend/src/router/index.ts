@@ -32,6 +32,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresOrg: true, teacherOnly: true },
     },
     {
+      path: '/moderasi',
+      name: 'moderation',
+      component: () => import('../views/org/ModerationView.vue'),
+      meta: { requiresAuth: true, requiresOrg: true, teacherOnly: true },
+    },
+    {
       path: '/mulai',
       name: 'start',
       component: () => import('../views/org/StartView.vue'),

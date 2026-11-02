@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, useTemplateRef, watch } from 'vue'
 
-import type { ChatState } from '@/realtime/chat'
+import type { ChatLine, ChatState } from '@/realtime/chat'
 import type { ChatScope } from '@/realtime/messages'
 
 const props = defineProps<{
@@ -12,7 +12,10 @@ const props = defineProps<{
   campus: boolean
   teacher?: boolean
 }>()
-const emit = defineEmits<{ send: [text: string, scope: ChatScope] }>()
+const emit = defineEmits<{
+  send: [text: string, scope: ChatScope]
+  report: [line: ChatLine]
+}>()
 
 const MAX_LEN = 500
 const tab = ref<ChatScope>('near')
@@ -139,6 +142,15 @@ function time(iso: string) {
           <span v-if="l.role !== 'participant' && !l.mine" class="role">Pengajar</span>
           <time :datetime="l.at">{{ time(l.at) }}</time></span
         >
+        <button
+          v-if="!l.mine"
+          type="button"
+          class="report"
+          :aria-label="`Laporkan pesan dari ${l.fromName}`"
+          @click="emit('report', l)"
+        >
+          Laporkan
+        </button>
         <p class="bubble"><strong v-if="l.broadcast">Pengumuman · </strong>{{ l.text }}</p>
       </div>
     </div>
@@ -280,6 +292,21 @@ function time(iso: string) {
   line-height: var(--line-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.report {
+  order: 3;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.report:focus-visible {
+  outline: 3px solid var(--color-primary-strong);
 }
 .mine .bubble {
   background: var(--color-primary);

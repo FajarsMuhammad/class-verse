@@ -6,6 +6,8 @@ import { useOrgStore } from '@/stores/org'
 import type { Building } from '@/realtime/mapdata'
 
 import ChatPanel from '@/components/ChatPanel.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
+import type { ChatLine } from '@/realtime/chat'
 import GameCanvas from '@/components/GameCanvas.vue'
 import { roomApi } from '@/api/rooms'
 import { errorMessage } from '@/api/client'
@@ -122,6 +124,12 @@ const locked = computed(() => {
   void chatVersion.value
   return chat.locked
 })
+const reporting = ref<ChatLine | null>(null)
+const reportNotice = ref('')
+function reported() {
+  reporting.value = null
+  reportNotice.value = 'Laporan terkirim ke pengajar dan admin.'
+}
 const statusText = computed(
   () =>
     ({
@@ -357,6 +365,18 @@ onBeforeUnmount(() => clearInterval(timer))
           :campus="campus"
           :teacher="org.isTeacher"
           @send="sendChat"
+          @report="reporting = $event"
+        />
+        <p v-if="reportNotice" role="status" class="room-meta">{{ reportNotice }}</p>
+        <ReportDialog
+          v-if="reporting && current"
+          :target-id="reporting.fromId"
+          :target-name="reporting.fromName"
+          :room-id="current.room_id"
+          :message-id="reporting.messageId"
+          :message-text="reporting.text"
+          @close="reporting = null"
+          @reported="reported"
         />
       </aside>
     </div>

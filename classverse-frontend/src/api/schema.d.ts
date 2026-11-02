@@ -314,6 +314,80 @@ export interface paths {
     patch: operations['updateRoom']
     trace?: never
   }
+  '/api/reports': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** @description Peserta melaporkan pengguna atau pesan. Jika message_id diisi, pengirim pesan menjadi target dan ruang diturunkan dari pesan; isi pesan tidak disalin dari client. */
+    post: operations['createReport']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/orgs/{org_id}/reports': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    /** @description Pengajar dan admin. Terbaru dulu. */
+    get: operations['listReports']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/reports/{report_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        report_id: string
+      }
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** @description Pengajar dan admin menandai laporan ditinjau atau diabaikan. */
+    patch: operations['reviewReport']
+    trace?: never
+  }
+  '/api/orgs/{org_id}/moderation-log': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    /** @description Hanya admin. Aksi mute, kick, izinkan, kunci; terbaru dulu. */
+    get: operations['listModerationLog']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -471,6 +545,70 @@ export interface components {
     }
     RoomList: {
       items: components['schemas']['Room'][]
+      next_cursor: string | null
+    }
+    /** @enum {string} */
+    ReportStatus: 'open' | 'reviewed' | 'dismissed'
+    CreateReportRequest: {
+      /** Format: uuid */
+      target_user_id: string
+      /** Format: int64 */
+      message_id?: number | null
+      /** Format: uuid */
+      room_id?: string | null
+      reason: string
+    }
+    ReviewReportRequest: {
+      /** @enum {string} */
+      status: 'reviewed' | 'dismissed'
+    }
+    UserRef: {
+      /** Format: uuid */
+      id: string
+      name: string
+    }
+    Report: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      org_id: string
+      /** Format: uuid */
+      room_id: string | null
+      room_name: string | null
+      reporter: components['schemas']['UserRef']
+      target: components['schemas']['UserRef']
+      /** Format: int64 */
+      message_id: number | null
+      /** @description Teks tersaring dari server; null setelah dihapus 30 hari */
+      message_text: string | null
+      reason: string
+      status: components['schemas']['ReportStatus']
+      /** Format: uuid */
+      reviewed_by: string | null
+      /** Format: date-time */
+      reviewed_at: string | null
+      /** Format: date-time */
+      created_at: string
+    }
+    ReportList: {
+      items: components['schemas']['Report'][]
+      next_cursor: string | null
+    }
+    ModerationAction: {
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      room_id: string
+      room_name: string
+      actor: components['schemas']['UserRef']
+      target: components['schemas']['UserRef'] | null
+      /** @enum {string} */
+      action: 'mute' | 'unmute' | 'kick' | 'allow' | 'lock' | 'unlock'
+      /** Format: date-time */
+      created_at: string
+    }
+    ModerationLog: {
+      items: components['schemas']['ModerationAction'][]
       next_cursor: string | null
     }
     InviteList: {
@@ -1138,6 +1276,122 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['Room']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
+  createReport: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateReportRequest']
+      }
+    }
+    responses: {
+      /** @description Laporan dibuat */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Report']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      404: components['responses']['NotFound']
+    }
+  }
+  listReports: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['ReportStatus']
+        limit?: number
+        cursor?: string
+      }
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Daftar laporan */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportList']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
+  reviewReport: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        report_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReviewReportRequest']
+      }
+    }
+    responses: {
+      /** @description Laporan diperbarui */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Report']
+        }
+      }
+      400: components['responses']['ValidationFailed']
+      401: components['responses']['Unauthenticated']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+    }
+  }
+  listModerationLog: {
+    parameters: {
+      query?: {
+        limit?: number
+        cursor?: string
+      }
+      header?: never
+      path: {
+        org_id: components['parameters']['OrgID']
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Log moderasi */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ModerationLog']
         }
       }
       400: components['responses']['ValidationFailed']

@@ -24,6 +24,32 @@ const mountPanel = (chat: ChatState, campus = false) =>
   mount(ChatPanel, { props: { chat, version: chat.version, error: '', disabled: false, campus } })
 
 describe('ChatPanel', () => {
+  it("offers reporting only on other people's messages and passes the stored id", async () => {
+    const chat = state()
+    for (const [id, from] of [
+      [7, 'me'],
+      [8, 'budi'],
+    ] as const) {
+      chat.apply({
+        t: 'chat',
+        seq: 3,
+        d: {
+          id,
+          from: { id: from, name: from, role: 'participant' },
+          text: 't',
+          scope: 'near',
+          at: '2026-01-01T08:00:00Z',
+        },
+      })
+    }
+    const w = mountPanel(chat)
+    await w.setProps({ version: chat.version })
+    const buttons = w.findAll('button.report')
+    expect(buttons).toHaveLength(1)
+    await buttons[0]!.trigger('click')
+    expect(w.emitted('report')![0]![0]).toMatchObject({ fromId: 'budi', messageId: 8 })
+  })
+
   it('disables every tab while muted, except on the campus', async () => {
     const chat = state()
     chat.apply({ t: 'room_state', seq: 2, d: { all_chat_enabled: true, muted: true } })

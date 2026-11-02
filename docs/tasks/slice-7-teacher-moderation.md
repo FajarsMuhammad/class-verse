@@ -1,6 +1,6 @@
 # Slice 7 — Teacher controls and moderation (US-10, US-11, US-12)
 
-Status: C7-01…C7-08 approved. Broadcast, gather, session recovery, kick/allow, mute and lock done; reports and admin audit log remain.
+Status: **done; awaiting user review**. All of C7-01…C7-08 implemented. Movement stutter after travel remains open (separate).
 Branch: `slice-7-teacher-moderation`, based on layout commit `35fb28e`.
 
 References: docs/spec.md (teacher controls, security 3/5), docs/design.md
@@ -101,6 +101,29 @@ Backend make test and lint pass. Queries are not wired into moderation commands/
   frontend lint, 78 tests, build pass.
 - Chrome (teacher, two participants): mute disables input, server still rejects chat sent through the raw socket,
   unmute restores; lock rejects newcomer (`room_locked`), occupant reload keeps seat, unlock lets newcomer in; no runtime errors.
+
+## Reports and moderation log (done)
+
+- REST in new package `internal/report` (handler/service/store): `POST /api/reports`,
+  `GET /api/orgs/{org_id}/reports?status&limit&cursor`, `PATCH /api/reports/{report_id}`,
+  `GET /api/orgs/{org_id}/moderation-log`. OpenAPI + generated Go/TS models.
+- Message report: org, room and target come from the stored message; reporter must be a member of that org;
+  reporting your own message is impossible (SQL). The client never supplies message text.
+- User report (campus or unsaved chat): room of the org + target member, not self.
+- Every visibility failure is 404 (no probing of other orgs). Reason: NFC + trim, 1–1000 code points,
+  control/format characters rejected. Report text is never logged.
+- Teachers/admins list (cursor, status filter) and review (reviewed/dismissed); other orgs' reports are 404.
+  Admin-only audit log, organization scoped; lock/unlock have no target.
+- After the 30-day purge a report keeps a null message (verified).
+- UI: "Laporkan" on others' messages in the chat panel (stored id when available), report dialog, "Moderasi" page
+  for teachers (filters Baru/Ditinjau/Diabaikan, review buttons) with the moderation log for admins.
+  Dialog states that the reporter's name is visible to teachers and admins (no anonymity promise).
+- Tests: reason table; PostgreSQL handler test covering forged target ignored, foreign/own/missing message,
+  outsider, foreign target/room, self, validation, unknown field, pagination, status filter, review permissions,
+  purge, admin-only and org-scoped log. Frontend dialog/panel tests.
+- Checks: backend make test (race, 0 skipped) and lint pass; frontend lint, 82 tests, build pass.
+- Chrome: participant reports a filtered teacher message from chat; teacher sees it on Moderasi with the filtered
+  text and marks it reviewed; admin log visible; server log contains no report or chat text; no runtime errors.
 
 ## Carried issue
 

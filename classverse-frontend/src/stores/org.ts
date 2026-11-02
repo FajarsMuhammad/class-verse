@@ -35,7 +35,9 @@ export const useOrgStore = defineStore('org', () => {
     activeId.value = id
   }
 
-  return { orgs, active, activeId, isTeacher, select }
+  const isAdmin = computed(() => active.value?.role === 'admin')
+
+  return { orgs, active, activeId, isTeacher, isAdmin, select }
 })
 
 function readStored(): string | null {

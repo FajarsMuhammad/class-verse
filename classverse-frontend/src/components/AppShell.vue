@@ -47,6 +47,9 @@ async function logout() {
         <RouterLink v-if="org.isTeacher" class="nav-link" :to="{ name: 'manage-rooms' }">
           Kelola ruang
         </RouterLink>
+        <RouterLink v-if="org.isTeacher" class="nav-link" :to="{ name: 'moderation' }">
+          Moderasi
+        </RouterLink>
       </nav>
       <div class="user">
         <button

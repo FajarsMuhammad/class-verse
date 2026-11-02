@@ -24,6 +24,7 @@ import (
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/logx"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/mail"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/realtime"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/report"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/room"
 )
 
@@ -162,6 +163,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	}
 	roomSvc := room.NewService(room.NewStore(pool), orgSvc, campusBuildings{mapData["campus"]}, roomOccupancy{hub}, now, log)
 	roomHandler := room.NewHandler(roomSvc, log)
+	reportHandler := report.NewHandler(report.NewService(report.NewStore(pool), orgSvc, now), log)
 
 	return &app{
 		api: func(r chi.Router) {
@@ -172,6 +174,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				orgHandler.Routes(r)
 				inviteHandler.Routes(r)
 				roomHandler.Routes(r)
+				reportHandler.Routes(r)
 			})
 		},
 		ws:  gateway.Routes,

@@ -321,6 +321,87 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/reports:
+    post:
+      operationId: createReport
+      description: >-
+        Peserta melaporkan pengguna atau pesan. Jika message_id diisi, pengirim pesan menjadi target
+        dan ruang diturunkan dari pesan; isi pesan tidak disalin dari client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReportRequest" }
+      responses:
+        "201":
+          description: Laporan dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/reports:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listReports
+      description: Pengajar dan admin. Terbaru dulu.
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/ReportStatus" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Daftar laporan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportList" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/reports/{report_id}:
+    parameters:
+      - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      operationId: reviewReport
+      description: Pengajar dan admin menandai laporan ditinjau atau diabaikan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewReportRequest" }
+      responses:
+        "200":
+          description: Laporan diperbarui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/moderation-log:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listModerationLog
+      description: Hanya admin. Aksi mute, kick, izinkan, kunci; terbaru dulu.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Log moderasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModerationLog" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     bearer:
@@ -554,6 +635,74 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/Room" }
+        next_cursor: { type: string, nullable: true }
+    ReportStatus:
+      type: string
+      enum: [open, reviewed, dismissed]
+    CreateReportRequest:
+      type: object
+      additionalProperties: false
+      required: [target_user_id, reason]
+      properties:
+        target_user_id: { type: string, format: uuid }
+        message_id: { type: integer, format: int64, nullable: true }
+        room_id: { type: string, format: uuid, nullable: true }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+    ReviewReportRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, enum: [reviewed, dismissed] }
+    UserRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    Report:
+      type: object
+      required: [id, org_id, room_id, room_name, reporter, target, message_id, message_text, reason, status, reviewed_by, reviewed_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        room_id: { type: string, format: uuid, nullable: true }
+        room_name: { type: string, nullable: true }
+        reporter: { $ref: "#/components/schemas/UserRef" }
+        target: { $ref: "#/components/schemas/UserRef" }
+        message_id: { type: integer, format: int64, nullable: true }
+        message_text: { type: string, nullable: true, description: "Teks tersaring dari server; null setelah dihapus 30 hari" }
+        reason: { type: string }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+        reviewed_by: { type: string, format: uuid, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    ReportList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Report" }
+        next_cursor: { type: string, nullable: true }
+    ModerationAction:
+      type: object
+      required: [id, room_id, room_name, actor, target, action, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        room_id: { type: string, format: uuid }
+        room_name: { type: string }
+        actor: { $ref: "#/components/schemas/UserRef" }
+        target: { allOf: [{ $ref: "#/components/schemas/UserRef" }], nullable: true }
+        action: { type: string, enum: [mute, unmute, kick, allow, lock, unlock] }
+        created_at: { type: string, format: date-time }
+    ModerationLog:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ModerationAction" }
         next_cursor: { type: string, nullable: true }
     InviteList:
       type: object
