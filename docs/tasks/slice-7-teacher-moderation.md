@@ -1,6 +1,6 @@
 # Slice 7 — Teacher controls and moderation (US-10, US-11, US-12)
 
-Status: C7-01…C7-08 approved. Broadcast, gather, session recovery and kick/allow done and committed; mute, lock, reports and audit log remain.
+Status: C7-01…C7-08 approved. Broadcast, gather, session recovery, kick/allow, mute and lock done; reports and admin audit log remain.
 Branch: `slice-7-teacher-moderation`, based on layout commit `35fb28e`.
 
 References: docs/spec.md (teacher controls, security 3/5), docs/design.md
@@ -83,6 +83,24 @@ Backend make test and lint pass. Queries are not wired into moderation commands/
   build pass. Migration up/down/up verified locally.
 - Chrome (teacher + participant): kick shows overlay, re-entry rejected `kicked`, allow lets the participant back in;
   audit has kick and allow; no runtime errors.
+
+## Mute / lock (done)
+
+- In-memory per room actor (design note: lives for the session); audit via `RecordRoomAction` (zero rows unless the
+  session is open, actor is staff, mute target is a participant of the same org, lock has no target).
+- Room validates, writes on the hub worker, applies only after commit; DB failure answers `unavailable` and changes nothing.
+- Mute: every chat scope rejected with `muted` (broadcast stays staff-only). Receiver gets personal `room_state.muted`;
+  staff get `event.muted[]`. Kick clears mute.
+- Lock: join and travel reservation reject non-staff with `room_locked` without leaking capacity; staff may enter;
+  occupants reconnecting within grace keep their seat. Campus cannot be muted/locked.
+- `room_state` and `welcome` now carry `locked` and the receiver's `muted`; toggling Semua keeps both.
+- Store implements SessionRecorder and Moderator with compile-time assertions (a missing method previously
+  failed silently through the runtime type assertion).
+- Tests: unit (mute all scopes/unmute, applied only after audit, staff/not-muted rejections, failure, lock join/reserve/
+  staff/reconnect/double lock, campus), PostgreSQL scoping table. Backend make test (race, 0 skipped) and lint pass;
+  frontend lint, 78 tests, build pass.
+- Chrome (teacher, two participants): mute disables input, server still rejects chat sent through the raw socket,
+  unmute restores; lock rejects newcomer (`room_locked`), occupant reload keeps seat, unlock lets newcomer in; no runtime errors.
 
 ## Carried issue
 

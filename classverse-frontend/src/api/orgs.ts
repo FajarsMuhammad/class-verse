@@ -19,16 +19,13 @@ export const orgApi = {
 
 export const inviteApi = {
   list: (orgId: string, cursor?: string) =>
-    api<InviteList>(
-      `/api/orgs/${enc(orgId)}/invites` + (cursor ? `?cursor=${enc(cursor)}` : ''),
-    ),
+    api<InviteList>(`/api/orgs/${enc(orgId)}/invites` + (cursor ? `?cursor=${enc(cursor)}` : '')),
   create: (orgId: string, input: CreateInviteRequest) =>
     api<Invite>(`/api/orgs/${enc(orgId)}/invites`, { method: 'POST', body: input }),
   revoke: (orgId: string, inviteId: string) =>
     api<void>(`/api/orgs/${enc(orgId)}/invites/${enc(inviteId)}`, { method: 'DELETE' }),
   preview: (code: string) => api<InvitePreview>(`/api/invites/${enc(code)}`),
-  accept: (code: string) =>
-    api<Membership>(`/api/invites/${enc(code)}/accept`, { method: 'POST' }),
+  accept: (code: string) => api<Membership>(`/api/invites/${enc(code)}/accept`, { method: 'POST' }),
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'

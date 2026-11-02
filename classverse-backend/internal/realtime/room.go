@@ -81,6 +81,7 @@ type roomStateCmd struct{ allChat bool }
 // reserveCmd holds one capacity slot for a travelling user.
 type reserveCmd struct {
 	userID uuid.UUID
+	staff  bool
 	result chan error
 }
 
@@ -163,8 +164,11 @@ type room struct {
 	emptySince  time.Time
 	sessionOpen bool
 	allChat     bool
-	ticks       int
-	lastStats   roomStats
+	// Session moderation state; lives as long as the room actor (see design).
+	locked    bool
+	muted     map[uuid.UUID]bool
+	ticks     int
+	lastStats roomStats
 }
 
 func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *slog.Logger) *room {
@@ -174,6 +178,7 @@ func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *
 		allChat: adm.AllChat || mapd.Key == campusKey,
 		inbox:   make(chan any, inboxSize), done: make(chan struct{}),
 		members: make(map[uuid.UUID]*member), reserved: make(map[uuid.UUID]bool),
+		muted: make(map[uuid.UUID]bool),
 	}
 }
 
@@ -226,7 +231,7 @@ func (r *room) handle(cmd any) {
 	case moveCmd:
 		r.move(c.c, c.seq, c.m)
 	case reserveCmd:
-		err := r.reserve(c.userID)
+		err := r.reserve(c.userID, c.staff)
 		if err != nil {
 			r.pending.Add(-1)
 		}
@@ -263,7 +268,11 @@ func (r *room) handle(cmd any) {
 	case roomStateCmd:
 		if !r.campus && r.allChat != c.allChat {
 			r.allChat = c.allChat
-			r.broadcast(newOut(TypeRoomState, RoomStateMsg{AllChatEnabled: c.allChat}), uuid.Nil)
+			for id, o := range r.members {
+				if o.conn != nil {
+					o.conn.send(newOut(TypeRoomState, r.state(id)))
+				}
+			}
 		}
 	case probeCmd:
 		c.fn(r)
@@ -274,6 +283,7 @@ var (
 	errRoomFull  = &roomError{code: CodeRoomFull, msg: "Ruang sudah penuh"}
 	errNotAtDoor = &roomError{code: CodeNotAtDoor, msg: "Berjalanlah ke pintu gedung dulu"}
 	errNotInRoom = &roomError{code: CodeUnavailable, msg: "Kamu belum berada di ruang ini"}
+	errLocked    = &roomError{code: CodeRoomLocked, msg: "Ruang sedang dikunci pengajar"}
 	errKicked    = &roomError{code: CodeKicked, msg: "Kamu dikeluarkan dari sesi ini. Minta izin pengajar untuk masuk lagi."}
 )
 
@@ -302,6 +312,9 @@ func (r *room) join(c *conn, adm Admission) error {
 		m.stride = newStride(r.mapd.WalkSpeed, r.now())
 		r.sendWelcome(m, TypeWelcome)
 		return nil
+	}
+	if r.locked && !adm.staff() {
+		return errLocked
 	}
 	if r.people() >= r.capacity {
 		return errRoomFull
@@ -348,6 +361,7 @@ func (r *room) sendWelcome(m *member, typ string) {
 	w := WelcomeMsg{
 		SelfID: m.p.ID, RoomID: r.id, MapKey: r.mapd.Key, RoomName: r.name, BuildingKey: r.buildingKey,
 		Participants: make([]Participant, 0, len(r.members)), AllChatEnabled: r.allChat,
+		Locked: r.locked, Muted: r.muted[m.p.ID],
 	}
 	for id, o := range r.members {
 		w.Participants = append(w.Participants, o.p)
@@ -365,7 +379,10 @@ func (r *room) sendWelcome(m *member, typ string) {
 	}
 }
 
-func (r *room) reserve(userID uuid.UUID) error {
+func (r *room) reserve(userID uuid.UUID, staff bool) error {
+	if r.locked && !staff {
+		return errLocked
+	}
 	if r.reserved[userID] {
 		return &roomError{code: CodeTravelInProgress, msg: "Perpindahan sedang diproses"}
 	}
@@ -581,6 +598,10 @@ func (r *room) chat(c chatCmd) {
 	}
 	if c.scope == ScopeBroadcast && m.p.Role != "teacher" && m.p.Role != "admin" {
 		reject(CodeForbidden, "Pengumuman hanya dapat dikirim pengajar atau admin")
+		return
+	}
+	if r.muted[m.p.ID] {
+		reject(CodeMuted, "Kamu sedang dibisukan pengajar")
 		return
 	}
 	if !m.chat.allow(now) {

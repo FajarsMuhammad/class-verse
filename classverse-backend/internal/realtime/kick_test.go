@@ -19,9 +19,10 @@ import (
 
 // fakeModerator records bans in memory; fail makes every write error.
 type fakeModerator struct {
-	mu     sync.Mutex
-	banned map[uuid.UUID]bool
-	fail   bool
+	mu      sync.Mutex
+	banned  map[uuid.UUID]bool
+	fail    bool
+	actions int
 }
 
 func (f *fakeModerator) OpenSession(context.Context, uuid.UUID, time.Time) (uuid.UUID, error) {
@@ -54,6 +55,16 @@ func (f *fakeModerator) Allow(_ context.Context, _, _, target uuid.UUID, _ time.
 	delete(f.banned, target)
 	return was, nil
 }
+func (f *fakeModerator) RecordAction(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, time.Time) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fail {
+		return false, errors.New("db down")
+	}
+	f.actions++
+	return true, nil
+}
+
 func (f *fakeModerator) Banned(context.Context, uuid.UUID) ([]BannedUser, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

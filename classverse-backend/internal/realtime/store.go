@@ -148,3 +148,22 @@ func (s *Store) Banned(ctx context.Context, roomID uuid.UUID) ([]BannedUser, err
 	}
 	return out, nil
 }
+
+// RecordAction audits mute/unmute/lock/unlock for the open session of roomID.
+// target is uuid.Nil for lock/unlock. ok is false when the roles,
+// organization or session state do not allow it.
+func (s *Store) RecordAction(ctx context.Context, roomID, actorID, targetID uuid.UUID, action string, at time.Time) (bool, error) {
+	n, err := s.q.RecordRoomAction(ctx, query.RecordRoomActionParams{
+		RoomID: roomID, ActorID: actorID, TargetID: uuid.NullUUID{UUID: targetID, Valid: targetID != uuid.Nil},
+		Action: query.ModAction(action), Now: pgTime(at),
+	})
+	if err != nil {
+		return false, fmt.Errorf("record %s: %w", action, err)
+	}
+	return n == 1, nil
+}
+
+var (
+	_ SessionRecorder = (*Store)(nil)
+	_ Moderator       = (*Store)(nil)
+)

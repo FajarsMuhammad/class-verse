@@ -54,7 +54,10 @@ describe('World', () => {
   it('moderation events do not move anyone', () => {
     const w = welcomed()
     const rev = w.movementRevision
-    w.apply({ t: 'event', seq: 6, d: { name: 'kick', by: 't', target: 'b', banned: [] } }, 60)
+    w.apply(
+      { t: 'event', seq: 6, d: { name: 'kick', by: 't', target: 'b', banned: [], muted: [] } },
+      60,
+    )
     expect(w.movementRevision).toBe(rev)
     expect(w.self).toMatchObject({ x: 5 })
   })

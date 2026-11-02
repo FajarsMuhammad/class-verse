@@ -54,7 +54,8 @@ type ModerationEvent struct {
 	Name   string       `json:"name"`
 	By     uuid.UUID    `json:"by"`
 	Target uuid.UUID    `json:"target"`
-	Banned []BannedUser `json:"banned"`
+	Banned []BannedUser `json:"banned,omitempty"`
+	Muted  []uuid.UUID  `json:"muted"`
 }
 
 // BannedUser is a participant kicked from the open session.
@@ -129,6 +130,8 @@ type WelcomeMsg struct {
 	Participants []Participant `json:"participants"`
 	// AllChatEnabled tells whether the "Semua" tab may send (always true on the campus).
 	AllChatEnabled bool `json:"all_chat_enabled"`
+	Locked         bool `json:"locked"`
+	Muted          bool `json:"muted"`
 }
 
 // Chat scopes. Broadcast is restricted to teachers and admins.
@@ -172,6 +175,10 @@ type ZoneMsg struct {
 // RoomStateMsg carries room settings that can change during a session.
 type RoomStateMsg struct {
 	AllChatEnabled bool `json:"all_chat_enabled"`
+	// Locked rooms reject new participants (slice 7).
+	Locked bool `json:"locked"`
+	// Muted is personal: true when this receiver may not chat.
+	Muted bool `json:"muted"`
 }
 
 // TravelMsg asks to move to another room of the same organization.
@@ -233,6 +240,8 @@ const (
 	CodeUnauthenticated  = "unauthenticated"
 	CodeForbidden        = "forbidden"
 	CodeKicked           = "kicked"
+	CodeMuted            = "muted"
+	CodeRoomLocked       = "room_locked"
 	CodeNotFoundTarget   = "target_not_found"
 	CodeNotFound         = "not_found"
 	CodeBadMessage       = "bad_message"

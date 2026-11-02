@@ -36,6 +36,18 @@ const chat = (
 })
 
 describe('ChatState', () => {
+  it('tracks personal mute and room lock from welcome and room_state', () => {
+    const s = new ChatState()
+    s.apply(welcome('r1'))
+    expect(s.muted).toBe(false)
+    s.apply({ t: 'room_state', seq: 2, d: { all_chat_enabled: true, locked: true, muted: true } })
+    expect(s.muted).toBe(true)
+    expect(s.locked).toBe(true)
+    s.apply(welcome('r2', 'traveled'))
+    expect(s.muted).toBe(false)
+    expect(s.locked).toBe(false)
+  })
+
   it('copies announcements into all tabs with bounded history and clears them on travel', () => {
     const s = new ChatState()
     s.apply(welcome('r1', 'welcome', false))

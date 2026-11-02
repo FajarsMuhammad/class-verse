@@ -77,7 +77,11 @@ describe('authGuard', () => {
 
   it('keeps participants out of teacher pages', async () => {
     stubBackend({ id: 'u', needs_profile: false, orgs: [orgA] })
-    const manage = route('manage-rooms', { requiresAuth: true, requiresOrg: true, teacherOnly: true })
+    const manage = route('manage-rooms', {
+      requiresAuth: true,
+      requiresOrg: true,
+      teacherOnly: true,
+    })
     expect(await authGuard(manage)).toEqual({ name: 'home' })
   })
 })

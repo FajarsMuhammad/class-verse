@@ -24,6 +24,15 @@ const mountPanel = (chat: ChatState, campus = false) =>
   mount(ChatPanel, { props: { chat, version: chat.version, error: '', disabled: false, campus } })
 
 describe('ChatPanel', () => {
+  it('disables every tab while muted, except on the campus', async () => {
+    const chat = state()
+    chat.apply({ t: 'room_state', seq: 2, d: { all_chat_enabled: true, muted: true } })
+    const w = mountPanel(chat)
+    expect(w.get('textarea').attributes('disabled')).toBeDefined()
+    expect(w.get('textarea').attributes('placeholder')).toContain('dibisukan')
+    expect(w.text()).toContain('membisukan')
+  })
+
   it('offers broadcast only to teachers and allows it when room chat is disabled', async () => {
     const w = mountPanel(state(false))
     expect(w.findAll('[role=tab]').some((t) => t.text() === 'Pengumuman')).toBe(false)

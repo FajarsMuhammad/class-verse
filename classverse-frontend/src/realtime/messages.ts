@@ -31,14 +31,22 @@ export interface ClientMessages {
   chat: ChatInMsg
 }
 
-export type CommandMsg = { name: 'gather' } | { name: 'kick' | 'allow'; target: string }
+export type CommandMsg =
+  | { name: 'gather' | 'lock' | 'unlock' }
+  | { name: 'kick' | 'allow' | 'mute' | 'unmute'; target: string }
 export interface BannedUser {
   id: string
   name: string
 }
 export type EventMsg =
   | { name: 'gather'; by: string; participants: Participant[] }
-  | { name: 'kick' | 'allow'; by: string; target: string; banned: BannedUser[] }
+  | {
+      name: 'kick' | 'allow' | 'mute' | 'unmute' | 'lock' | 'unlock'
+      by: string
+      target: string
+      banned?: BannedUser[]
+      muted: string[]
+    }
 
 export type ChatScope = 'near' | 'zone' | 'room' | 'broadcast'
 export interface ChatInMsg {
@@ -64,6 +72,8 @@ export interface WelcomeMsg {
   building_key?: string
   participants: Participant[]
   all_chat_enabled: boolean
+  locked?: boolean
+  muted?: boolean
 }
 export interface LeftMsg {
   id: string
@@ -104,6 +114,8 @@ export type ErrorCode =
   | 'rate_limited'
   | 'not_in_zone'
   | 'kicked'
+  | 'muted'
+  | 'room_locked'
   | 'target_not_found'
   | 'all_chat_disabled'
 
@@ -127,6 +139,8 @@ export interface ZoneMsg {
 }
 export interface RoomStateMsg {
   all_chat_enabled: boolean
+  locked?: boolean
+  muted?: boolean
 }
 
 export interface ServerMessages {

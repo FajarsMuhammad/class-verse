@@ -47,3 +47,21 @@ JOIN room_sessions s ON s.id = b.session_id AND s.ended_at IS NULL
 JOIN users u ON u.id = b.user_id
 WHERE s.room_id = sqlc.arg(room_id)
 ORDER BY b.created_at, u.id;
+
+-- name: RecordRoomAction :execrows
+-- Audits mute/unmute/lock/unlock. Zero rows unless the room's session is open,
+-- the actor is teacher/admin of its organization and, for mute/unmute, the
+-- target is a participant of the same organization.
+INSERT INTO moderation_actions (room_id, actor_id, target_id, action, created_at)
+SELECT r.id, sqlc.arg(actor_id), sqlc.narg(target_id)::uuid, sqlc.arg(action)::mod_action, sqlc.arg(now)
+FROM rooms r
+JOIN room_sessions s ON s.room_id = r.id AND s.ended_at IS NULL
+JOIN memberships actor ON actor.org_id = r.org_id AND actor.user_id = sqlc.arg(actor_id)
+WHERE r.id = sqlc.arg(room_id) AND r.archived_at IS NULL
+  AND actor.role IN ('teacher', 'admin')
+  AND (
+    (sqlc.arg(action)::mod_action IN ('lock', 'unlock') AND sqlc.narg(target_id)::uuid IS NULL)
+    OR (sqlc.arg(action)::mod_action IN ('mute', 'unmute') AND EXISTS (
+      SELECT 1 FROM memberships t
+      WHERE t.org_id = r.org_id AND t.user_id = sqlc.narg(target_id)::uuid AND t.role = 'participant'))
+  );

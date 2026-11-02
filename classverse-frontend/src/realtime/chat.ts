@@ -20,6 +20,8 @@ export class ChatState {
   roomId: string | null = null
   zone: ZoneMsg = { key: '', name: '' }
   allChatEnabled = true
+  muted = false
+  locked = false
   readonly lines: Record<ChatScope, ChatLine[]> = { near: [], zone: [], room: [], broadcast: [] }
   // Bumped on any change so Vue can re-render cheaply.
   version = 0
@@ -34,6 +36,8 @@ export class ChatState {
         const sameRoom = msg.t === 'welcome' && this.roomId === msg.d!.room_id
         this.selfId = msg.d!.self_id
         this.allChatEnabled = msg.d!.all_chat_enabled
+        this.muted = msg.d!.muted ?? false
+        this.locked = msg.d!.locked ?? false
         if (!sameRoom) {
           this.lines.near = []
           this.lines.zone = []
@@ -49,6 +53,8 @@ export class ChatState {
         break
       case 'room_state':
         this.allChatEnabled = msg.d!.all_chat_enabled
+        this.muted = msg.d!.muted ?? false
+        this.locked = msg.d!.locked ?? false
         break
       case 'chat':
         this.add(msg.d!)

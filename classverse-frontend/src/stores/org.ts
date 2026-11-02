@@ -18,7 +18,9 @@ export const useOrgStore = defineStore('org', () => {
     if (list.length === 1) return list[0] ?? null
     return list.find((o) => o.id === activeId.value) ?? null
   })
-  const isTeacher = computed(() => active.value?.role === 'admin' || active.value?.role === 'teacher')
+  const isTeacher = computed(
+    () => active.value?.role === 'admin' || active.value?.role === 'teacher',
+  )
 
   watch(activeId, (id) => {
     try {

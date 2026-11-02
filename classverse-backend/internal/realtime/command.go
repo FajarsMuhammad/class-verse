@@ -15,7 +15,7 @@ type commandCmd struct {
 
 // moderatedCmd comes back from the hub worker after a kick/allow was written.
 type moderatedCmd struct {
-	kick    bool
+	action  string
 	actor   uuid.UUID
 	seq     uint64
 	target  uuid.UUID
@@ -39,7 +39,7 @@ func (r *room) command(c commandCmd) {
 	switch c.name {
 	case "gather":
 		r.gather(m, c.seq, reject)
-	case "kick", "allow":
+	case "kick", "allow", "mute", "unmute", "lock", "unlock":
 		r.moderate(m, c, reject)
 	default:
 		reject(CodeBadMessage, "Perintah tidak dikenal")
@@ -68,33 +68,51 @@ func (r *room) gather(m *member, _ uint64, reject func(code, message string)) {
 }
 
 // moderate validates against live room state, then hands the write to the
-// hub worker. The room never blocks on the database; the target is removed
-// only after the ban and its audit row are committed.
+// hub worker. The room never blocks on the database; the change takes effect
+// only after the audit row (and, for kick, the ban) is committed.
 func (r *room) moderate(m *member, c commandCmd, reject func(code, message string)) {
 	if r.campus {
 		reject(CodeForbidden, "Moderasi hanya tersedia di ruang")
 		return
 	}
-	if c.target == uuid.Nil || c.target == m.p.ID {
-		reject(CodeBadMessage, "Pilih peserta yang dituju")
-		return
-	}
-	kick := c.name == "kick"
-	if kick {
-		t := r.members[c.target]
+	target := c.target
+	switch c.name {
+	case "lock", "unlock":
+		if (c.name == "lock") == r.locked {
+			reject(CodeBadMessage, map[bool]string{true: "Ruang sudah terkunci", false: "Ruang tidak terkunci"}[r.locked])
+			return
+		}
+		target = uuid.Nil
+	default:
+		if target == uuid.Nil || target == m.p.ID {
+			reject(CodeBadMessage, "Pilih peserta yang dituju")
+			return
+		}
+		if c.name == "allow" {
+			break // the banned user is not in the room
+		}
+		t := r.members[target]
 		if t == nil {
 			reject(CodeNotFoundTarget, "Peserta tidak ada di ruang ini")
 			return
 		}
 		if t.p.Role != "participant" {
-			reject(CodeForbidden, "Pengajar dan admin tidak bisa dikeluarkan")
+			reject(CodeForbidden, "Pengajar dan admin tidak bisa dimoderasi")
+			return
+		}
+		if c.name == "mute" && r.muted[target] {
+			reject(CodeBadMessage, "Peserta sudah dibisukan")
+			return
+		}
+		if c.name == "unmute" && !r.muted[target] {
+			reject(CodeBadMessage, "Peserta tidak sedang dibisukan")
 			return
 		}
 	}
-	actor, seq, target := m.p.ID, c.seq, c.target
-	r.hub.moderate(modJob{kick: kick, roomID: r.id, actor: actor, target: target, at: r.now(),
+	action, actor, seq := c.name, m.p.ID, c.seq
+	r.hub.moderate(modJob{action: action, roomID: r.id, actor: actor, target: target, at: r.now(),
 		done: func(changed bool, banned []BannedUser, err error) {
-			cmd := moderatedCmd{kick: kick, actor: actor, seq: seq, target: target, changed: changed, banned: banned, err: err}
+			cmd := moderatedCmd{action: action, actor: actor, seq: seq, target: target, changed: changed, banned: banned, err: err}
 			select {
 			case r.inbox <- cmd:
 			case <-r.done:
@@ -112,19 +130,22 @@ func (r *room) moderated(c moderatedCmd) {
 		}
 	}
 	if c.err != nil {
-		r.log.Error("moderation write failed", slog.String("room_id", r.id.String()), slog.Any("err", c.err))
+		r.log.Error("moderation write failed", slog.String("room_id", r.id.String()),
+			slog.String("action", c.action), slog.Any("err", c.err))
 		reply(CodeUnavailable, "Aksi gagal disimpan. Coba lagi.")
 		return
 	}
 	if !c.changed {
-		if c.kick {
-			reply(CodeForbidden, "Peserta tidak dapat dikeluarkan")
-		} else {
+		if c.action == "allow" {
 			reply(CodeNotFoundTarget, "Peserta tidak sedang dikeluarkan")
+		} else {
+			reply(CodeForbidden, "Aksi tidak diizinkan")
 		}
 		return
 	}
-	if c.kick {
+	switch c.action {
+	case "kick":
+		delete(r.muted, c.target)
 		if t := r.members[c.target]; t != nil {
 			if t.conn != nil {
 				t.conn.sendError(ErrorMsg{Code: CodeKicked, Message: errKicked.msg})
@@ -133,15 +154,41 @@ func (r *room) moderated(c moderatedCmd) {
 			}
 			r.remove(c.target)
 		}
+	case "mute", "unmute":
+		muted := c.action == "mute"
+		if muted {
+			r.muted[c.target] = true
+		} else {
+			delete(r.muted, c.target)
+		}
+		if t := r.members[c.target]; t != nil && t.conn != nil {
+			t.conn.send(newOut(TypeRoomState, r.state(c.target)))
+		}
+	case "lock", "unlock":
+		r.locked = c.action == "lock"
+		for id, o := range r.members {
+			if o.conn != nil {
+				o.conn.send(newOut(TypeRoomState, r.state(id)))
+			}
+		}
 	}
-	name := "allow"
-	if c.kick {
-		name = "kick"
-	}
-	ev := newOut(TypeEvent, ModerationEvent{Name: name, By: c.actor, Target: c.target, Banned: c.banned})
+	ev := newOut(TypeEvent, ModerationEvent{Name: c.action, By: c.actor, Target: c.target, Banned: c.banned, Muted: r.mutedIDs()})
 	for _, o := range r.members {
 		if o.conn != nil && (o.p.Role == "teacher" || o.p.Role == "admin") {
 			o.conn.send(ev)
 		}
 	}
+}
+
+// state is the room_state a member sees: shared settings plus their own mute.
+func (r *room) state(id uuid.UUID) RoomStateMsg {
+	return RoomStateMsg{AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id]}
+}
+
+func (r *room) mutedIDs() []uuid.UUID {
+	out := make([]uuid.UUID, 0, len(r.muted))
+	for id := range r.muted {
+		out = append(out, id)
+	}
+	return out
 }

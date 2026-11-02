@@ -36,11 +36,17 @@ const zoneKey = computed(() => {
   void props.version
   return props.chat.zone.key
 })
+const muted = computed(() => {
+  void props.version
+  return props.chat.muted && !props.campus
+})
+// roomOff blocks sending: muted by the teacher, or "Semua" switched off.
 const roomOff = computed(() => {
   void props.version
-  return tab.value === 'room' && !props.chat.allChatEnabled && !props.campus
+  return muted.value || (tab.value === 'room' && !props.chat.allChatEnabled && !props.campus)
 })
 const placeholder = computed(() => {
+  if (muted.value) return 'Kamu dibisukan pengajar'
   if (roomOff.value) return 'Chat semua ruangan dimatikan pengajar'
   if (tab.value === 'zone') return `Tulis ke ${props.chat.zone.name}…`
   if (tab.value === 'near') return 'Tulis ke orang di dekatmu…'
@@ -105,6 +111,9 @@ function time(iso: string) {
       </button>
     </div>
     <p v-if="announcement" class="zone-note" role="status">Pengumuman: {{ announcement.text }}</p>
+    <p v-if="muted" class="zone-note" role="status">
+      Pengajar membisukan chatmu. Kamu tetap bisa membaca pesan.
+    </p>
     <p v-if="zoneKey" class="zone-note">Kamu di {{ chat.zone.name }}</p>
     <div
       id="chat-log"

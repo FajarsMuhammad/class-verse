@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { api, ApiError, getAccessToken, onTokenChange, refreshAccessToken, setAccessToken } from '../client'
+import {
+  api,
+  ApiError,
+  getAccessToken,
+  onTokenChange,
+  refreshAccessToken,
+  setAccessToken,
+} from '../client'
 
 type Handler = (url: string, init: RequestInit) => Response | Promise<Response>
 
@@ -69,7 +76,13 @@ describe('api client', () => {
   it('maps API errors with fields', async () => {
     stubFetch(() =>
       Response.json(
-        { error: { code: 'validation_failed', message: 'x', fields: { email: 'Email tidak valid' } } },
+        {
+          error: {
+            code: 'validation_failed',
+            message: 'x',
+            fields: { email: 'Email tidak valid' },
+          },
+        },
         { status: 400 },
       ),
     )

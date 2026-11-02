@@ -25,7 +25,9 @@ async function submit() {
   notice.value = ''
   try {
     await auth.verifyEmail(email.value, code.value.trim())
-    await router.push(auth.needsProfile ? { name: 'complete-profile' } : (pending.takeRedirect() ?? '/'))
+    await router.push(
+      auth.needsProfile ? { name: 'complete-profile' } : (pending.takeRedirect() ?? '/'),
+    )
   } catch (e) {
     error.value = errorMessage(e)
   } finally {
@@ -38,7 +40,8 @@ async function resend() {
   notice.value = ''
   try {
     await authApi.resendOtp(email.value)
-    notice.value = 'Jika email terdaftar dan belum diverifikasi, kode baru sudah dikirim. Tunggu 1 menit sebelum meminta lagi.'
+    notice.value =
+      'Jika email terdaftar dan belum diverifikasi, kode baru sudah dikirim. Tunggu 1 menit sebelum meminta lagi.'
   } catch (e) {
     error.value = errorMessage(e)
   }
@@ -50,7 +53,13 @@ async function resend() {
     <form class="form" novalidate @submit.prevent="submit">
       <p v-if="error" class="alert" role="alert">{{ error }}</p>
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-      <FormField v-model="email" label="Email" type="email" autocomplete="email" inputmode="email" />
+      <FormField
+        v-model="email"
+        label="Email"
+        type="email"
+        autocomplete="email"
+        inputmode="email"
+      />
       <FormField
         v-model="code"
         label="Kode verifikasi"

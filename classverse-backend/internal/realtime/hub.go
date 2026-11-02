@@ -34,11 +34,12 @@ type Moderator interface {
 	Kick(ctx context.Context, roomID, actorID, targetID uuid.UUID, at time.Time) (bool, error)
 	Allow(ctx context.Context, roomID, actorID, targetID uuid.UUID, at time.Time) (bool, error)
 	Banned(ctx context.Context, roomID uuid.UUID) ([]BannedUser, error)
+	RecordAction(ctx context.Context, roomID, actorID, targetID uuid.UUID, action string, at time.Time) (bool, error)
 }
 
 // modJob runs one moderation write; done runs on the worker and must not block.
 type modJob struct {
-	kick   bool
+	action string // kick, allow, mute, unmute, lock, unlock
 	roomID uuid.UUID
 	actor  uuid.UUID
 	target uuid.UUID
@@ -316,7 +317,7 @@ func (h *Hub) travel(c *conn, from *room, dest Admission) (*room, error) {
 		return nil, err
 	}
 	res := make(chan error, 1)
-	if !to.post(reserveCmd{userID: c.userID, result: res}) {
+	if !to.post(reserveCmd{userID: c.userID, staff: dest.staff(), result: res}) {
 		to.pending.Add(-1)
 		return nil, errUnavailable
 	}
@@ -517,12 +518,15 @@ func (h *Hub) recordLoop() {
 			}
 			var changed bool
 			var banned []BannedUser
-			if j.mod.kick {
+			switch j.mod.action {
+			case "kick":
 				changed, err = m.Kick(ctx, j.roomID, j.mod.actor, j.mod.target, j.mod.at)
-			} else {
+			case "allow":
 				changed, err = m.Allow(ctx, j.roomID, j.mod.actor, j.mod.target, j.mod.at)
+			default:
+				changed, err = m.RecordAction(ctx, j.roomID, j.mod.actor, j.mod.target, j.mod.action, j.mod.at)
 			}
-			if err == nil {
+			if err == nil && (j.mod.action == "kick" || j.mod.action == "allow") {
 				banned, err = m.Banned(ctx, j.roomID)
 			}
 			j.mod.done(changed, banned, err)

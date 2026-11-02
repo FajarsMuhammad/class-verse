@@ -129,3 +129,44 @@ func (q *Queries) ListOpenSessionBans(ctx context.Context, roomID uuid.UUID) ([]
 	}
 	return items, nil
 }
+
+const recordRoomAction = `-- name: RecordRoomAction :execrows
+INSERT INTO moderation_actions (room_id, actor_id, target_id, action, created_at)
+SELECT r.id, $1, $2::uuid, $3::mod_action, $4
+FROM rooms r
+JOIN room_sessions s ON s.room_id = r.id AND s.ended_at IS NULL
+JOIN memberships actor ON actor.org_id = r.org_id AND actor.user_id = $1
+WHERE r.id = $5 AND r.archived_at IS NULL
+  AND actor.role IN ('teacher', 'admin')
+  AND (
+    ($3::mod_action IN ('lock', 'unlock') AND $2::uuid IS NULL)
+    OR ($3::mod_action IN ('mute', 'unmute') AND EXISTS (
+      SELECT 1 FROM memberships t
+      WHERE t.org_id = r.org_id AND t.user_id = $2::uuid AND t.role = 'participant'))
+  )
+`
+
+type RecordRoomActionParams struct {
+	ActorID  uuid.UUID
+	TargetID uuid.NullUUID
+	Action   ModAction
+	Now      pgtype.Timestamptz
+	RoomID   uuid.UUID
+}
+
+// Audits mute/unmute/lock/unlock. Zero rows unless the room's session is open,
+// the actor is teacher/admin of its organization and, for mute/unmute, the
+// target is a participant of the same organization.
+func (q *Queries) RecordRoomAction(ctx context.Context, arg RecordRoomActionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordRoomAction,
+		arg.ActorID,
+		arg.TargetID,
+		arg.Action,
+		arg.Now,
+		arg.RoomID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

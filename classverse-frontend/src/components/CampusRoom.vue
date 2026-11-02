@@ -31,6 +31,9 @@ const {
   gather,
   kick,
   allow,
+  moderate,
+  setLocked,
+  mutedIds,
   banned,
   kicked,
   people,
@@ -115,6 +118,10 @@ function doKick() {
   if (confirmKick.value) kick(confirmKick.value.id)
   confirmKick.value = null
 }
+const locked = computed(() => {
+  void chatVersion.value
+  return chat.locked
+})
 const statusText = computed(
   () =>
     ({
@@ -276,12 +283,34 @@ onBeforeUnmount(() => clearInterval(timer))
             Chat semua ruangan: {{ allChat ? 'aktif' : 'mati' }}
           </button>
           <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
+          <button
+            type="button"
+            class="btn-secondary toggle"
+            role="switch"
+            :aria-checked="locked"
+            :disabled="status !== 'open'"
+            @click="setLocked(!locked)"
+          >
+            Ruang: {{ locked ? 'terkunci' : 'terbuka' }}
+          </button>
           <details class="moderation">
             <summary>Peserta ({{ participants.length }})</summary>
             <p v-if="!participants.length" class="room-meta">Belum ada peserta lain.</p>
             <ul class="people">
               <li v-for="p in participants" :key="p.id">
-                <span>{{ p.name }}</span>
+                <span
+                  >{{ p.name
+                  }}<template v-if="mutedIds.includes(p.id)"> (dibisukan)</template></span
+                >
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  :aria-label="`${mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan'} ${p.name}`"
+                  :disabled="status !== 'open'"
+                  @click="moderate(mutedIds.includes(p.id) ? 'unmute' : 'mute', p.id)"
+                >
+                  {{ mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan' }}
+                </button>
                 <button
                   type="button"
                   class="btn-secondary"
@@ -351,9 +380,13 @@ onBeforeUnmount(() => clearInterval(timer))
 }
 .people li {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+.people li > span {
+  flex-basis: 100%;
+  font-weight: var(--weight-bold);
 }
 .confirm {
   display: grid;
