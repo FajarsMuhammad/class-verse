@@ -38,6 +38,7 @@ func (s *Store) Admit(ctx context.Context, roomID, userID uuid.UUID) (Admission,
 		RoomID: row.RoomID, OrgID: row.OrgID, MapKey: row.MapKey, Capacity: int(row.Capacity),
 		RoomName: row.RoomName, BuildingKey: row.BuildingKey.String, AllChat: row.AllChatEnabled,
 		UserID: userID, Name: row.DisplayName, Avatar: row.AvatarKey, Role: string(row.Role),
+		Banned: row.Banned,
 	}
 	if row.ScheduledAt.Valid {
 		t := row.ScheduledAt.Time.UTC()
@@ -114,3 +115,36 @@ func (s *Store) CloseOpenSessions(ctx context.Context, at time.Time) error {
 }
 
 func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+
+// Kick bans target from the open session of roomID and audits it atomically.
+// ok is false when nothing changed: no open session, or the actor/target
+// roles or organization do not allow it.
+func (s *Store) Kick(ctx context.Context, roomID, actorID, targetID uuid.UUID, at time.Time) (bool, error) {
+	n, err := s.q.KickFromOpenSession(ctx, query.KickFromOpenSessionParams{RoomID: roomID, ActorID: actorID, TargetID: targetID, Now: pgTime(at)})
+	if err != nil {
+		return false, fmt.Errorf("kick: %w", err)
+	}
+	return n == 1, nil
+}
+
+// Allow revokes target's ban from the open session of roomID, with audit.
+func (s *Store) Allow(ctx context.Context, roomID, actorID, targetID uuid.UUID, at time.Time) (bool, error) {
+	n, err := s.q.AllowInOpenSession(ctx, query.AllowInOpenSessionParams{RoomID: roomID, ActorID: actorID, TargetID: targetID, Now: pgTime(at)})
+	if err != nil {
+		return false, fmt.Errorf("allow: %w", err)
+	}
+	return n == 1, nil
+}
+
+// Banned lists users banned from the open session of roomID.
+func (s *Store) Banned(ctx context.Context, roomID uuid.UUID) ([]BannedUser, error) {
+	rows, err := s.q.ListOpenSessionBans(ctx, roomID)
+	if err != nil {
+		return nil, fmt.Errorf("list bans: %w", err)
+	}
+	out := make([]BannedUser, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, BannedUser{ID: r.ID, Name: r.DisplayName})
+	}
+	return out, nil
+}

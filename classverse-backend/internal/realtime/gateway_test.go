@@ -64,14 +64,16 @@ func TestGatewayTravelAdmission(t *testing.T) {
 		orgID    uuid.UUID
 		building string
 		schedule *time.Time
+		banned   bool
 		code     string
 	}{
-		{"other organization", uuid.New(), "kelas-a", nil, CodeNotFound},
-		{"staff room", source.OrgID, staffBuildingKey, nil, CodeForbidden},
-		{"scheduled", source.OrgID, "kelas-a", &future, CodeScheduled},
+		{"other organization", uuid.New(), "kelas-a", nil, false, CodeNotFound},
+		{"staff room", source.OrgID, staffBuildingKey, nil, false, CodeForbidden},
+		{"scheduled", source.OrgID, "kelas-a", &future, false, CodeScheduled},
+		{"kicked from session", source.OrgID, "kelas-a", nil, true, CodeKicked},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			dest := Admission{RoomID: uuid.New(), OrgID: tt.orgID, MapKey: "classroom", BuildingKey: tt.building, ScheduledAt: tt.schedule, Role: "participant"}
+			dest := Admission{RoomID: uuid.New(), OrgID: tt.orgID, MapKey: "classroom", BuildingKey: tt.building, ScheduledAt: tt.schedule, Banned: tt.banned, Role: "participant"}
 			g := &Gateway{hub: e.hub, admit: admissionMap{dest.RoomID: dest}}
 			_, err := g.travel(t.Context(), c, from, dest.RoomID)
 			if got := travelError(err, 1).Code; got != tt.code {
@@ -93,6 +95,14 @@ func TestGatewayEntryReconnect(t *testing.T) {
 	got, err := g.entry(t.Context(), e.ani, campus)
 	if err != nil || got.RoomID != dest.RoomID {
 		t.Fatalf("resume=%+v err=%v", got, err)
+	}
+	// A kick while away: reconnect must not resume into the banned session.
+	banned := dest
+	banned.Banned = true
+	g.admit.(admissionMap)[dest.RoomID] = banned
+	got, err = g.entry(t.Context(), e.ani, campus)
+	if err != nil || got.RoomID != campus.RoomID {
+		t.Fatalf("banned resume=%+v err=%v", got, err)
 	}
 	delete(g.admit.(admissionMap), dest.RoomID)
 	got, err = g.entry(t.Context(), e.ani, campus)

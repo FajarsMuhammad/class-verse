@@ -139,11 +139,11 @@ func (g *Gateway) session(ctx context.Context, ws *websocket.Conn, roomID uuid.U
 // around doors, schedules, or Ruang Guru.
 func (g *Gateway) entry(ctx context.Context, userID uuid.UUID, requested Admission) (Admission, error) {
 	if last := g.hub.resume(userID); last != uuid.Nil {
-		if last == requested.RoomID {
+		if last == requested.RoomID && !requested.Banned {
 			return requested, nil
 		}
 		adm, err := g.admit.Admit(ctx, last, userID)
-		if err == nil && adm.OrgID == requested.OrgID && (adm.BuildingKey != staffBuildingKey || adm.staff()) {
+		if err == nil && !adm.Banned && adm.OrgID == requested.OrgID && (adm.BuildingKey != staffBuildingKey || adm.staff()) {
 			return adm, nil
 		}
 	}
@@ -244,6 +244,15 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur
 				continue
 			}
 			cur.Store(to)
+		case TypeCmd:
+			var m CommandMsg
+			if err := json.Unmarshal(env.D, &m); err != nil {
+				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Perintah tidak valid", Seq: env.Seq})
+				continue
+			}
+			if !cur.Load().post(commandCmd{c: c, seq: env.Seq, name: m.Name, target: m.Target}) {
+				return
+			}
 		case TypeChat:
 			var m ChatInMsg
 			if json.Unmarshal(env.D, &m) != nil {
@@ -281,6 +290,9 @@ func (g *Gateway) travel(ctx context.Context, c *conn, from *room, roomID uuid.U
 	}
 	if dest.BuildingKey == staffBuildingKey && !dest.staff() {
 		return nil, &roomError{code: CodeForbidden, msg: "Ruang Guru khusus pengajar dan admin"}
+	}
+	if dest.Banned {
+		return nil, errKicked
 	}
 	if dest.ScheduledAt != nil && dest.ScheduledAt.After(g.hub.now()) && !dest.staff() {
 		return nil, &roomError{code: CodeScheduled, msg: "Ruang belum dibuka. Tunggu jadwalnya."}

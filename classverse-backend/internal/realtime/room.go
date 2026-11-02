@@ -39,6 +39,8 @@ type Admission struct {
 	Name        string
 	Avatar      string
 	Role        string
+	// Banned is true when the user was kicked from the room's open session.
+	Banned bool
 }
 
 func (a Admission) staff() bool { return a.Role == "teacher" || a.Role == "admin" }
@@ -187,7 +189,17 @@ func (r *room) post(cmd any) bool {
 
 func (r *room) run(ctx context.Context) {
 	defer close(r.done)
-	defer r.closeSession()
+	defer func() {
+		if ctx.Err() != nil {
+			for id := range r.members {
+				if !r.campus {
+					r.hub.record(sessionJob{kind: jobLeave, roomID: r.id, userID: id, at: r.now()})
+				}
+			}
+			return // Preserve session identity across process restarts.
+		}
+		r.closeSession()
+	}()
 	t := time.NewTicker(tickInterval)
 	defer t.Stop()
 	for {
@@ -239,6 +251,10 @@ func (r *room) handle(cmd any) {
 			r.broadcast(newOut(TypeProfileUpdated, c.p), uuid.Nil)
 		}
 		close(c.done)
+	case commandCmd:
+		r.command(c)
+	case moderatedCmd:
+		r.moderated(c)
 	case chatCmd:
 		r.chat(c)
 	case deliverCmd:
@@ -258,6 +274,7 @@ var (
 	errRoomFull  = &roomError{code: CodeRoomFull, msg: "Ruang sudah penuh"}
 	errNotAtDoor = &roomError{code: CodeNotAtDoor, msg: "Berjalanlah ke pintu gedung dulu"}
 	errNotInRoom = &roomError{code: CodeUnavailable, msg: "Kamu belum berada di ruang ini"}
+	errKicked    = &roomError{code: CodeKicked, msg: "Kamu dikeluarkan dari sesi ini. Minta izin pengajar untuk masuk lagi."}
 )
 
 type roomError struct{ code, msg string }
@@ -562,6 +579,10 @@ func (r *room) chat(c chatCmd) {
 	reject := func(code, msg string) {
 		c.c.sendError(ErrorMsg{Code: code, Message: msg, Seq: c.seq})
 	}
+	if c.scope == ScopeBroadcast && m.p.Role != "teacher" && m.p.Role != "admin" {
+		reject(CodeForbidden, "Pengumuman hanya dapat dikirim pengajar atau admin")
+		return
+	}
 	if !m.chat.allow(now) {
 		reject(CodeRateLimited, "Terlalu cepat. Tunggu sebentar sebelum mengirim lagi.")
 		return
@@ -592,8 +613,8 @@ func (r *room) chat(c chatCmd) {
 				to = append(to, o)
 			}
 		}
-	case ScopeRoom:
-		if !r.allChat {
+	case ScopeRoom, ScopeBroadcast:
+		if c.scope == ScopeRoom && !r.allChat {
 			reject(CodeAllChatDisabled, "Chat semua ruangan sedang dimatikan pengajar")
 			return
 		}

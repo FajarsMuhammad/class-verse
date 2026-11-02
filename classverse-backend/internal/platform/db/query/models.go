@@ -64,6 +64,7 @@ const (
 	ModActionKick   ModAction = "kick"
 	ModActionLock   ModAction = "lock"
 	ModActionUnlock ModAction = "unlock"
+	ModActionAllow  ModAction = "allow"
 )
 
 func (e *ModAction) Scan(src interface{}) error {
@@ -296,6 +297,12 @@ type SessionAttendance struct {
 	UserID    uuid.UUID
 	JoinedAt  pgtype.Timestamptz
 	LeftAt    pgtype.Timestamptz
+}
+
+type SessionBan struct {
+	SessionID uuid.UUID
+	UserID    uuid.UUID
+	CreatedAt pgtype.Timestamptz
 }
 
 type User struct {

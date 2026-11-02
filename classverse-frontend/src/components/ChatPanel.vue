@@ -10,6 +10,7 @@ const props = defineProps<{
   error: string
   disabled: boolean
   campus: boolean
+  teacher?: boolean
 }>()
 const emit = defineEmits<{ send: [text: string, scope: ChatScope] }>()
 
@@ -24,6 +25,7 @@ const tabs = computed(() => {
   const list: { scope: ChatScope; label: string }[] = []
   if (props.chat.zone.key) list.push({ scope: 'zone', label: props.chat.zone.name })
   list.push({ scope: 'near', label: 'Dekat' }, { scope: 'room', label: 'Semua' })
+  if (props.teacher) list.push({ scope: 'broadcast', label: 'Pengumuman' })
   return list
 })
 const lines = computed(() => {
@@ -42,9 +44,15 @@ const placeholder = computed(() => {
   if (roomOff.value) return 'Chat semua ruangan dimatikan pengajar'
   if (tab.value === 'zone') return `Tulis ke ${props.chat.zone.name}…`
   if (tab.value === 'near') return 'Tulis ke orang di dekatmu…'
+  if (tab.value === 'broadcast') return 'Tulis pengumuman untuk seluruh ruang…'
   return 'Tulis ke semua orang di ruang…'
 })
 const remaining = computed(() => MAX_LEN - [...text.value].length)
+const announcement = computed(() => {
+  void props.version
+  const lines = props.chat.lines.broadcast
+  return lines[lines.length - 1]
+})
 
 // Entering a zone opens its tab; leaving it falls back to near.
 watch(zoneKey, (key, prev) => {
@@ -88,7 +96,7 @@ function time(iso: string) {
         role="tab"
         type="button"
         class="tab"
-        :class="{ zone: t.scope === 'zone' }"
+        :class="{ zone: t.scope === 'zone', broadcast: t.scope === 'broadcast' }"
         :aria-selected="tab === t.scope"
         aria-controls="chat-log"
         @click="tab = t.scope"
@@ -96,6 +104,7 @@ function time(iso: string) {
         {{ t.label }}
       </button>
     </div>
+    <p v-if="announcement" class="zone-note" role="status">Pengumuman: {{ announcement.text }}</p>
     <p v-if="zoneKey" class="zone-note">Kamu di {{ chat.zone.name }}</p>
     <div
       id="chat-log"
@@ -121,7 +130,7 @@ function time(iso: string) {
           <span v-if="l.role !== 'participant' && !l.mine" class="role">Pengajar</span>
           <time :datetime="l.at">{{ time(l.at) }}</time></span
         >
-        <p class="bubble">{{ l.text }}</p>
+        <p class="bubble"><strong v-if="l.broadcast">Pengumuman · </strong>{{ l.text }}</p>
       </div>
     </div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -174,7 +183,11 @@ function time(iso: string) {
 }
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+}
+.tab.broadcast {
+  flex-basis: 100%;
 }
 .tab {
   flex: 1 1 0;

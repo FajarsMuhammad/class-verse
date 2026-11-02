@@ -26,7 +26,12 @@ func (q *Queries) GetCampusRoomID(ctx context.Context, orgID uuid.UUID) (uuid.UU
 const getRoomAdmission = `-- name: GetRoomAdmission :one
 SELECT r.id AS room_id, r.org_id, r.map_key, r.capacity, r.name AS room_name,
        r.building_key, r.scheduled_at, r.all_chat_enabled,
-       m.role, u.display_name, u.avatar_key
+       m.role, u.display_name, u.avatar_key,
+       EXISTS (
+         SELECT 1 FROM session_bans b
+         JOIN room_sessions s ON s.id = b.session_id AND s.ended_at IS NULL
+         WHERE s.room_id = r.id AND b.user_id = m.user_id
+       ) AS banned
 FROM rooms r
 JOIN memberships m ON m.org_id = r.org_id AND m.user_id = $1
 JOIN users u ON u.id = m.user_id
@@ -50,6 +55,7 @@ type GetRoomAdmissionRow struct {
 	Role           OrgRole
 	DisplayName    string
 	AvatarKey      string
+	Banned         bool
 }
 
 // The room plus the caller's membership and profile; no row when the room
@@ -69,6 +75,7 @@ func (q *Queries) GetRoomAdmission(ctx context.Context, arg GetRoomAdmissionPara
 		&i.Role,
 		&i.DisplayName,
 		&i.AvatarKey,
+		&i.Banned,
 	)
 	return i, err
 }

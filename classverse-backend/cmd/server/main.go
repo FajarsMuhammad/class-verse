@@ -145,10 +145,15 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	}
 	rtStore := realtime.NewStore(pool)
 	// Sessions left open by a crash cannot be resumed; end them before serving.
-	if err := rtStore.CloseOpenSessions(ctx, now()); err != nil {
+	recovered, err := rtStore.RecoverSessions(ctx, now())
+	if err != nil {
 		return nil, err
 	}
 	hub := realtime.NewHub(mapData, rtStore, now, log)
+	if err := hub.RestoreSessions(recovered); err != nil {
+		_ = hub.Shutdown(ctx)
+		return nil, err
+	}
 	go runChatRetention(ctx, rtStore, now, purgeInterval, log)
 	authHandler.SetProfilePublisher(hub)
 	gateway, err := realtime.NewGateway(hub, tokens, rtStore, cfg.FrontendURL, log)

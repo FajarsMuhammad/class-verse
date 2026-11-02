@@ -207,7 +207,7 @@ func TestChatUnknownScope(t *testing.T) {
 	r, _ := newMapRoom(t, "campus", false)
 	a := r.testJoin(t, "Ani")
 	drain(a)
-	r.say(a, "broadcast", "semua dengar")
+	r.say(a, "unknown", "semua dengar")
 	if codes := errorsOf(t, a); len(codes) != 1 || codes[0] != CodeBadMessage {
 		t.Fatalf("errors = %v", codes)
 	}

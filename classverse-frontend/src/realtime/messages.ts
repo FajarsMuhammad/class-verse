@@ -23,6 +23,7 @@ export interface PingMsg {
 }
 
 export interface ClientMessages {
+  cmd: CommandMsg
   auth: AuthMsg
   move: MoveMsg
   ping: PingMsg
@@ -30,7 +31,16 @@ export interface ClientMessages {
   chat: ChatInMsg
 }
 
-export type ChatScope = 'near' | 'zone' | 'room'
+export type CommandMsg = { name: 'gather' } | { name: 'kick' | 'allow'; target: string }
+export interface BannedUser {
+  id: string
+  name: string
+}
+export type EventMsg =
+  | { name: 'gather'; by: string; participants: Participant[] }
+  | { name: 'kick' | 'allow'; by: string; target: string; banned: BannedUser[] }
+
+export type ChatScope = 'near' | 'zone' | 'room' | 'broadcast'
 export interface ChatInMsg {
   text: string
   scope: ChatScope
@@ -93,6 +103,8 @@ export type ErrorCode =
   | 'travel_in_progress'
   | 'rate_limited'
   | 'not_in_zone'
+  | 'kicked'
+  | 'target_not_found'
   | 'all_chat_disabled'
 
 export interface BuildingCount {
@@ -118,6 +130,7 @@ export interface RoomStateMsg {
 }
 
 export interface ServerMessages {
+  event: EventMsg
   welcome: WelcomeMsg
   traveled: WelcomeMsg
   buildings: { items: BuildingCount[] }

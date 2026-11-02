@@ -24,6 +24,19 @@ const mountPanel = (chat: ChatState, campus = false) =>
   mount(ChatPanel, { props: { chat, version: chat.version, error: '', disabled: false, campus } })
 
 describe('ChatPanel', () => {
+  it('offers broadcast only to teachers and allows it when room chat is disabled', async () => {
+    const w = mountPanel(state(false))
+    expect(w.findAll('[role=tab]').some((t) => t.text() === 'Pengumuman')).toBe(false)
+    await w.setProps({ teacher: true })
+    await w
+      .findAll('[role=tab]')
+      .find((t) => t.text() === 'Pengumuman')!
+      .trigger('click')
+    await w.get('textarea').setValue('Mulai kelas')
+    await w.get('form').trigger('submit')
+    expect(w.emitted('send')).toEqual([['Mulai kelas', 'broadcast']])
+  })
+
   it('sends on Enter to the selected tab and keeps Shift+Enter as newline', async () => {
     const w = mountPanel(state())
     const input = w.get('textarea')

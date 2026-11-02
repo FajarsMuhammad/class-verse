@@ -28,6 +28,13 @@ const {
   chatVersion,
   chatError,
   sendChat,
+  gather,
+  kick,
+  allow,
+  banned,
+  kicked,
+  people,
+  rejoin,
 } = useRoom()
 const org = useOrgStore()
 const route = useRoute()
@@ -102,6 +109,12 @@ async function toggleAllChat() {
     toggling.value = false
   }
 }
+const participants = computed(() => people.value.filter((p) => p.role === 'participant'))
+const confirmKick = ref<{ id: string; name: string } | null>(null)
+function doKick() {
+  if (confirmKick.value) kick(confirmKick.value.id)
+  confirmKick.value = null
+}
 const statusText = computed(
   () =>
     ({
@@ -146,7 +159,7 @@ onBeforeUnmount(() => clearInterval(timer))
         Daftar gedung
       </button>
       <button
-        v-else
+        v-else-if="!kicked"
         class="btn-secondary"
         :disabled="traveling || status !== 'open'"
         @click="travel(roomId)"
@@ -184,7 +197,13 @@ onBeforeUnmount(() => clearInterval(timer))
             <strong>{{ nearDoor.name }}</strong>
             <button class="btn-primary" @click="roomsOpen = true">Pilih ruang</button>
           </div>
-          <div v-if="map && status !== 'open'" class="connection-overlay" role="status">
+          <div v-if="kicked" class="connection-overlay" role="alert">
+            <p>
+              Kamu dikeluarkan dari sesi ini oleh pengajar. Minta izin pengajar untuk masuk lagi.
+            </p>
+            <button class="btn-primary" @click="rejoin">Buka peta sekolah</button>
+          </div>
+          <div v-else-if="map && status !== 'open'" class="connection-overlay" role="status">
             {{ statusText }}
           </div>
         </div>
@@ -243,6 +262,9 @@ onBeforeUnmount(() => clearInterval(timer))
       <aside class="chat-sidebar" aria-label="Chat ruang">
         <h2>Chat</h2>
         <div v-if="!campus && org.isTeacher" class="teacher">
+          <button class="btn-secondary" :disabled="status !== 'open' || traveling" @click="gather">
+            Kumpulkan peserta
+          </button>
           <button
             type="button"
             class="btn-secondary toggle"
@@ -254,6 +276,48 @@ onBeforeUnmount(() => clearInterval(timer))
             Chat semua ruangan: {{ allChat ? 'aktif' : 'mati' }}
           </button>
           <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
+          <details class="moderation">
+            <summary>Peserta ({{ participants.length }})</summary>
+            <p v-if="!participants.length" class="room-meta">Belum ada peserta lain.</p>
+            <ul class="people">
+              <li v-for="p in participants" :key="p.id">
+                <span>{{ p.name }}</span>
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  :aria-label="`Keluarkan ${p.name} dari sesi`"
+                  :disabled="status !== 'open'"
+                  @click="confirmKick = p"
+                >
+                  Keluarkan
+                </button>
+              </li>
+            </ul>
+            <div v-if="confirmKick" class="confirm" role="alertdialog" aria-labelledby="kick-q">
+              <p id="kick-q">
+                Keluarkan {{ confirmKick.name }}? Ia tidak bisa masuk lagi ke sesi ini sampai kamu
+                izinkan.
+              </p>
+              <button type="button" class="btn-primary" @click="doKick">Ya, keluarkan</button>
+              <button type="button" class="btn-secondary" @click="confirmKick = null">Batal</button>
+            </div>
+            <template v-if="banned.length">
+              <p class="room-meta">Dikeluarkan dari sesi ini</p>
+              <ul class="people">
+                <li v-for="b in banned" :key="b.id">
+                  <span>{{ b.name }}</span>
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    :aria-label="`Izinkan ${b.name} masuk lagi`"
+                    @click="allow(b.id)"
+                  >
+                    Izinkan
+                  </button>
+                </li>
+              </ul>
+            </template>
+          </details>
         </div>
         <ChatPanel
           class="side-chat"
@@ -262,6 +326,7 @@ onBeforeUnmount(() => clearInterval(timer))
           :error="chatError"
           :disabled="status !== 'open'"
           :campus="campus"
+          :teacher="org.isTeacher"
           @send="sendChat"
         />
       </aside>
@@ -270,6 +335,34 @@ onBeforeUnmount(() => clearInterval(timer))
 </template>
 
 <style scoped>
+.moderation summary {
+  min-height: var(--touch-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: var(--weight-bold);
+}
+.people {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+.people li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+.confirm {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
 .room-meta {
   margin: 0 0 var(--space-3);
   color: var(--color-ink-muted);

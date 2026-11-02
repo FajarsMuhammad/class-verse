@@ -161,14 +161,16 @@ func TestHubSessionWriteFailureDoesNotBlock(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("room loop blocked by session failure")
 	}
-	// Without a session id attendance is skipped; shutdown still closes and drains.
+	// Without a session id attendance is skipped; shutdown drains without ending sessions.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := hub.Shutdown(ctx); err != nil {
 		t.Fatalf("shutdown: %v", err)
 	}
-	if got := <-calls; got != "close" {
-		t.Fatalf("shutdown job = %s, want close", got)
+	select {
+	case got := <-calls:
+		t.Fatalf("unexpected shutdown job = %s", got)
+	default:
 	}
 }
 
