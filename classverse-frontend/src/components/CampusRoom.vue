@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import DoorRooms from '@/components/DoorRooms.vue'
 import { useOrgStore } from '@/stores/org'
@@ -34,6 +34,40 @@ const route = useRoute()
 const nearDoor = ref<Building | null>(null)
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
 const selectedKey = ref('')
+const directoryButton = ref<HTMLButtonElement | null>(null)
+const closeButton = ref<HTMLButtonElement | null>(null)
+const directoryOpen = ref(false)
+const roomsOpen = ref(false)
+const mobilePanel = ref<'map' | 'chat'>('map')
+function toggleDirectory() {
+  directoryOpen.value = !directoryOpen.value
+  roomsOpen.value = false
+}
+async function closeDirectory() {
+  directoryOpen.value = false
+  roomsOpen.value = false
+  await nextTick()
+  directoryButton.value?.focus()
+}
+watch(
+  () => directoryOpen.value || roomsOpen.value,
+  async (open) => {
+    if (open) {
+      await nextTick()
+      closeButton.value?.focus()
+    }
+  },
+)
+function selectBuilding(key: string) {
+  selectedKey.value = key
+  directoryOpen.value = false
+  roomsOpen.value = true
+}
+watch(campus, () => {
+  directoryOpen.value = false
+  roomsOpen.value = false
+  selectedKey.value = ''
+})
 watch(
   () => route.query.building,
   (key) => {
@@ -44,7 +78,7 @@ watch(
 const selectedBuilding = computed(() =>
   map.value?.buildings.find((b) => b.key === selectedKey.value),
 )
-const panelBuilding = computed(() => selectedBuilding.value ?? nearDoor.value)
+const panelBuilding = computed(() => nearDoor.value ?? selectedBuilding.value)
 const canEnter = computed(
   () => !!panelBuilding.value && panelBuilding.value.key === nearDoor.value?.key,
 )
@@ -95,13 +129,22 @@ onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
-  <section aria-labelledby="map-title">
+  <section class="workspace" aria-labelledby="map-title">
     <header class="heading">
       <div>
         <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
         <p role="status" data-testid="connection-status">{{ error || statusText }}</p>
       </div>
-      <span v-if="campus" class="scope">Peta sekolah</span>
+      <button
+        v-if="campus"
+        ref="directoryButton"
+        class="btn-secondary"
+        :aria-expanded="directoryOpen"
+        aria-controls="building-directory"
+        @click="toggleDirectory"
+      >
+        Daftar gedung
+      </button>
       <button
         v-else
         class="btn-secondary"
@@ -111,8 +154,24 @@ onBeforeUnmount(() => clearInterval(timer))
         Kembali ke peta sekolah
       </button>
     </header>
-    <div class="layout">
-      <div>
+    <div class="mobile-switch" aria-label="Tampilan ruang">
+      <button
+        class="btn-secondary"
+        :aria-pressed="mobilePanel === 'map'"
+        @click="mobilePanel = 'map'"
+      >
+        Peta
+      </button>
+      <button
+        class="btn-secondary"
+        :aria-pressed="mobilePanel === 'chat'"
+        @click="mobilePanel = 'chat'"
+      >
+        Chat
+      </button>
+    </div>
+    <div class="layout" :class="`show-${mobilePanel}`">
+      <div class="map-column">
         <div class="map-frame">
           <GameCanvas
             v-if="map"
@@ -121,6 +180,10 @@ onBeforeUnmount(() => clearInterval(timer))
             :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
           />
           <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
+          <div v-if="campus && nearDoor && !directoryOpen && !roomsOpen" class="door-prompt">
+            <strong>{{ nearDoor.name }}</strong>
+            <button class="btn-primary" @click="roomsOpen = true">Pilih ruang</button>
+          </div>
           <div v-if="map && status !== 'open'" class="connection-overlay" role="status">
             {{ statusText }}
           </div>
@@ -136,36 +199,35 @@ onBeforeUnmount(() => clearInterval(timer))
             >Tujuan: {{ selectedBuilding.name }}. Jalan ke pintunya; tidak ada teleport.</span
           >
         </p>
-        <div v-if="campus" class="campus-chat">
-          <ChatPanel
-            :chat="chat"
-            :version="chatVersion"
-            :error="chatError"
-            :disabled="status !== 'open'"
-            :campus="true"
-            @send="sendChat"
-          />
-        </div>
       </div>
-      <aside class="buildings" aria-labelledby="buildings-title">
-        <h2 id="buildings-title">{{ campus ? 'Gedung' : 'Ruang' }}</h2>
+      <aside
+        v-if="campus && (directoryOpen || roomsOpen)"
+        id="building-directory"
+        class="buildings"
+        aria-label="Pilihan gedung dan ruang"
+        @keydown.esc="closeDirectory"
+      >
+        <button ref="closeButton" class="btn-secondary" @click="closeDirectory">
+          Tutup pilihan
+        </button>
+        <h2 v-if="directoryOpen">Daftar gedung</h2>
         <DoorRooms
-          v-if="campus && panelBuilding && org.active"
+          v-if="roomsOpen && panelBuilding && org.active"
           :org-id="org.active.id"
           :building="panelBuilding"
           :disabled="!canEnter || traveling || status !== 'open'"
           :at-door="canEnter"
           @travel="travel"
         />
-        <p v-else-if="campus">
+        <p v-if="directoryOpen">
           Pilih gedung untuk melihat ruang, lalu jalan ke pintunya untuk masuk.
         </p>
-        <ul v-if="campus">
+        <ul v-if="directoryOpen">
           <li v-for="b in map?.buildings ?? []" :key="b.key" :class="b.key">
             <button
               class="building-choice"
               :aria-pressed="panelBuilding?.key === b.key"
-              @click="selectedKey = b.key"
+              @click="selectBuilding(b.key)"
             >
               {{ b.name }}
             </button>
@@ -177,31 +239,31 @@ onBeforeUnmount(() => clearInterval(timer))
             >
           </li>
         </ul>
-        <template v-if="!campus">
-          <p class="room-meta">{{ online }} orang di ruang</p>
-          <div v-if="org.isTeacher" class="teacher">
-            <button
-              type="button"
-              class="btn-secondary toggle"
-              role="switch"
-              :aria-checked="allChat"
-              :disabled="toggling || status !== 'open'"
-              @click="toggleAllChat"
-            >
-              Chat semua ruangan: {{ allChat ? 'aktif' : 'mati' }}
-            </button>
-            <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
-          </div>
-          <ChatPanel
-            class="side-chat"
-            :chat="chat"
-            :version="chatVersion"
-            :error="chatError"
-            :disabled="status !== 'open'"
-            :campus="false"
-            @send="sendChat"
-          />
-        </template>
+      </aside>
+      <aside class="chat-sidebar" aria-label="Chat ruang">
+        <h2>Chat</h2>
+        <div v-if="!campus && org.isTeacher" class="teacher">
+          <button
+            type="button"
+            class="btn-secondary toggle"
+            role="switch"
+            :aria-checked="allChat"
+            :disabled="toggling || status !== 'open'"
+            @click="toggleAllChat"
+          >
+            Chat semua ruangan: {{ allChat ? 'aktif' : 'mati' }}
+          </button>
+          <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
+        </div>
+        <ChatPanel
+          class="side-chat"
+          :chat="chat"
+          :version="chatVersion"
+          :error="chatError"
+          :disabled="status !== 'open'"
+          :campus="campus"
+          @send="sendChat"
+        />
       </aside>
     </div>
   </section>
@@ -222,8 +284,42 @@ onBeforeUnmount(() => clearInterval(timer))
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
 }
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mobile-switch {
+  display: none;
+}
+.map-column {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-sidebar {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-2xl);
+}
 .side-chat {
-  min-height: 360px;
+  flex: 1;
+  min-height: 0;
+}
+.door-prompt {
+  position: absolute;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
 }
 .campus-chat {
   margin-top: var(--space-5);
@@ -275,14 +371,16 @@ h1 {
   font-weight: var(--weight-bold);
 }
 .layout {
+  flex: 1;
+  min-height: 0;
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: var(--space-5);
-  align-items: start;
-  container-type: inline-size;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-4);
 }
 .map-frame {
-  aspect-ratio: 8 / 5;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   position: relative;
   background: var(--map-grass);
@@ -314,7 +412,13 @@ h1 {
   padding: var(--space-5);
   min-height: 0;
   box-sizing: border-box;
-  max-height: calc((100cqw - 280px - var(--space-5)) * 0.625);
+  position: absolute;
+  z-index: 2;
+  top: var(--space-3);
+  left: var(--space-3);
+  width: min(360px, calc(100% - var(--space-6)));
+  max-height: calc(100% - var(--space-6));
+  border: 2px solid var(--color-border);
   overflow-y: auto;
 }
 h2 {
@@ -357,14 +461,21 @@ li span {
   border-color: var(--color-speaking);
 }
 @media (max-width: 900px) {
+  .mobile-switch {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
   .layout {
     grid-template-columns: minmax(0, 1fr);
+    min-height: 400px;
   }
-  .scope {
+  .show-map .chat-sidebar,
+  .show-chat .map-column {
     display: none;
   }
-  .buildings {
-    max-height: none;
+  .heading {
+    flex-wrap: wrap;
   }
 }
 </style>

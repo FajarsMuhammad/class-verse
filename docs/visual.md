@@ -38,6 +38,16 @@ HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
 | HP: peta sekolah | `05-hp-peta-sekolah.png` | "Di dekatmu", daftar gedung yang bisa dibuka, input chat dekat |
 | HP: di ruang | `06-hp-di-ruang.png` | Broadcast pengajar, pilih zona, teman semeja, chat zona, mic |
 
+## Revisi layout setelah slice 6 (disetujui)
+
+- Desktop: workspace selebar viewport dengan margin ringkas; peta mengisi area kiri dan chat tetap di kanan
+  (320–360 px). Tinggi mengikuti viewport, daftar pesan scroll sendiri. Overview peta tetap, tanpa kamera follow.
+- Daftar gedung bukan sidebar permanen: tombol **Daftar gedung** membuka panel sementara di area peta;
+  memilih gedung membuka preview ruang dan petunjuk tujuan, tanpa teleport.
+- Dekat pintu: kartu nama gedung + **Pilih ruang**. Pemilihan ruang tidak menutup chat.
+- Kelas/taman memakai layout sama, kontrol pengajar di atas chat.
+- Layar sempit: pilihan tampilan **Peta / Chat**; mode HP tanpa movement tetap slice 8.
+
 ## Peta (Phaser)
 
 - Gaya top-down, flat, sudut membulat; palet `--map-*` dan `--roof-*` di `tokens.css`.

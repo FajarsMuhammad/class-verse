@@ -7,6 +7,8 @@ import logoUrl from '@/assets/avatars/round.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
+defineProps<{ immersive?: boolean }>()
+
 const auth = useAuthStore()
 const org = useOrgStore()
 const router = useRouter()
@@ -26,7 +28,7 @@ async function logout() {
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :class="{ immersive }">
     <header class="top">
       <div class="brand">
         <img :src="logoUrl" alt="" width="40" height="40" />
@@ -163,6 +165,16 @@ async function logout() {
   min-height: var(--touch-min);
 }
 
+.immersive {
+  height: 100dvh;
+}
+.immersive .content {
+  max-width: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+}
 .content {
   flex: 1;
   width: 100%;
