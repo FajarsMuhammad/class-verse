@@ -10,10 +10,16 @@ Status: layout reviewed and accepted by user; approved for commit before slice 7
 - Browser automation for the revised chooser did not complete; user accepted appearance.
 - Selected-door map highlight remains pending (destination text exists).
 
-## Open bug: movement after travel
+## Fixed: movement after travel
 
 User reports delayed/choppy avatar movement after entering and leaving rooms with two users.
 Refreshing restores smooth movement temporarily; repeating travel reproduces the symptom.
-Root cause not confirmed. No movement fix is included in this commit.
-Investigate Phaser lifecycle, frame timing, and move_rejected corrections across repeated travel.
-Automated reproduction stalled at room selection; do not claim runtime verification passed.
+Root cause (confirmed): every travel remounts GameCanvas and creates a new Phaser.Game. Phaser's
+destroy never calls WEBGL_lose_context, so each room left a live WebGL context behind. After ~15 trips
+Chrome hit its 16-context limit ("Too many active WebGL contexts. Oldest context will be lost") and
+started force-dropping contexts, which shows up as delays and choppy movement; reload cleared them.
+Measured with /tmp/kv-e2e/stutter.mjs (9 rounds, two users): before the fix live contexts after GC grew
+3→16 with the Chrome warning; after the fix exactly 1 live context every round, no warning. FPS 61, worst
+frame 17 ms, 0 move_rejected, snapshots every ~100 ms in both cases (no server or network cause).
+Fix: GameCanvas loses the context on Phaser's DESTROY event. Regression test GameCanvas.spec.ts fails
+without the fix.
