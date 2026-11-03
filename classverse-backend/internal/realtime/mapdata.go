@@ -220,6 +220,9 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 			return nil, fmt.Errorf("parse map %s: zone %q invalid, duplicated, or outside the map", key, z.Key)
 		}
 		zoneKeys[z.Key] = true
+		if _, _, ok := md.freePoint(a, 0); !ok {
+			return nil, fmt.Errorf("parse map %s: zone %q has no walkable tile", key, z.Key)
+		}
 	}
 	if md.HasExit && md.Blocked(md.ExitX, md.ExitY) {
 		return nil, fmt.Errorf("parse map %s: exit is not walkable", key)
@@ -270,22 +273,42 @@ var errNoSpawn = errors.New("spawn area has no walkable tile")
 // SpawnPoint returns the centre of a walkable tile inside the spawn area. n
 // spreads players over the free tiles so they do not stack on one point.
 func (m *MapData) SpawnPoint(n int) (int, int, error) {
+	x, y, ok := m.freePoint(m.Spawn, n)
+	if !ok {
+		return 0, 0, errNoSpawn
+	}
+	return x, y, nil
+}
+
+// SeatPoint returns a walkable tile centre inside zone key (mode HP seats
+// people at a table without walking); n spreads them like SpawnPoint.
+func (m *MapData) SeatPoint(key string, n int) (int, int, bool) {
+	for _, z := range m.Zones {
+		if z.Key == key {
+			return m.freePoint(z.Area, n)
+		}
+	}
+	return 0, 0, false
+}
+
+// freePoint picks the n-th walkable tile centre inside r (wrapping).
+func (m *MapData) freePoint(r Rect, n int) (int, int, bool) {
 	ts := m.TileSize
 	var free [][2]int
-	for ty := m.Spawn.Y / ts; ty*ts < m.Spawn.Y+m.Spawn.H; ty++ {
-		for tx := m.Spawn.X / ts; tx*ts < m.Spawn.X+m.Spawn.W; tx++ {
+	for ty := r.Y / ts; ty*ts < r.Y+r.H; ty++ {
+		for tx := r.X / ts; tx*ts < r.X+r.W; tx++ {
 			x, y := tx*ts+ts/2, ty*ts+ts/2
-			if !m.Blocked(x, y) {
+			if r.Contains(x, y) && !m.Blocked(x, y) {
 				free = append(free, [2]int{x, y})
 			}
 		}
 	}
 	if len(free) == 0 {
-		return 0, 0, errNoSpawn
+		return 0, 0, false
 	}
 	if n < 0 {
 		n = -n
 	}
 	p := free[n%len(free)]
-	return p[0], p[1], nil
+	return p[0], p[1], true
 }

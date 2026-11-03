@@ -225,6 +225,7 @@ func TestGatewayRejects(t *testing.T) {
 		code  websocket.StatusCode
 	}{
 		{"wrong first message", func(c *websocket.Conn) { send(t, c, TypePing, 1, PingMsg{}) }, e.room, closeUnauthenticated},
+		{"unknown mode", func(c *websocket.Conn) { send(t, c, TypeAuth, 1, AuthMsg{Token: "tok-ani", Mode: "walk"}) }, e.room, closeUnauthenticated},
 		{"bad token", func(c *websocket.Conn) { send(t, c, TypeAuth, 1, AuthMsg{Token: "nope"}) }, e.room, closeUnauthenticated},
 		{"not a member", func(c *websocket.Conn) { send(t, c, TypeAuth, 1, AuthMsg{Token: "tok-stranger"}) }, e.room, closeNotFound},
 		{"unknown room", func(c *websocket.Conn) { send(t, c, TypeAuth, 1, AuthMsg{Token: "tok-ani"}) }, uuid.New(), closeNotFound},
@@ -393,5 +394,30 @@ func TestGatewayChatFiltered(t *testing.T) {
 	var em ErrorMsg
 	if err != nil || json.Unmarshal(env.D, &em) != nil || em.Code != CodeBadMessage || em.Seq != 3 {
 		t.Fatalf("empty chat error = %+v %v", em, err)
+	}
+}
+
+// TestGatewayListModeRejectsMove checks that auth mode "list" reaches the
+// connection: the server rejects movement from mode HP.
+func TestGatewayListModeRejectsMove(t *testing.T) {
+	e := newWSEnv(t)
+	c, err := e.dial(t, testOrigin, e.room)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.CloseNow() }()
+	send(t, c, TypeAuth, 1, AuthMsg{Token: "tok-ani", Mode: ModeList})
+	env, err := next(t, c, TypeWelcome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var w WelcomeMsg
+	_ = json.Unmarshal(env.D, &w)
+	me := w.Participants[0]
+	send(t, c, TypeMove, 2, MoveMsg{X: me.X + 8, Y: me.Y, Dir: DirRight})
+	env, err = next(t, c, TypeError)
+	var em ErrorMsg
+	if err != nil || json.Unmarshal(env.D, &em) != nil || em.Code != CodeMoveRejected || *em.X != me.X {
+		t.Fatalf("list move = %+v, %v", em, err)
 	}
 }

@@ -4,7 +4,14 @@ import { getAccessToken, refreshAccessToken } from '@/api/client'
 import { RealtimeClient, roomSocketURL, type ConnectionStatus } from './client'
 import { fetchMap, type MapData } from './mapdata'
 import { ChatState } from './chat'
-import type { BannedUser, BuildingCount, ChatScope, MoveMsg, WelcomeMsg } from './messages'
+import type {
+  BannedUser,
+  BuildingCount,
+  ChatScope,
+  ConnectionMode,
+  MoveMsg,
+  WelcomeMsg,
+} from './messages'
 import { World } from './world'
 
 export interface RoomHandle {
@@ -37,7 +44,9 @@ export interface RoomHandle {
   people: Ref<{ id: string; name: string; role: string }[]>
   rejoin: () => void
   sendMove: (m: MoveMsg) => void
-  start: (roomId: string, mapKey: string) => Promise<void>
+  // seat picks a zone in mode HP ('' = general area).
+  seat: (zone: string) => void
+  start: (roomId: string, mapKey: string, mode?: ConnectionMode) => Promise<void>
 }
 
 // useRoom connects to one room over WebSocket and keeps a World in sync.
@@ -67,7 +76,9 @@ export function useRoom(): RoomHandle {
   const offline = () => client?.networkLost()
   window.addEventListener('offline', offline)
 
-  async function start(roomId: string, mapKey: string) {
+  let mode: ConnectionMode = 'map'
+  async function start(roomId: string, mapKey: string, connMode: ConnectionMode = 'map') {
+    mode = connMode
     try {
       map.value = await fetchMap(mapKey, abort.signal)
     } catch {
@@ -77,6 +88,7 @@ export function useRoom(): RoomHandle {
     if (abort.signal.aborted) return
     client = new RealtimeClient({
       url: roomSocketURL(roomId),
+      mode,
       getToken: freshToken,
       onStatus: (s) => {
         status.value = s
@@ -154,7 +166,7 @@ export function useRoom(): RoomHandle {
       // Moves are throttled, so the server may still hold an older position.
       // Flush the predicted one first; the room handles it before the travel.
       const self = world.self
-      if (self)
+      if (self && mode === 'map')
         client?.send('move', { x: Math.round(self.x), y: Math.round(self.y), dir: self.dir })
       if (!client?.send('travel', { room_id: roomId })) traveling.value = false
     },
@@ -192,6 +204,9 @@ export function useRoom(): RoomHandle {
     },
     gather: () => {
       if (status.value === 'open' && !traveling.value) client?.send('cmd', { name: 'gather' })
+    },
+    seat: (zone) => {
+      if (status.value === 'open' && !traveling.value) client?.send('seat', { zone })
     },
     sendMove: (m) => {
       if (!traveling.value && map.value) void client?.send('move', m)

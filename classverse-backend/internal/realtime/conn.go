@@ -39,6 +39,8 @@ func newOut(t string, v any) outMsg {
 // safe for concurrent use.
 type conn struct {
 	userID uuid.UUID
+	// list is mode HP (set once before the conn is shared, read-only after).
+	list   bool
 	out    chan outMsg
 	done   chan struct{}
 	once   sync.Once

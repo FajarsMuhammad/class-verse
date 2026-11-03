@@ -1,6 +1,6 @@
 # Slice 8 — Mode HP (M1)
 
-Status: **decisions proposed; awaiting approval**. No code yet.
+Status: **done; awaiting user review**. M8-01…M8-06 approved and written to `docs/design.md`.
 Branch: `slice-8-mobile`, based on `fix-travel-webgl-leak` (`cd4583f`, slice 7 + WebGL fix).
 
 References: docs/spec.md (M1 row: "mode HP — pilih zona lewat daftar + chat, tanpa movement"; NFR Perangkat),
@@ -20,7 +20,7 @@ slice 6 zones/near, slice 7 controls).
 Slice 5 requires every role to stand at the door (48 px) to enter and at the exit to leave; `move` cannot teleport.
 A phone without movement cannot satisfy either rule or enter a zone. A server-side exception is required.
 
-## Decisions proposed for approval
+## Decisions (approved)
 
 | ID | Proposed behavior |
 | M8-01 | Mode HP turns on automatically when `matchMedia('(pointer: coarse) and (max-width: 767px)')` matches at room start; no manual toggle in M1. Phaser is not loaded in mode HP. Wider touch devices (tablets) keep the map (best effort). |
@@ -49,3 +49,27 @@ A phone without movement cannot satisfy either rule or enter a zone. A server-si
 
 - Mic button / voice (slice 9, M2).
 - Manual mode toggle, tablet-specific layout.
+
+## Result
+
+- Backend `realtime`: `AuthMsg.Mode` (`map`/`list`, other values close 4401), `conn.list`, travel skips the
+  door/exit check for list connections, `seat {zone}` (1/s, classroom/garden, list only), list `move` rejected.
+  `MapData.SeatPoint` picks a walkable tile inside the zone (zone centres are tables); parsing rejects zones without
+  one. Tests: `seat_test.go` (every zone of classroom/garden + area umum, rejections, campus, zone chat + gather,
+  hub travel list vs map + capacity), gateway (list mode reaches the conn, unknown mode rejected).
+- Frontend: `MobileRoom.vue` (campus: Di dekatmu + building list with live/people + rooms; room: back, Pilih tempat
+  with counts, tablemates, chat), `TeacherPanel.vue` extracted and shared with the map view, `places.ts`
+  (zone counts/nearby from newest snapshots), `RealtimeClient` `mode`, `useRoom.seat`. Phaser is lazy-loaded
+  (`GameCanvas` chunk), so phones do not download it. Tests: `places.spec.ts`, `MobileRoom.spec.ts`, client auth mode.
+- Checks: `go test -race ./...` (11 packages ok) and `make lint` (0 issues); frontend lint ok, 90 tests,
+  build ok (Phaser chunk-size warning remains, now isolated to `GameCanvas`).
+- Chrome (puppeteer, phone 390×844 touch + desktop 1400×900, `/tmp/kv-e2e/mobile.mjs`): phone has no canvas,
+  enters Biologi from the list, seats at Meja 3, zone chat, back to campus; desktop still must walk to the
+  Kelas A door; phone counts the desktop user; room chat crosses devices; second seat within 1 s rate limited;
+  teacher on phone uses Kontrol pengajar to lock; phone re-entry rejected `room_locked`; no runtime errors.
+
+## Known limits
+
+- AppShell header wraps to three rows on phones on this branch; `main` has `00a1d36` (nav on one row) not merged here.
+- Mic (M2), manual mode toggle, tablet layout not done.
+- "Di dekatmu" uses the campus snapshot (AOI 24 tiles), so it is accurate for the 160 px radius.

@@ -130,13 +130,14 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 | `t` | Payload | Aturan server |
 | --- | --- | --- |
-| `auth` | `token` | Validasi JWT dan membership organisasi |
+| `auth` | `token`, `mode?` (`map`/`list`) | Validasi JWT dan membership organisasi; `list` = mode HP (slice 8) |
 | `move` | `x`, `y`, `dir` | Maks 15 pesan/detik; ditolak jika menembus collision atau melebihi kecepatan maksimum |
 | `chat` | `text`, `scope` (`near` / `zone` / `room`) | Maks 3 pesan/detik; difilter; `room` ditolak jika chat semua ruangan dimatikan |
 | `emote` | `kind` | Maks 1/detik |
 | `cmd` | `name` (`broadcast`, `gather`, `mute`, `kick`, `lock`), `target?` | Hanya role pengajar/admin |
 | `ping` | `ts` | Dibalas `pong` untuk mengukur latency |
-| `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung; koneksi dipindah tanpa reconnect |
+| `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali mode HP); koneksi dipindah tanpa reconnect |
+| `seat` | `zone` | Mode HP saja, di kelas/taman; maks 1/detik (slice 8) |
 
 **Server → client**
 
@@ -590,3 +591,23 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
   keyed by session, so they end with the session and survive restarts (sessions are restored on startup).
 - Kick, allow, mute, unmute, lock and unlock take effect only after their audit row commits; a failed write
   changes nothing and answers `unavailable`.
+
+## Slice 8 — Mode HP (M8-01…M8-06 approved)
+
+- *Detection.* Mode HP is automatic when `matchMedia('(pointer: coarse) and (max-width: 767px)')` matches at room
+  start; no manual toggle. Phaser is not loaded. Tablets keep the map (best effort).
+- *Protocol.* `auth {token, mode?}` with `mode` `map` (default) or `list`; any other value closes 4401. Fixed per
+  connection, survives travel; reconnect re-declares. `move` from a list connection → `move_rejected` with the
+  official position.
+- *Travel.* List connections skip the door/exit proximity check (exception to slice 5 *Akses masuk*). Membership,
+  Ruang Guru, schedule, capacity, lock, ban and travel serialization still apply. Arrival at spawn, return to the
+  origin building door as before. Accepted risk: a desktop client can forge `list` to skip walking; the door is
+  presence UX, not access control.
+- *Seat.* Client → server `seat {zone}` (list mode, classroom/garden only, 1 per second → `rate_limited`). Server
+  places the avatar on a walkable tile inside the zone (zone centres are tables, so not the literal centre; spread
+  like spawn); `zone: ""` returns to the spawn ("Area umum"). Unknown zone → `bad_message`; campus or map
+  connection → `forbidden`. Zone/snapshot follow on the next tick; gather still moves everyone to spawn. Map parsing
+  rejects zones without a walkable tile.
+- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (≤160 px) are computed from welcome/snapshot
+  positions; building counts reuse `buildings`, room rows reuse the rooms list (`people`, `live`).
+- *Teacher.* Phone keeps the announcement tab and the teacher panel (collapsible).

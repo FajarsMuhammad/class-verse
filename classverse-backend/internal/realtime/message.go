@@ -24,6 +24,7 @@ const (
 	TypePing   = "ping"
 	TypeTravel = "travel"
 	TypeChat   = "chat" // both directions
+	TypeSeat   = "seat" // mode HP only
 )
 
 // Server → client message types.
@@ -89,6 +90,21 @@ func (d Direction) valid() bool {
 // AuthMsg is the first message a client must send.
 type AuthMsg struct {
 	Token string `json:"token"`
+	// Mode is ModeMap (default) or ModeList (mode HP: no movement, travel
+	// without walking to the door, seat to pick a zone). Fixed per connection.
+	Mode string `json:"mode,omitempty"`
+}
+
+// Connection modes declared in AuthMsg.
+const (
+	ModeMap  = "map"
+	ModeList = "list"
+)
+
+// SeatMsg places a list-mode avatar in a zone; an empty Zone means the
+// general area (spawn).
+type SeatMsg struct {
+	Zone string `json:"zone"`
 }
 
 // MoveMsg is a requested position in world pixels.
