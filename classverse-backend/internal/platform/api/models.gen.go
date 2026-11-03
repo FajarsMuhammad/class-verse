@@ -27,6 +27,75 @@ func (e InviteRole) Valid() bool {
 	}
 }
 
+// Defines values for ModerationActionAction.
+const (
+	Allow  ModerationActionAction = "allow"
+	Kick   ModerationActionAction = "kick"
+	Lock   ModerationActionAction = "lock"
+	Mute   ModerationActionAction = "mute"
+	Unlock ModerationActionAction = "unlock"
+	Unmute ModerationActionAction = "unmute"
+)
+
+// Valid indicates whether the value is a known member of the ModerationActionAction enum.
+func (e ModerationActionAction) Valid() bool {
+	switch e {
+	case Allow:
+		return true
+	case Kick:
+		return true
+	case Lock:
+		return true
+	case Mute:
+		return true
+	case Unlock:
+		return true
+	case Unmute:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReportStatus.
+const (
+	ReportStatusDismissed ReportStatus = "dismissed"
+	ReportStatusOpen      ReportStatus = "open"
+	ReportStatusReviewed  ReportStatus = "reviewed"
+)
+
+// Valid indicates whether the value is a known member of the ReportStatus enum.
+func (e ReportStatus) Valid() bool {
+	switch e {
+	case ReportStatusDismissed:
+		return true
+	case ReportStatusOpen:
+		return true
+	case ReportStatusReviewed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReviewReportRequestStatus.
+const (
+	ReviewReportRequestStatusDismissed ReviewReportRequestStatus = "dismissed"
+	ReviewReportRequestStatusReviewed  ReviewReportRequestStatus = "reviewed"
+)
+
+// Valid indicates whether the value is a known member of the ReviewReportRequestStatus enum.
+func (e ReviewReportRequestStatus) Valid() bool {
+	switch e {
+	case ReviewReportRequestStatusDismissed:
+		return true
+	case ReviewReportRequestStatusReviewed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Role.
 const (
 	RoleAdmin       Role = "admin"
@@ -137,6 +206,14 @@ type CreateOrgRequest struct {
 	Slug    string  `json:"slug"`
 }
 
+// CreateReportRequest defines model for CreateReportRequest.
+type CreateReportRequest struct {
+	MessageId    *int64              `json:"message_id,omitempty"`
+	Reason       string              `json:"reason"`
+	RoomId       *openapi_types.UUID `json:"room_id,omitempty"`
+	TargetUserId openapi_types.UUID  `json:"target_user_id"`
+}
+
 // CreateRoomRequest defines model for CreateRoomRequest.
 type CreateRoomRequest struct {
 	BuildingKey string     `json:"building_key"`
@@ -213,6 +290,26 @@ type Membership struct {
 	UserId   openapi_types.UUID `json:"user_id"`
 }
 
+// ModerationAction defines model for ModerationAction.
+type ModerationAction struct {
+	Action    ModerationActionAction `json:"action"`
+	Actor     UserRef                `json:"actor"`
+	CreatedAt time.Time              `json:"created_at"`
+	Id        openapi_types.UUID     `json:"id"`
+	RoomId    openapi_types.UUID     `json:"room_id"`
+	RoomName  string                 `json:"room_name"`
+	Target    *UserRef               `json:"target"`
+}
+
+// ModerationActionAction defines model for ModerationAction.Action.
+type ModerationActionAction string
+
+// ModerationLog defines model for ModerationLog.
+type ModerationLog struct {
+	Items      []ModerationAction `json:"items"`
+	NextCursor *string            `json:"next_cursor"`
+}
+
 // OrgSummary defines model for OrgSummary.
 type OrgSummary struct {
 	Id   openapi_types.UUID `json:"id"`
@@ -240,6 +337,42 @@ type RegisterRequest struct {
 	Email       string             `json:"email"`
 	Password    string             `json:"password"`
 }
+
+// Report defines model for Report.
+type Report struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+	MessageId *int64             `json:"message_id"`
+
+	// MessageText Teks tersaring dari server; null setelah dihapus 30 hari
+	MessageText *string             `json:"message_text"`
+	OrgId       openapi_types.UUID  `json:"org_id"`
+	Reason      string              `json:"reason"`
+	Reporter    UserRef             `json:"reporter"`
+	ReviewedAt  *time.Time          `json:"reviewed_at"`
+	ReviewedBy  *openapi_types.UUID `json:"reviewed_by"`
+	RoomId      *openapi_types.UUID `json:"room_id"`
+	RoomName    *string             `json:"room_name"`
+	Status      ReportStatus        `json:"status"`
+	Target      UserRef             `json:"target"`
+}
+
+// ReportList defines model for ReportList.
+type ReportList struct {
+	Items      []Report `json:"items"`
+	NextCursor *string  `json:"next_cursor"`
+}
+
+// ReportStatus defines model for ReportStatus.
+type ReportStatus string
+
+// ReviewReportRequest defines model for ReviewReportRequest.
+type ReviewReportRequest struct {
+	Status ReviewReportRequestStatus `json:"status"`
+}
+
+// ReviewReportRequestStatus defines model for ReviewReportRequest.Status.
+type ReviewReportRequestStatus string
 
 // Role defines model for Role.
 type Role string
@@ -292,6 +425,12 @@ type UpdateRoomRequest struct {
 	ScheduledAt    *time.Time `json:"scheduled_at,omitempty"`
 }
 
+// UserRef defines model for UserRef.
+type UserRef struct {
+	Id   openapi_types.UUID `json:"id"`
+	Name string             `json:"name"`
+}
+
 // VerifyEmailRequest defines model for VerifyEmailRequest.
 type VerifyEmailRequest struct {
 	Code  string `json:"code"`
@@ -337,6 +476,19 @@ type ListInvitesParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ListModerationLogParams defines parameters for ListModerationLog.
+type ListModerationLogParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListReportsParams defines parameters for ListReports.
+type ListReportsParams struct {
+	Status *ReportStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit  *int          `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string       `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // ListRoomsParams defines parameters for ListRooms.
 type ListRoomsParams struct {
 	Building *string `form:"building,omitempty" json:"building,omitempty"`
@@ -367,6 +519,12 @@ type CreateInviteJSONRequestBody = CreateInviteRequest
 
 // CreateRoomJSONRequestBody defines body for CreateRoom for application/json ContentType.
 type CreateRoomJSONRequestBody = CreateRoomRequest
+
+// CreateReportJSONRequestBody defines body for CreateReport for application/json ContentType.
+type CreateReportJSONRequestBody = CreateReportRequest
+
+// ReviewReportJSONRequestBody defines body for ReviewReport for application/json ContentType.
+type ReviewReportJSONRequestBody = ReviewReportRequest
 
 // UpdateRoomJSONRequestBody defines body for UpdateRoom for application/json ContentType.
 type UpdateRoomJSONRequestBody = UpdateRoomRequest

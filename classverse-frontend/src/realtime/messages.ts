@@ -23,6 +23,7 @@ export interface PingMsg {
 }
 
 export interface ClientMessages {
+  cmd: CommandMsg
   auth: AuthMsg
   move: MoveMsg
   ping: PingMsg
@@ -30,7 +31,24 @@ export interface ClientMessages {
   chat: ChatInMsg
 }
 
-export type ChatScope = 'near' | 'zone' | 'room'
+export type CommandMsg =
+  | { name: 'gather' | 'lock' | 'unlock' }
+  | { name: 'kick' | 'allow' | 'mute' | 'unmute'; target: string }
+export interface BannedUser {
+  id: string
+  name: string
+}
+export type EventMsg =
+  | { name: 'gather'; by: string; participants: Participant[] }
+  | {
+      name: 'kick' | 'allow' | 'mute' | 'unmute' | 'lock' | 'unlock'
+      by: string
+      target: string
+      banned?: BannedUser[]
+      muted: string[]
+    }
+
+export type ChatScope = 'near' | 'zone' | 'room' | 'broadcast'
 export interface ChatInMsg {
   text: string
   scope: ChatScope
@@ -54,6 +72,8 @@ export interface WelcomeMsg {
   building_key?: string
   participants: Participant[]
   all_chat_enabled: boolean
+  locked?: boolean
+  muted?: boolean
 }
 export interface LeftMsg {
   id: string
@@ -93,6 +113,10 @@ export type ErrorCode =
   | 'travel_in_progress'
   | 'rate_limited'
   | 'not_in_zone'
+  | 'kicked'
+  | 'muted'
+  | 'room_locked'
+  | 'target_not_found'
   | 'all_chat_disabled'
 
 export interface BuildingCount {
@@ -115,9 +139,12 @@ export interface ZoneMsg {
 }
 export interface RoomStateMsg {
   all_chat_enabled: boolean
+  locked?: boolean
+  muted?: boolean
 }
 
 export interface ServerMessages {
+  event: EventMsg
   welcome: WelcomeMsg
   traveled: WelcomeMsg
   buildings: { items: BuildingCount[] }

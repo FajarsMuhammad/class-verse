@@ -4,7 +4,7 @@ import { getAccessToken, refreshAccessToken } from '@/api/client'
 import { RealtimeClient, roomSocketURL, type ConnectionStatus } from './client'
 import { fetchMap, type MapData } from './mapdata'
 import { ChatState } from './chat'
-import type { BuildingCount, ChatScope, MoveMsg, WelcomeMsg } from './messages'
+import type { BannedUser, BuildingCount, ChatScope, MoveMsg, WelcomeMsg } from './messages'
 import { World } from './world'
 
 export interface RoomHandle {
@@ -22,6 +22,20 @@ export interface RoomHandle {
   chatVersion: Ref<number>
   chatError: Ref<string>
   sendChat: (text: string, scope: ChatScope) => boolean
+  gather: () => void
+  kick: (target: string) => void
+  moderate: (name: 'mute' | 'unmute', target: string) => void
+  setLocked: (locked: boolean) => void
+  // muted lists participants muted in this session (staff only).
+  mutedIds: Ref<string[]>
+  allow: (target: string) => void
+  // banned lists participants kicked from the open session (staff only).
+  banned: Ref<BannedUser[]>
+  // kicked is set when this user was removed; rejoin() returns to the campus.
+  kicked: Ref<boolean>
+  // people lists other avatars in the room (for teacher moderation).
+  people: Ref<{ id: string; name: string; role: string }[]>
+  rejoin: () => void
   sendMove: (m: MoveMsg) => void
   start: (roomId: string, mapKey: string) => Promise<void>
 }
@@ -37,6 +51,10 @@ export function useRoom(): RoomHandle {
   const current = shallowRef<WelcomeMsg | null>(null)
   const buildings = ref<BuildingCount[]>([])
   const traveling = ref(false)
+  const banned = ref<BannedUser[]>([])
+  const kicked = ref(false)
+  const mutedIds = ref<string[]>([])
+  const people = ref<{ id: string; name: string; role: string }[]>([])
   let mapVersion = 0
   const chat = new ChatState()
   const chatVersion = ref(0)
@@ -68,7 +86,15 @@ export function useRoom(): RoomHandle {
         world.apply(msg, performance.now())
         chat.apply(msg)
         if (chat.version !== chatVersion.value) chatVersion.value = chat.version
+        if (msg.t === 'event' && msg.d!.name !== 'gather') {
+          if (msg.d!.banned) banned.value = msg.d!.banned
+          mutedIds.value = msg.d!.muted ?? []
+        }
+        if (msg.t === 'error' && msg.d!.code === 'kicked') kicked.value = true
         if (msg.t === 'welcome' || msg.t === 'traveled') {
+          kicked.value = false
+          banned.value = []
+          mutedIds.value = []
           current.value = msg.d!
           traveling.value = false
           error.value = ''
@@ -97,6 +123,9 @@ export function useRoom(): RoomHandle {
         if (world.version !== lastVersion) {
           lastVersion = world.version
           online.value = world.count
+          people.value = [...world.avatars.values()]
+            .map((a) => ({ id: a.id, name: a.name, role: a.role }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'id'))
         }
       },
     })
@@ -139,6 +168,30 @@ export function useRoom(): RoomHandle {
       if (seq === null) return false
       lastChatSeq = seq
       return true
+    },
+    banned,
+    kicked,
+    people,
+    rejoin: () => {
+      if (!kicked.value) return
+      error.value = ''
+      client?.start()
+    },
+    mutedIds,
+    moderate: (name, target) => {
+      if (status.value === 'open') client?.send('cmd', { name, target })
+    },
+    setLocked: (locked) => {
+      if (status.value === 'open') client?.send('cmd', { name: locked ? 'lock' : 'unlock' })
+    },
+    kick: (target) => {
+      if (status.value === 'open') client?.send('cmd', { name: 'kick', target })
+    },
+    allow: (target) => {
+      if (status.value === 'open') client?.send('cmd', { name: 'allow', target })
+    },
+    gather: () => {
+      if (status.value === 'open' && !traveling.value) client?.send('cmd', { name: 'gather' })
     },
     sendMove: (m) => {
       if (!traveling.value && map.value) void client?.send('move', m)

@@ -18,6 +18,7 @@ type Envelope struct {
 
 // Client → server message types.
 const (
+	TypeCmd    = "cmd"
 	TypeAuth   = "auth"
 	TypeMove   = "move"
 	TypePing   = "ping"
@@ -27,6 +28,7 @@ const (
 
 // Server → client message types.
 const (
+	TypeEvent          = "event"
 	TypeWelcome        = "welcome"
 	TypeSnapshot       = "snapshot"
 	TypeJoined         = "joined"
@@ -39,6 +41,35 @@ const (
 	TypeZone           = "zone"
 	TypeRoomState      = "room_state"
 )
+
+// CommandMsg requests a teacher action in the current room.
+type CommandMsg struct {
+	Name   string    `json:"name"`
+	Target uuid.UUID `json:"target,omitempty"`
+}
+
+// ModerationEvent tells staff the result of kick/allow and the open-session
+// ban list; the kicked participant only receives an error before close.
+type ModerationEvent struct {
+	Name   string       `json:"name"`
+	By     uuid.UUID    `json:"by"`
+	Target uuid.UUID    `json:"target"`
+	Banned []BannedUser `json:"banned,omitempty"`
+	Muted  []uuid.UUID  `json:"muted"`
+}
+
+// BannedUser is a participant kicked from the open session.
+type BannedUser struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+// GatherEvent resets authoritative positions and client prediction.
+type GatherEvent struct {
+	Name         string        `json:"name"`
+	By           uuid.UUID     `json:"by"`
+	Participants []Participant `json:"participants"`
+}
 
 // Direction an avatar faces.
 type Direction string
@@ -99,13 +130,16 @@ type WelcomeMsg struct {
 	Participants []Participant `json:"participants"`
 	// AllChatEnabled tells whether the "Semua" tab may send (always true on the campus).
 	AllChatEnabled bool `json:"all_chat_enabled"`
+	Locked         bool `json:"locked"`
+	Muted          bool `json:"muted"`
 }
 
-// Chat scopes. Broadcast is reserved for teachers (slice 7).
+// Chat scopes. Broadcast is restricted to teachers and admins.
 const (
-	ScopeNear = "near"
-	ScopeZone = "zone"
-	ScopeRoom = "room"
+	ScopeNear      = "near"
+	ScopeZone      = "zone"
+	ScopeRoom      = "room"
+	ScopeBroadcast = "broadcast"
 )
 
 // ChatInMsg is a chat message sent by a client.
@@ -141,6 +175,10 @@ type ZoneMsg struct {
 // RoomStateMsg carries room settings that can change during a session.
 type RoomStateMsg struct {
 	AllChatEnabled bool `json:"all_chat_enabled"`
+	// Locked rooms reject new participants (slice 7).
+	Locked bool `json:"locked"`
+	// Muted is personal: true when this receiver may not chat.
+	Muted bool `json:"muted"`
 }
 
 // TravelMsg asks to move to another room of the same organization.
@@ -201,6 +239,10 @@ type ErrorMsg struct {
 const (
 	CodeUnauthenticated  = "unauthenticated"
 	CodeForbidden        = "forbidden"
+	CodeKicked           = "kicked"
+	CodeMuted            = "muted"
+	CodeRoomLocked       = "room_locked"
+	CodeNotFoundTarget   = "target_not_found"
 	CodeNotFound         = "not_found"
 	CodeBadMessage       = "bad_message"
 	CodeMoveRejected     = "move_rejected"

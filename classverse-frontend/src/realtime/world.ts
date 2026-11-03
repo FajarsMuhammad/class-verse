@@ -40,6 +40,7 @@ export class World {
   selfAvatar = 'default'
   // Bumped whenever avatars are added or removed (for UI lists and counts).
   version = 0
+  movementRevision = 0
 
   apply(msg: ServerMessage, now: number) {
     switch (msg.t) {
@@ -60,6 +61,16 @@ export class World {
         this.version++
         break
       }
+      case 'event':
+        if (msg.d!.name === 'gather') {
+          for (const p of msg.d!.participants) {
+            if (p.id === this.selfId) this.self = { x: p.x, y: p.y, dir: p.dir }
+            else this.upsert(p, now)
+          }
+          this.movementRevision++
+          this.version++
+        }
+        break
       case 'joined':
         if (msg.d!.id !== this.selfId) {
           this.upsert(msg.d!, now)

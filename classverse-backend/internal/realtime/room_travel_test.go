@@ -64,10 +64,10 @@ func TestRoomCapacityReservations(t *testing.T) {
 		r.testJoin(t, "Participant")
 	}
 	winner := uuid.New()
-	if err := r.reserve(winner); err != nil {
+	if err := r.reserve(winner, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.reserve(uuid.New()); !errors.Is(err, errRoomFull) {
+	if err := r.reserve(uuid.New(), false); !errors.Is(err, errRoomFull) {
 		t.Fatalf("41st reservation: %v", err)
 	}
 	if r.people() != 40 {
@@ -75,7 +75,7 @@ func TestRoomCapacityReservations(t *testing.T) {
 	}
 	r.pending.Add(1)
 	r.handle(cancelCmd{userID: winner})
-	if err := r.reserve(uuid.New()); err != nil {
+	if err := r.reserve(uuid.New(), false); err != nil {
 		t.Fatalf("cancel did not free slot: %v", err)
 	}
 }

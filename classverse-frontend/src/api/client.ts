@@ -132,7 +132,8 @@ async function toError(res: Response): Promise<ApiError> {
 
 // errorMessage maps API error codes to friendly Indonesian sentences.
 export function errorMessage(err: unknown): string {
-  if (!(err instanceof ApiError)) return 'Tidak bisa terhubung ke server. Periksa koneksi lalu coba lagi.'
+  if (!(err instanceof ApiError))
+    return 'Tidak bisa terhubung ke server. Periksa koneksi lalu coba lagi.'
   switch (err.code) {
     case 'validation_failed':
       return 'Periksa kembali isian yang ditandai.'

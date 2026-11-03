@@ -27,7 +27,9 @@ onMounted(async () => {
     await router.replace({ name: 'login', query: { error: 'google_failed' } })
     return
   }
-  await router.replace(auth.needsProfile ? { name: 'complete-profile' } : (pending.takeRedirect() ?? '/'))
+  await router.replace(
+    auth.needsProfile ? { name: 'complete-profile' } : (pending.takeRedirect() ?? '/'),
+  )
 })
 </script>
 

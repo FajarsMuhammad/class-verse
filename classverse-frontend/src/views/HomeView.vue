@@ -33,7 +33,7 @@ watch(
 </script>
 
 <template>
-  <AppShell>
+  <AppShell immersive>
     <CampusRoom
       v-if="school"
       :key="school.id"

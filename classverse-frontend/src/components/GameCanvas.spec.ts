@@ -1,0 +1,53 @@
+import { mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+
+// Phaser needs a real canvas; replace it with the parts GameCanvas touches.
+const lose = vi.fn<() => void>()
+const created: FakeGame[] = []
+class FakeRenderer {
+  gl: { getExtension: (name: string) => unknown } | null = {
+    getExtension: (name) => (name === 'WEBGL_lose_context' ? { loseContext: lose } : null),
+  }
+}
+class FakeGame {
+  renderer = new FakeRenderer()
+  private handlers: Record<string, (() => void)[]> = {}
+  events = {
+    once: (name: string, fn: () => void) => (this.handlers[name] ??= []).push(fn),
+  }
+  scene = { add: vi.fn<() => void>() }
+  destroy = vi.fn<(removeCanvas: boolean) => void>(() => {
+    // Phaser runs destroy at the end of the frame and then nulls renderer.gl.
+    const gl = this.renderer.gl
+    for (const fn of this.handlers.destroy ?? []) fn()
+    this.renderer.gl = null
+    void gl
+  })
+  constructor() {
+    created.push(this)
+  }
+}
+vi.mock('phaser', () => ({
+  default: {
+    Game: FakeGame,
+    AUTO: 0,
+    Scale: { RESIZE: 3 },
+    Renderer: { WebGL: { WebGLRenderer: FakeRenderer } },
+    Core: { Events: { DESTROY: 'destroy' } },
+  },
+}))
+vi.mock('@/game/CampusScene', () => ({ CampusScene: class {} }))
+
+const { default: GameCanvas } = await import('./GameCanvas.vue')
+
+describe('GameCanvas', () => {
+  it('releases the WebGL context when unmounted (travel remounts it)', () => {
+    for (let i = 0; i < 3; i++) {
+      const w = mount(GameCanvas, { props: { deps: {} as never, label: 'Peta' } })
+      w.unmount()
+    }
+    expect(created).toHaveLength(3)
+    for (const g of created) expect(g.destroy).toHaveBeenCalledWith(true)
+    expect(lose).toHaveBeenCalledTimes(3)
+  })
+})

@@ -33,6 +33,35 @@ function welcomed() {
 }
 
 describe('World', () => {
+  it('gather resets self, snaps remote avatars and bumps the movement revision', () => {
+    const w = welcomed()
+    w.self!.x = 900
+    const rev = w.movementRevision
+    w.apply(
+      {
+        t: 'event',
+        seq: 5,
+        d: { name: 'gather', by: 'teacher', participants: [p('me', 320, 200), p('b', 320, 200)] },
+      },
+      50,
+    )
+    expect(w.self).toEqual({ x: 320, y: 200, dir: 'down' })
+    expect(w.movementRevision).toBe(rev + 1)
+    w.sample(50 + RENDER_DELAY_MS * 3)
+    expect(w.avatars.get('b')).toMatchObject({ x: 320, y: 200 })
+  })
+
+  it('moderation events do not move anyone', () => {
+    const w = welcomed()
+    const rev = w.movementRevision
+    w.apply(
+      { t: 'event', seq: 6, d: { name: 'kick', by: 't', target: 'b', banned: [], muted: [] } },
+      60,
+    )
+    expect(w.movementRevision).toBe(rev)
+    expect(w.self).toMatchObject({ x: 5 })
+  })
+
   it('replaces origin presence and self position only after traveled', () => {
     const w = welcomed()
     w.apply({ t: 'error', seq: 2, d: { code: 'room_full', message: 'Penuh' } }, 10)

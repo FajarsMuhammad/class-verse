@@ -36,6 +36,31 @@ const chat = (
 })
 
 describe('ChatState', () => {
+  it('tracks personal mute and room lock from welcome and room_state', () => {
+    const s = new ChatState()
+    s.apply(welcome('r1'))
+    expect(s.muted).toBe(false)
+    s.apply({ t: 'room_state', seq: 2, d: { all_chat_enabled: true, locked: true, muted: true } })
+    expect(s.muted).toBe(true)
+    expect(s.locked).toBe(true)
+    s.apply(welcome('r2', 'traveled'))
+    expect(s.muted).toBe(false)
+    expect(s.locked).toBe(false)
+  })
+
+  it('copies announcements into all tabs with bounded history and clears them on travel', () => {
+    const s = new ChatState()
+    s.apply(welcome('r1', 'welcome', false))
+    for (let i = 0; i <= MAX_PER_TAB; i++)
+      s.apply(chat('teacher', 'broadcast', `notice ${i}`, i + 1))
+    for (const lines of Object.values(s.lines)) {
+      expect(lines).toHaveLength(MAX_PER_TAB)
+      expect(lines[0]).toMatchObject({ text: 'notice 1', broadcast: true })
+    }
+    s.apply(welcome('r2', 'traveled'))
+    for (const lines of Object.values(s.lines)) expect(lines).toHaveLength(0)
+  })
+
   it('sorts messages into tabs and marks own lines', () => {
     const s = new ChatState()
     s.apply(welcome('r1'))

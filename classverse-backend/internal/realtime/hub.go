@@ -28,6 +28,25 @@ type SessionRecorder interface {
 	SaveChat(ctx context.Context, roomID uuid.UUID, msg ChatOutMsg) (id int64, ok bool, err error)
 }
 
+// Moderator persists session bans with their audit row (implemented by Store).
+// Calls run on the hub worker so they stay ordered behind session jobs.
+type Moderator interface {
+	Kick(ctx context.Context, roomID, actorID, targetID uuid.UUID, at time.Time) (bool, error)
+	Allow(ctx context.Context, roomID, actorID, targetID uuid.UUID, at time.Time) (bool, error)
+	Banned(ctx context.Context, roomID uuid.UUID) ([]BannedUser, error)
+	RecordAction(ctx context.Context, roomID, actorID, targetID uuid.UUID, action string, at time.Time) (bool, error)
+}
+
+// modJob runs one moderation write; done runs on the worker and must not block.
+type modJob struct {
+	action string // kick, allow, mute, unmute, lock, unlock
+	roomID uuid.UUID
+	actor  uuid.UUID
+	target uuid.UUID
+	at     time.Time
+	done   func(ok bool, banned []BannedUser, err error)
+}
+
 type jobKind int
 
 const (
@@ -36,6 +55,7 @@ const (
 	jobLeave
 	jobClose
 	jobChat
+	jobMod
 )
 
 type sessionJob struct {
@@ -44,6 +64,7 @@ type sessionJob struct {
 	userID uuid.UUID
 	at     time.Time
 	chat   *chatJob
+	mod    *modJob
 }
 
 // chatJob stores one message; deliver runs on the worker with the stored id
@@ -67,6 +88,20 @@ func (h *Hub) storeChat(j chatJob) {
 	default:
 		h.log.Warn("chat store queue full", slog.String("room_id", j.roomID.String()))
 		j.deliver(0)
+	}
+}
+
+// moderate queues a ban/allow write behind the room's session jobs. Without
+// persistence the action fails (an unaudited kick must not succeed).
+func (h *Hub) moderate(j modJob) {
+	if h.sessions == nil {
+		j.done(false, nil, errUnavailable)
+		return
+	}
+	select {
+	case h.jobs <- sessionJob{kind: jobMod, roomID: j.roomID, mod: &j}:
+	default:
+		j.done(false, nil, errUnavailable)
 	}
 }
 
@@ -282,7 +317,7 @@ func (h *Hub) travel(c *conn, from *room, dest Admission) (*room, error) {
 		return nil, err
 	}
 	res := make(chan error, 1)
-	if !to.post(reserveCmd{userID: c.userID, result: res}) {
+	if !to.post(reserveCmd{userID: c.userID, staff: dest.staff(), result: res}) {
 		to.pending.Add(-1)
 		return nil, errUnavailable
 	}
@@ -475,6 +510,26 @@ func (h *Hub) recordLoop() {
 		case jobClose:
 			err = h.sessions.CloseSession(ctx, j.roomID, j.at)
 			delete(open, j.roomID)
+		case jobMod:
+			m, ok := h.sessions.(Moderator)
+			if !ok {
+				j.mod.done(false, nil, errUnavailable)
+				return
+			}
+			var changed bool
+			var banned []BannedUser
+			switch j.mod.action {
+			case "kick":
+				changed, err = m.Kick(ctx, j.roomID, j.mod.actor, j.mod.target, j.mod.at)
+			case "allow":
+				changed, err = m.Allow(ctx, j.roomID, j.mod.actor, j.mod.target, j.mod.at)
+			default:
+				changed, err = m.RecordAction(ctx, j.roomID, j.mod.actor, j.mod.target, j.mod.action, j.mod.at)
+			}
+			if err == nil && (j.mod.action == "kick" || j.mod.action == "allow") {
+				banned, err = m.Banned(ctx, j.roomID)
+			}
+			j.mod.done(changed, banned, err)
 		case jobChat:
 			var id int64
 			var ok bool

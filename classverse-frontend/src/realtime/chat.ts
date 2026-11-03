@@ -11,6 +11,9 @@ export interface ChatLine {
   text: string
   at: string
   mine: boolean
+  broadcast: boolean
+  // messageId is set when the server stored the message (classroom/garden).
+  messageId?: number
 }
 
 // ChatState is plain TypeScript (unit-tested); Vue wraps it in a reactive ref.
@@ -19,7 +22,9 @@ export class ChatState {
   roomId: string | null = null
   zone: ZoneMsg = { key: '', name: '' }
   allChatEnabled = true
-  readonly lines: Record<ChatScope, ChatLine[]> = { near: [], zone: [], room: [] }
+  muted = false
+  locked = false
+  readonly lines: Record<ChatScope, ChatLine[]> = { near: [], zone: [], room: [], broadcast: [] }
   // Bumped on any change so Vue can re-render cheaply.
   version = 0
   private n = 0
@@ -33,10 +38,13 @@ export class ChatState {
         const sameRoom = msg.t === 'welcome' && this.roomId === msg.d!.room_id
         this.selfId = msg.d!.self_id
         this.allChatEnabled = msg.d!.all_chat_enabled
+        this.muted = msg.d!.muted ?? false
+        this.locked = msg.d!.locked ?? false
         if (!sameRoom) {
           this.lines.near = []
           this.lines.zone = []
           this.lines.room = []
+          this.lines.broadcast = []
         }
         this.zone = { key: '', name: '' }
         this.roomId = msg.d!.room_id
@@ -47,6 +55,8 @@ export class ChatState {
         break
       case 'room_state':
         this.allChatEnabled = msg.d!.all_chat_enabled
+        this.muted = msg.d!.muted ?? false
+        this.locked = msg.d!.locked ?? false
         break
       case 'chat':
         this.add(msg.d!)
@@ -60,7 +70,7 @@ export class ChatState {
   private add(m: ChatOutMsg) {
     const list = this.lines[m.scope]
     if (!list) return
-    list.push({
+    const line: ChatLine = {
       key: m.id ? `id-${m.id}` : `n-${++this.n}`,
       fromId: m.from.id,
       fromName: m.from.name,
@@ -68,8 +78,14 @@ export class ChatState {
       text: m.text,
       at: m.at,
       mine: m.from.id === this.selfId,
-    })
-    if (list.length > MAX_PER_TAB) list.splice(0, list.length - MAX_PER_TAB)
+      broadcast: m.scope === 'broadcast',
+      messageId: m.id,
+    }
+    const targets = m.scope === 'broadcast' ? Object.values(this.lines) : [list]
+    for (const target of targets) {
+      target.push(line)
+      if (target.length > MAX_PER_TAB) target.splice(0, target.length - MAX_PER_TAB)
+    }
   }
 
   // defaultTab is the zone tab while inside a zone, otherwise near.

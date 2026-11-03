@@ -24,8 +24,25 @@ onMounted(() => {
   game.scene.add('campus', CampusScene, true, props.deps)
 })
 
+// releaseContext frees the GPU context. Phaser's destroy drops its references
+// but never calls WEBGL_lose_context, so every travel (which remounts this
+// component) leaked one context until Chrome's limit of 16 forced the oldest
+// ones to be lost: the stutter after entering and leaving rooms.
+function releaseContext(g: Phaser.Game) {
+  const renderer = g.renderer
+  if (!(renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) return
+  const gl = renderer.gl
+  // Phaser destroys at the end of the current frame and nulls renderer.gl.
+  g.events.once(Phaser.Core.Events.DESTROY, () => {
+    gl?.getExtension('WEBGL_lose_context')?.loseContext()
+  })
+}
+
 onBeforeUnmount(() => {
-  game?.destroy(true)
+  if (game) {
+    releaseContext(game)
+    game.destroy(true)
+  }
   game = null
 })
 </script>

@@ -568,3 +568,25 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
 
 - [x] Lokasi `openapi.yaml`: `classverse-backend/api/openapi.yaml` (diputuskan untuk slice 2, lihat API contract).
 - [x] Cara frontend mendapat file peta Tiled: backend menyajikan `GET /api/maps/{map_key}` dari `maps/` yang di-embed ke binary (diputuskan untuk slice 3, lihat Protokol real-time).
+
+## Slice 7 — approved teacher controls and moderation
+
+| ID | Approved behavior |
+| --- | --- |
+| C7-01 | M1 mute blocks participant chat in every scope; unmute restores it. Teacher/admin cannot mute or kick other teachers/admins or themselves. |
+| C7-02 | Gather moves all connected avatars and grace avatars to the map's existing walkable spawn point; clears client paths/held keys and resets movement budgets. Campus gather is unavailable. |
+| C7-03 | Broadcast uses filtered chat with scope broadcast, teacher/admin only, bypasses all_chat_enabled but retains length/rate limits; appears in every recipient's visible chat and a distinct announcement area. |
+| C7-04 | Kick closes the target WebSocket, as existing design requires. Ban is keyed by room session and user; reconnect can enter campus but cannot enter the banned session. Add explicit teacher command allow to revoke the ban, with audit. |
+| C7-05 | Lock/unlock affects participants entering classroom/garden; teachers/admins and an existing participant reconnecting within grace may enter. Campus cannot be locked. |
+| C7-06 | Muted IDs, bans and lock survive empty-room actor cleanup for the remainder of the open session. Process restart must not bypass session bans: persist bans by session. This requires schema/design extension; do not silently treat room-actor lifetime as session lifetime. |
+| C7-07 | Reports accept a target user, optional room/message, and reason 1–1000 code points. Server derives message sender/room/org from the stored message, validates organization access and target membership; no client-supplied chat copy is stored. Campus or unsaved chat can report user only. |
+| C7-08 | Teacher/admin can list and review reports within organization; admin alone reads audit log. Audit writes must succeed before acknowledging moderation success; return unavailable on persistence failure. Report text is not written to application logs. |
+
+### Slice 7 — implementation notes
+
+- Reports and the audit log live in package `report` (not `moderation`, which stays the pure text filter used by
+  auth and realtime) to avoid mixing HTTP/DB code into a dependency-free package.
+- `allow` was added to `mod_action` (migration 00003) to audit revoking a kick; bans are rows of `session_bans`
+  keyed by session, so they end with the session and survive restarts (sessions are restored on startup).
+- Kick, allow, mute, unmute, lock and unlock take effect only after their audit row commits; a failed write
+  changes nothing and answers `unavailable`.

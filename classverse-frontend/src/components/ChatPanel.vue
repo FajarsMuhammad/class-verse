@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, useTemplateRef, watch } from 'vue'
 
-import type { ChatState } from '@/realtime/chat'
+import type { ChatLine, ChatState } from '@/realtime/chat'
 import type { ChatScope } from '@/realtime/messages'
 
 const props = defineProps<{
@@ -10,8 +10,12 @@ const props = defineProps<{
   error: string
   disabled: boolean
   campus: boolean
+  teacher?: boolean
 }>()
-const emit = defineEmits<{ send: [text: string, scope: ChatScope] }>()
+const emit = defineEmits<{
+  send: [text: string, scope: ChatScope]
+  report: [line: ChatLine]
+}>()
 
 const MAX_LEN = 500
 const tab = ref<ChatScope>('near')
@@ -24,6 +28,7 @@ const tabs = computed(() => {
   const list: { scope: ChatScope; label: string }[] = []
   if (props.chat.zone.key) list.push({ scope: 'zone', label: props.chat.zone.name })
   list.push({ scope: 'near', label: 'Dekat' }, { scope: 'room', label: 'Semua' })
+  if (props.teacher) list.push({ scope: 'broadcast', label: 'Pengumuman' })
   return list
 })
 const lines = computed(() => {
@@ -34,17 +39,29 @@ const zoneKey = computed(() => {
   void props.version
   return props.chat.zone.key
 })
+const muted = computed(() => {
+  void props.version
+  return props.chat.muted && !props.campus
+})
+// roomOff blocks sending: muted by the teacher, or "Semua" switched off.
 const roomOff = computed(() => {
   void props.version
-  return tab.value === 'room' && !props.chat.allChatEnabled && !props.campus
+  return muted.value || (tab.value === 'room' && !props.chat.allChatEnabled && !props.campus)
 })
 const placeholder = computed(() => {
+  if (muted.value) return 'Kamu dibisukan pengajar'
   if (roomOff.value) return 'Chat semua ruangan dimatikan pengajar'
   if (tab.value === 'zone') return `Tulis ke ${props.chat.zone.name}…`
   if (tab.value === 'near') return 'Tulis ke orang di dekatmu…'
+  if (tab.value === 'broadcast') return 'Tulis pengumuman untuk seluruh ruang…'
   return 'Tulis ke semua orang di ruang…'
 })
 const remaining = computed(() => MAX_LEN - [...text.value].length)
+const announcement = computed(() => {
+  void props.version
+  const lines = props.chat.lines.broadcast
+  return lines[lines.length - 1]
+})
 
 // Entering a zone opens its tab; leaving it falls back to near.
 watch(zoneKey, (key, prev) => {
@@ -88,7 +105,7 @@ function time(iso: string) {
         role="tab"
         type="button"
         class="tab"
-        :class="{ zone: t.scope === 'zone' }"
+        :class="{ zone: t.scope === 'zone', broadcast: t.scope === 'broadcast' }"
         :aria-selected="tab === t.scope"
         aria-controls="chat-log"
         @click="tab = t.scope"
@@ -96,6 +113,10 @@ function time(iso: string) {
         {{ t.label }}
       </button>
     </div>
+    <p v-if="announcement" class="zone-note" role="status">Pengumuman: {{ announcement.text }}</p>
+    <p v-if="muted" class="zone-note" role="status">
+      Pengajar membisukan chatmu. Kamu tetap bisa membaca pesan.
+    </p>
     <p v-if="zoneKey" class="zone-note">Kamu di {{ chat.zone.name }}</p>
     <div
       id="chat-log"
@@ -121,7 +142,16 @@ function time(iso: string) {
           <span v-if="l.role !== 'participant' && !l.mine" class="role">Pengajar</span>
           <time :datetime="l.at">{{ time(l.at) }}</time></span
         >
-        <p class="bubble">{{ l.text }}</p>
+        <button
+          v-if="!l.mine"
+          type="button"
+          class="report"
+          :aria-label="`Laporkan pesan dari ${l.fromName}`"
+          @click="emit('report', l)"
+        >
+          Laporkan
+        </button>
+        <p class="bubble"><strong v-if="l.broadcast">Pengumuman · </strong>{{ l.text }}</p>
       </div>
     </div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -174,7 +204,11 @@ function time(iso: string) {
 }
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+}
+.tab.broadcast {
+  flex-basis: 100%;
 }
 .tab {
   flex: 1 1 0;
@@ -258,6 +292,21 @@ function time(iso: string) {
   line-height: var(--line-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.report {
+  order: 3;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.report:focus-visible {
+  outline: 3px solid var(--color-primary-strong);
 }
 .mine .bubble {
   background: var(--color-primary);

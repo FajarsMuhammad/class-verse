@@ -49,6 +49,7 @@ export class CampusScene extends Phaser.Scene {
   private drawnZone = '?'
   private radius: Phaser.GameObjects.Graphics | null = null
   private focused = false
+  private movementRevision = 0
 
   constructor() {
     super('campus')
@@ -130,6 +131,12 @@ export class CampusScene extends Phaser.Scene {
 
   update(time: number, delta: number) {
     const { world, map } = this.deps
+    if (this.movementRevision !== world.movementRevision) {
+      this.movementRevision = world.movementRevision
+      this.path = []
+      this.input.keyboard?.resetKeys()
+      this.lastSentPos = null
+    }
     const dt = Math.min(delta, MAX_FRAME_MS)
     const self = world.self
 

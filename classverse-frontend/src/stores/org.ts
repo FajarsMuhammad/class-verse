@@ -18,7 +18,9 @@ export const useOrgStore = defineStore('org', () => {
     if (list.length === 1) return list[0] ?? null
     return list.find((o) => o.id === activeId.value) ?? null
   })
-  const isTeacher = computed(() => active.value?.role === 'admin' || active.value?.role === 'teacher')
+  const isTeacher = computed(
+    () => active.value?.role === 'admin' || active.value?.role === 'teacher',
+  )
 
   watch(activeId, (id) => {
     try {
@@ -33,7 +35,9 @@ export const useOrgStore = defineStore('org', () => {
     activeId.value = id
   }
 
-  return { orgs, active, activeId, isTeacher, select }
+  const isAdmin = computed(() => active.value?.role === 'admin')
+
+  return { orgs, active, activeId, isTeacher, isAdmin, select }
 })
 
 function readStored(): string | null {
