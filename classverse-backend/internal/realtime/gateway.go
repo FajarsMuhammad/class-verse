@@ -90,11 +90,12 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request) {
 
 // session runs one connection until it closes.
 func (g *Gateway) session(ctx context.Context, ws *websocket.Conn, roomID uuid.UUID) {
-	userID, adm, err := g.authenticate(ctx, ws, roomID)
+	userID, adm, list, err := g.authenticate(ctx, ws, roomID)
 	if err != nil {
 		return
 	}
 	c := newConn(userID)
+	c.list = list
 	g.hub.claim(c)
 	defer g.hub.release(c)
 
@@ -154,12 +155,13 @@ func (g *Gateway) entry(ctx context.Context, userID uuid.UUID, requested Admissi
 }
 
 // authenticate waits for the auth message and admits the user to the room.
-// On failure it has already closed the socket.
-func (g *Gateway) authenticate(ctx context.Context, ws *websocket.Conn, roomID uuid.UUID) (uuid.UUID, Admission, error) {
-	fail := func(status websocket.StatusCode, code, msg string) (uuid.UUID, Admission, error) {
+// It also reports whether the client declared list mode (mode HP). On failure
+// it has already closed the socket.
+func (g *Gateway) authenticate(ctx context.Context, ws *websocket.Conn, roomID uuid.UUID) (uuid.UUID, Admission, bool, error) {
+	fail := func(status websocket.StatusCode, code, msg string) (uuid.UUID, Admission, bool, error) {
 		writeNow(ctx, ws, newOut(TypeError, ErrorMsg{Code: code, Message: msg}), 1)
 		_ = ws.Close(status, code)
-		return uuid.Nil, Admission{}, errors.New(code)
+		return uuid.Nil, Admission{}, false, errors.New(code)
 	}
 
 	// Read in a goroutine: cancelling a Read context makes the library drop
@@ -180,19 +182,20 @@ func (g *Gateway) authenticate(ctx context.Context, ws *websocket.Conn, roomID u
 	case res := <-got:
 		if res.err != nil {
 			_ = ws.CloseNow()
-			return uuid.Nil, Admission{}, res.err
+			return uuid.Nil, Admission{}, false, res.err
 		}
 		data = res.data
 	case <-timer.C:
 		_ = ws.Close(closeUnauthenticated, "auth timeout")
 		<-got
-		return uuid.Nil, Admission{}, errors.New("auth timeout")
+		return uuid.Nil, Admission{}, false, errors.New("auth timeout")
 	}
 	actx, cancel := context.WithTimeout(ctx, authTimeout)
 	defer cancel()
 	var env Envelope
 	var am AuthMsg
-	if json.Unmarshal(data, &env) != nil || env.T != TypeAuth || json.Unmarshal(env.D, &am) != nil {
+	if json.Unmarshal(data, &env) != nil || env.T != TypeAuth || json.Unmarshal(env.D, &am) != nil ||
+		(am.Mode != "" && am.Mode != ModeMap && am.Mode != ModeList) {
 		return fail(closeUnauthenticated, CodeUnauthenticated, "Pesan pertama harus auth")
 	}
 	userID, err := g.tokens.Verify(am.Token)
@@ -207,7 +210,7 @@ func (g *Gateway) authenticate(ctx context.Context, ws *websocket.Conn, roomID u
 		g.log.ErrorContext(ctx, "ws admit failed", slog.Any("err", err))
 		return fail(websocket.StatusInternalError, CodeUnavailable, "Ruang sedang tidak tersedia")
 	}
-	return userID, adm, nil
+	return userID, adm, am.Mode == ModeList, nil
 }
 
 func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur *atomic.Pointer[room]) {
@@ -244,6 +247,15 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur
 				continue
 			}
 			cur.Store(to)
+		case TypeSeat:
+			var m SeatMsg
+			if json.Unmarshal(env.D, &m) != nil {
+				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Pesan tidak valid", Seq: env.Seq})
+				continue
+			}
+			if !cur.Load().post(seatCmd{c: c, seq: env.Seq, zone: m.Zone}) {
+				return
+			}
 		case TypeCmd:
 			var m CommandMsg
 			if err := json.Unmarshal(env.D, &m); err != nil {

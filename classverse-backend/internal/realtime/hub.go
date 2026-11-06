@@ -311,6 +311,11 @@ func (h *Hub) travel(c *conn, from *room, dest Admission) (*room, error) {
 	default:
 		return nil, errNotAtDoor // room to room goes through the campus
 	}
+	if c.list {
+		// Mode HP cannot walk; the door is presence UX, not access control
+		// (admission, lock, ban and capacity still apply). Design M8-03.
+		check = func(Participant) error { return nil }
+	}
 
 	to, err := h.ensure(dest)
 	if err != nil {

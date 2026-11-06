@@ -30,7 +30,7 @@ class FakeSocket {
   }
 }
 
-function setup(token: string | null = 'tok') {
+function setup(token: string | null = 'tok', mode?: 'map' | 'list') {
   vi.stubGlobal('WebSocket', { OPEN: 1 })
   const sockets: FakeSocket[] = []
   const timers: { fn: () => void; ms: number }[] = []
@@ -38,6 +38,7 @@ function setup(token: string | null = 'tok') {
   const messages: ServerMessage[] = []
   const client = new RealtimeClient({
     url: 'ws://x/ws/rooms/r',
+    mode,
     getToken: () => Promise.resolve(token),
     onMessage: (m) => messages.push(m),
     onStatus: (s) => statuses.push(s),
@@ -70,6 +71,20 @@ describe('RealtimeClient', () => {
     expect(statuses[statuses.length - 1]).toBe('open')
     expect(client.send('move', { x: 1, y: 2, dir: 'up' })).toBe(true)
     expect(JSON.parse(sockets[0]!.sent[1]!)).toMatchObject({ t: 'move', seq: 2 })
+  })
+
+  it('declares list mode in every auth, including after a reconnect', async () => {
+    const { client, sockets, timers } = setup('tok', 'list')
+    client.start()
+    sockets[0]!.open()
+    await Promise.resolve()
+    sockets[0]!.drop(1006)
+    timers[0]!.fn()
+    sockets[1]!.open()
+    await Promise.resolve()
+    for (const s of sockets) {
+      expect(JSON.parse(s.sent[0]!)).toEqual({ t: 'auth', seq: 1, d: { token: 'tok', mode: 'list' } })
+    }
   })
 
   it('reconnects with backoff 1, 2, 4, 8, 8 s and resets after welcome', async () => {

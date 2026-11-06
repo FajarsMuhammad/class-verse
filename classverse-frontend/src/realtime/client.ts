@@ -1,4 +1,4 @@
-import { CloseCode, type ClientMessages, type ServerMessage } from './messages'
+import { CloseCode, type ClientMessages, type ConnectionMode, type ServerMessage } from './messages'
 
 export type ConnectionStatus =
   | 'connecting'
@@ -18,6 +18,8 @@ export interface RealtimeOptions {
   getToken: () => Promise<string | null>
   onMessage: (msg: ServerMessage) => void
   onStatus: (status: ConnectionStatus) => void
+  // mode is declared in every auth (re-sent on reconnect); default 'map'.
+  mode?: ConnectionMode
   // Injected for tests.
   createSocket?: (url: string) => WebSocket
   setTimer?: (fn: () => void, ms: number) => unknown
@@ -37,6 +39,7 @@ export class RealtimeClient {
 
   constructor(opts: RealtimeOptions) {
     this.opts = {
+      mode: 'map',
       createSocket: (url) => new WebSocket(url),
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
@@ -105,7 +108,8 @@ export class RealtimeClient {
         return
       }
       this.seq = 0
-      ws.send(JSON.stringify({ t: 'auth', seq: ++this.seq, d: { token } }))
+      const d = this.opts.mode === 'list' ? { token, mode: 'list' } : { token }
+      ws.send(JSON.stringify({ t: 'auth', seq: ++this.seq, d }))
     }
     ws.onmessage = (ev: MessageEvent) => {
       if (this.socket !== ws || this.stopped) return

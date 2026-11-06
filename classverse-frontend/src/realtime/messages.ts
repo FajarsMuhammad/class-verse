@@ -10,8 +10,15 @@ export interface Envelope<T extends string = string, D = unknown> {
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
 // Client → server
+// mode 'list' is mode HP: no movement, travel without the door, seat (slice 8).
+export type ConnectionMode = 'map' | 'list'
 export interface AuthMsg {
   token: string
+  mode?: ConnectionMode
+}
+// SeatMsg places a mode HP avatar in a zone; '' is the general area.
+export interface SeatMsg {
+  zone: string
 }
 export interface MoveMsg {
   x: number
@@ -29,6 +36,7 @@ export interface ClientMessages {
   ping: PingMsg
   travel: { room_id: string }
   chat: ChatInMsg
+  seat: SeatMsg
 }
 
 export type CommandMsg =

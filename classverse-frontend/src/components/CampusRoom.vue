@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import DoorRooms from '@/components/DoorRooms.vue'
 import { useOrgStore } from '@/stores/org'
@@ -8,12 +8,20 @@ import type { Building } from '@/realtime/mapdata'
 import ChatPanel from '@/components/ChatPanel.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import type { ChatLine } from '@/realtime/chat'
-import GameCanvas from '@/components/GameCanvas.vue'
-import { roomApi } from '@/api/rooms'
-import { errorMessage } from '@/api/client'
+import MobileRoom from '@/components/MobileRoom.vue'
+import TeacherPanel from '@/components/TeacherPanel.vue'
 import { useRoom } from '@/realtime/useRoom'
 
+// Phaser is loaded only when the map is shown (never in mode HP).
+const GameCanvas = defineAsyncComponent(() => import('@/components/GameCanvas.vue'))
+// Mode HP (design slice 8, M8-01): phones get lists instead of the map. Decided
+// once per room start; the connection mode cannot change afterwards.
+const listMode =
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(pointer: coarse) and (max-width: 767px)').matches
+
 const props = defineProps<{ roomId: string; schoolName: string }>()
+const room = useRoom()
 const {
   status,
   map,
@@ -30,17 +38,9 @@ const {
   chatVersion,
   chatError,
   sendChat,
-  gather,
-  kick,
-  allow,
-  moderate,
-  setLocked,
-  mutedIds,
-  banned,
   kicked,
-  people,
   rejoin,
-} = useRoom()
+} = room
 const org = useOrgStore()
 const route = useRoute()
 const nearDoor = ref<Building | null>(null)
@@ -96,34 +96,6 @@ const canEnter = computed(
 )
 let timer: ReturnType<typeof setInterval> | undefined
 
-const allChat = computed(() => {
-  void chatVersion.value
-  return chat.allChatEnabled
-})
-const toggling = ref(false)
-const toggleError = ref('')
-async function toggleAllChat() {
-  if (!current.value || toggling.value) return
-  toggling.value = true
-  toggleError.value = ''
-  try {
-    await roomApi.update(current.value.room_id, { all_chat_enabled: !allChat.value })
-  } catch (e) {
-    toggleError.value = errorMessage(e)
-  } finally {
-    toggling.value = false
-  }
-}
-const participants = computed(() => people.value.filter((p) => p.role === 'participant'))
-const confirmKick = ref<{ id: string; name: string } | null>(null)
-function doKick() {
-  if (confirmKick.value) kick(confirmKick.value.id)
-  confirmKick.value = null
-}
-const locked = computed(() => {
-  void chatVersion.value
-  return chat.locked
-})
 const reporting = ref<ChatLine | null>(null)
 const reportNotice = ref('')
 function reported() {
@@ -143,7 +115,8 @@ const statusText = computed(
 )
 
 onMounted(() => {
-  void start(props.roomId, 'campus')
+  void start(props.roomId, 'campus', listMode ? 'list' : 'map')
+  if (listMode) return
   timer = setInterval(() => {
     const self = world.self
     nearDoor.value =
@@ -157,7 +130,14 @@ onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
-  <section class="workspace" aria-labelledby="map-title">
+  <MobileRoom
+    v-if="listMode"
+    :room="room"
+    :room-id="roomId"
+    :school-name="schoolName"
+    :status-text="statusText"
+  />
+  <section v-else class="workspace" aria-labelledby="map-title">
     <header class="heading">
       <div>
         <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
@@ -276,86 +256,7 @@ onBeforeUnmount(() => clearInterval(timer))
       </aside>
       <aside class="chat-sidebar" aria-label="Chat ruang">
         <h2>Chat</h2>
-        <div v-if="!campus && org.isTeacher" class="teacher">
-          <button class="btn-secondary" :disabled="status !== 'open' || traveling" @click="gather">
-            Kumpulkan peserta
-          </button>
-          <button
-            type="button"
-            class="btn-secondary toggle"
-            role="switch"
-            :aria-checked="allChat"
-            :disabled="toggling || status !== 'open'"
-            @click="toggleAllChat"
-          >
-            Chat semua ruangan: {{ allChat ? 'aktif' : 'mati' }}
-          </button>
-          <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
-          <button
-            type="button"
-            class="btn-secondary toggle"
-            role="switch"
-            :aria-checked="locked"
-            :disabled="status !== 'open'"
-            @click="setLocked(!locked)"
-          >
-            Ruang: {{ locked ? 'terkunci' : 'terbuka' }}
-          </button>
-          <details class="moderation">
-            <summary>Peserta ({{ participants.length }})</summary>
-            <p v-if="!participants.length" class="room-meta">Belum ada peserta lain.</p>
-            <ul class="people">
-              <li v-for="p in participants" :key="p.id">
-                <span
-                  >{{ p.name
-                  }}<template v-if="mutedIds.includes(p.id)"> (dibisukan)</template></span
-                >
-                <button
-                  type="button"
-                  class="btn-secondary"
-                  :aria-label="`${mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan'} ${p.name}`"
-                  :disabled="status !== 'open'"
-                  @click="moderate(mutedIds.includes(p.id) ? 'unmute' : 'mute', p.id)"
-                >
-                  {{ mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan' }}
-                </button>
-                <button
-                  type="button"
-                  class="btn-secondary"
-                  :aria-label="`Keluarkan ${p.name} dari sesi`"
-                  :disabled="status !== 'open'"
-                  @click="confirmKick = p"
-                >
-                  Keluarkan
-                </button>
-              </li>
-            </ul>
-            <div v-if="confirmKick" class="confirm" role="alertdialog" aria-labelledby="kick-q">
-              <p id="kick-q">
-                Keluarkan {{ confirmKick.name }}? Ia tidak bisa masuk lagi ke sesi ini sampai kamu
-                izinkan.
-              </p>
-              <button type="button" class="btn-primary" @click="doKick">Ya, keluarkan</button>
-              <button type="button" class="btn-secondary" @click="confirmKick = null">Batal</button>
-            </div>
-            <template v-if="banned.length">
-              <p class="room-meta">Dikeluarkan dari sesi ini</p>
-              <ul class="people">
-                <li v-for="b in banned" :key="b.id">
-                  <span>{{ b.name }}</span>
-                  <button
-                    type="button"
-                    class="btn-secondary"
-                    :aria-label="`Izinkan ${b.name} masuk lagi`"
-                    @click="allow(b.id)"
-                  >
-                    Izinkan
-                  </button>
-                </li>
-              </ul>
-            </template>
-          </details>
-        </div>
+        <TeacherPanel v-if="!campus && org.isTeacher" :room="room" />
         <ChatPanel
           class="side-chat"
           :chat="chat"
@@ -384,51 +285,9 @@ onBeforeUnmount(() => clearInterval(timer))
 </template>
 
 <style scoped>
-.moderation summary {
-  min-height: var(--touch-min);
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-weight: var(--weight-bold);
-}
-.people {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--space-3);
-  display: grid;
-  gap: var(--space-2);
-}
-.people li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-.people li > span {
-  flex-basis: 100%;
-  font-weight: var(--weight-bold);
-}
-.confirm {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-3);
-}
 .room-meta {
   margin: 0 0 var(--space-3);
   color: var(--color-ink-muted);
-}
-.teacher {
-  margin-bottom: var(--space-4);
-}
-.toggle {
-  width: 100%;
-}
-.toggle-error {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
 }
 .workspace {
   flex: 1;

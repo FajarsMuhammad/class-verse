@@ -118,6 +118,7 @@ type member struct {
 	seen      map[uuid.UUID]bool // ids the client currently shows (area of interest)
 	zone      Zone               // zone the avatar stands in, zero when none
 	chat      chatBudget
+	seatAt    time.Time // last accepted seat (mode HP), 1 per second
 }
 
 // chatBudget is a token bucket: chatRate per second, at most chatBurst.
@@ -262,6 +263,8 @@ func (r *room) handle(cmd any) {
 		r.moderated(c)
 	case chatCmd:
 		r.chat(c)
+	case seatCmd:
+		r.seat(c)
 	case deliverCmd:
 		c.msg.ID = c.id
 		r.deliverChat(c.msg, c.to)
@@ -454,6 +457,11 @@ func (r *room) leave(c *conn) {
 func (r *room) move(c *conn, seq uint64, mv MoveMsg) {
 	m, ok := r.members[c.userID]
 	if !ok || m.conn != c {
+		return
+	}
+	if c.list {
+		x, y := m.p.X, m.p.Y
+		c.sendError(ErrorMsg{Code: CodeMoveRejected, Message: "Mode HP tidak berjalan", Seq: seq, X: &x, Y: &y})
 		return
 	}
 	now := r.now()
@@ -679,6 +687,53 @@ func (r *room) deliverChat(msg ChatOutMsg, to []*member) {
 			m.conn.send(o)
 		}
 	}
+}
+
+// seatCmd places a list-mode (mode HP) avatar in a zone or the general area.
+type seatCmd struct {
+	c    *conn
+	seq  uint64
+	zone string
+}
+
+// seatEvery limits seat to one per second per avatar.
+const seatEvery = time.Second
+
+// seat teleports a mode HP avatar into a zone; the next tick sends its zone
+// and the snapshot that shows it at the table to everyone else.
+func (r *room) seat(c seatCmd) {
+	m, ok := r.members[c.c.userID]
+	if !ok || m.conn != c.c {
+		return
+	}
+	reject := func(code, msg string) {
+		c.c.sendError(ErrorMsg{Code: code, Message: msg, Seq: c.seq})
+	}
+	if !c.c.list || r.campus {
+		reject(CodeForbidden, "Pilih tempat hanya tersedia di mode HP dalam ruang")
+		return
+	}
+	now := r.now()
+	if !m.seatAt.IsZero() && now.Sub(m.seatAt) < seatEvery {
+		reject(CodeRateLimited, "Terlalu cepat. Tunggu sebentar.")
+		return
+	}
+	var x, y int
+	if c.zone == "" {
+		var err error
+		if x, y, err = r.mapd.SpawnPoint(r.spawnN); err != nil {
+			reject(CodeUnavailable, "Area umum tidak tersedia")
+			return
+		}
+	} else if x, y, ok = r.mapd.SeatPoint(c.zone, r.spawnN); !ok {
+		reject(CodeBadMessage, "Tempat tidak dikenal")
+		return
+	}
+	r.spawnN++
+	m.seatAt = now
+	m.p.X, m.p.Y, m.p.Dir = x, y, DirDown
+	m.stride = newStride(r.mapd.WalkSpeed, now)
+	m.dirty = true
 }
 
 // nearPoint returns a check that accepts avatars within doorRadius of (x, y).
