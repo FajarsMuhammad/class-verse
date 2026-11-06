@@ -17,6 +17,7 @@
     "api": "openapi-typescript ../classverse-backend/api/openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "livekit-client": "^2.23.0",
     "phaser": "^3.90.0",
     "pinia": "^4.0.3",
     "vue": "^3.5.42",

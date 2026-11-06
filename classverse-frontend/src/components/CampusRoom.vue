@@ -10,7 +10,9 @@ import ReportDialog from '@/components/ReportDialog.vue'
 import type { ChatLine } from '@/realtime/chat'
 import MobileRoom from '@/components/MobileRoom.vue'
 import TeacherPanel from '@/components/TeacherPanel.vue'
+import VoiceBar from '@/components/VoiceBar.vue'
 import { useRoom } from '@/realtime/useRoom'
+import { useVoice } from '@/realtime/useVoice'
 
 // Phaser is loaded only when the map is shown (never in mode HP).
 const GameCanvas = defineAsyncComponent(() => import('@/components/GameCanvas.vue'))
@@ -22,6 +24,8 @@ const listMode =
 
 const props = defineProps<{ roomId: string; schoolName: string }>()
 const room = useRoom()
+// Voice is web only for now (mode HP voice is deferred with the phone polish).
+const voice = listMode ? null : useVoice(room)
 const {
   status,
   map,
@@ -184,7 +188,13 @@ onBeforeUnmount(() => clearInterval(timer))
           <GameCanvas
             v-if="map"
             :key="current?.room_id"
-            :deps="{ map, world, sendMove, currentZone: () => chat.zone.key }"
+            :deps="{
+              map,
+              world,
+              sendMove,
+              currentZone: () => chat.zone.key,
+              speaking: () => voice?.speaking.value ?? new Set(),
+            }"
             :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
           />
           <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
@@ -256,6 +266,16 @@ onBeforeUnmount(() => clearInterval(timer))
       </aside>
       <aside class="chat-sidebar" aria-label="Chat ruang">
         <h2>Chat</h2>
+        <VoiceBar
+          v-if="voice && !campus && !kicked"
+          :voice="voice"
+          :chat="chat"
+          :version="chatVersion"
+          :self-id="world.selfId"
+          :teacher="org.isTeacher"
+          :disabled="status !== 'open'"
+          @broadcast="room.voiceBroadcast"
+        />
         <TeacherPanel v-if="!campus && org.isTeacher" :room="room" />
         <ChatPanel
           class="side-chat"

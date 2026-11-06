@@ -16,6 +16,8 @@ export interface SceneDeps {
   sendMove: (m: MoveMsg) => void
   // currentZone returns the server-reported zone key of the local avatar.
   currentZone?: () => string
+  // speaking returns ids (self included) talking right now (voice, slice 9).
+  speaking?: () => Set<string>
 }
 
 // Near-chat radius (docs/design.md, slice 6): 5 tiles.
@@ -48,6 +50,7 @@ export class CampusScene extends Phaser.Scene {
   private zoneLabels: Phaser.GameObjects.Text[] = []
   private drawnZone = '?'
   private radius: Phaser.GameObjects.Graphics | null = null
+  private rings: Phaser.GameObjects.Graphics | null = null
   private focused = false
   private movementRevision = 0
 
@@ -96,6 +99,7 @@ export class CampusScene extends Phaser.Scene {
       }
     }
     this.radius = this.add.graphics().setDepth(1.5)
+    this.rings = this.add.graphics().setDepth(1.6)
 
     this.cameras.main.setBackgroundColor(cssToken('--map-grass'))
 
@@ -166,6 +170,7 @@ export class CampusScene extends Phaser.Scene {
     this.syncSprites()
     this.drawZones()
     this.drawRadius()
+    this.drawSpeaking()
   }
 
   // drawZones outlines discussion tables: dashed Mangga, the player's own zone
@@ -192,6 +197,25 @@ export class CampusScene extends Phaser.Scene {
       }
       this.zoneLabels[i]?.setText(own ? `${z.name} · kamu di sini` : z.name)
     })
+  }
+
+  // drawSpeaking rings active speakers with --color-speaking (docs/visual.md).
+  private drawSpeaking() {
+    const g = this.rings
+    if (!g) return
+    g.clear()
+    const ids = this.deps.speaking?.()
+    if (!ids?.size) return
+    const zoom = this.cameras.main.zoom
+    g.lineStyle(3 / zoom, Phaser.Display.Color.HexStringToColor(cssToken('--color-speaking')).color, 1)
+    const r = (AVATAR_SIZE / 2 + 4) / zoom
+    // Sprites are anchored at the feet (origin 0.5, 0.9); centre the ring on the body.
+    const lift = AVATAR_SIZE * 0.4 / zoom
+    const { world } = this.deps
+    for (const a of world.avatars.values()) {
+      if (ids.has(a.id) && !a.hidden) g.strokeCircle(a.x, a.y - lift, r)
+    }
+    if (world.self && world.selfId && ids.has(world.selfId)) g.strokeCircle(world.self.x, world.self.y - lift, r)
   }
 
   // drawRadius shows the near-chat range around the local avatar.

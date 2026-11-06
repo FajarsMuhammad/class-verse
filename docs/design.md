@@ -134,7 +134,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 | `move` | `x`, `y`, `dir` | Maks 15 pesan/detik; ditolak jika menembus collision atau melebihi kecepatan maksimum |
 | `chat` | `text`, `scope` (`near` / `zone` / `room`) | Maks 3 pesan/detik; difilter; `room` ditolak jika chat semua ruangan dimatikan |
 | `emote` | `kind` | Maks 1/detik |
-| `cmd` | `name` (`broadcast`, `gather`, `mute`, `kick`, `lock`), `target?` | Hanya role pengajar/admin |
+| `cmd` | `name` (`broadcast`, `gather`, `mute`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
 | `ping` | `ts` | Dibalas `pong` untuk mengukur latency |
 | `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali mode HP); koneksi dipindah tanpa reconnect |
 | `seat` | `zone` | Mode HP saja, di kelas/taman; maks 1/detik (slice 8) |
@@ -611,3 +611,29 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
 - *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (≤160 px) are computed from welcome/snapshot
   positions; building counts reuse `buildings`, room rows reuse the rooms list (`people`, `live`).
 - *Teacher.* Phone keeps the announcement tab and the teacher panel (collapsible).
+
+## Slice 9 — Voice (V9-01…V9-07 approved; V9-03 revised by the user)
+
+- *Where.* Classroom/garden only; campus and mode HP stay text-only. One LiveKit room per Kelasverse room
+  (name = room UUID), identity = user UUID, name = display name.
+- *Channels (V9-03).* No distance volume. Channel = the zone the avatar stands in, or "area umum" outside every zone.
+  Everyone in the same channel is heard at full volume, plus staff in `voice_broadcast`. Enforced by the client
+  (`autoSubscribe: false`, subscriptions resynced every 250 ms from server positions). Accepted risk: a modified
+  client inside the same room could subscribe to other channels of that room.
+- *Token.* `POST /api/rooms/{room_id}/voice-token` → `{url, token}` only while the caller has a live WS connection
+  in that classroom/garden (hub probe); otherwise 404. 503 `voice_unavailable` when LiveKit is not configured.
+  HS256 JWT signed with the LiveKit secret, claims as `livekit/protocol/auth`: `roomJoin`, `room`, `canSubscribe`,
+  `canPublish` (false while muted), `canPublishSources: [microphone]`, no data/metadata. TTL 2 minutes (self-host has
+  no revocation; LiveKit refreshes connected participants). `Cache-Control: no-store`.
+- *Moderation.* After a mute/unmute audit commits, the hub voice worker calls RoomService `UpdateParticipant`
+  (`can_publish`). Every removal from a classroom/garden (travel, grace expiry, kick) calls `RemoveParticipant`.
+  Calls are best effort, logged on failure, never block a room; `not_found` (already gone) is success.
+- *Broadcast voice.* `cmd voice_broadcast` / `voice_broadcast_off` (staff, not campus, not audited). The room keeps
+  the set; `welcome` and `room_state` carry `voice_broadcast: [user_id]`. Leaving the room clears it.
+- *Config.* `LIVEKIT_URL` (`ws(s)://`), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; all empty disables voice (mic hidden).
+  RoomService base URL is derived from `LIVEKIT_URL` (`ws`→`http`). Dev: `livekit/livekit-server:v1.9 --dev` in
+  `compose.yaml` (7880 signal/API, 7881 TCP, 7882/udp media). Production self-host vs Cloud is decided at deploy.
+  No new Go dependency; frontend `livekit-client` is a lazy chunk loaded only in a room.
+- *UI.* Mic 52×52 round Tinta (`aria-pressed`, off on entry and after travel), status line naming the heard channel,
+  teacher switch "Bicara ke semua ruang", "Aktifkan suara" when autoplay is blocked, `--color-speaking` ring on
+  active speakers (LiveKit active speakers).

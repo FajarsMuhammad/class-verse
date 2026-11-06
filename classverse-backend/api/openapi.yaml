@@ -321,6 +321,24 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /api/rooms/{room_id}/voice-token:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: createVoiceToken
+      description: >
+        Token LiveKit (2 menit) untuk voice ruang kelas/taman. Hanya untuk user yang sedang terhubung lewat
+        WebSocket di ruang itu; publish hanya mikrofon, ditolak selama dibisukan pengajar (slice 9).
+      responses:
+        "200":
+          description: Token voice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VoiceToken" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/VoiceUnavailable" }
+
   /api/reports:
     post:
       operationId: createReport
@@ -455,6 +473,11 @@ components:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     InviteExpired:
       description: invite_expired (kedaluwarsa, dicabut, atau kuota habis)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    VoiceUnavailable:
+      description: voice_unavailable (LiveKit tidak dikonfigurasi)
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -639,6 +662,12 @@ components:
     ReportStatus:
       type: string
       enum: [open, reviewed, dismissed]
+    VoiceToken:
+      type: object
+      required: [url, token]
+      properties:
+        url: { type: string, description: "URL ws(s):// LiveKit untuk browser" }
+        token: { type: string }
     CreateReportRequest:
       type: object
       additionalProperties: false

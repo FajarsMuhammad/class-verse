@@ -26,6 +26,7 @@ import (
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/realtime"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/report"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/room"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/voice"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -125,6 +126,17 @@ func (o roomOccupancy) WhileEmpty(ctx context.Context, roomID uuid.UUID, fn func
 	return err
 }
 
+// voicePresence adapts the hub to voice.Presence.
+type voicePresence struct{ *realtime.Hub }
+
+func (p voicePresence) VoiceMember(ctx context.Context, roomID, userID uuid.UUID) (string, bool, error) {
+	m, err := p.Hub.VoiceMember(ctx, roomID, userID)
+	if errors.Is(err, realtime.ErrNotInRoom) {
+		return "", false, voice.ErrNotPresent
+	}
+	return m.Name, m.Muted, err
+}
+
 // newApp wires every feature.
 func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (*app, error) {
 	now := func() time.Time { return time.Now().UTC() }
@@ -164,6 +176,19 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	roomSvc := room.NewService(room.NewStore(pool), orgSvc, campusBuildings{mapData["campus"]}, roomOccupancy{hub}, now, log)
 	roomHandler := room.NewHandler(roomSvc, log)
 	reportHandler := report.NewHandler(report.NewService(report.NewStore(pool), orgSvc, now), log)
+	lk, err := voice.NewLiveKit(cfg.LiveKit.URL, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, now)
+	if err != nil {
+		_ = hub.Shutdown(ctx)
+		return nil, err
+	}
+	var issuer voice.Issuer
+	if lk != nil {
+		hub.SetVoice(lk)
+		issuer = lk
+	} else {
+		log.Info("voice disabled: LIVEKIT_URL not set")
+	}
+	voiceHandler := voice.NewHandler(voice.NewService(voicePresence{hub}, issuer), log)
 
 	return &app{
 		api: func(r chi.Router) {
@@ -175,6 +200,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				inviteHandler.Routes(r)
 				roomHandler.Routes(r)
 				reportHandler.Routes(r)
+				voiceHandler.Routes(r)
 			})
 		},
 		ws:  gateway.Routes,

@@ -41,6 +41,15 @@ type Config struct {
 	JWTPrivateKey ed25519.PrivateKey
 	OTPHMACKey    []byte
 	Google        Google
+	LiveKit       LiveKit
+}
+
+// LiveKit configures voice (slice 9). All empty disables voice; validation
+// of the combination happens in voice.NewLiveKit.
+type LiveKit struct {
+	URL       string
+	APIKey    string
+	APISecret string
 }
 
 // IsProduction reports whether the server runs in production mode.
@@ -77,6 +86,11 @@ func Load(getenv func(string) string) (Config, error) {
 			ClientID:     optional("GOOGLE_CLIENT_ID", ""),
 			ClientSecret: optional("GOOGLE_CLIENT_SECRET", ""),
 			RedirectURL:  optional("GOOGLE_REDIRECT_URL", ""),
+		},
+		LiveKit: LiveKit{
+			URL:       optional("LIVEKIT_URL", ""),
+			APIKey:    optional("LIVEKIT_API_KEY", ""),
+			APISecret: optional("LIVEKIT_API_SECRET", ""),
 		},
 	}
 	jwtSeed := required("JWT_PRIVATE_KEY")

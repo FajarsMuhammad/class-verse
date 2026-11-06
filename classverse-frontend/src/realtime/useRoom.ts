@@ -30,6 +30,8 @@ export interface RoomHandle {
   chatError: Ref<string>
   sendChat: (text: string, scope: ChatScope) => boolean
   gather: () => void
+  // voiceBroadcast starts or stops the teacher's voice to the whole room.
+  voiceBroadcast: (on: boolean) => void
   kick: (target: string) => void
   moderate: (name: 'mute' | 'unmute', target: string) => void
   setLocked: (locked: boolean) => void
@@ -201,6 +203,10 @@ export function useRoom(): RoomHandle {
     },
     allow: (target) => {
       if (status.value === 'open') client?.send('cmd', { name: 'allow', target })
+    },
+    voiceBroadcast: (on) => {
+      if (status.value === 'open')
+        client?.send('cmd', { name: on ? 'voice_broadcast' : 'voice_broadcast_off' })
     },
     gather: () => {
       if (status.value === 'open' && !traveling.value) client?.send('cmd', { name: 'gather' })

@@ -139,6 +139,91 @@ type Hub struct {
 	locked    map[uuid.UUID]bool // rooms being archived
 	wg        sync.WaitGroup     // room goroutines
 	worker    chan struct{}      // closed when recordLoop returns
+	voice     VoiceAdmin         // nil when voice is off; set before serving
+	voiceJobs chan func(context.Context)
+}
+
+// VoiceAdmin applies room moderation to LiveKit (implemented by voice.LiveKit).
+// Calls run on the hub's voice worker, never on a room goroutine.
+type VoiceAdmin interface {
+	SetCanPublish(ctx context.Context, room, identity string, canPublish bool) error
+	Remove(ctx context.Context, room, identity string) error
+}
+
+// SetVoice enables LiveKit moderation hooks. Call before serving.
+func (h *Hub) SetVoice(v VoiceAdmin) {
+	h.voice = v
+	h.voiceJobs = make(chan func(context.Context), sessionQueue)
+	go func() {
+		for job := range h.voiceJobs {
+			job(context.WithoutCancel(h.ctx))
+		}
+	}()
+}
+
+// voiceCall queues a best-effort LiveKit call; it never blocks the room.
+func (h *Hub) voiceCall(name string, roomID, userID uuid.UUID, fn func(ctx context.Context, v VoiceAdmin) error) {
+	if h.voice == nil {
+		return
+	}
+	job := func(ctx context.Context) {
+		if err := fn(ctx, h.voice); err != nil {
+			h.log.Warn("voice call failed", slog.String("call", name), slog.String("room_id", roomID.String()),
+				slog.String("user_id", userID.String()), slog.Any("err", err))
+		}
+	}
+	select {
+	case h.voiceJobs <- job:
+	default:
+		h.log.Warn("voice queue full", slog.String("call", name), slog.String("room_id", roomID.String()))
+	}
+}
+
+// VoiceMember is what the voice token endpoint needs about a room member.
+type VoiceMember struct {
+	Name  string
+	Muted bool
+}
+
+// ErrNotInRoom means the user has no live connection in that classroom or garden.
+var ErrNotInRoom = errors.New("not connected to this room")
+
+// VoiceMember reports whether userID is connected to roomID right now
+// (campus excluded). Admission rules were applied when the user entered.
+func (h *Hub) VoiceMember(ctx context.Context, roomID, userID uuid.UUID) (VoiceMember, error) {
+	h.mu.Lock()
+	r := h.rooms[roomID]
+	h.mu.Unlock()
+	if r == nil || r.campus {
+		return VoiceMember{}, ErrNotInRoom
+	}
+	res := make(chan VoiceMember, 1)
+	probe := probeCmd{fn: func(r *room) {
+		m := r.members[userID]
+		if m == nil || m.conn == nil {
+			close(res)
+			return
+		}
+		res <- VoiceMember{Name: m.p.Name, Muted: r.muted[userID]}
+	}}
+	select {
+	case r.inbox <- probe:
+	case <-r.done:
+		return VoiceMember{}, ErrNotInRoom
+	case <-ctx.Done():
+		return VoiceMember{}, ctx.Err()
+	}
+	select {
+	case m, ok := <-res:
+		if !ok {
+			return VoiceMember{}, ErrNotInRoom
+		}
+		return m, nil
+	case <-r.done:
+		return VoiceMember{}, ErrNotInRoom
+	case <-ctx.Done():
+		return VoiceMember{}, ctx.Err()
+	}
 }
 
 // NewHub returns an empty hub. sessions may be nil (tests). Call Shutdown to stop it.
@@ -607,6 +692,9 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 		h.wg.Wait()   // no room can record after this
 		close(h.jobs) // let the worker drain and stop
 		<-h.worker
+		if h.voiceJobs != nil {
+			close(h.voiceJobs)
+		}
 		close(done)
 	}()
 	select {

@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { CreateRoomRequest, Room, RoomList, UpdateRoomRequest } from './types'
+import type { CreateRoomRequest, Room, RoomList, UpdateRoomRequest, VoiceToken } from './types'
 
 const enc = encodeURIComponent
 
@@ -16,4 +16,6 @@ export const roomApi = {
   update: (id: string, input: UpdateRoomRequest) =>
     api<Room>(`/api/rooms/${enc(id)}`, { method: 'PATCH', body: input }),
   archive: (id: string) => api<void>(`/api/rooms/${enc(id)}`, { method: 'DELETE' }),
+  voiceToken: (id: string) =>
+    api<VoiceToken>(`/api/rooms/${enc(id)}/voice-token`, { method: 'POST' }),
 }

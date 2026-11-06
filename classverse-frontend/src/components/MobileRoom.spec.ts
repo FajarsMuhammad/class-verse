@@ -71,6 +71,7 @@ function handle(welcome: WelcomeMsg, map: MapData): RoomHandle {
     chatError: ref(''),
     sendChat: vi.fn<RoomHandle['sendChat']>(() => true),
     gather: vi.fn<RoomHandle['gather']>(),
+    voiceBroadcast: vi.fn<RoomHandle['voiceBroadcast']>(),
     kick: vi.fn<RoomHandle['kick']>(),
     moderate: vi.fn<RoomHandle['moderate']>(),
     setLocked: vi.fn<RoomHandle['setLocked']>(),

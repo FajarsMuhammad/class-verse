@@ -40,7 +40,7 @@ export interface ClientMessages {
 }
 
 export type CommandMsg =
-  | { name: 'gather' | 'lock' | 'unlock' }
+  | { name: 'gather' | 'lock' | 'unlock' | 'voice_broadcast' | 'voice_broadcast_off' }
   | { name: 'kick' | 'allow' | 'mute' | 'unmute'; target: string }
 export interface BannedUser {
   id: string
@@ -82,6 +82,8 @@ export interface WelcomeMsg {
   all_chat_enabled: boolean
   locked?: boolean
   muted?: boolean
+  // staff whose voice reaches the whole room (slice 9)
+  voice_broadcast?: string[]
 }
 export interface LeftMsg {
   id: string
@@ -149,6 +151,7 @@ export interface RoomStateMsg {
   all_chat_enabled: boolean
   locked?: boolean
   muted?: boolean
+  voice_broadcast?: string[]
 }
 
 export interface ServerMessages {

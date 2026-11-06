@@ -148,6 +148,8 @@ type WelcomeMsg struct {
 	AllChatEnabled bool `json:"all_chat_enabled"`
 	Locked         bool `json:"locked"`
 	Muted          bool `json:"muted"`
+	// VoiceBroadcast lists staff whose voice reaches the whole room (slice 9).
+	VoiceBroadcast []uuid.UUID `json:"voice_broadcast"`
 }
 
 // Chat scopes. Broadcast is restricted to teachers and admins.
@@ -193,8 +195,10 @@ type RoomStateMsg struct {
 	AllChatEnabled bool `json:"all_chat_enabled"`
 	// Locked rooms reject new participants (slice 7).
 	Locked bool `json:"locked"`
-	// Muted is personal: true when this receiver may not chat.
+	// Muted is personal: true when this receiver may not chat or speak.
 	Muted bool `json:"muted"`
+	// VoiceBroadcast lists staff whose voice reaches the whole room (slice 9).
+	VoiceBroadcast []uuid.UUID `json:"voice_broadcast"`
 }
 
 // TravelMsg asks to move to another room of the same organization.

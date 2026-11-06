@@ -437,6 +437,14 @@ type VerifyEmailRequest struct {
 	Email string `json:"email"`
 }
 
+// VoiceToken defines model for VoiceToken.
+type VoiceToken struct {
+	Token string `json:"token"`
+
+	// Url URL ws(s):// LiveKit untuk browser
+	Url string `json:"url"`
+}
+
 // InviteCode defines model for InviteCode.
 type InviteCode = string
 
@@ -469,6 +477,9 @@ type Unauthenticated = ErrorResponse
 
 // ValidationFailed defines model for ValidationFailed.
 type ValidationFailed = ErrorResponse
+
+// VoiceUnavailable defines model for VoiceUnavailable.
+type VoiceUnavailable = ErrorResponse
 
 // ListInvitesParams defines parameters for ListInvites.
 type ListInvitesParams struct {

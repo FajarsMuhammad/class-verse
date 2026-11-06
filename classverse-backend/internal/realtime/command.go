@@ -1,7 +1,10 @@
 package realtime
 
 import (
+	"context"
 	"log/slog"
+	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -39,6 +42,21 @@ func (r *room) command(c commandCmd) {
 	switch c.name {
 	case "gather":
 		r.gather(m, c.seq, reject)
+	case "voice_broadcast", "voice_broadcast_off":
+		if r.campus {
+			reject(CodeForbidden, "Suara ke semua hanya tersedia di ruang")
+			return
+		}
+		on := c.name == "voice_broadcast"
+		if on == r.voiceOn[m.p.ID] {
+			return
+		}
+		if on {
+			r.voiceOn[m.p.ID] = true
+		} else {
+			delete(r.voiceOn, m.p.ID)
+		}
+		r.sendStates()
 	case "kick", "allow", "mute", "unmute", "lock", "unlock":
 		r.moderate(m, c, reject)
 	default:
@@ -164,13 +182,14 @@ func (r *room) moderated(c moderatedCmd) {
 		if t := r.members[c.target]; t != nil && t.conn != nil {
 			t.conn.send(newOut(TypeRoomState, r.state(c.target)))
 		}
+		// The audit row is committed; mirror the mute on voice (best effort).
+		room, target := r.id, c.target
+		r.hub.voiceCall(c.action, room, target, func(ctx context.Context, v VoiceAdmin) error {
+			return v.SetCanPublish(ctx, room.String(), target.String(), !muted)
+		})
 	case "lock", "unlock":
 		r.locked = c.action == "lock"
-		for id, o := range r.members {
-			if o.conn != nil {
-				o.conn.send(newOut(TypeRoomState, r.state(id)))
-			}
-		}
+		r.sendStates()
 	}
 	ev := newOut(TypeEvent, ModerationEvent{Name: c.action, By: c.actor, Target: c.target, Banned: c.banned, Muted: r.mutedIDs()})
 	for _, o := range r.members {
@@ -182,7 +201,26 @@ func (r *room) moderated(c moderatedCmd) {
 
 // state is the room_state a member sees: shared settings plus their own mute.
 func (r *room) state(id uuid.UUID) RoomStateMsg {
-	return RoomStateMsg{AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id]}
+	return RoomStateMsg{AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id], VoiceBroadcast: r.broadcasters()}
+}
+
+// sendStates sends every connected member its room_state.
+func (r *room) sendStates() {
+	for id, o := range r.members {
+		if o.conn != nil {
+			o.conn.send(newOut(TypeRoomState, r.state(id)))
+		}
+	}
+}
+
+// broadcasters lists staff currently speaking to the whole room, sorted.
+func (r *room) broadcasters() []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(r.voiceOn))
+	for id := range r.voiceOn {
+		ids = append(ids, id)
+	}
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	return ids
 }
 
 func (r *room) mutedIDs() []uuid.UUID {

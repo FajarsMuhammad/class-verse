@@ -24,6 +24,8 @@ export class ChatState {
   allChatEnabled = true
   muted = false
   locked = false
+  // Staff currently speaking to the whole room (voice broadcast).
+  voiceBroadcast: string[] = []
   readonly lines: Record<ChatScope, ChatLine[]> = { near: [], zone: [], room: [], broadcast: [] }
   // Bumped on any change so Vue can re-render cheaply.
   version = 0
@@ -40,6 +42,7 @@ export class ChatState {
         this.allChatEnabled = msg.d!.all_chat_enabled
         this.muted = msg.d!.muted ?? false
         this.locked = msg.d!.locked ?? false
+        this.voiceBroadcast = msg.d!.voice_broadcast ?? []
         if (!sameRoom) {
           this.lines.near = []
           this.lines.zone = []
@@ -57,6 +60,7 @@ export class ChatState {
         this.allChatEnabled = msg.d!.all_chat_enabled
         this.muted = msg.d!.muted ?? false
         this.locked = msg.d!.locked ?? false
+        this.voiceBroadcast = msg.d!.voice_broadcast ?? []
         break
       case 'chat':
         this.add(msg.d!)

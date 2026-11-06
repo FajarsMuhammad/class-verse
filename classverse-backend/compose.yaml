@@ -24,5 +24,14 @@ services:
       - "${MAILPIT_SMTP_PORT:-1025}:1025" # SMTP
       - "${MAILPIT_UI_PORT:-8025}:8025" # web UI
 
+  # Voice (slice 9). --dev uses the fixed key pair devkey/secret; never in production.
+  livekit:
+    image: livekit/livekit-server:v1.9
+    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880" # signal (ws) + RoomService (http)
+      - "7881:7881" # WebRTC over TCP
+      - "7882:7882/udp" # WebRTC media (single muxed UDP port in --dev)
+
 volumes:
   pgdata:

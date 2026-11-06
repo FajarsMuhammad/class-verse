@@ -168,6 +168,7 @@ type room struct {
 	// Session moderation state; lives as long as the room actor (see design).
 	locked    bool
 	muted     map[uuid.UUID]bool
+	voiceOn   map[uuid.UUID]bool // staff speaking to the whole room (voice broadcast)
 	ticks     int
 	lastStats roomStats
 }
@@ -179,7 +180,7 @@ func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *
 		allChat: adm.AllChat || mapd.Key == campusKey,
 		inbox:   make(chan any, inboxSize), done: make(chan struct{}),
 		members: make(map[uuid.UUID]*member), reserved: make(map[uuid.UUID]bool),
-		muted: make(map[uuid.UUID]bool),
+		muted: make(map[uuid.UUID]bool), voiceOn: make(map[uuid.UUID]bool),
 	}
 }
 
@@ -271,11 +272,7 @@ func (r *room) handle(cmd any) {
 	case roomStateCmd:
 		if !r.campus && r.allChat != c.allChat {
 			r.allChat = c.allChat
-			for id, o := range r.members {
-				if o.conn != nil {
-					o.conn.send(newOut(TypeRoomState, r.state(id)))
-				}
-			}
+			r.sendStates()
 		}
 	case probeCmd:
 		c.fn(r)
@@ -364,7 +361,7 @@ func (r *room) sendWelcome(m *member, typ string) {
 	w := WelcomeMsg{
 		SelfID: m.p.ID, RoomID: r.id, MapKey: r.mapd.Key, RoomName: r.name, BuildingKey: r.buildingKey,
 		Participants: make([]Participant, 0, len(r.members)), AllChatEnabled: r.allChat,
-		Locked: r.locked, Muted: r.muted[m.p.ID],
+		Locked: r.locked, Muted: r.muted[m.p.ID], VoiceBroadcast: r.broadcasters(),
 	}
 	for id, o := range r.members {
 		w.Participants = append(w.Participants, o.p)
@@ -422,6 +419,15 @@ func (r *room) remove(id uuid.UUID) {
 	r.hub.forget(id, r.id)
 	if !r.campus {
 		r.hub.record(sessionJob{kind: jobLeave, roomID: r.id, userID: id, at: r.now()})
+		// Leaving (travel, grace expiry, kick) also ends the user's voice here.
+		room := r.id
+		r.hub.voiceCall("remove", room, id, func(ctx context.Context, v VoiceAdmin) error {
+			return v.Remove(ctx, room.String(), id.String())
+		})
+	}
+	if r.voiceOn[id] {
+		delete(r.voiceOn, id)
+		r.sendStates()
 	}
 }
 

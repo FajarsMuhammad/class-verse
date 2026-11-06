@@ -5,6 +5,7 @@ import type { components } from './schema'
 type Schemas = components['schemas']
 
 export type Room = Schemas['Room']
+export type VoiceToken = Schemas['VoiceToken']
 export type RoomList = Schemas['RoomList']
 export type RoomMap = Schemas['RoomMap']
 export type CreateRoomRequest = Schemas['CreateRoomRequest']
