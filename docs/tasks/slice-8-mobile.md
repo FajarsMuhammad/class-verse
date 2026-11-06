@@ -1,6 +1,6 @@
 # Slice 8 — Mode HP (M1)
 
-Status: **done; awaiting user review**. M8-01…M8-06 approved and written to `docs/design.md`.
+Status: **reviewed; functional, phone layout polish deferred to the next MVP** (user decision: focus on web). M8-01…M8-06 approved and written to `docs/design.md`.
 Branch: `slice-8-mobile`, based on `fix-travel-webgl-leak` (`cd4583f`, slice 7 + WebGL fix).
 
 References: docs/spec.md (M1 row: "mode HP — pilih zona lewat daftar + chat, tanpa movement"; NFR Perangkat),
