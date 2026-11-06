@@ -24,6 +24,10 @@ const broadcasting = computed(() => {
   void props.version
   return !!props.selfId && props.chat.voiceBroadcast.includes(props.selfId)
 })
+const pending = computed(() => {
+  void props.version
+  return props.chat.voicePending.length
+})
 const channel = computed(() => {
   void props.version
   return props.chat.zone.key ? props.chat.zone.name : 'area umum'
@@ -51,7 +55,16 @@ const label = computed(() =>
       @click="toggleMic"
     >
       <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-        <rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2" />
+        <rect
+          x="9"
+          y="3"
+          width="6"
+          height="11"
+          rx="3"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        />
         <path
           d="M5 11a7 7 0 0 0 14 0M12 18v3"
           fill="none"
@@ -59,7 +72,13 @@ const label = computed(() =>
           stroke-width="2"
           stroke-linecap="round"
         />
-        <path v-if="!micOn" d="M4 4l16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        <path
+          v-if="!micOn"
+          d="M4 4l16 16"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
       </svg>
     </button>
     <p class="state" role="status">{{ label }}</p>
@@ -77,6 +96,10 @@ const label = computed(() =>
     <button v-if="needsAudioStart" type="button" class="btn-primary toggle" @click="startAudio">
       Aktifkan suara
     </button>
+    <p v-if="teacher && pending" role="status" class="error">
+      Pemutusan suara {{ pending }} peserta belum terkonfirmasi. Server mencoba ulang; jangan anggap
+      suara sudah terputus.
+    </p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
   </div>
 </template>

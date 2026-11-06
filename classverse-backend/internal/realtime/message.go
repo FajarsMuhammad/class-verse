@@ -145,9 +145,12 @@ type WelcomeMsg struct {
 	BuildingKey  string        `json:"building_key,omitempty"`
 	Participants []Participant `json:"participants"`
 	// AllChatEnabled tells whether the "Semua" tab may send (always true on the campus).
-	AllChatEnabled bool `json:"all_chat_enabled"`
-	Locked         bool `json:"locked"`
-	Muted          bool `json:"muted"`
+	AllChatEnabled bool        `json:"all_chat_enabled"`
+	Locked         bool        `json:"locked"`
+	Muted          bool        `json:"muted"`
+	VoiceIdentity  string      `json:"voice_identity"`
+	VoiceChannel   string      `json:"voice_channel"`
+	VoicePending   []uuid.UUID `json:"voice_pending"`
 	// VoiceBroadcast lists staff whose voice reaches the whole room (slice 9).
 	VoiceBroadcast []uuid.UUID `json:"voice_broadcast"`
 }
@@ -196,7 +199,10 @@ type RoomStateMsg struct {
 	// Locked rooms reject new participants (slice 7).
 	Locked bool `json:"locked"`
 	// Muted is personal: true when this receiver may not chat or speak.
-	Muted bool `json:"muted"`
+	Muted         bool        `json:"muted"`
+	VoiceIdentity string      `json:"voice_identity"`
+	VoiceChannel  string      `json:"voice_channel"`
+	VoicePending  []uuid.UUID `json:"voice_pending"`
 	// VoiceBroadcast lists staff whose voice reaches the whole room (slice 9).
 	VoiceBroadcast []uuid.UUID `json:"voice_broadcast"`
 }

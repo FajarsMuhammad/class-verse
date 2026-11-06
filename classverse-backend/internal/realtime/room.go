@@ -109,16 +109,18 @@ type arriveCmd struct {
 }
 
 type member struct {
-	p         Participant
-	conn      *conn // nil while held after a disconnect
-	heldUntil time.Time
-	stride    stride
-	moves     moveBudget
-	dirty     bool
-	seen      map[uuid.UUID]bool // ids the client currently shows (area of interest)
-	zone      Zone               // zone the avatar stands in, zero when none
-	chat      chatBudget
-	seatAt    time.Time // last accepted seat (mode HP), 1 per second
+	p             Participant
+	conn          *conn // nil while held after a disconnect
+	heldUntil     time.Time
+	stride        stride
+	moves         moveBudget
+	dirty         bool
+	seen          map[uuid.UUID]bool // ids the client currently shows (area of interest)
+	zone          Zone               // zone the avatar stands in, zero when none
+	chat          chatBudget
+	seatAt        time.Time // last accepted seat (mode HP), 1 per second
+	voiceIdentity string
+	voiceChannel  string
 }
 
 // chatBudget is a token bucket: chatRate per second, at most chatBurst.
@@ -166,11 +168,13 @@ type room struct {
 	sessionOpen bool
 	allChat     bool
 	// Session moderation state; lives as long as the room actor (see design).
-	locked    bool
-	muted     map[uuid.UUID]bool
-	voiceOn   map[uuid.UUID]bool // staff speaking to the whole room (voice broadcast)
-	ticks     int
-	lastStats roomStats
+	locked       bool
+	muted        map[uuid.UUID]bool
+	voiceOn      map[uuid.UUID]bool // staff speaking to the whole room (voice broadcast)
+	voicePending map[string]*voiceCleanup
+	voiceEpoch   uuid.UUID // prevents stale media sessions hearing a restarted actor
+	ticks        int
+	lastStats    roomStats
 }
 
 func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *slog.Logger) *room {
@@ -180,7 +184,7 @@ func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *
 		allChat: adm.AllChat || mapd.Key == campusKey,
 		inbox:   make(chan any, inboxSize), done: make(chan struct{}),
 		members: make(map[uuid.UUID]*member), reserved: make(map[uuid.UUID]bool),
-		muted: make(map[uuid.UUID]bool), voiceOn: make(map[uuid.UUID]bool),
+		muted: make(map[uuid.UUID]bool), voiceOn: make(map[uuid.UUID]bool), voiceEpoch: uuid.New(),
 	}
 }
 
@@ -262,6 +266,8 @@ func (r *room) handle(cmd any) {
 		r.command(c)
 	case moderatedCmd:
 		r.moderated(c)
+	case voiceCleanedCmd:
+		r.voiceCleaned(c)
 	case chatCmd:
 		r.chat(c)
 	case seatCmd:
@@ -338,6 +344,7 @@ func (r *room) add(c *conn, adm Admission, x, y int, typ string) error {
 		stride: newStride(r.mapd.WalkSpeed, r.now()),
 		seen:   map[uuid.UUID]bool{},
 	}
+	r.initVoice(m)
 	r.members[c.userID] = m
 	r.broadcast(newOut(TypeJoined, m.p), c.userID)
 	// joined includes a position. Track it as seen even outside AOI so the
@@ -362,6 +369,10 @@ func (r *room) sendWelcome(m *member, typ string) {
 		SelfID: m.p.ID, RoomID: r.id, MapKey: r.mapd.Key, RoomName: r.name, BuildingKey: r.buildingKey,
 		Participants: make([]Participant, 0, len(r.members)), AllChatEnabled: r.allChat,
 		Locked: r.locked, Muted: r.muted[m.p.ID], VoiceBroadcast: r.broadcasters(),
+		VoiceIdentity: m.voiceIdentity, VoiceChannel: m.voiceChannel,
+	}
+	if m.p.Role == "teacher" || m.p.Role == "admin" {
+		w.VoicePending = r.pendingVoice()
 	}
 	for id, o := range r.members {
 		w.Participants = append(w.Participants, o.p)
@@ -411,6 +422,9 @@ func (r *room) depart(c *conn, check func(Participant) error) (Participant, erro
 
 // remove deletes an avatar and tells everyone else.
 func (r *room) remove(id uuid.UUID) {
+	if m := r.members[id]; m != nil {
+		r.revokeVoice(m, nil)
+	}
 	delete(r.members, id)
 	for _, o := range r.members {
 		delete(o.seen, id)
@@ -419,11 +433,7 @@ func (r *room) remove(id uuid.UUID) {
 	r.hub.forget(id, r.id)
 	if !r.campus {
 		r.hub.record(sessionJob{kind: jobLeave, roomID: r.id, userID: id, at: r.now()})
-		// Leaving (travel, grace expiry, kick) also ends the user's voice here.
-		room := r.id
-		r.hub.voiceCall("remove", room, id, func(ctx context.Context, v VoiceAdmin) error {
-			return v.Remove(ctx, room.String(), id.String())
-		})
+
 	}
 	if r.voiceOn[id] {
 		delete(r.voiceOn, id)
@@ -483,6 +493,9 @@ func (r *room) move(c *conn, seq uint64, mv MoveMsg) {
 		c.sendError(ErrorMsg{Code: CodeMoveRejected, Message: "Posisi ditolak", Seq: seq, X: &x, Y: &y})
 		return
 	}
+	if !r.voicePosition(m, mv.X, mv.Y, mv.Dir) {
+		return
+	}
 	if mv.X != m.p.X || mv.Y != m.p.Y || mv.Dir != m.p.Dir {
 		m.p.X, m.p.Y, m.p.Dir = mv.X, mv.Y, mv.Dir
 		m.dirty = true
@@ -498,6 +511,7 @@ func (r *room) tick(now time.Time) (stopped bool) {
 		}
 	}
 
+	r.retryVoice(now)
 	r.updateZones()
 
 	for _, recv := range r.members {
@@ -547,7 +561,7 @@ func (r *room) tick(now time.Time) (stopped bool) {
 		r.hub.setStats(r.id, stats)
 	}
 
-	if r.people() > 0 {
+	if r.people() > 0 || len(r.voicePending) > 0 {
 		r.emptySince = time.Time{}
 		return false
 	}
@@ -737,6 +751,9 @@ func (r *room) seat(c seatCmd) {
 	}
 	r.spawnN++
 	m.seatAt = now
+	if !r.voicePosition(m, x, y, DirDown) {
+		return
+	}
 	m.p.X, m.p.Y, m.p.Dir = x, y, DirDown
 	m.stride = newStride(r.mapd.WalkSpeed, now)
 	m.dirty = true

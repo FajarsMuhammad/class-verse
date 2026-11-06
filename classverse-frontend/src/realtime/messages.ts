@@ -84,6 +84,9 @@ export interface WelcomeMsg {
   muted?: boolean
   // staff whose voice reaches the whole room (slice 9)
   voice_broadcast?: string[]
+  voice_identity?: string
+  voice_channel?: string
+  voice_pending?: string[]
 }
 export interface LeftMsg {
   id: string
@@ -152,6 +155,9 @@ export interface RoomStateMsg {
   locked?: boolean
   muted?: boolean
   voice_broadcast?: string[]
+  voice_identity?: string
+  voice_channel?: string
+  voice_pending?: string[]
 }
 
 export interface ServerMessages {

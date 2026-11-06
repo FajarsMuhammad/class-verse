@@ -612,27 +612,36 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
   positions; building counts reuse `buildings`, room rows reuse the rooms list (`people`, `live`).
 - *Teacher.* Phone keeps the announcement tab and the teacher panel (collapsible).
 
-## Slice 9 — Voice (V9-01…V9-07 approved; V9-03 revised by the user)
+## Slice 9 — Voice (self-hosted MVP; implemented, awaiting review)
 
-- *Where.* Classroom/garden only; campus and mode HP stay text-only. One LiveKit room per Kelasverse room
-  (name = room UUID), identity = user UUID, name = display name.
-- *Channels (V9-03).* No distance volume. Channel = the zone the avatar stands in, or "area umum" outside every zone.
-  Everyone in the same channel is heard at full volume, plus staff in `voice_broadcast`. Enforced by the client
-  (`autoSubscribe: false`, subscriptions resynced every 250 ms from server positions). Accepted risk: a modified
-  client inside the same room could subscribe to other channels of that room.
-- *Token.* `POST /api/rooms/{room_id}/voice-token` → `{url, token}` only while the caller has a live WS connection
-  in that classroom/garden (hub probe); otherwise 404. 503 `voice_unavailable` when LiveKit is not configured.
-  HS256 JWT signed with the LiveKit secret, claims as `livekit/protocol/auth`: `roomJoin`, `room`, `canSubscribe`,
-  `canPublish` (false while muted), `canPublishSources: [microphone]`, no data/metadata. TTL 2 minutes (self-host has
-  no revocation; LiveKit refreshes connected participants). `Cache-Control: no-store`.
-- *Moderation.* After a mute/unmute audit commits, the hub voice worker calls RoomService `UpdateParticipant`
-  (`can_publish`). Every removal from a classroom/garden (travel, grace expiry, kick) calls `RemoveParticipant`.
-  Calls are best effort, logged on failure, never block a room; `not_found` (already gone) is success.
+The user approved server-enforced zone audio without distance attenuation, confirmed eviction with visible pending/failure handling, and self-hosted LiveKit. `docs/spec.md` records the requirements.
+
+- *Where.* Classroom/garden only; campus and mode HP stay text-only. Each actor incarnation has a random epoch.
+  Zone room names are `<room UUID>:<epoch>:zone:<zone key>` (outside zones: `general`); broadcast room is
+  `<room UUID>:<epoch>:broadcast`. A new incarnation never reuses the audio rooms of a crashed process.
+- *Channels.* Full volume within a zone. Room-scoped signed grants enforce isolation in LiveKit. Browser connects
+  to zone and broadcast rooms with `autoSubscribe: true`; there is no client distance/subscription filter.
+  Only an active staff broadcaster can publish in the broadcast room; while broadcasting, zone publication is disabled.
+- *Token/admission.* `POST /api/rooms/{room_id}/voice-token` returns `{url, token, broadcast_token, identity, channel}`
+  only for a live WS member (404 otherwise); 409 `voice_pending` while prior media eviction is outstanding,
+  503 `voice_unavailable` when disabled. Identity is `<user UUID>:<random admission UUID>`, changed after every revocation.
+  Microphone-only HS256 grants, no data/metadata, TTL 2 minutes, `Cache-Control: no-store`. TTL alone is not revocation.
+  Gateway checks signature, issuer, expiry, current actor identity/channel and publish permission on every join/reconnect,
+  including refreshed LiveKit tokens. RoomService endpoints and alternate authorization headers are not forwarded publicly.
+- *Transitions/moderation.* Cross-zone movement waits for prior media eviction before authoritative destination is committed;
+  no room goroutine blocks on network I/O. Gather/seat follow the same boundary. Broadcast toggles and audited mute/unmute
+  revoke the old admission and reconnect with new grants. Travel/kick revoke immediately; the hub blocks new voice admissions
+  across room actors until cleanup completes. Kick keeps its existing audited ban behavior.
+  Room retains cleanup jobs across failures and queue backpressure, retries each second, and exposes `voice_pending` IDs to staff.
+  Worker removes zone and broadcast participants and confirms absence via `GetParticipant`; failure is never reported as success.
+  Gateway handshake and eviction share an admission lock, preventing an in-flight handshake from landing after absence confirmation.
+  `welcome`/`room_state` carry personal `voice_identity`, `voice_channel`, and staff-facing `voice_pending`.
+  During a control API outage an existing media connection may remain live: staff sees unconfirmed eviction until recovery.
 - *Broadcast voice.* `cmd voice_broadcast` / `voice_broadcast_off` (staff, not campus, not audited). The room keeps
   the set; `welcome` and `room_state` carry `voice_broadcast: [user_id]`. Leaving the room clears it.
-- *Config.* `LIVEKIT_URL` (`ws(s)://`), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; all empty disables voice (mic hidden).
-  RoomService base URL is derived from `LIVEKIT_URL` (`ws`→`http`). Dev: `livekit/livekit-server:v1.9 --dev` in
-  `compose.yaml` (7880 signal/API, 7881 TCP, 7882/udp media). Production self-host vs Cloud is decided at deploy.
+- *Config.* `LIVEKIT_URL` (private `ws(s)://` upstream), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; all empty disables voice (mic hidden).
+  Public signaling uses `FRONTEND_URL/voice` through Go's admission gateway; the LiveKit signaling/API port must not be publicly reachable. RoomService base URL is derived from `LIVEKIT_URL` (`ws`→`http`). Dev: `livekit/livekit-server:v1.9.12 --dev` in
+  `compose.yaml` (loopback-only 7880 signal/API, 7881 TCP, 7882/udp media). MVP uses self-hosted LiveKit; production ingress/TLS remains to be configured.
   No new Go dependency; frontend `livekit-client` is a lazy chunk loaded only in a room.
 - *UI.* Mic 52×52 round Tinta (`aria-pressed`, off on entry and after travel), status line naming the heard channel,
   teacher switch "Bicara ke semua ruang", "Aktifkan suara" when autoplay is blocked, `--color-speaking` ring on

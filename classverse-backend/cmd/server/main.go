@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -129,12 +130,15 @@ func (o roomOccupancy) WhileEmpty(ctx context.Context, roomID uuid.UUID, fn func
 // voicePresence adapts the hub to voice.Presence.
 type voicePresence struct{ *realtime.Hub }
 
-func (p voicePresence) VoiceMember(ctx context.Context, roomID, userID uuid.UUID) (string, bool, error) {
+func (p voicePresence) VoiceMember(ctx context.Context, roomID, userID uuid.UUID) (voice.Member, error) {
 	m, err := p.Hub.VoiceMember(ctx, roomID, userID)
-	if errors.Is(err, realtime.ErrNotInRoom) {
-		return "", false, voice.ErrNotPresent
+	if errors.Is(err, realtime.ErrVoicePending) {
+		return voice.Member{}, voice.ErrPending
 	}
-	return m.Name, m.Muted, err
+	if errors.Is(err, realtime.ErrNotInRoom) {
+		return voice.Member{}, voice.ErrNotPresent
+	}
+	return voice.Member{Name: m.Name, Muted: m.Muted, Identity: m.Identity, Channel: m.Channel, Broadcasting: m.Broadcasting}, err
 }
 
 // newApp wires every feature.
@@ -188,7 +192,16 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	} else {
 		log.Info("voice disabled: LIVEKIT_URL not set")
 	}
-	voiceHandler := voice.NewHandler(voice.NewService(voicePresence{hub}, issuer), log)
+	signalURL := "ws" + strings.TrimPrefix(cfg.FrontendURL, "http") + "/voice"
+	voiceHandler := voice.NewHandler(voice.NewService(voicePresence{hub}, issuer, signalURL), log)
+	var signaling http.Handler
+	if lk != nil {
+		signaling, err = voice.NewSignaling(lk, voicePresence{hub}, cfg.FrontendURL)
+		if err != nil {
+			_ = hub.Shutdown(ctx)
+			return nil, err
+		}
+	}
 
 	return &app{
 		api: func(r chi.Router) {
@@ -203,7 +216,12 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				voiceHandler.Routes(r)
 			})
 		},
-		ws:  gateway.Routes,
+		ws: func(r chi.Router) {
+			gateway.Routes(r)
+			if signaling != nil {
+				r.Handle("/voice/*", signaling)
+			}
+		},
 		hub: hub,
 	}, nil
 }

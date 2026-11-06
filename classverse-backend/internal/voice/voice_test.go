@@ -97,6 +97,11 @@ func TestRoomServiceCalls(t *testing.T) {
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		got = append(got, call{r.URL.Path, body, parse(t, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), "secret")})
+		if strings.HasSuffix(r.URL.Path, "/GetParticipant") && status == http.StatusOK {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"code":"not_found"}`)
+			return
+		}
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, `{"code":"`+code+`"}`)
 	}))
@@ -137,8 +142,8 @@ type fakePresence struct {
 	err   error
 }
 
-func (f fakePresence) VoiceMember(context.Context, uuid.UUID, uuid.UUID) (string, bool, error) {
-	return f.name, f.muted, f.err
+func (f fakePresence) VoiceMember(_ context.Context, roomID, userID uuid.UUID) (Member, error) {
+	return Member{Name: f.name, Muted: f.muted, Identity: userID.String() + ":admission", Channel: roomID.String() + ":zone:general"}, f.err
 }
 
 func TestTokenEndpoint(t *testing.T) {
@@ -168,7 +173,7 @@ func TestTokenEndpoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := chi.NewRouter()
 			r.Use(auth.RequireUser(tokens, log))
-			NewHandler(NewService(tt.p, tt.issuer), log).Routes(r)
+			NewHandler(NewService(tt.p, tt.issuer, "ws://app.test/voice"), log).Routes(r)
 			req := httptest.NewRequest(http.MethodPost, "/rooms/"+tt.room+"/voice-token", nil)
 			req.Header.Set("Authorization", "Bearer "+access)
 			rec := httptest.NewRecorder()
@@ -189,7 +194,7 @@ func TestTokenEndpoint(t *testing.T) {
 				return
 			}
 			c := parse(t, body.Token, "secret")
-			if body.URL != "ws://lk" || c.Name != "Ani" || *c.Video.CanPublish == tt.p.muted || c.Video.Room != tt.room {
+			if body.URL != "ws://app.test/voice" || c.Name != "Ani" || *c.Video.CanPublish == tt.p.muted || c.Video.Room != tt.room+":zone:general" {
 				t.Errorf("url=%s claims=%+v", body.URL, c.Video)
 			}
 			if rec.Header().Get("Cache-Control") != "no-store" {

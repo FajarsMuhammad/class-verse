@@ -328,8 +328,14 @@ paths:
       operationId: createVoiceToken
       description: >
         Token LiveKit (2 menit) untuk voice ruang kelas/taman. Hanya untuk user yang sedang terhubung lewat
-        WebSocket di ruang itu; publish hanya mikrofon, ditolak selama dibisukan pengajar (slice 9).
+        WebSocket di ruang itu. Token zona dan broadcast terpisah, admission dirotasi setelah perpindahan/moderasi;
+        publish hanya mikrofon, ditolak selama dibisukan pengajar (slice 9).
       responses:
+        "409":
+          description: voice_pending; pemutusan admission sebelumnya belum terkonfirmasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "200":
           description: Token voice
           content:
@@ -664,10 +670,13 @@ components:
       enum: [open, reviewed, dismissed]
     VoiceToken:
       type: object
-      required: [url, token]
+      required: [url, token, broadcast_token, identity, channel]
       properties:
-        url: { type: string, description: "URL ws(s):// LiveKit untuk browser" }
+        url: { type: string, description: "URL ws(s):// gerbang izin voice publik untuk browser; bukan alamat LiveKit privat" }
         token: { type: string }
+        broadcast_token: { type: string }
+        identity: { type: string }
+        channel: { type: string }
     CreateReportRequest:
       type: object
       additionalProperties: false

@@ -1,67 +1,57 @@
 # Slice 9 — Voice (M2, US-09, US-10 voice, US-12 mute)
 
-Status: **done; awaiting user review**. V9-01…V9-07 approved (V9-03 revised by the user).
-Branch: `slice-9-voice`, based on `origin/main` `365aad7` (slice 8 merged). Web only; mode HP voice deferred with phone polish.
+Status: **implemented; local verification complete; awaiting user review**.
+Branch: `slice-9-voice`, based on `origin/main` `365aad7` (slice 8 merged).
+User approved room/zone audio without distance attenuation, server-enforced isolation, confirmed eviction with visible failure handling, and **self-hosted LiveKit for the MVP**. Mobile voice remains deferred.
 
-References: docs/spec.md (US-09, US-10, US-12, M2 row, security 6 "voice tidak direkam", NFR bandwidth),
-docs/design.md (ADR-006 LiveKit, architecture, `POST /api/rooms/{room_id}/voice-token`), docs/visual.md
-(mic 52×52 in room toolbar, speaking ring `--color-speaking`).
+References: `docs/spec.md`, `docs/design.md` slice 9, `docs/visual.md`.
 
-## Existing requirements
+## Decisions and implementation
 
-- Volume falls with distance and is silent outside the radius; mic off on entry; clear mute button; speaking icon.
-- Same zone shares voice regardless of distance. Teacher broadcast voice reaches the whole room. Teacher mute.
-- Audio is relayed live only, never recorded. Go only issues tokens and calls LiveKit for mute/kick.
+| ID | Behavior |
+| --- | --- |
+| V9-01 | Voice in classroom/garden only. Each actor incarnation has a random epoch; zone rooms `<room UUID>:<epoch>:zone:<zone key>` and room-wide broadcast `<room UUID>:<epoch>:broadcast`. Identity `<user UUID>:<admission UUID>`. New actor epochs prevent old media sessions hearing a restarted room. |
+| V9-02 | Authenticated `POST /api/rooms/{room_id}/voice-token` requires live WS membership; returns `{url, token, broadcast_token, identity, channel}`. 404 for nonmembers/campus, 409 `voice_pending` during eviction, 503 `voice_unavailable` when disabled. Microphone-only HS256 grants, 2-minute TTL, no data/own metadata, no-store. TTL does not revoke active connections. |
+| V9-03 | Full-volume audio within the current zone; outside all zones is `general`. LiveKit room grants enforce isolation; browser uses auto-subscription inside its admitted rooms, not a distance filter. Cross-zone authoritative movement waits for old media eviction. |
+| V9-04 | Staff `voice_broadcast` / `voice_broadcast_off` rotates admission. Only active staff broadcasters can publish in the broadcast room; zone publish disabled while broadcasting. Leaving clears broadcast. |
+| V9-05 | Audited mute/unmute and kick revoke old admissions. Worker removes both connections and confirms absence with `GetParticipant`. Room retains failed/queue-full jobs and retries each second. Staff sees pending eviction; no false success. Hub prevents new voice admissions during cleanup even after travel to another room. |
+| V9-06 | Self-hosted LiveKit v1.9.12 for MVP. `LIVEKIT_URL` is private upstream. Public signaling goes through `FRONTEND_URL/voice` and Go. Direct public port 7880 is forbidden. Compose binds it to loopback; media 7881/TCP and 7882/UDP remain accessible. No new Go dependency. |
+| V9-07 | Mic off on entry/travel; accessible mic toggle, heard-channel label, speaking ring, staff broadcast switch, autoplay fallback, inline mic permission errors. Mic intent retained over confirmed same-room channel changes, not mute or travel. |
 
-## Decisions proposed for approval
+## Security boundary
 
-| ID | Proposed behavior |
-| V9-01 | **Where.** Voice only in classroom/garden. Campus stays text-only in M2 (200 people, no session/moderation). One LiveKit room per Kelasverse room, name = room UUID, identity = user UUID, display name from profile. |
-| V9-02 | **Token.** `POST /api/rooms/{room_id}/voice-token` issues a token only if the hub says the caller is currently a connected member of that room actor. So door, lock, ban, schedule and Ruang Guru are already enforced by WS admission. Grant: `roomJoin`, `canSubscribe`, `canPublishSources: [microphone]` (`canPublish` false while muted), no data/metadata, TTL 2 min (self-host has no revocation; the client fetches a token right before connecting and LiveKit refreshes it while connected). Response `{url, token}`. 404 when not in the room, 503 `voice_unavailable` when LiveKit is not configured. |
-| V9-03 | **Who hears whom (revised by user: no distance volume).** Voice channel = the zone the avatar stands in, or "area umum" when outside every zone. A listener hears everyone in the same channel at full volume, plus active broadcasters (V9-04). Enforced by the client: `autoSubscribe: false`, subscribe only to tracks whose speaker is in the listener's channel (from server positions + map zones). Accepted risk: a modified client in the same room could subscribe to other channels of that room; all are admitted members of one moderated room and nothing is recorded. |
-| V9-04 | **Teacher broadcast voice.** New `cmd {name: "voice_broadcast"}` / `"voice_broadcast_off"` (teacher/admin, room only). Room keeps the broadcaster set and adds `voice_broadcast: [ids]` to `room_state`/`welcome`. Not audited (not moderation). Cleared when the teacher leaves the room. |
-| V9-05 | **Teacher mute covers voice.** Existing mute/unmute (C7-01) also sets LiveKit permission `can_publish=false/true` via `UpdateParticipant`, run on the hub worker after the audit commit; LiveKit failure is logged and does not undo the chat mute (the token endpoint also refuses publish while muted). Kick and leaving the room call `RemoveParticipant` (best effort, async), so an evicted client cannot keep listening. |
-| V9-06 | **Config and dev.** `LIVEKIT_URL` (browser `ws(s)://`), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. All empty means voice disabled (UI hides the mic). Dev: `livekit/livekit-server --dev` added to `compose.yaml` (port 7880, dev key pair in `.env.example`). Production self-host vs Cloud is decided at deploy. Backend: no new dependency; the LiveKit token is an HS256 JWT (existing `golang-jwt/jwt/v5`, claims as in `livekit/protocol/auth`) and RoomService is Twirp JSON over `net/http`. Frontend: `livekit-client`, loaded lazily only in classroom/garden. |
-| V9-07 | **UI.** Mic button 52×52 round Tinta in the room toolbar above chat, `aria-label` "Nyalakan mikrofon"/"Matikan mikrofon", `aria-pressed`. Mic always off on entry and after travel. Speaking avatars get a `--color-speaking` ring on the map (LiveKit active speakers). Teacher toggle "Bicara ke semua ruang". Muted participant sees a disabled mic with the existing mute notice. Mic permission denied → inline message, chat unaffected. |
+- Gateway exposes only `/voice/rtc`, `/voice/rtc/v1` and their validation routes. Never forwards RoomService.
+- Signature, issuer, expiration, origin, live membership, actor admission identity/channel and publish permission checked on every join/reconnect, including refreshed LiveKit tokens. Alternate Authorization/Cookie headers stripped.
+- Handshake and eviction share an admission lock: old in-flight handshakes finish before eviction/absence confirmation. Network I/O never runs on a room actor.
+- Cross-zone movement holds the authoritative position until old audio is removed; failed transitions stay pending. Gather/seat use this gate too.
+- `welcome`/`room_state`: personal `voice_identity`, `voice_channel`; staff receives `voice_pending` IDs. Empty identity means admission revoked/pending. No client may infer permissions from avatar coordinates.
+- Existing media may stay connected during a control API outage. UI says **not confirmed**, retries after recovery, and prevents fresh admission. A network failure cannot be honestly reported as confirmed disconnection.
+- MVP state lives in the single process. On restart, new actor epochs isolate fresh audio from old media rooms; old admissions cannot rejoin. Durable cross-process cleanup and HA are not implemented.
 
-## Plan (after approval)
+## Verification
 
-1. Design, OpenAPI (`voice-token`), `message.go`/`messages.ts` (`voice_broadcast` cmd, `RoomStateMsg.VoiceBroadcast`); compose + env.
-2. Backend `internal/voice` (handler/service; token issuer + LiveKit client behind a consumer interface), hub presence check,
-   mute/kick/leave hooks on the hub worker, broadcast set in the room. Tests: token denied when not present / campus /
-   unconfigured, grant contents (publish off when muted, mic only, TTL), broadcast cmd authorization and state,
-   mute calls UpdateParticipant after audit only, kick/leave call RemoveParticipant.
-3. Frontend: `realtime/voice.ts` (pure `audible(world, map, selfZone, broadcasters) → Set<id>`, unit-tested),
-   `useVoice` (connect/disconnect per room, subscribe/volume each 200 ms, mic toggle), mic + broadcast UI, speaking ring.
-4. Checks: `make test && make lint`; `npm run lint && npm run test:unit -- --run && npm run build`.
-5. Chrome with fake media (`--use-fake-device-for-media-stream`) against local LiveKit: two participants hear each other
-   near, not far; same zone far apart hear; teacher broadcast heard by all; mute stops publishing; kick drops audio.
-6. User review before commit.
+- Backend `make test` (race), `make lint` pass; measured package coverage: voice **88.5%**, realtime **80.3%**. Voice tests cover token grants, invalid/admin/forged/expired tokens, old/foreign admissions, student broadcast restriction, WebSocket binary proxy/replay rejection, confirmation probe failures, mute after audit, transition hold/retry and full-queue retention.
+- Frontend lint, **96 unit tests / 19 files**, and build pass. `useVoice.spec.ts` protects against reconnecting both voice rooms on unrelated chat updates; VoiceBar covers unconfirmed eviction warning. Removed obsolete client-side `audible` filter/tests.
+- Chrome with fake microphones and real local LiveKit: **21/21 checks** in `/tmp/kv-e2e/voice.mjs`: mic off, general audio, table isolation, same table far corners, teacher broadcast on/off, mute/unmute, kick audio removal, old zone token after transition rejected, old zone and broadcast tokens after kick rejected. No page runtime errors; expected SDK reconnect errors during admission revocation are not counted as application failures.
+- Attack probe `/tmp/kv-e2e/voice-attack.mjs`: modified client directly requests another zone's track SID; **no audio delivered**.
+- Outage probe `/tmp/kv-e2e/voice-outage.mjs`: stop local LiveKit before kick; staff sees unconfirmed eviction, old token denied immediately, restarting LiveKit triggers retry and clears pending only after absence confirmation.
+- Dev Compose checked: LiveKit signaling port bound to `127.0.0.1:7880`, not all interfaces.
 
-## Deliberately out of scope
+Temporary browser scripts are outside the repository and use disposable local test accounts. They must not print raw token URLs or credentials.
 
-- Mode HP voice, campus voice, stereo panning/spatial WebAudio, push-to-talk, device picker, noise suppression settings.
+## Remaining limits
 
-## Result
+- Production VPS ingress/firewall/TLS/TURN and real-device audio quality not verified. Must keep port 7880 private and route all public signaling through Go; no alternate ingress bypass.
+- No mobile/campus voice, recording, spatial panning, device picker, push-to-talk, or noise-suppression settings.
+- Failed cleanup jobs retry in memory; shutdown/crash is not durable eviction confirmation. New room epochs prevent stale sessions from joining future actor audio.
+- `livekit-client` remains a lazy ~148 kB gzip chunk; existing Phaser large-chunk warning remains.
+- User authorized a local commit. Push and production deployment remain pending.
 
-- Backend: package `voice` (LiveKit token signer + RoomService Twirp client on `net/http`, handler/service with a
-  `Presence` consumer interface), `Hub.VoiceMember`, `Hub.SetVoice` with a voice worker, mute → `UpdateParticipant`
-  after audit, removal → `RemoveParticipant`, `voice_broadcast` set in the room, OpenAPI `voice-token`, config,
-  compose `livekit`. Tests: token claims/TTL/mic only/no publish while muted, RoomService calls (paths, admin grant,
-  `not_found` ok, 401 fails), handler (member, muted, not in room, bad id, disabled 503, error 500, no-store),
-  realtime (mute follows audit, not on failure; kick/leave remove; broadcast state + welcome + cleared on leave;
-  campus forbidden; VoiceMember campus/stranger/other room). Signature verified against real LiveKit (wrong secret → 401).
-- Frontend: `voice.ts` (`channelAt`, `audible`), `useVoice` (lazy `livekit-client`, manual subscriptions, mic, speaking,
-  autoplay), `VoiceBar.vue`, speaking ring in `CampusScene`, `roomApi.voiceToken`, mirrored types.
-  Tests: `voice.spec.ts`, `VoiceBar.spec.ts`.
-- Checks: `go test -race ./...` (12 packages ok), `make lint` 0 issues; frontend lint ok, 99 tests, build ok
-  (`livekit-client` own chunk 148 kB gzip; Phaser chunk warning remains).
-- Chrome (3 desktop users, fake mic, local LiveKit, `/tmp/kv-e2e/voice.mjs`), 18/18 pass: mic off on entry; area
-  umum hears area umum; table separates from area umum; same table far corners hear each other; teacher outside does
-  not hear the table; teacher broadcast heard at the table and stops when off; teacher mute disables the mic and
-  stops audio, unmute restores; kick removes audio both ways; no runtime errors.
+## Sources
 
-## Known limits
+- https://docs.livekit.io/reference/other/roomservice-api/
+- https://raw.githubusercontent.com/livekit/livekit/v1.9.12/pkg/rtc/room.go
+- https://raw.githubusercontent.com/livekit/livekit/v1.9.12/pkg/rtc/subscriptionmanager.go
+- https://raw.githubusercontent.com/livekit/livekit/v1.9.12/pkg/service/roommanager.go
 
-- Mode HP and campus have no voice. Channel enforcement is client-side (V9-03 accepted risk).
-- Production LiveKit (TURN/TLS, self-host vs Cloud) not set up; dev compose only.
+`UpdateSubscriptions` is not an access-control allowlist: client/admin requests share the subscription path; `canSubscribe: false` blocks both. Publisher-controlled subscription permission is not authoritative against a modified publisher. Separate rooms plus server admission are used instead.

@@ -4,23 +4,14 @@ import type { Room as LkRoom } from 'livekit-client'
 import { errorMessage } from '@/api/client'
 import { roomApi } from '@/api/rooms'
 import type { ChatState } from './chat'
-import type { MapData } from './mapdata'
 import type { WelcomeMsg } from './messages'
-import { audible } from './voice'
-import type { World } from './world'
 
 export type VoiceStatus = 'off' | 'connecting' | 'on' | 'unavailable' | 'error'
 
-// Subscriptions follow positions from WS snapshots; resync this often.
-const SYNC_MS = 250
-
-// useVoice joins the LiveKit room of the current classroom/garden (never the
-// campus) and keeps subscriptions to the user's voice channel (V9-03).
-// livekit-client is loaded only when a room with voice is entered.
+// LiveKit room grants enforce isolation. Never infer voice permissions from
+// client positions: actor-issued identity changes after every revocation.
 export function useVoice(opts: {
   current: Ref<WelcomeMsg | null>
-  map: Ref<MapData | null>
-  world: World
   chat: ChatState
   chatVersion: Ref<number>
 }) {
@@ -29,112 +20,137 @@ export function useVoice(opts: {
   const micOn = ref(false)
   const speaking = ref<Set<string>>(new Set())
   const needsAudioStart = ref(false)
-  let lk: LkRoom | null = null
-  let timer: ReturnType<typeof setInterval> | undefined
+  let rooms: LkRoom[] = []
   let generation = 0
-  // Audio elements per remote track sid. The SDK may detach before emitting
-  // TrackUnsubscribed, so elements are removed from this map, not detach().
+  let wantedMic = false
+  let retry: ReturnType<typeof setTimeout> | undefined
+  let stopped = false
   const audio = new Map<string, HTMLMediaElement>()
-
-  function dropAudio() {
-    for (const el of audio.values()) el.remove()
-    audio.clear()
-    speaking.value = new Set()
-  }
+  const active = new Map<LkRoom, string[]>()
 
   async function leave() {
     generation++
-    clearInterval(timer)
-    timer = undefined
+    clearTimeout(retry)
+    const old = rooms
+    rooms = []
     micOn.value = false
     needsAudioStart.value = false
-    dropAudio()
-    const old = lk
-    lk = null
-    await old?.disconnect()
+    for (const el of audio.values()) el.remove()
+    audio.clear()
+    active.clear()
+    speaking.value = new Set()
+    await Promise.all(old.map((room) => room.disconnect()))
   }
 
-  async function join(roomId: string) {
+  async function join(roomId: string, identity: string) {
     const gen = ++generation
     status.value = 'connecting'
     error.value = ''
+    const pending: LkRoom[] = []
     try {
       const [{ Room, RoomEvent, Track }, token] = await Promise.all([
         import('livekit-client'),
         roomApi.voiceToken(roomId),
       ])
       if (gen !== generation) return
-      const room = new Room({ adaptiveStream: false })
-      room
-        .on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
-          if (track.kind !== Track.Kind.Audio) return
-          audio.get(pub.trackSid)?.remove()
-          const el = track.attach()
-          el.dataset.voice = participant.identity
-          document.body.appendChild(el)
-          audio.set(pub.trackSid, el)
-        })
-        .on(RoomEvent.TrackUnsubscribed, (track, pub) => {
-          for (const el of track.detach()) el.remove()
-          audio.get(pub.trackSid)?.remove()
-          audio.delete(pub.trackSid)
-        })
-        .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-          speaking.value = new Set(speakers.map((s) => s.identity))
-        })
-        .on(RoomEvent.AudioPlaybackStatusChanged, () => {
-          needsAudioStart.value = !room.canPlaybackAudio
-        })
-        .on(RoomEvent.Disconnected, () => {
-          // Kick or leaving the room on the server side: stop playing everything.
-          if (lk === room) {
-            lk = null
-            clearInterval(timer)
-            timer = undefined
-            micOn.value = false
-            dropAudio()
-            status.value = 'off'
-          }
-        })
-      await room.connect(token.url, token.token, { autoSubscribe: false })
-      if (gen !== generation) {
-        await room.disconnect()
+      if (token.identity !== identity) {
+        scheduleRetry()
         return
       }
-      lk = room
+      for (const grant of [token.token, token.broadcast_token]) {
+        const room = new Room({ adaptiveStream: false })
+        pending.push(room)
+        room
+          .on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
+            if (gen !== generation || track.kind !== Track.Kind.Audio) return
+            audio.get(pub.trackSid)?.remove()
+            const el = track.attach()
+            el.dataset.voice = participant.identity.split(':')[0]
+            document.body.appendChild(el)
+            audio.set(pub.trackSid, el)
+          })
+          .on(RoomEvent.TrackUnsubscribed, (track, pub) => {
+            for (const el of track.detach()) el.remove()
+            audio.get(pub.trackSid)?.remove()
+            audio.delete(pub.trackSid)
+          })
+          .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+            if (gen !== generation) return
+            active.set(
+              room,
+              speakers.map((p) => p.identity.split(':')[0]!),
+            )
+            speaking.value = new Set([...active.values()].flat())
+          })
+          .on(RoomEvent.AudioPlaybackStatusChanged, () => {
+            needsAudioStart.value = pending.some((r) => !r.canPlaybackAudio)
+          })
+          .on(RoomEvent.Disconnected, () => {
+            if (gen === generation && rooms.includes(room)) {
+              void leave()
+              status.value = 'error'
+              error.value = 'Suara terputus. Mencoba menyambung kembali…'
+              scheduleRetry()
+            }
+          })
+        await room.connect(token.url, grant, { autoSubscribe: true })
+        if (gen !== generation) {
+          await Promise.all(pending.map((r) => r.disconnect()))
+          return
+        }
+      }
+      rooms = pending
       status.value = 'on'
-      needsAudioStart.value = !room.canPlaybackAudio
-      sync()
-      timer = setInterval(sync, SYNC_MS)
+      needsAudioStart.value = rooms.some((r) => !r.canPlaybackAudio)
+      if (wantedMic && !opts.chat.muted) await setMic(true)
     } catch (e) {
+      await Promise.all(pending.map((r) => r.disconnect()))
       if (gen !== generation) return
       const code = (e as { code?: string }).code
       status.value = code === 'voice_unavailable' ? 'unavailable' : 'error'
-      error.value = code === 'voice_unavailable' ? '' : `Suara tidak tersambung: ${errorMessage(e)}`
+      error.value = code === 'voice_unavailable' ? '' : `Suara belum tersambung: ${errorMessage(e)}`
+      if (code !== 'voice_unavailable' && code !== 'not_found') scheduleRetry()
     }
   }
 
-  // sync subscribes to exactly the audible speakers' microphone tracks.
-  function sync() {
-    const map = opts.map.value
-    if (!lk || !map) return
-    const want = audible(map, opts.world, opts.chat.zone.key, opts.chat.voiceBroadcast)
-    for (const p of lk.remoteParticipants.values()) {
-      const on = want.has(p.identity)
-      for (const pub of p.audioTrackPublications.values()) {
-        if (pub.isDesired !== on) pub.setSubscribed(on)
-      }
-    }
+  function scheduleRetry() {
+    clearTimeout(retry)
+    retry = setTimeout(() => {
+      if (!stopped) void reconnect()
+    }, 1500)
   }
 
-  async function toggleMic() {
-    if (!lk) return
-    const next = !micOn.value
-    error.value = ''
+  async function reconnect() {
+    const cur = opts.current.value
+    const identity = opts.chat.voiceIdentity
+    const closing = leave()
+    const gen = generation
+    await closing
+    if (gen !== generation) return
+    if (stopped || !cur || cur.map_key === 'campus') {
+      status.value = 'off'
+      return
+    }
+    if (!identity) {
+      status.value = 'connecting'
+      error.value = 'Menunggu konfirmasi pemutusan suara sebelumnya…'
+      return
+    }
+    await join(cur.room_id, identity)
+  }
+
+  async function setMic(on: boolean) {
+    const gen = generation
     try {
-      await lk.localParticipant.setMicrophoneEnabled(next)
-      micOn.value = next
+      const broadcast = !!opts.chat.selfId && opts.chat.voiceBroadcast.includes(opts.chat.selfId)
+      // One publisher only; broadcast listeners cannot publish in this room.
+      const room = rooms[broadcast ? 1 : 0]
+      if (!room) return
+      await room.localParticipant.setMicrophoneEnabled(on)
+      if (gen === generation) micOn.value = on
     } catch (e) {
+      if (gen !== generation) return
+      wantedMic = false
       micOn.value = false
       error.value =
         (e as Error).name === 'NotAllowedError'
@@ -143,35 +159,37 @@ export function useVoice(opts: {
     }
   }
 
+  async function toggleMic() {
+    wantedMic = !micOn.value
+    error.value = ''
+    await setMic(wantedMic)
+  }
   async function startAudio() {
-    await lk?.startAudio()
-    needsAudioStart.value = !(lk?.canPlaybackAudio ?? true)
+    try {
+      await Promise.all(rooms.map((r) => r.startAudio()))
+      needsAudioStart.value = rooms.some((r) => !r.canPlaybackAudio)
+    } catch {
+      error.value = 'Suara belum dapat diputar. Coba aktifkan suara lagi.'
+    }
   }
 
-  // A teacher mute removes publish permission server-side; reflect it here.
-  watch(opts.chatVersion, () => {
-    if (opts.chat.muted && micOn.value) {
-      micOn.value = false
-      void lk?.localParticipant.setMicrophoneEnabled(false).catch(() => {})
-    }
-  })
-
-  // One LiveKit room per classroom/garden; mic is always off after travel.
   watch(
-    () => opts.current.value,
-    (cur, prev) => {
-      const id = cur && cur.map_key !== 'campus' ? cur.room_id : null
-      const prevId = prev && prev.map_key !== 'campus' ? prev.room_id : null
-      if (id === prevId && lk) return
-      void leave().then(() => {
-        if (id) void join(id)
-        else status.value = 'off'
-      })
+    () => {
+      void opts.chatVersion.value
+      return `${opts.current.value?.room_id ?? ''}|${opts.chat.voiceIdentity}`
     },
+    (next, previous) => {
+      if (next.split('|')[0] !== previous?.split('|')[0]) wantedMic = false
+      if (opts.chat.muted) wantedMic = false
+      void reconnect()
+    },
+    { immediate: true },
   )
 
-  onBeforeUnmount(() => void leave())
-
+  onBeforeUnmount(() => {
+    stopped = true
+    void leave()
+  })
   return { status, error, micOn, speaking, needsAudioStart, toggleMic, startAudio }
 }
 

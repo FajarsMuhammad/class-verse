@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -76,14 +77,16 @@ func TestVoiceMuteFollowsAudit(t *testing.T) {
 			}
 			continue
 		}
-		if got := v.wait(t, 1); got[0] != "nopublish:"+student.userID.String() {
-			t.Fatalf("mute calls = %v", got)
+		if got := v.wait(t, 2); len(got) != 2 || !strings.HasPrefix(got[0], "remove:"+student.userID.String()+":") {
+			t.Fatalf("mute calls=%v", got)
 		}
+		r.settle(t) // removal confirmation restores admission with muted grant
 		r.handle(commandCmd{c: teacher, seq: 2, name: "unmute", target: student.userID})
 		r.settle(t)
-		if got := v.wait(t, 1); got[1] != "publish:"+student.userID.String() {
-			t.Fatalf("unmute calls = %v", got)
+		if got := v.wait(t, 2); len(got) != 4 || !strings.HasPrefix(got[2], "remove:"+student.userID.String()+":") {
+			t.Fatalf("unmute calls=%v", got)
 		}
+		r.settle(t)
 	}
 }
 
@@ -97,8 +100,8 @@ func TestVoiceRemovedOnKickAndLeave(t *testing.T) {
 	r.handle(commandCmd{c: teacher, seq: 1, name: "kick", target: kicked.userID})
 	r.settle(t)
 	r.remove(leaver.userID) // travel or grace expiry
-	got := v.wait(t, 2)
-	if got[0] != "remove:"+kicked.userID.String() || got[1] != "remove:"+leaver.userID.String() {
+	got := v.wait(t, 4)
+	if !strings.HasPrefix(got[0], "remove:"+kicked.userID.String()+":") || !strings.HasPrefix(got[2], "remove:"+leaver.userID.String()+":") {
 		t.Fatalf("calls = %v", got)
 	}
 }

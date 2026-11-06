@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -30,12 +32,12 @@ const (
 // LiveKit signs participant and admin tokens and calls the RoomService
 // (Twirp JSON over HTTP). Claims follow github.com/livekit/protocol/auth.
 type LiveKit struct {
-	url    string // browser URL, ws(s)://
-	api    string // RoomService base URL, http(s)://
-	key    string
-	secret []byte
-	http   *http.Client
-	now    func() time.Time
+	api       string // RoomService base URL, http(s)://
+	key       string
+	secret    []byte
+	http      *http.Client
+	now       func() time.Time
+	admission sync.RWMutex // serialize revocation against in-flight signaling handshakes
 }
 
 // NewLiveKit returns nil when url, key and secret are all empty (voice off).
@@ -51,13 +53,10 @@ func NewLiveKit(url, key, secret string, now func() time.Time) (*LiveKit, error)
 		return nil, fmt.Errorf("voice: LIVEKIT_URL must start with ws:// or wss://")
 	}
 	return &LiveKit{
-		url: url, api: "http" + strings.TrimRight(api, "/"), key: key, secret: []byte(secret),
+		api: "http" + strings.TrimRight(api, "/"), key: key, secret: []byte(secret),
 		http: &http.Client{Timeout: callTimeout}, now: now,
 	}, nil
 }
-
-// URL is the address the browser connects to.
-func (l *LiveKit) URL() string { return l.url }
 
 type videoGrant struct {
 	RoomJoin             bool     `json:"roomJoin,omitempty"`
@@ -119,8 +118,25 @@ func (l *LiveKit) SetCanPublish(ctx context.Context, room, identity string, canP
 
 // Remove disconnects identity from room (kick or leaving the room).
 func (l *LiveKit) Remove(ctx context.Context, room, identity string) error {
-	return l.call(ctx, room, "RemoveParticipant", map[string]any{"room": room, "identity": identity})
+	// Handshakes must finish before eviction, otherwise a delayed join can land
+	// after GetParticipant confirmed absence. This lock never runs on room actors.
+	l.admission.Lock()
+	defer l.admission.Unlock()
+	body := map[string]any{"room": room, "identity": identity}
+	if err := l.call(ctx, room, "RemoveParticipant", body); err != nil {
+		return err
+	}
+	err := l.call(ctx, room, "GetParticipant", body)
+	if errors.Is(err, errParticipantAbsent) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("livekit removal not yet confirmed")
 }
+
+var errParticipantAbsent = errors.New("livekit participant absent")
 
 func (l *LiveKit) call(ctx context.Context, room, method string, body any) error {
 	tok, err := l.sign("", "", adminTTL, &videoGrant{RoomAdmin: true, Room: room})
@@ -153,6 +169,9 @@ func (l *LiveKit) call(ctx context.Context, room, method string, body any) error
 	}
 	// The participant already left: nothing to mute or remove.
 	if json.Unmarshal(msg, &te) == nil && te.Code == "not_found" {
+		if method == "GetParticipant" {
+			return errParticipantAbsent
+		}
 		return nil
 	}
 	return fmt.Errorf("livekit %s: status %d code %q", method, res.StatusCode, te.Code)

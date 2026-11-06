@@ -41,6 +41,8 @@ func (h *Handler) token(w http.ResponseWriter, r *http.Request) error {
 	switch {
 	case errors.Is(err, ErrDisabled):
 		return errUnavailable
+	case errors.Is(err, ErrPending):
+		return &httpx.Error{Status: http.StatusConflict, Code: "voice_pending", Message: "Pemutusan suara sebelumnya belum terkonfirmasi"}
 	case errors.Is(err, ErrNotPresent):
 		// Same answer for missing rooms, other orgs and not being inside.
 		return httpx.ErrNotFound
@@ -48,6 +50,6 @@ func (h *Handler) token(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	httpx.JSON(w, http.StatusOK, api.VoiceToken{Url: t.URL, Token: t.Token})
+	httpx.JSON(w, http.StatusOK, api.VoiceToken{Url: t.URL, Token: t.Token, BroadcastToken: t.BroadcastToken, Identity: t.Identity, Channel: t.Channel})
 	return nil
 }

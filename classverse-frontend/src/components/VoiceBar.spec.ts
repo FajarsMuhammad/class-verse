@@ -23,7 +23,9 @@ function chat(patch: Partial<ChatState> = {}) {
 }
 
 const mountBar = (v: VoiceHandle, c: ChatState, teacher = false) =>
-  mount(VoiceBar, { props: { voice: v, chat: c, version: 0, selfId: 'me', teacher, disabled: false } })
+  mount(VoiceBar, {
+    props: { voice: v, chat: c, version: 0, selfId: 'me', teacher, disabled: false },
+  })
 
 describe('VoiceBar', () => {
   it('starts with the mic off and says which channel you hear', async () => {
@@ -50,6 +52,15 @@ describe('VoiceBar', () => {
     expect(toggle.attributes('aria-checked')).toBe('true')
     await toggle.trigger('click')
     expect(w.emitted('broadcast')).toEqual([[false]])
+  })
+
+  it('shows unconfirmed eviction to staff instead of claiming success', () => {
+    const w = mountBar(voice(), chat({ voicePending: ['user'] }), true)
+    expect(w.text()).toContain('Pemutusan suara 1 peserta belum terkonfirmasi')
+    expect(w.text()).toContain('Server mencoba ulang')
+    expect(mountBar(voice(), chat({ voicePending: ['user'] })).text()).not.toContain(
+      'belum terkonfirmasi',
+    )
   })
 
   it('stays hidden when voice is not configured', () => {

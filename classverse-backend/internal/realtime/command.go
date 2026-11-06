@@ -1,7 +1,6 @@
 package realtime
 
 import (
-	"context"
 	"log/slog"
 	"slices"
 	"strings"
@@ -56,6 +55,7 @@ func (r *room) command(c commandCmd) {
 		} else {
 			delete(r.voiceOn, m.p.ID)
 		}
+		r.revokeVoice(m, nil)
 		r.sendStates()
 	case "kick", "allow", "mute", "unmute", "lock", "unlock":
 		r.moderate(m, c, reject)
@@ -77,6 +77,9 @@ func (r *room) gather(m *member, _ uint64, reject func(code, message string)) {
 	now := r.now()
 	participants := make([]Participant, 0, len(r.members))
 	for _, member := range r.members {
+		if !r.voicePosition(member, x, y, DirDown) {
+			continue
+		}
 		member.p.X, member.p.Y = x, y
 		member.stride = newStride(r.mapd.WalkSpeed, now)
 		member.dirty = true
@@ -182,11 +185,10 @@ func (r *room) moderated(c moderatedCmd) {
 		if t := r.members[c.target]; t != nil && t.conn != nil {
 			t.conn.send(newOut(TypeRoomState, r.state(c.target)))
 		}
-		// The audit row is committed; mirror the mute on voice (best effort).
-		room, target := r.id, c.target
-		r.hub.voiceCall(c.action, room, target, func(ctx context.Context, v VoiceAdmin) error {
-			return v.SetCanPublish(ctx, room.String(), target.String(), !muted)
-		})
+		// Revoke old grants and media before issuing the new mute permission.
+		if t := r.members[c.target]; t != nil {
+			r.revokeVoice(t, nil)
+		}
 	case "lock", "unlock":
 		r.locked = c.action == "lock"
 		r.sendStates()
@@ -201,7 +203,15 @@ func (r *room) moderated(c moderatedCmd) {
 
 // state is the room_state a member sees: shared settings plus their own mute.
 func (r *room) state(id uuid.UUID) RoomStateMsg {
-	return RoomStateMsg{AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id], VoiceBroadcast: r.broadcasters()}
+	s := RoomStateMsg{AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id], VoiceBroadcast: r.broadcasters()}
+	if m := r.members[id]; m != nil {
+		s.VoiceIdentity = m.voiceIdentity
+		s.VoiceChannel = m.voiceChannel
+	}
+	if m := r.members[id]; m != nil && (m.p.Role == "teacher" || m.p.Role == "admin") {
+		s.VoicePending = r.pendingVoice()
+	}
+	return s
 }
 
 // sendStates sends every connected member its room_state.

@@ -130,17 +130,19 @@ type Hub struct {
 	sessions SessionRecorder
 	jobs     chan sessionJob
 
-	mu        sync.Mutex
-	rooms     map[uuid.UUID]*room
-	conns     map[uuid.UUID]*conn
-	where     map[uuid.UUID]location
-	stats     map[uuid.UUID]roomStats
-	traveling map[uuid.UUID]bool
-	locked    map[uuid.UUID]bool // rooms being archived
-	wg        sync.WaitGroup     // room goroutines
-	worker    chan struct{}      // closed when recordLoop returns
-	voice     VoiceAdmin         // nil when voice is off; set before serving
-	voiceJobs chan func(context.Context)
+	mu            sync.Mutex
+	rooms         map[uuid.UUID]*room
+	conns         map[uuid.UUID]*conn
+	where         map[uuid.UUID]location
+	stats         map[uuid.UUID]roomStats
+	traveling     map[uuid.UUID]bool
+	locked        map[uuid.UUID]bool // rooms being archived
+	wg            sync.WaitGroup     // room goroutines
+	worker        chan struct{}      // closed when recordLoop returns
+	voice         VoiceAdmin         // nil when voice is off; set before serving
+	voiceJobs     chan func(context.Context)
+	voiceWorker   chan struct{}
+	voiceRevoking map[uuid.UUID]int // protected by mu, spans travel between room actors
 }
 
 // VoiceAdmin applies room moderation to LiveKit (implemented by voice.LiveKit).
@@ -154,46 +156,40 @@ type VoiceAdmin interface {
 func (h *Hub) SetVoice(v VoiceAdmin) {
 	h.voice = v
 	h.voiceJobs = make(chan func(context.Context), sessionQueue)
+	h.voiceWorker = make(chan struct{})
 	go func() {
+		defer close(h.voiceWorker)
 		for job := range h.voiceJobs {
-			job(context.WithoutCancel(h.ctx))
+			job(h.ctx)
 		}
 	}()
 }
 
-// voiceCall queues a best-effort LiveKit call; it never blocks the room.
-func (h *Hub) voiceCall(name string, roomID, userID uuid.UUID, fn func(ctx context.Context, v VoiceAdmin) error) {
-	if h.voice == nil {
-		return
-	}
-	job := func(ctx context.Context) {
-		if err := fn(ctx, h.voice); err != nil {
-			h.log.Warn("voice call failed", slog.String("call", name), slog.String("room_id", roomID.String()),
-				slog.String("user_id", userID.String()), slog.Any("err", err))
-		}
-	}
-	select {
-	case h.voiceJobs <- job:
-	default:
-		h.log.Warn("voice queue full", slog.String("call", name), slog.String("room_id", roomID.String()))
-	}
-}
-
 // VoiceMember is what the voice token endpoint needs about a room member.
 type VoiceMember struct {
-	Name  string
-	Muted bool
+	Name         string
+	Muted        bool
+	Identity     string
+	Channel      string
+	Broadcasting bool
 }
 
 // ErrNotInRoom means the user has no live connection in that classroom or garden.
 var ErrNotInRoom = errors.New("not connected to this room")
+
+// ErrVoicePending means an old media admission has not been evicted yet.
+var ErrVoicePending = errors.New("voice revocation pending")
 
 // VoiceMember reports whether userID is connected to roomID right now
 // (campus excluded). Admission rules were applied when the user entered.
 func (h *Hub) VoiceMember(ctx context.Context, roomID, userID uuid.UUID) (VoiceMember, error) {
 	h.mu.Lock()
 	r := h.rooms[roomID]
+	pending := h.voiceRevoking[userID] > 0
 	h.mu.Unlock()
+	if pending {
+		return VoiceMember{}, ErrVoicePending
+	}
 	if r == nil || r.campus {
 		return VoiceMember{}, ErrNotInRoom
 	}
@@ -204,7 +200,8 @@ func (h *Hub) VoiceMember(ctx context.Context, roomID, userID uuid.UUID) (VoiceM
 			close(res)
 			return
 		}
-		res <- VoiceMember{Name: m.p.Name, Muted: r.muted[userID]}
+		res <- VoiceMember{Name: m.p.Name, Muted: r.muted[userID], Identity: m.voiceIdentity,
+			Channel: m.voiceChannel, Broadcasting: r.voiceOn[userID]}
 	}}
 	select {
 	case r.inbox <- probe:
@@ -694,6 +691,7 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 		<-h.worker
 		if h.voiceJobs != nil {
 			close(h.voiceJobs)
+			<-h.voiceWorker
 		}
 		close(done)
 	}()

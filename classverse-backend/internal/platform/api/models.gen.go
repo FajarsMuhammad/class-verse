@@ -439,9 +439,12 @@ type VerifyEmailRequest struct {
 
 // VoiceToken defines model for VoiceToken.
 type VoiceToken struct {
-	Token string `json:"token"`
+	BroadcastToken string `json:"broadcast_token"`
+	Channel        string `json:"channel"`
+	Identity       string `json:"identity"`
+	Token          string `json:"token"`
 
-	// Url URL ws(s):// LiveKit untuk browser
+	// Url URL ws(s):// gerbang izin voice publik untuk browser; bukan alamat LiveKit privat
 	Url string `json:"url"`
 }
 

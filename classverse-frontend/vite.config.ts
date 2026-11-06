@@ -23,6 +23,7 @@ export default defineConfig({
     proxy: {
       '/api': backend,
       '/ws': { target: backend, ws: true },
+      '/voice': { target: backend, ws: true },
       '/healthz': backend,
     },
   },

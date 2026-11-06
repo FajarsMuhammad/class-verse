@@ -36,7 +36,7 @@ MVP dibagi dua milestone. M1 harus bisa dipakai kelas sungguhan sebelum M2 dimul
 | Milestone | Isi | Kriteria selesai |
 | --- | --- | --- |
 | M1 — Ruang + text | Auth, organisasi, undangan, peta sekolah sebagai spawn utama, 2 map ruang bawaan (kelas + taman diskusi), avatar preset, movement real-time, proximity text chat, zona meja, kontrol pengajar, moderasi dasar, mode HP (pilih zona lewat daftar + chat, tanpa movement) | Satu kelas pilot (30 orang) menjalankan sesi 60 menit tanpa gangguan besar |
-| M2 — Voice | Proximity voice (LiveKit), voice per zona, broadcast voice pengajar, mute oleh pengajar, indikator siapa yang bicara | Satu kelas pilot menjalankan sesi diskusi kelompok dengan voice |
+| M2 — Voice | Voice per ruangan/zona (LiveKit, tanpa attenuasi jarak), broadcast voice pengajar, mute oleh pengajar, indikator siapa yang bicara | Satu kelas pilot menjalankan sesi diskusi kelompok dengan voice |
 
 **Out-of-scope MVP:** video kamera, screen share, map editor custom, gamifikasi (poin, badge, toko item), kuis interaktif, whiteboard, mobile app native, integrasi LMS, recording sesi, segmen SD/SMP.
 
@@ -103,9 +103,10 @@ Setiap story punya ID agar bisa dirujuk di ticket, API spec, dan test. Story M1 
 - Semua orang di zona yang sama berbagi chat (dan voice di M2), apa pun jaraknya di dalam zona.
 - Masuk dan keluar zona ditandai visual yang jelas.
 
-**US-09 (M2)** Sebagai peserta, saya ingin bicara dengan orang di dekat saya agar diskusi lebih cepat dari mengetik.
+**US-09 (M2)** Sebagai peserta, saya ingin bicara dengan orang di ruangan/zona yang sama agar diskusi lebih cepat dari mengetik.
 
-- Volume mengecil sesuai jarak dan hilang di luar radius.
+- Dalam ruangan yang sama, peserta mendengar zona yang sama dengan volume penuh, tanpa perubahan volume berdasarkan jarak. Area di luar semua zona menjadi satu kanal area umum.
+- Server audio wajib menolak akses suara dari zona lain, kecuali broadcast pengajar. Memodifikasi browser tidak boleh melewati pembatasan ini.
 - Mikrofon default mati saat masuk ruang; ada tombol mute yang jelas.
 - Ikon menunjukkan siapa yang sedang bicara.
 
@@ -119,7 +120,8 @@ Setiap story punya ID agar bisa dirujuk di ticket, API spec, dan test. Story M1 
 
 **US-12** Sebagai pengajar, saya ingin mute, kick, dan mengunci ruangan agar kelas tetap tertib.
 
-- Peserta yang di-kick tidak bisa masuk lagi ke sesi yang sama tanpa izin pengajar.
+- Peserta yang di-kick tidak bisa masuk lagi ke sesi yang sama tanpa izin pengajar, termasuk koneksi voice dengan token lama.
+- Kick mencakup pemutusan voice yang dikonfirmasi server audio. Bila belum terkonfirmasi, pengajar melihat status tertunda/gagal dan sistem mencoba ulang; UI tidak boleh mengklaim voice sudah terputus hanya karena peserta hilang dari peta/chat.
 - Ruang terkunci menolak peserta baru.
 
 ## Keamanan dan moderasi
