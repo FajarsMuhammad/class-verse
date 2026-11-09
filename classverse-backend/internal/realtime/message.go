@@ -259,6 +259,8 @@ type ErrorMsg struct {
 	Seq     uint64 `json:"seq,omitempty"`
 	X       *int   `json:"x,omitempty"`
 	Y       *int   `json:"y,omitempty"`
+	// ContinuePath distinguishes a successful zone correction from a rejected move.
+	ContinuePath bool `json:"continue_path,omitempty"`
 }
 
 // Error codes sent in ErrorMsg.

@@ -142,6 +142,14 @@ describe('World', () => {
     expect(b.x).toBe(900)
   })
 
+  it('keeps the click path after a confirmed voice-zone transition', () => {
+    const w = welcomed()
+    const rev = w.movementRevision
+    w.apply({ t: 'error', seq: 5, d: { code: 'move_rejected', message: '', x: 7, y: 8, continue_path: true } }, 0)
+    expect(w.self).toMatchObject({ x: 7, y: 8 })
+    expect(w.movementRevision).toBe(rev)
+  })
+
   it('handles joined, left, and rejected moves', () => {
     const w = welcomed()
     w.apply({ t: 'joined', seq: 2, d: p('c', 1) }, 0)
@@ -149,7 +157,11 @@ describe('World', () => {
     w.apply({ t: 'left', seq: 4, d: { id: 'b' } }, 0)
     expect([...w.avatars.keys()]).toEqual(['c'])
     w.self!.x = 400
+    const rev = w.movementRevision
     w.apply({ t: 'error', seq: 5, d: { code: 'move_rejected', message: '', x: 7, y: 8 } }, 0)
     expect(w.self).toMatchObject({ x: 7, y: 8 })
+    // The scene drops its click path on a revision bump; otherwise it retries
+    // the rejected step every frame and the avatar cannot walk elsewhere.
+    expect(w.movementRevision).toBe(rev + 1)
   })
 })

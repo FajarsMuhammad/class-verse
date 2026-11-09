@@ -18,7 +18,8 @@ type voiceCleanup struct {
 	target            uuid.UUID
 	at                time.Time
 	busy              bool
-	position          *Position
+	position          *Position // cross-zone destination, applied only if the avatar has not moved since
+	fromX, fromY      int
 }
 
 type voiceCleanedCmd struct {
@@ -57,7 +58,10 @@ func (r *room) revokeVoice(m *member, position *Position) {
 	}
 	r.hub.voiceRevoking[m.p.ID]++
 	r.hub.mu.Unlock()
-	r.voicePending[identity] = &voiceCleanup{identity: identity, channel: m.voiceChannel, target: m.p.ID, position: position}
+	r.voicePending[identity] = &voiceCleanup{
+		identity: identity, channel: m.voiceChannel, target: m.p.ID, position: position,
+		fromX: m.p.X, fromY: m.p.Y,
+	}
 	m.voiceIdentity = ""
 	r.sendStates()
 	r.retryVoice(r.now())
@@ -103,6 +107,14 @@ func (r *room) voiceCleaned(c voiceCleanedCmd) {
 		job.busy = false
 		job.at = r.now().Add(voiceRetry)
 		r.log.Warn("voice eviction pending", slog.String("room_id", r.id.String()), slog.Any("err", c.err))
+		// Do not keep the client walking toward a zone it cannot enter yet:
+		// drop the destination and snap it back. Moves in the old zone stay allowed.
+		if job.position != nil {
+			job.position = nil
+			if m := r.members[job.target]; m != nil {
+				r.rejectMove(m, "Suara sedang diputus, tunggu sebentar")
+			}
+		}
 		r.sendStates()
 		return
 	}
@@ -114,7 +126,11 @@ func (r *room) voiceCleaned(c voiceCleanedCmd) {
 	}
 	r.hub.mu.Unlock()
 	if m := r.members[job.target]; m != nil && m.voiceIdentity == "" {
-		if job.position != nil {
+		moved := m.p.X != job.fromX || m.p.Y != job.fromY
+		if job.position != nil && moved {
+			r.rejectMove(m, "Posisi diperbarui")
+		}
+		if job.position != nil && !moved {
 			p := job.position
 			m.p.X, m.p.Y, m.p.Dir = p.X, p.Y, p.Dir
 			m.stride = newStride(r.mapd.WalkSpeed, r.now())
@@ -123,7 +139,7 @@ func (r *room) voiceCleaned(c voiceCleanedCmd) {
 			if m.conn != nil {
 				m.conn.send(newOut(TypeZone, ZoneMsg{Key: m.zone.Key, Name: m.zone.Name}))
 				x, y := m.p.X, m.p.Y
-				m.conn.sendError(ErrorMsg{Code: CodeMoveRejected, Message: "Perpindahan zona dikonfirmasi", X: &x, Y: &y})
+				m.conn.sendError(ErrorMsg{Code: CodeMoveRejected, Message: "Perpindahan zona dikonfirmasi", X: &x, Y: &y, ContinuePath: true})
 			}
 		}
 		r.initVoice(m)
@@ -131,19 +147,44 @@ func (r *room) voiceCleaned(c voiceCleanedCmd) {
 	r.sendStates()
 }
 
-// voicePosition holds cross-zone movement until old media is gone.
+// voicePosition holds cross-zone movement until old media is gone. Moves that
+// stay in the current channel are always allowed, even while an eviction is
+// pending, so a LiveKit outage never freezes the avatar.
 func (r *room) voicePosition(m *member, x, y int, dir Direction) bool {
 	if r.campus || r.hub.voice == nil {
 		return true
 	}
-	if m.voiceIdentity == "" {
-		return false
-	}
 	if r.voiceChannel(x, y) == m.voiceChannel {
 		return true
 	}
-	r.revokeVoice(m, &Position{ID: m.p.ID, X: x, Y: y, Dir: dir})
+	if m.voiceIdentity != "" {
+		r.revokeVoice(m, &Position{ID: m.p.ID, X: x, Y: y, Dir: dir})
+		return false
+	}
+	// Already revoking. A queued destination will be applied (and the client
+	// snapped to it) on confirmation; otherwise tell the client to stop here.
+	if job := r.voiceJobFor(m.p.ID); job == nil || job.position == nil {
+		r.rejectMove(m, "Suara sedang diputus, tunggu sebentar")
+	}
 	return false
+}
+
+func (r *room) voiceJobFor(id uuid.UUID) *voiceCleanup {
+	for _, job := range r.voicePending {
+		if job.target == id {
+			return job
+		}
+	}
+	return nil
+}
+
+// rejectMove resyncs the client's predicted position with the server.
+func (r *room) rejectMove(m *member, msg string) {
+	if m.conn == nil {
+		return
+	}
+	x, y := m.p.X, m.p.Y
+	m.conn.sendError(ErrorMsg{Code: CodeMoveRejected, Message: msg, X: &x, Y: &y})
 }
 
 func (r *room) pendingVoice() []uuid.UUID {

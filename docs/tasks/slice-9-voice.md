@@ -39,6 +39,15 @@ References: `docs/spec.md`, `docs/design.md` slice 9, `docs/visual.md`.
 
 Temporary browser scripts are outside the repository and use disposable local test accounts. They must not print raw token URLs or credentials.
 
+## Review follow-up (commit 68f459e review, findings 1 and 2)
+
+- **Finding 1, avatar froze during a pending eviction.** `voicePosition` rejected every move while the old admission was being removed, so a LiveKit outage froze the avatar and desynced client prediction. Now moves that stay in the old channel are always allowed. Cross-zone moves stay blocked until removal is confirmed, and get `move_rejected` with the authoritative position. If removal fails, the queued destination is dropped (client resynced) instead of teleporting later. If the avatar moved in the old zone meanwhile, the stale destination is skipped. Test `TestVoicePendingEvictionDoesNotFreezeAvatar`; it fails on the previous code.
+- **Finding 2, untested lock ordering.** `TestRemoveWaitsForInFlightHandshake` holds an admitted handshake upstream and checks `Remove` cannot finish until it completes. Removing the gateway `RLock` makes it fail with a clear message (verified, then restored).
+- Browser re-run against real local LiveKit: normal suite 21/21, outage suite 19/19, cross-zone attack 8/8 stable over 3 runs. Attack script fixed: it previously opened a duplicate-identity publisher that LiveKit evicted (flaky, 2 of 3 runs aborted before the security check); it now reads the real mic track SID via loopback dev RoomService.
+- Browser outage movement verified with real Chrome and local LiveKit stopped via Docker. `/tmp/kv-e2e/voice-outage-walk.mjs` observes authoritative positions through the other browser's received WebSocket frames: cross-zone entry blocked, same-channel movement remains usable, pending voice status visible, rejected click path stops, movement and voice recover after restart. Five consecutive runs passed 11/11; final run with an explicit correction-count assertion passed 12/12. Final normal 21/21, attack 8/8, kick/outage 19/19 also passed.
+- Final checks: backend `make test` (race) and `make lint` passed; voice coverage 88.5%, realtime 80.4%. Frontend lint, 97 tests across 19 files, and build passed; existing Phaser large-chunk warning remains.
+- Browser testing exposed a frontend regression: clearing every `move_rejected` route also stopped successful cross-zone corrections, leaving avatars in intermediate zones. Successful corrections now carry optional `continue_path: true`; actual rejections clear the path through `movementRevision`. Backend and frontend tests protect this distinction. No speculative reconnect change: the earlier recovery timeout did not recur after this fix.
+
 ## Remaining limits
 
 - Production VPS ingress/firewall/TLS/TURN and real-device audio quality not verified. Must keep port 7880 private and route all public signaling through Go; no alternate ingress bypass.

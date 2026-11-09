@@ -110,6 +110,9 @@ export class World {
         ) {
           this.self.x = msg.d!.x
           this.self.y = msg.d!.y
+          // Successful zone corrections keep the route; real rejections stop
+          // repeated attempts to enter a zone blocked by pending eviction.
+          if (!msg.d!.continue_path) this.movementRevision++
         }
         break
     }

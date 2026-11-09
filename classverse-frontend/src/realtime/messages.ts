@@ -110,6 +110,7 @@ export interface ErrorMsg {
   seq?: number
   x?: number
   y?: number
+  continue_path?: boolean
 }
 
 export type ErrorCode =
