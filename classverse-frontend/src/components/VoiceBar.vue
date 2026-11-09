@@ -85,15 +85,16 @@ const label = computed(() =>
     <button
       v-if="teacher"
       type="button"
-      class="btn-secondary toggle"
+      class="btn-secondary switch"
       role="switch"
       :aria-checked="broadcasting"
       :disabled="disabled || status !== 'on'"
       @click="emit('broadcast', !broadcasting)"
     >
-      Bicara ke semua ruang: {{ broadcasting ? 'aktif' : 'mati' }}
+      Bicara ke semua ruang
+      <span class="pill" aria-hidden="true">{{ broadcasting ? 'Aktif' : 'Mati' }}</span>
     </button>
-    <button v-if="needsAudioStart" type="button" class="btn-primary toggle" @click="startAudio">
+    <button v-if="needsAudioStart" type="button" class="btn-primary" @click="startAudio">
       Aktifkan suara
     </button>
     <p v-if="teacher && pending" role="status" class="error">
@@ -110,7 +111,6 @@ const label = computed(() =>
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 .mic {
   width: 52px;
@@ -137,15 +137,29 @@ const label = computed(() =>
   outline-offset: 2px;
 }
 .state {
-  flex: 1;
   margin: 0;
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
 }
-.toggle {
-  width: 100%;
+.switch {
+  gap: var(--space-2);
+}
+.pill {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  font-size: var(--text-sm);
+}
+.switch[aria-checked='true'] {
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+}
+.switch[aria-checked='true'] .pill {
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 .error {
+  flex-basis: 100%;
   margin: 0;
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);

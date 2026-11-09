@@ -298,7 +298,6 @@ h2 {
 }
 .label {
   font-size: var(--text-md);
-  text-transform: uppercase;
   color: var(--color-ink-muted);
 }
 .faces {

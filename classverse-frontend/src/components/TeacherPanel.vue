@@ -6,7 +6,8 @@ import { roomApi } from '@/api/rooms'
 import type { RoomHandle } from '@/realtime/useRoom'
 
 // Teacher controls of a classroom/garden, shared by the map and mode HP.
-const props = defineProps<{ room: RoomHandle }>()
+// floating: shown in the map toolbar, where the participant list opens as a popover.
+const props = defineProps<{ room: RoomHandle; floating?: boolean }>()
 const {
   status,
   traveling,
@@ -54,33 +55,36 @@ function doKick() {
 </script>
 
 <template>
-  <div class="teacher">
+  <div class="teacher" :class="{ floating }" aria-label="Kontrol pengajar" role="group">
     <button class="btn-secondary" :disabled="status !== 'open' || traveling" @click="gather">
       Kumpulkan peserta
     </button>
     <button
       type="button"
-      class="btn-secondary toggle"
-      role="switch"
-      :aria-checked="allChat"
-      :disabled="toggling || status !== 'open'"
-      @click="toggleAllChat"
-    >
-      Chat semua ruangan: {{ allChat ? 'aktif' : 'mati' }}
-    </button>
-    <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
-    <button
-      type="button"
-      class="btn-secondary toggle"
+      class="btn-secondary switch"
       role="switch"
       :aria-checked="locked"
       :disabled="status !== 'open'"
       @click="setLocked(!locked)"
     >
-      Ruang: {{ locked ? 'terkunci' : 'terbuka' }}
+      Kunci ruang
+      <span class="state" aria-hidden="true">{{ locked ? 'Aktif' : 'Mati' }}</span>
     </button>
+    <button
+      type="button"
+      class="btn-secondary switch"
+      role="switch"
+      :aria-checked="allChat"
+      :disabled="toggling || status !== 'open'"
+      @click="toggleAllChat"
+    >
+      Chat semua ruangan
+      <span class="state" aria-hidden="true">{{ allChat ? 'Aktif' : 'Mati' }}</span>
+    </button>
+    <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
     <details class="moderation">
-      <summary>Peserta ({{ participants.length }})</summary>
+      <summary class="btn-secondary">Peserta ({{ participants.length }})</summary>
+      <div class="people-panel">
       <p v-if="!participants.length" class="room-meta">Belum ada peserta lain.</p>
       <ul class="people">
         <li v-for="p in participants" :key="p.id">
@@ -131,17 +135,59 @@ function doKick() {
           </li>
         </ul>
       </template>
+      </div>
     </details>
   </div>
 </template>
 
 <style scoped>
-.moderation summary {
-  min-height: var(--touch-min);
+.teacher {
   display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-weight: var(--weight-bold);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.moderation summary {
+  list-style: none;
+}
+.moderation summary::-webkit-details-marker {
+  display: none;
+}
+.people-panel {
+  margin-top: var(--space-2);
+}
+.floating .moderation {
+  position: relative;
+}
+.floating .people-panel {
+  position: absolute;
+  z-index: 3;
+  top: 100%;
+  right: 0;
+  width: min(340px, 80vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+/* Setting name stays on the button; the pill shows its state. */
+.switch {
+  gap: var(--space-2);
+}
+.state {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  font-size: var(--text-sm);
+}
+.switch[aria-checked='true'] {
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+}
+.switch[aria-checked='true'] .state {
+  background: var(--color-primary);
+  color: var(--color-surface);
 }
 .people {
   list-style: none;
@@ -172,13 +218,9 @@ function doKick() {
   margin: 0 0 var(--space-3);
   color: var(--color-ink-muted);
 }
-.teacher {
-  margin-bottom: var(--space-4);
-}
-.toggle {
-  width: 100%;
-}
 .toggle-error {
+  flex-basis: 100%;
+  margin: 0;
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
 }

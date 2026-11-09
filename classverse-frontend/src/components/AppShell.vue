@@ -168,6 +168,46 @@ async function logout() {
   min-height: var(--touch-min);
 }
 
+/* Phones: brand + account on one row, navigation as one scrollable row. */
+@media (max-width: 767px) {
+  .top {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+  .wordmark,
+  .name {
+    display: none;
+  }
+  .brand {
+    flex: 1;
+    min-width: 0;
+  }
+  .school {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    line-height: var(--touch-min);
+  }
+  .user {
+    gap: var(--space-2);
+  }
+  .nav {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+  .nav-link {
+    white-space: nowrap;
+  }
+  .small {
+    padding: 0 var(--space-3);
+    font-size: var(--text-md);
+  }
+}
 .immersive {
   height: 100dvh;
 }

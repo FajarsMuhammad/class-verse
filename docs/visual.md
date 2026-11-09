@@ -45,8 +45,33 @@ HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
 - Daftar gedung bukan sidebar permanen: tombol **Daftar gedung** membuka panel sementara di area peta;
   memilih gedung membuka preview ruang dan petunjuk tujuan, tanpa teleport.
 - Dekat pintu: kartu nama gedung + **Pilih ruang**. Pemilihan ruang tidak menutup chat.
-- Kelas/taman memakai layout sama, kontrol pengajar di atas chat.
 - Layar sempit: pilihan tampilan **Peta / Chat**; mode HP tanpa movement tetap slice 8.
+
+## Revisi layout setelah slice 9 (disetujui)
+
+Kontrol ruang ada di dalam bingkai peta, bukan di luar, agar jelas bahwa aksi itu milik ruang yang sedang dibuka.
+Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantikan "kontrol pengajar di atas chat".
+
+```
+┌ bingkai peta ───────────────────────────────────────┐ ┌ chat ──────┐
+│ [<] Biologi XI-2   [Kumpulkan] [Kunci ruang ·] [Peserta]│ │ tab zona   │
+│            Papan tulis                               │ │ pesan…     │
+│   Meja 1   Meja 2   Meja 3            (peta)         │ │            │
+│            Pintu keluar                              │ │            │
+│ (mic)  Mikrofon mati · Meja 1  [Bicara ke semua ·]   │ │ [input][>] │
+└─────────────────────────────────────────────────────┘ └────────────┘
+```
+
+- Baris atas: tombol kembali (ikon + `aria-label`), nama ruang, jumlah online; pengajar menambah Kumpulkan peserta,
+  Kunci ruang, Chat semua ruangan, dan Peserta (popover moderasi). Peta sekolah: nama sekolah + Daftar gedung.
+- Baris bawah: mic bulat 52 px, status suara, Bicara ke semua ruang (pengajar), petunjuk gerak.
+- Kedua baris ikut alur (bukan melayang di atas lantai); peta di-fit di antaranya. Saat layar sempit, tombol turun
+  ke baris baru dan peta mengecil.
+- Toggle menyebut aksinya ("Kunci ruang"); statusnya pill kecil Aktif/Mati, aktif bergaris Nila. `role="switch"`.
+- Peta kelas memberi label "Papan tulis" dan "Pintu keluar"; label zona di kiri bawah meja agar tidak tertutup
+  avatar di kursi atas; name tag yang bertumpuk digeser ke bawah.
+- Mode HP: kontrol pengajar sama (dalam kartu lipat), label tanpa huruf kapital, header satu baris akun
+  + satu baris navigasi yang bisa digeser.
 
 ## Peta (Phaser)
 

@@ -8,7 +8,8 @@ import type { World } from '@/realtime/world'
 import { avatarChoices, avatarKey, avatarURL } from './avatars'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
-import { roomArt } from './roomArt'
+import { roomArt, roomLandmarks } from './roomArt'
+import { stackLabels } from './layout'
 
 export interface SceneDeps {
   map: MapData
@@ -83,16 +84,22 @@ export class CampusScene extends Phaser.Scene {
 
     for (const b of map.buildings)
       this.labels.push(this.buildingLabel(b.name, b.x + b.w / 2, b.y, b.staffOnly))
+    // Campus reuses the board tile id for the flagpole; landmarks are room-only.
+    if (this.deps.world.mapKey !== 'campus')
+      for (const l of roomLandmarks(map))
+        this.labels.push(this.buildingLabel(l.text, l.x, l.y, false, l.dark))
     if (map.zones.length) {
       this.zoneLayer = this.add.graphics().setDepth(1)
       for (const z of map.zones) {
+        // Bottom-left: seats sit at the top of a table, where a label would be covered.
         const label = this.add
-          .text(z.x + 8, z.y + 6, z.name, {
+          .text(z.x + 8, z.y + z.h - 6, z.name, {
             fontFamily: cssToken('--font-body'),
             fontSize: cssToken('--text-sm'),
             fontStyle: '700',
             color: cssToken('--color-accent-ink'),
           })
+          .setOrigin(0, 1)
           .setResolution(Math.min(window.devicePixelRatio || 1, 2) * 2)
           .setDepth(2)
         this.zoneLabels.push(label)
@@ -227,7 +234,10 @@ export class CampusScene extends Phaser.Scene {
     if (!self) return
     const c = Phaser.Display.Color.HexStringToColor(cssToken('--color-primary')).color
     const segments = 48
-    g.lineStyle(2 / this.cameras.main.zoom, c, 0.6)
+    // Same 5-tile range everywhere; rooms are zoomed in ~2x, so the ring is
+    // drawn lighter there to read as a hint, not a boundary.
+    const room = this.deps.world.mapKey !== 'campus'
+    g.lineStyle((room ? 1.5 : 2) / this.cameras.main.zoom, c, room ? 0.3 : 0.6)
     for (let i = 0; i < segments; i += 2) {
       const a0 = (i / segments) * Math.PI * 2
       const a1 = ((i + 1) / segments) * Math.PI * 2
@@ -300,6 +310,20 @@ export class CampusScene extends Phaser.Scene {
       this.self.body.setPosition(self.x, self.y).setDepth(self.y)
       this.self.tag.setPosition(self.x, self.y + 6).setDepth(self.y + 1)
     }
+    this.unstackTags()
+  }
+
+  // unstackTags moves overlapping name tags apart; positions come from syncSprites.
+  private unstackTags() {
+    const tags = [...this.sprites.values(), ...(this.self ? [this.self] : [])]
+      .map((s) => s.tag)
+      .filter((t) => t.visible)
+    if (tags.length < 2) return
+    const boxes = tags.map((t) => {
+      const size = t.getData('size') as { w: number; h: number }
+      return { x: t.x, y: t.y, w: size.w * t.scaleX, h: size.h * t.scaleY }
+    })
+    stackLabels(boxes).forEach((y, i) => tags[i]!.setY(y))
   }
 
   private makeSprite(
@@ -327,11 +351,11 @@ export class CampusScene extends Phaser.Scene {
     return tag
   }
 
-  private buildingLabel(name: string, x: number, y: number, locked: boolean) {
+  private buildingLabel(name: string, x: number, y: number, locked: boolean, dark = false) {
     const c = this.pill(
       name,
-      cssToken('--color-surface'),
-      cssToken('--color-ink'),
+      cssToken(dark ? '--color-ink' : '--color-surface'),
+      cssToken(dark ? '--color-surface' : '--color-ink'),
       cssToken('--text-md'),
       locked,
     )
@@ -378,7 +402,8 @@ export class CampusScene extends Phaser.Scene {
       lock.strokePath()
       parts.push(lock)
     }
-    return this.add.container(0, 0, parts)
+    // Containers have no reliable bounds for Graphics children; keep the pill size.
+    return this.add.container(0, 0, parts).setData('size', { w, h })
   }
 }
 
