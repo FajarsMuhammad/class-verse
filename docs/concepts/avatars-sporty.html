@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kelasverse — konsep avatar sporty</title>
+<link rel="stylesheet" href="../../classverse-frontend/src/styles/tokens.css">
+<style>
+*{box-sizing:border-box}body{margin:0;color:var(--color-ink);background:var(--color-bg);font:var(--text-base)/var(--line-relaxed) var(--font-body);padding:var(--space-8)}main{max-width:1320px;margin:auto}h1,h2,p,figure{margin:0}h1,h2,.brand{font-family:var(--font-display);font-weight:var(--weight-semibold)}header{display:flex;justify-content:space-between;gap:var(--space-4);align-items:center;border-bottom:1px solid var(--color-border);padding-bottom:var(--space-4)}.brand{font-size:var(--text-2xl)}.muted{color:var(--color-ink-muted);font-size:var(--text-md)}h1{font-size:var(--text-4xl);line-height:var(--line-tight);margin-bottom:var(--space-4)}h2{font-size:var(--text-2xl);line-height:var(--line-tight)}.hero{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:var(--space-10);padding:var(--space-8) 0}.intro{max-width:54ch}.intro p{margin-bottom:var(--space-5)}.swatches{display:flex;gap:var(--space-3);font-size:var(--text-sm)}.swatches span{display:flex;align-items:center;gap:var(--space-2)}.swatches i{width:16px;height:16px;background:var(--color-primary);display:inline-block}.swatches span:nth-child(2) i{background:var(--color-accent)}.swatches span:nth-child(3) i{background:var(--color-ink)}.hero-art{background:var(--color-primary-soft);border-radius:var(--radius-xl);padding:var(--space-5);display:flex;justify-content:space-evenly;align-items:end;min-height:280px}.hero-art figure{display:grid;justify-items:center;gap:var(--space-3)}.hero-art svg{height:192px;width:128px}.hero-art figcaption{font-weight:var(--weight-bold);font-size:var(--text-sm)}.lineup{background:var(--color-surface);border-radius:var(--radius-xl);padding:var(--space-6)}.heading{display:flex;justify-content:space-between;gap:var(--space-4);align-items:baseline;margin-bottom:var(--space-5)}.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--space-4)}.preset{text-align:center;border-right:1px solid var(--color-border-soft)}.preset:last-child{border:0}.duo{display:flex;justify-content:center;gap:var(--space-3);padding:var(--space-2) 0 var(--space-4)}.duo svg{width:64px;height:96px}.preset strong{display:block;font-size:var(--text-md)}.preset p{font-size:var(--text-sm);color:var(--color-ink-muted)}.bottom{display:grid;grid-template-columns:1.25fr 1fr;gap:var(--space-8);margin-top:var(--space-6)}.court{margin-top:var(--space-4);background:var(--map-grass);padding:var(--space-6);position:relative;min-height:170px;border-radius:var(--radius-lg);display:flex;justify-content:space-evenly;align-items:center;gap:var(--space-2)}.court:before{content:"";position:absolute;inset:var(--space-3);border:2px solid var(--color-surface);opacity:.6;pointer-events:none}.player{display:grid;justify-items:center;gap:var(--space-2);z-index:1}.player svg{height:48px;width:32px}.tag{font-size:var(--text-xs);font-weight:var(--weight-bold);background:var(--color-surface);padding:0 var(--space-2);border-radius:var(--radius-pill)}.player.self .tag{background:var(--color-ink);color:var(--color-surface)}.sizes{display:flex;align-items:end;gap:var(--space-8);padding:var(--space-4) 0}.sizes figure{display:grid;justify-items:center;gap:var(--space-2)}figcaption{font-size:var(--text-sm);color:var(--color-ink-muted)}footer{border-top:1px solid var(--color-border);margin-top:var(--space-6);padding-top:var(--space-4);font-size:var(--text-sm);color:var(--color-ink-muted)}.sprite{image-rendering:pixelated;shape-rendering:crispEdges;overflow:visible;--kit:var(--color-primary);--kit-light:var(--avatar-nila);--skin:var(--map-path)}.sprite.mangga{--kit:var(--color-accent);--kit-light:var(--avatar-mangga)}.sprite.medium{--skin:var(--map-wood)}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(3,1fr)}.preset:nth-child(3){border:0}.hero-art svg{height:144px;width:96px}.hero-art{min-height:240px}}@media(max-width:650px){body{padding:var(--space-4)}header .muted{font-size:var(--text-sm);text-align:right;max-width:20ch}.hero{grid-template-columns:1fr;gap:var(--space-5)}h1{font-size:var(--text-3xl)}.hero-art{min-height:220px}.hero-art svg{height:144px;width:96px}.heading{display:block}.heading p{margin-top:var(--space-2)}.lineup{padding:var(--space-4)}.grid{grid-template-columns:repeat(2,1fr);row-gap:var(--space-6)}.preset:nth-child(3){border-right:1px solid var(--color-border-soft)}.preset:nth-child(even){border:0}.duo{gap:var(--space-1)}.duo svg{height:84px;width:56px}.bottom{grid-template-columns:1fr}.court{padding:var(--space-6) var(--space-2)}.sizes{gap:var(--space-6)}}
+</style>
+</head>
+<body><main>
+<header><div class="brand">Kelasverse</div><p class="muted">Avatar sporty · konsep kedua</p></header>
+<section class="hero"><div class="intro"><h1>Lebih game.<br>Lebih siap bergerak.</h1><p>Pixel art terinspirasi Gather, dengan pakaian olahraga kampus. Proporsi lebih tinggi, rambut bersiluet tegas, jaket berpanel, dan sneakers kontras. Bukan lagi figur chibi berkepala besar.</p><div class="swatches"><span><i></i>Nila</span><span><i></i>Mangga</span><span><i></i>Tinta</span></div></div><div class="hero-art" id="hero"></div></section>
+<section class="lineup"><div class="heading"><h2>Enam gaya untuk satu angkatan</h2><p class="muted">Dua warna pakaian · warna kulit tidak terikat warna pakaian</p></div><div class="grid" id="grid"></div></section>
+<div class="bottom"><section><h2>Ketemu di lapangan</h2><p class="muted">Simulasi ukuran 48 px di layar, bukan tangkapan aplikasi.</p><div class="court" id="court"></div></section><section><h2>Cek ukuran sebelum diterapkan</h2><div class="sizes" id="sizes"></div><p class="muted">36 px: detail mulai menyatu. Usulan 48 px: headphone, garis jaket, dan sepatu lebih terbaca. Ukuran aplikasi belum diubah.</p></section></div>
+<footer>Rancangan orisinal, bukan aset Gather. Headphone tanpa boom mikrofon. Pose diam depan dahulu; arah samping, belakang, dan animasi belum dibuat. Aset aplikasi tetap memakai versi lama.</footer>
+</main>
+<script>
+const presets=[['runner','Pelari','Track jacket + jogger'],['cap','Topi sport','Visor + jersey'],['headphones','Headphone','Over-ear tanpa mikrofon'],['varsity','Varsity','Jaket lengan kontras'],['ponytail','Kuncir','Ikat rambut + training'],['hoodie','Hoodie','Hood turun + sneakers']];
+function sprite(key,color='nila',height=96){
+ const ink='var(--color-ink)',white='var(--color-surface)',skin='var(--skin)',kit='var(--kit)',light='var(--kit-light)';
+ const rect=(x,y,w,h,fill)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`;
+ const path=(d,fill)=>`<path d="${d}" fill="${fill}"/>`;
+ let s=rect(7,46,20,1,ink).replace('/>',' opacity=".14"/>');
+ // Rear silhouettes, then grounded legs and shoes.
+ if(key==='ponytail')s+=path('M8 7h-4v5H2v9h3v6h4V16h2V9z',ink);
+ if(key==='hoodie')s+=path('M8 20h16v10H7z',light);
+ s+=path('M10 33h12v6h-1v5h-5V35h-1v9h-5z',ink);
+ s+=rect(10,34,2,8,light)+rect(19,34,2,8,light);
+ s+=path('M9 42h6v4H7v-2h2zM17 42h5v2h3v2h-8z',white);
+ s+=rect(7,46,8,1,ink)+rect(17,46,8,1,ink)+rect(10,43,4,1,kit)+rect(18,43,3,1,kit);
+ // Sleeves, hands, torso; shoulder stripe and a zipped panel survive small scale.
+ const sleeve=key==='varsity'?white:kit;
+ s+=path('M9 22h3v10H8v6H5v-4h1v-8h2v-3zM21 22h3v2h2v10h1v4h-4v-6h-2z',sleeve);
+ s+=rect(5,35,3,4,skin)+rect(24,35,3,4,skin);
+ s+=path('M11 21h10v2h2v12H9V23h2z',kit);
+ if(key==='cap'){
+  s+=rect(9,23,3,12,white)+rect(20,23,3,12,white)+rect(15,28,3,4,white);
+ }else if(key==='hoodie'){
+  s+=rect(10,24,2,10,light)+rect(21,24,2,10,light)+rect(10,34,13,1,ink);
+ }else{
+  s+=rect(11,23,3,11,light)+rect(16,23,1,12,white)+rect(10,22,4,2,white)+rect(19,22,3,2,white);
+  s+=rect(19,28,2,1,white)+rect(10,34,13,1,ink);
+ }
+ if(key==='varsity')s+=rect(6,26,3,8,white)+rect(24,26,2,8,white)+rect(6,33,3,2,kit)+rect(24,33,2,2,kit);
+ if(key==='hoodie')s+=path('M11 21h10v2h-2v2h-6v-2h-2z',light)+rect(13,25,1,4,white)+rect(19,25,1,4,white)+rect(13,31,7,1,light);
+ s+=rect(14,18,5,4,skin);
+ // Gather-like compact face: no blush, smile or oversized eyes.
+ s+=rect(9,6,14,11,ink)+path('M11 8h11v3h2v7h-2v2H12v-2h-2v-7h1z',skin)+rect(8,13,3,4,skin)+rect(23,13,2,4,skin);
+ if(key==='varsity')s+=path('M9 10V5h3V3h9v2h3v6h-3V8h-2v2h-5V8h-2v3z',ink);
+ else if(key==='ponytail')s+=path('M9 13V6h3V4h8v2h3v6h-4V9h-5v3h-2v2z',ink);
+ else s+=path('M9 12V7h2V5h10v2h3v5h-5V9h-3v2h-4v2z',ink);
+ s+=rect(14,13,1,2,ink)+rect(21,13,1,2,ink)+rect(17,18,3,1,'var(--color-accent-ink)');
+ if(key==='runner')s+=rect(9,9,15,2,white)+rect(10,9,3,2,kit);
+ if(key==='cap')s+=path('M9 8V5h3V3h9v2h2v4h4v2H10V9z',kit)+rect(12,4,2,4,light)+rect(20,9,9,2,ink);
+ if(key==='headphones')s+=path('M7 16V7h2V4h3V3h9v2h3v3h2v8h-2V9h-2V6H12v2h-2v8z',ink)+rect(6,11,4,8,ink)+rect(24,11,4,8,ink)+rect(7,12,2,5,light)+rect(25,12,2,5,light);
+ if(key==='ponytail')s+=rect(5,8,4,2,kit);
+ return `<svg xmlns="http://www.w3.org/2000/svg" class="sprite ${color} ${['varsity','ponytail'].includes(key)?'medium':''}" width="${height*2/3}" height="${height}" viewBox="0 0 32 48" role="img" aria-label="${presets.find(p=>p[0]===key)[1]}, pakaian ${color}">${s}</svg>`;
+}
+document.querySelector('#hero').innerHTML=[['runner','nila'],['headphones','mangga'],['cap','nila']].map(([key,color])=>`<figure>${sprite(key,color)}<figcaption>${presets.find(p=>p[0]===key)[1]}</figcaption></figure>`).join('');
+document.querySelector('#grid').innerHTML=presets.map(([key,name,note])=>`<div class="preset"><div class="duo">${sprite(key)}${sprite(key,'mangga')}</div><strong>${name}</strong><p>${note}</p></div>`).join('');
+document.querySelector('#court').innerHTML=[['cap','nila','Dimas'],['ponytail','mangga','Naya'],['headphones','nila','Kamu'],['varsity','mangga','Budi']].map(([key,color,name])=>`<div class="player ${name==='Kamu'?'self':''}">${sprite(key,color,48)}<span class="tag">${name}</span></div>`).join('');
+document.querySelector('#sizes').innerHTML=[36,48,96].map(size=>`<figure>${sprite('headphones','nila',size)}<figcaption>${size} px${size===48?' · usulan':''}</figcaption></figure>`).join('');
+console.assert(document.querySelectorAll('#grid svg').length===12,'Expected 12 presets');
+</script>
+</body></html>

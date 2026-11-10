@@ -95,6 +95,23 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
 
 ## Avatar
 
+### Revisi sporty US-04 (disetujui setelah slice 9)
+
+- Pixel art orisinal terinspirasi game sosial, bukan aset Gather: Pelari, Topi sport, Headphone, Varsity,
+  Kuncir, Hoodie, Kacamata. Headphone tanpa boom mikrofon. Tujuh gaya × enam warna pakaian = 42 pilihan.
+  Kacamata berbingkai Tinta, lensa terbuka; tampak samping menampilkan gagang, tampak belakang tanpa lensa.
+- Palet pakaian Nila, Mangga, Zamrud, Biru laut, Koral, Grafit; warna dasar/panel terang dari
+  `--avatar-kit-*` di `tokens.css`. Warna kulit tidak berganti saat warna pakaian diganti.
+- Profil: preview dan kelompok radio gaya/warna terpisah, label nama warna, indikator native radio,
+  fokus terlihat, target minimal 44 px. Simpan ke akun memakai `sporty-<gaya>-<warna>`.
+- Phaser: gambar 32×48 px di layar, bukan diregangkan menjadi persegi. Titik kaki (16,46) mengikuti posisi
+  resmi; label tetap di bawah. Empat arah, pose diam + empat frame jalan pada 8 fps, nearest-neighbor.
+  Animasi hanya saat posisi render berubah; preferensi kurangi gerakan memakai pose diam sesuai arah.
+- Aset di `assets/avatars/sporty/`, generator dan pemeriksaan reproducible di
+  `scripts/generate_sporty_avatars.py`. Avatar SVG lama tetap didukung dan tidak diganti saat hanya mengedit nama.
+
+### Avatar lama (kompatibilitas)
+
 Enam preset di `assets/avatars/` (viewBox 64×64), satu bentuk badan yang sama dengan aksesori berbeda:
 
 | File | Nama | Warna badan |

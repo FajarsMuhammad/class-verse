@@ -145,6 +145,10 @@ func TestHandlerProfilePartial(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"display_name":"Ani"`) || !strings.Contains(rec.Body.String(), `"avatar_key":"cap-mangga"`) {
 		t.Fatal("partial profile update failed")
 	}
+	rec = do(h, http.MethodPatch, "/api/me", `{"avatar_key":"sporty-headphones-zamrud"}`, withBearer(session.AccessToken))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"avatar_key":"sporty-headphones-zamrud"`) {
+		t.Fatal("sporty profile update failed")
+	}
 	if rec := do(h, http.MethodPatch, "/api/me", `{}`); rec.Code != http.StatusUnauthorized {
 		t.Fatal("unauthenticated patch accepted")
 	}

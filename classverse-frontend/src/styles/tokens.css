@@ -64,6 +64,20 @@
   --avatar-nila: #7c83fd;
   --avatar-mangga: #ffb547;
 
+  /* Sporty clothing: base and light panels, independent of skin color. */
+  --avatar-kit-nila: #4f46e5;
+  --avatar-kit-nila-light: #7c83fd;
+  --avatar-kit-mangga: #f5a524;
+  --avatar-kit-mangga-light: #ffcf70;
+  --avatar-kit-zamrud: #127b63;
+  --avatar-kit-zamrud-light: #49bc93;
+  --avatar-kit-laut: #2263bf;
+  --avatar-kit-laut-light: #63a8ee;
+  --avatar-kit-koral: #c74759;
+  --avatar-kit-koral-light: #f38c94;
+  --avatar-kit-grafit: #4c536b;
+  --avatar-kit-grafit-light: #919bb4;
+
   /* Typography */
   --font-display: 'Fredoka', system-ui, sans-serif; /* headings, room and building names */
   --font-body: 'Nunito', system-ui, sans-serif; /* everything else */

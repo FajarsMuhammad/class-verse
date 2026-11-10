@@ -5,7 +5,7 @@ import { directionOf, moveToward, SEND_INTERVAL_MS, step, type Vec } from '@/rea
 import type { Direction, MoveMsg } from '@/realtime/messages'
 import { findPath } from '@/realtime/pathfind'
 import type { World } from '@/realtime/world'
-import { avatarChoices, avatarKey, avatarURL } from './avatars'
+import { avatarChoices, avatarKey, avatarURL, avatarSheetURL, avatarFrame } from './avatars'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
 import { roomArt, roomLandmarks } from './roomArt'
@@ -34,6 +34,7 @@ interface Sprite {
 }
 
 const AVATAR_SIZE = 36
+const SPORTY_HEIGHT = 48
 // Extra A* cost per tile inside a table you are not walking to (see tablePenalty).
 const TABLE_PENALTY = 20
 const MAX_FRAME_MS = 100
@@ -61,6 +62,7 @@ export class CampusScene extends Phaser.Scene {
   private movementRevision = 0
   private walkId = 0
   private fitted = ''
+  private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
   constructor() {
     super('campus')
@@ -71,8 +73,11 @@ export class CampusScene extends Phaser.Scene {
   }
 
   preload() {
-    for (const key of ['default', ...avatarChoices.map((a) => a.key)]) {
-      this.load.svg(`avatar-${key}`, avatarURL(key), { width: 128, height: 128 })
+    const legacy = ['default', ...['round', 'cap', 'glasses', 'headset', 'bun', 'beret']
+      .flatMap((style) => ['nila', 'mangga'].map((color) => `${style}-${color}`))]
+    for (const key of legacy) this.load.svg(`avatar-${key}`, avatarURL(key), { width: 128, height: 128 })
+    for (const { key } of avatarChoices) {
+      this.load.spritesheet(`avatar-${key}`, avatarSheetURL(key)!, { frameWidth: 32, frameHeight: 48 })
     }
   }
 
@@ -187,7 +192,7 @@ export class CampusScene extends Phaser.Scene {
     }
 
     world.sample(performance.now())
-    this.syncSprites()
+    this.syncSprites(time)
     this.drawZones()
     this.drawRadius()
     this.drawSpeaking()
@@ -285,7 +290,7 @@ export class CampusScene extends Phaser.Scene {
     for (const label of this.labels) label.setScale(1 / zoom)
     for (const s of [...this.sprites.values(), ...(this.self ? [this.self] : [])]) {
       s.tag.setScale(1 / zoom)
-      s.body.setDisplaySize(AVATAR_SIZE / zoom, AVATAR_SIZE / zoom)
+      this.sizeAvatar(s.body)
     }
   }
 
@@ -298,7 +303,7 @@ export class CampusScene extends Phaser.Scene {
     this.deps.sendMove({ x: Math.round(x), y: Math.round(y), dir })
   }
 
-  private syncSprites() {
+  private syncSprites(time: number) {
     const { world } = this.deps
     for (const [id, s] of this.sprites) {
       const a = world.avatars.get(id)
@@ -308,7 +313,7 @@ export class CampusScene extends Phaser.Scene {
         this.sprites.delete(id)
         continue
       }
-      s.body.setTexture(`avatar-${avatarKey(a.avatar)}`)
+      this.drawAvatar(s.body, a.avatar, a.x, a.y, a.dir, time)
       if (s.name !== a.name) {
         s.tag.destroy()
         s.tag = this.makeTag(a.name, a.role === 'participant' ? 'other' : 'teacher')
@@ -331,7 +336,7 @@ export class CampusScene extends Phaser.Scene {
         this.self = this.makeSprite(world.selfName, 'self', self.x, self.y, world.selfAvatar)
         this.fitCamera()
       }
-      this.self.body.setTexture(`avatar-${avatarKey(world.selfAvatar)}`)
+      this.drawAvatar(this.self.body, world.selfAvatar, self.x, self.y, self.dir, time)
       if (this.self.name !== world.selfName) {
         this.self.tag.destroy()
         this.self.tag = this.makeTag(world.selfName, 'self')
@@ -364,12 +369,30 @@ export class CampusScene extends Phaser.Scene {
     avatar = 'default',
   ): Sprite {
     const body = this.add
-      .image(x, y, `avatar-${avatarKey(avatar)}`)
-      .setOrigin(0.5, 0.9)
-      .setDisplaySize(AVATAR_SIZE / this.cameras.main.zoom, AVATAR_SIZE / this.cameras.main.zoom)
+      .image(x, y, `avatar-${avatarKey(avatar)}`, avatar.startsWith('sporty-') ? 0 : undefined)
+    this.sizeAvatar(body)
     const tag = this.makeTag(name, kind)
     tag.setPosition(x, y + 6)
     return { body, tag, name }
+  }
+
+  private sizeAvatar(body: Phaser.GameObjects.Image) {
+    const sporty = body.texture.key.startsWith('avatar-sporty-')
+    const zoom = this.cameras.main.zoom
+    body.setOrigin(0.5, sporty ? 46 / 48 : 0.9)
+      .setDisplaySize((sporty ? 32 : AVATAR_SIZE) / zoom, (sporty ? SPORTY_HEIGHT : AVATAR_SIZE) / zoom)
+    if (sporty) body.texture.setFilter(Phaser.Textures.FilterMode.NEAREST)
+  }
+
+  private drawAvatar(body: Phaser.GameObjects.Image, key: string, x: number, y: number, dir: Direction, time: number) {
+    const texture = `avatar-${avatarKey(key)}`
+    // Compare rendered positions: held keys alone must not animate blocked movement.
+    const distance = Math.hypot(body.x - x, body.y - y)
+    const moving = body.visible && distance > 0.01 && distance < this.deps.map.walkSpeed * 0.2
+    const frame = texture.startsWith('avatar-sporty-')
+      ? avatarFrame(dir, moving, time, this.reducedMotion.matches) : undefined
+    body.setTexture(texture, frame)
+    this.sizeAvatar(body)
   }
 
   private makeTag(name: string, kind: 'self' | 'teacher' | 'other') {
