@@ -34,7 +34,7 @@ describe('VoiceBar', () => {
     const mic = w.get('button.mic')
     expect(mic.attributes('aria-pressed')).toBe('false')
     expect(mic.attributes('aria-label')).toBe('Nyalakan mikrofon')
-    expect(w.text()).toContain('kamu mendengar Meja 3')
+    expect(w.text()).toContain('Mendengar Meja 3')
     await mic.trigger('click')
     expect(v.toggleMic).toHaveBeenCalled()
     expect(w.text()).not.toContain('Bicara ke semua ruang')

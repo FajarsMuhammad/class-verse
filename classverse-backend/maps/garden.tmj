@@ -12,6 +12,13 @@
  "tiledversion": "1.10.2",
  "nextlayerid": 7,
  "nextobjectid": 20,
+ "properties": [
+  {
+   "name": "near_tiles",
+   "type": "int",
+   "value": 3
+  }
+ ],
  "tilesets": [
   {
    "firstgid": 1,

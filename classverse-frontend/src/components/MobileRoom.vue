@@ -59,7 +59,7 @@ const zoneKey = computed(() => {
 const near = computed(() => {
   void tick.value
   void online.value
-  return nearby(world, 160)
+  return nearby(world, map.value?.nearRadius ?? 160)
 })
 const lastNear = computed(() => {
   void chatVersion.value

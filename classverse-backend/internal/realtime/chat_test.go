@@ -92,6 +92,26 @@ func TestChatNearRadius(t *testing.T) {
 	}
 }
 
+// In a classroom near chat reaches 3 tiles (96 px), not the campus 5.
+func TestChatNearRadiusPerMap(t *testing.T) {
+	r, _ := newMapRoom(t, "classroom", false)
+	a, b, far := r.testJoin(t, "Ani"), r.testJoin(t, "Budi"), r.testJoin(t, "Jauh")
+	x, y, _ := r.mapd.SpawnPoint(0)
+	r.place(a, x, y)
+	r.place(b, x, y+96)    // exactly on the radius
+	r.place(far, x, y+128) // inside the campus range, outside the room range
+	drain(a)
+	drain(b)
+	drain(far)
+	r.say(a, ScopeNear, "halo")
+	if len(chats(t, b)) != 1 {
+		t.Error("avatar at 96 px did not receive")
+	}
+	if len(chats(t, far)) != 0 {
+		t.Error("avatar at 128 px received room near chat")
+	}
+}
+
 func TestChatHeldAvatarDoesNotReceive(t *testing.T) {
 	r, _ := newMapRoom(t, "campus", false)
 	a, b := r.testJoin(t, "Ani"), r.testJoin(t, "Budi")

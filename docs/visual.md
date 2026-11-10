@@ -58,15 +58,21 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
 │            Papan tulis                               │ │ pesan…     │
 │   Meja 1   Meja 2   Meja 3            (peta)         │ │            │
 │            Pintu keluar                              │ │            │
-│ (mic)  Mikrofon mati · Meja 1  [Bicara ke semua ·]   │ │ [input][>] │
+│ (mic) Mendengar Meja 1 · mikrofon mati [Bicara semua] │ │ [input][>] │
 └─────────────────────────────────────────────────────┘ └────────────┘
 ```
 
 - Baris atas: tombol kembali (ikon + `aria-label`), nama ruang, jumlah online; pengajar menambah Kumpulkan peserta,
   Kunci ruang, Chat semua ruangan, dan Peserta (popover moderasi). Peta sekolah: nama sekolah + Daftar gedung.
 - Baris bawah: mic bulat 52 px, status suara, Bicara ke semua ruang (pengajar), petunjuk gerak.
-- Kedua baris ikut alur (bukan melayang di atas lantai); peta di-fit di antaranya. Saat layar sempit, tombol turun
-  ke baris baru dan peta mengecil.
+- Kedua rail melayang di atas peta, satu baris dengan tinggi tetap 60 px; kamera di-fit di pita antara keduanya.
+  Chip kanal suara berlebar tetap; pesan/error melayang di atas rail, tidak menambah tinggi. Status sambungan
+  memakai garis putus-putus dan teks, bukan warna saja. Kontrol pengajar memakai popover **Peserta & chat**.
+- Jalur klik mengutamakan jalan di luar meja selain meja asal/tujuan untuk mengurangi perpindahan kanal suara;
+  meja tetap dapat dilalui jika tidak ada jalan lain.
+- Tombol kembali bernama **Keluar ruang**: dari mana saja, avatar berjalan sendiri ke Pintu keluar lalu keluar (tanpa
+  teleport; server tetap memeriksa jarak pintu). Bila tidak sampai dalam 15 detik, batalkan proses keluar otomatis
+  dan beri tahu pengguna; jangan mengirim travel belakangan tanpa klik baru.
 - Toggle menyebut aksinya ("Kunci ruang"); statusnya pill kecil Aktif/Mati, aktif bergaris Nila. `role="switch"`.
 - Peta kelas memberi label "Papan tulis" dan "Pintu keluar"; label zona di kiri bawah meja agar tidak tertutup
   avatar di kursi atas; name tag yang bertumpuk digeser ke bawah.
@@ -82,7 +88,9 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
 - Setiap gedung punya label mengambang (nama + badge jumlah/status) dan satu pintu sebagai titik `travel`.
 - Ruang kelas: lantai kayu dengan grid tile, papan tulis di atas, meja diskusi sebagai zona bergaris putus-putus Mangga;
   zona tempat pemain berada diberi garis solid dan isi lebih tebal.
-- Radius proximity pemain: lingkaran putus-putus Nila tipis. Pembicara aktif (M2): cincin `--color-speaking`.
+- Radius proximity pemain: lingkaran putus-putus Nila mengikuti `near_tiles` peta, sama dengan jangkauan chat
+  Dekat di server: sekolah 5 tile (160 px), kelas/taman 3 tile (96 px). Ini radius jarak, bukan batas privasi meja;
+  suara dan chat Meja tetap dibatasi zona. Pembicara aktif (M2): cincin `--color-speaking`.
 - Name tag: pill putih teks 12 px; pemain sendiri pill Tinta, pengajar pill Nila.
 
 ## Avatar

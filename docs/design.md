@@ -157,7 +157,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 **Reconnect.** Client otomatis menyambung ulang dengan backoff 1, 2, 4, 8 detik. Jika kembali dalam 30 detik, posisi terakhir dipertahankan dan peserta lain tidak melihat `left`.
 
-**Proximity.** Penerima chat `near` dihitung server dari jarak tile (default radius 5). Zona dibaca dari layer objek di file Tiled. Untuk 40 orang per room, perhitungan O(n²) per tick masih sangat murah, jadi spatial index belum diperlukan.
+**Proximity.** Penerima chat `near` dihitung server dari jarak Euclid titik kaki. Properti peta Tiled `near_tiles` menentukan radius (bilangan bulat 1–10, default 5), dikalikan ukuran tile: peta sekolah 5 tile (160 px), kelas/taman 3 tile (96 px), sesuai revisi yang disetujui setelah slice 9. Server dan frontend membaca properti yang sama. Zona dibaca dari layer objek di file Tiled. Untuk 40 orang per room, perhitungan O(n²) per tick masih sangat murah, jadi spatial index belum diperlukan.
 
 **Peta sekolah.** Setiap organisasi punya satu room dengan `map_key = 'campus'`, dibuat otomatis saat organisasi dibuat; semua peserta muncul di sini setelah masuk. Kapasitasnya 200, jadi `snapshot` hanya berisi avatar dalam radius 24 tile dari penerima (area of interest berbasis grid sel 8×8 tile), agar bandwidth per peserta tetap kecil. Gedung dan pintunya didefinisikan di layer objek file Tiled peta sekolah; setiap ruang menyimpan `building_key` gedungnya. Satu koneksi WebSocket dipakai sepanjang sesi: `travel` memindahkan peserta antar room di dalam hub, dan keluar dari ruang mengembalikannya ke pintu gedung asal.
 
@@ -530,8 +530,10 @@ Contoh potongan OpenAPI untuk satu endpoint:
 
 ## Slice 6 — Chat dan zona (C6-01…C6-10 disetujui)
 
-- *Dekat.* Penerima `near` = avatar terhubung dengan jarak Euclid titik kaki ≤ 160 px (5 tile) saat pesan diterima server;
-  pengirim selalu menerima salinannya. Berlaku di peta sekolah juga. Avatar dalam grace reconnect tidak menerima.
+- *Dekat.* Penerima `near` = avatar terhubung dengan jarak Euclid titik kaki ≤ radius peta saat pesan diterima server:
+  peta sekolah 160 px (5 tile), kelas/taman 96 px (3 tile), dari properti Tiled `near_tiles` (default 5, rentang 1–10).
+  Revisi setelah slice 9 ini memperkecil jangkauan ruang, bukan mengubah isolasi suara atau chat zona.
+  Pengirim selalu menerima salinannya. Avatar dalam grace reconnect tidak menerima.
 - *Zona.* Layer objek `zones` pada classroom/garden: persegi dengan properti `key` unik, nama objek = label. Zona aktif =
   persegi yang memuat titik kaki, dihitung server tiap tick; perubahan dikirim `zone {key, name}` hanya ke pemiliknya
   (`key` kosong = keluar zona). Peta sekolah tanpa zona.
@@ -608,7 +610,7 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
   like spawn); `zone: ""` returns to the spawn ("Area umum"). Unknown zone → `bad_message`; campus or map
   connection → `forbidden`. Zone/snapshot follow on the next tick; gather still moves everyone to spawn. Map parsing
   rejects zones without a walkable tile.
-- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (≤160 px) are computed from welcome/snapshot
+- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (within the map's `near_tiles` radius) are computed from welcome/snapshot
   positions; building counts reuse `buildings`, room rows reuse the rooms list (`people`, `live`).
 - *Teacher.* Phone keeps the announcement tab and the teacher panel (collapsible).
 

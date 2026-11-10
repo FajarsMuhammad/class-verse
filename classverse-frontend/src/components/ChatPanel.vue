@@ -130,7 +130,9 @@ function time(iso: string) {
       <p v-if="!lines.length" class="empty">
         {{
           tab === 'near'
-            ? 'Belum ada pesan. Orang dalam 5 tile darimu bisa membaca pesan di sini.'
+            ? campus
+              ? 'Belum ada pesan. Orang di dalam lingkaran di sekitarmu bisa membaca pesan di sini.'
+              : 'Belum ada pesan. Orang di dalam lingkaran, sekitar satu meja, bisa membaca pesan di sini.'
             : tab === 'zone'
               ? 'Belum ada pesan di meja ini.'
               : 'Belum ada pesan untuk semua orang.'

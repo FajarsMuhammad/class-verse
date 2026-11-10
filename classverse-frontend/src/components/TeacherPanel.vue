@@ -56,8 +56,13 @@ function doKick() {
 
 <template>
   <div class="teacher" :class="{ floating }" aria-label="Kontrol pengajar" role="group">
-    <button class="btn-secondary" :disabled="status !== 'open' || traveling" @click="gather">
-      Kumpulkan peserta
+    <button
+      class="btn-secondary"
+      :disabled="status !== 'open' || traveling"
+      title="Pindahkan semua peserta ke titik kumpul"
+      @click="gather"
+    >
+      Kumpulkan
     </button>
     <button
       type="button"
@@ -70,71 +75,75 @@ function doKick() {
       Kunci ruang
       <span class="state" aria-hidden="true">{{ locked ? 'Aktif' : 'Mati' }}</span>
     </button>
-    <button
-      type="button"
-      class="btn-secondary switch"
-      role="switch"
-      :aria-checked="allChat"
-      :disabled="toggling || status !== 'open'"
-      @click="toggleAllChat"
-    >
-      Chat semua ruangan
-      <span class="state" aria-hidden="true">{{ allChat ? 'Aktif' : 'Mati' }}</span>
-    </button>
-    <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
-    <details class="moderation">
-      <summary class="btn-secondary">Peserta ({{ participants.length }})</summary>
-      <div class="people-panel">
-      <p v-if="!participants.length" class="room-meta">Belum ada peserta lain.</p>
-      <ul class="people">
-        <li v-for="p in participants" :key="p.id">
-          <span
-            >{{ p.name }}<template v-if="mutedIds.includes(p.id)"> (dibisukan)</template></span
-          >
-          <button
-            type="button"
-            class="btn-secondary"
-            :aria-label="`${mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan'} ${p.name}`"
-            :disabled="status !== 'open'"
-            @click="moderate(mutedIds.includes(p.id) ? 'unmute' : 'mute', p.id)"
-          >
-            {{ mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan' }}
-          </button>
-          <button
-            type="button"
-            class="btn-secondary"
-            :aria-label="`Keluarkan ${p.name} dari sesi`"
-            :disabled="status !== 'open'"
-            @click="confirmKick = p"
-          >
-            Keluarkan
-          </button>
-        </li>
-      </ul>
-      <div v-if="confirmKick" class="confirm" role="alertdialog" aria-labelledby="kick-q">
-        <p id="kick-q">
-          Keluarkan {{ confirmKick.name }}? Ia tidak bisa masuk lagi ke sesi ini sampai kamu
-          izinkan.
-        </p>
-        <button type="button" class="btn-primary" @click="doKick">Ya, keluarkan</button>
-        <button type="button" class="btn-secondary" @click="confirmKick = null">Batal</button>
-      </div>
-      <template v-if="banned.length">
-        <p class="room-meta">Dikeluarkan dari sesi ini</p>
+    <details class="more">
+      <summary class="btn-secondary">
+        Peserta &amp; chat
+        <span class="state" aria-hidden="true">{{ participants.length }}</span>
+      </summary>
+      <div class="panel">
+        <button
+          type="button"
+          class="btn-secondary switch wide"
+          role="switch"
+          :aria-checked="allChat"
+          :disabled="toggling || status !== 'open'"
+          @click="toggleAllChat"
+        >
+          Chat semua ruangan
+          <span class="state" aria-hidden="true">{{ allChat ? 'Aktif' : 'Mati' }}</span>
+        </button>
+        <p v-if="toggleError" role="alert" class="toggle-error">{{ toggleError }}</p>
+        <h3>Peserta ({{ participants.length }})</h3>
+        <p v-if="!participants.length" class="room-meta">Belum ada peserta lain.</p>
         <ul class="people">
-          <li v-for="b in banned" :key="b.id">
-            <span>{{ b.name }}</span>
+          <li v-for="p in participants" :key="p.id">
+            <span
+              >{{ p.name }}<template v-if="mutedIds.includes(p.id)"> (dibisukan)</template></span
+            >
             <button
               type="button"
               class="btn-secondary"
-              :aria-label="`Izinkan ${b.name} masuk lagi`"
-              @click="allow(b.id)"
+              :aria-label="`${mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan'} ${p.name}`"
+              :disabled="status !== 'open'"
+              @click="moderate(mutedIds.includes(p.id) ? 'unmute' : 'mute', p.id)"
             >
-              Izinkan
+              {{ mutedIds.includes(p.id) ? 'Aktifkan chat' : 'Bisukan' }}
+            </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              :aria-label="`Keluarkan ${p.name} dari sesi`"
+              :disabled="status !== 'open'"
+              @click="confirmKick = p"
+            >
+              Keluarkan
             </button>
           </li>
         </ul>
-      </template>
+        <div v-if="confirmKick" class="confirm" role="alertdialog" aria-labelledby="kick-q">
+          <p id="kick-q">
+            Keluarkan {{ confirmKick.name }}? Ia tidak bisa masuk lagi ke sesi ini sampai kamu
+            izinkan.
+          </p>
+          <button type="button" class="btn-primary" @click="doKick">Ya, keluarkan</button>
+          <button type="button" class="btn-secondary" @click="confirmKick = null">Batal</button>
+        </div>
+        <template v-if="banned.length">
+          <h3>Dikeluarkan dari sesi ini</h3>
+          <ul class="people">
+            <li v-for="b in banned" :key="b.id">
+              <span>{{ b.name }}</span>
+              <button
+                type="button"
+                class="btn-secondary"
+                :aria-label="`Izinkan ${b.name} masuk lagi`"
+                @click="allow(b.id)"
+              >
+                Izinkan
+              </button>
+            </li>
+          </ul>
+        </template>
       </div>
     </details>
   </div>
@@ -144,32 +153,58 @@ function doKick() {
 .teacher {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
 }
-.moderation summary {
-  list-style: none;
+/* In the map rail: one line, never wraps (the rail has a fixed height). */
+.floating {
+  flex: none;
+  flex-wrap: nowrap;
 }
-.moderation summary::-webkit-details-marker {
+.floating .btn-secondary {
+  min-height: var(--touch-min);
+  white-space: nowrap;
+}
+.more summary {
+  list-style: none;
+  gap: var(--space-2);
+}
+.more summary::-webkit-details-marker {
   display: none;
 }
-.people-panel {
+.more[open] summary {
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+}
+.panel {
+  display: grid;
+  gap: var(--space-2);
   margin-top: var(--space-2);
 }
-.floating .moderation {
+.floating .more {
   position: relative;
 }
-.floating .people-panel {
+.floating .panel {
   position: absolute;
   z-index: 3;
-  top: 100%;
+  top: calc(100% + var(--space-3));
   right: 0;
-  width: min(340px, 80vw);
+  width: min(22rem, 80vw);
   max-height: 60vh;
   overflow-y: auto;
   padding: var(--space-4);
   background: var(--color-surface);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raise);
+}
+.wide {
+  width: 100%;
+  justify-content: space-between;
+}
+h3 {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-md);
 }
 /* Setting name stays on the button; the pill shows its state. */
 .switch {
@@ -192,7 +227,7 @@ function doKick() {
 .people {
   list-style: none;
   padding: 0;
-  margin: 0 0 var(--space-3);
+  margin: 0;
   display: grid;
   gap: var(--space-2);
 }
@@ -212,14 +247,15 @@ function doKick() {
   padding: var(--space-3);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
-  margin-bottom: var(--space-3);
+}
+.confirm p,
+.room-meta {
+  margin: 0;
 }
 .room-meta {
-  margin: 0 0 var(--space-3);
   color: var(--color-ink-muted);
 }
 .toggle-error {
-  flex-basis: 100%;
   margin: 0;
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);

@@ -18,10 +18,9 @@ const (
 	buildingsEvery   = 50               // ticks (5 s)
 	inboxSize        = 256
 	campusKey        = "campus"
-	doorRadius       = 48.0  // px from a door or exit point
-	nearRadius       = 160.0 // px (5 tiles) for near chat
-	chatRate         = 3.0   // messages per second
-	chatBurst        = 5.0   // messages
+	doorRadius       = 48.0 // px from a door or exit point
+	chatRate         = 3.0  // messages per second
+	chatBurst        = 5.0  // messages
 	staffBuildingKey = "ruang-guru"
 )
 
@@ -647,7 +646,7 @@ func (r *room) chat(c chatCmd) {
 	switch c.scope {
 	case ScopeNear:
 		for _, o := range r.members {
-			if o == m || (o.conn != nil && math.Hypot(float64(o.p.X-m.p.X), float64(o.p.Y-m.p.Y)) <= nearRadius) {
+			if o == m || (o.conn != nil && math.Hypot(float64(o.p.X-m.p.X), float64(o.p.Y-m.p.Y)) <= float64(r.mapd.NearRadius)) {
 				to = append(to, o)
 			}
 		}

@@ -5,8 +5,15 @@ const MAX_EXPANDED = 6000
 
 // findPath returns waypoints (tile centres, in pixels) from `from` to `to`
 // using A* on the collision grid with 8-way moves that never cut corners.
-// It returns [] when the target is blocked or unreachable.
-export function findPath(map: MapData, from: Vec, to: Vec): Vec[] {
+// It returns [] when the target is blocked or unreachable. `penalty` adds a
+// cost per entered tile (e.g. other tables, so a walk does not cut through
+// them); a penalised tile is still usable when it is the only way.
+export function findPath(
+  map: MapData,
+  from: Vec,
+  to: Vec,
+  penalty?: (tx: number, ty: number) => number,
+): Vec[] {
   const ts = map.tileSize
   const sx = Math.floor(from.x / ts)
   const sy = Math.floor(from.y / ts)
@@ -35,7 +42,7 @@ export function findPath(map: MapData, from: Vec, to: Vec): Vec[] {
     closed.add(k)
     const cx = k % w
     const cy = Math.floor(k / w)
-    if (cx === gx && cy === gy) return smooth(map, from, rebuild(came, k, w, ts, to))
+    if (cx === gx && cy === gy) return smooth(map, from, rebuild(came, k, w, ts, to), penalty)
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue
@@ -50,7 +57,8 @@ export function findPath(map: MapData, from: Vec, to: Vec): Vec[] {
           continue
         const nk = key(nx, ny)
         if (closed.has(nk)) continue
-        const cost = (g.get(k) ?? 0) + (dx !== 0 && dy !== 0 ? Math.SQRT2 : 1)
+        const cost =
+          (g.get(k) ?? 0) + (dx !== 0 && dy !== 0 ? Math.SQRT2 : 1) + (penalty?.(nx, ny) ?? 0)
         if (cost < (g.get(nk) ?? Infinity)) {
           g.set(nk, cost)
           came.set(nk, k)
@@ -75,13 +83,36 @@ function rebuild(came: Map<number, number>, end: number, w: number, ts: number, 
 }
 
 // smooth drops waypoints that can be skipped with a clear straight line.
-function smooth(map: MapData, from: Vec, path: Vec[]): Vec[] {
+// A shortcut is taken only if it is clear and enters no penalised tile the
+// A* route avoided.
+function smooth(
+  map: MapData,
+  from: Vec,
+  path: Vec[],
+  penalty?: (tx: number, ty: number) => number,
+): Vec[] {
+  const ts = map.tileSize
+  const costly = (a: Vec, b: Vec) => {
+    if (!penalty) return false
+    const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8)
+    for (let s = 0; s <= steps; s++) {
+      const t = steps > 0 ? s / steps : 1
+      const tx = Math.floor((a.x + (b.x - a.x) * t) / ts)
+      const ty = Math.floor((a.y + (b.y - a.y) * t) / ts)
+      if (penalty(tx, ty) > 0) return true
+    }
+    return false
+  }
   const out: Vec[] = []
   let anchor = from
   let i = 0
   while (i < path.length) {
     let j = path.length - 1
-    while (j > i && !map.pathClear(anchor.x, anchor.y, path[j]!.x, path[j]!.y)) j--
+    while (
+      j > i &&
+      (!map.pathClear(anchor.x, anchor.y, path[j]!.x, path[j]!.y) || costly(anchor, path[j]!))
+    )
+      j--
     out.push(path[j]!)
     anchor = path[j]!
     i = j + 1
