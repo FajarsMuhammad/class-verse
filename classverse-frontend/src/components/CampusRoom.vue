@@ -275,6 +275,8 @@ onBeforeUnmount(() => {
                 speaking: () => voice?.speaking.value ?? new Set(),
                 inset: () => inset,
                 walkTarget: () => walkTarget,
+                lit: () =>
+                  new Set(buildings.filter((b) => b.people > 0).map((b) => b.building_key)),
               }"
               :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
             />
@@ -644,6 +646,11 @@ li span {
 .kantin {
   border-color: var(--roof-canteen);
 }
+.lab { border-color: var(--roof-lab); }
+.studio { border-color: var(--roof-studio); }
+.mushola { border-color: var(--roof-mosque); }
+.uks { border-color: var(--roof-clinic); }
+.kebun,
 .taman,
 .lapangan {
   border-color: var(--color-speaking);

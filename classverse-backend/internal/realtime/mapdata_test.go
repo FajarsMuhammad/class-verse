@@ -22,16 +22,25 @@ func loadCampus(t *testing.T) *MapData {
 
 func TestParseCampus(t *testing.T) {
 	m := loadCampus(t)
-	if m.Width != 64 || m.Height != 40 || m.TileSize != 32 {
+	// Slice 10: the campus is a 128x80 world (W10-01).
+	if m.Width != 128 || m.Height != 80 || m.TileSize != 32 {
 		t.Errorf("size = %dx%d@%d", m.Width, m.Height, m.TileSize)
 	}
 	keys := map[string]Building{}
 	for _, b := range m.Buildings {
 		keys[b.Key] = b
 	}
-	for _, k := range []string{"kelas-a", "kelas-b", "ruang-guru", "perpustakaan", "aula", "kantin", "taman", "lapangan"} {
+	for _, k := range []string{"kelas-a", "kelas-b", "kelas-c", "ruang-guru", "perpustakaan", "kantin", "taman", "lapangan"} {
 		if _, ok := keys[k]; !ok {
 			t.Errorf("missing building %q", k)
+		}
+	}
+	if len(keys) != 8 {
+		t.Errorf("building count = %d, want 8", len(keys))
+	}
+	for _, key := range []string{"kebun", "lab", "aula", "uks", "studio", "mushola"} {
+		if _, ok := keys[key]; ok {
+			t.Errorf("removed building %q still present", key)
 		}
 	}
 	if !keys["ruang-guru"].StaffOnly || keys["kelas-a"].StaffOnly {
@@ -53,6 +62,40 @@ func TestParseCampus(t *testing.T) {
 	if m.PathClear(a.DoorX, a.DoorY, a.DoorX, a.DoorY-3*m.TileSize) {
 		t.Error("path through a wall should not be clear")
 	}
+	// Every door is a walkable stand reachable on foot from the spawn.
+	sx, sy, _ := m.SpawnPoint(0)
+	for _, b := range m.Buildings {
+		if m.Blocked(b.DoorX, b.DoorY) {
+			t.Errorf("%s door %d,%d is blocked", b.Key, b.DoorX, b.DoorY)
+		}
+		if !reachable(m, sx, sy, b.DoorX, b.DoorY) {
+			t.Errorf("%s door unreachable from spawn", b.Key)
+		}
+	}
+}
+
+// reachable floods walkable tiles (4-neighbour) from one pixel point to another.
+func reachable(m *MapData, x0, y0, x1, y1 int) bool {
+	ts := m.TileSize
+	start, goal := [2]int{x0 / ts, y0 / ts}, [2]int{x1 / ts, y1 / ts}
+	seen := map[[2]int]bool{start: true}
+	queue := [][2]int{start}
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		if c == goal {
+			return true
+		}
+		for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+			n := [2]int{c[0] + d[0], c[1] + d[1]}
+			if seen[n] || m.Blocked(n[0]*ts+ts/2, n[1]*ts+ts/2) {
+				continue
+			}
+			seen[n] = true
+			queue = append(queue, n)
+		}
+	}
+	return false
 }
 
 func TestMapWalkSpeeds(t *testing.T) {

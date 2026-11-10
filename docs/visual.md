@@ -81,7 +81,8 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
 
 ## Peta (Phaser)
 
-- Gaya top-down, flat, sudut membulat; palet `--map-*` dan `--roof-*` di `tokens.css`.
+- Kampus top-down pixel art: atap miring bertekstur dengan sisi gelap, fasad bertingkat, lis/tiang, jendela dan pintu yang terbaca pada overview. Palet `--map-*` dan `--roof-*` di `tokens.css`.
+- Dunia kampus 128×80 tile berisi 8 gedung/area (Kelas A/B/C, Ruang Guru, Perpustakaan, Kantin, Taman, Lapangan), jalan, alun-alun, kolam, bangku, lampu dan bunga. Kamera tetap overview tanpa follow/minimap. Jendela menyala bila gedung dihuni; riak air, daun, bendera dan cahaya lampu memakai overlay jarang yang dinonaktifkan oleh reduced motion.
 - Peta sekolah: jalan berbentuk salib dengan alun-alun bertiang bendera di tengah (titik spawn).
   Gedung: Kelas A, Kelas B (atap Nila), Ruang Guru (bergembok, khusus pengajar), Perpustakaan (zona hening, chat saja),
   Aula, Kantin, Taman diskusi, Lapangan.

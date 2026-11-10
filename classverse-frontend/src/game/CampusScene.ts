@@ -8,6 +8,7 @@ import type { World } from '@/realtime/world'
 import { avatarChoices, avatarKey, avatarURL, avatarSheetURL, avatarFrame } from './avatars'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
+import { drawCampusAmbient } from './campusAmbient'
 import { roomArt, roomLandmarks } from './roomArt'
 import { stackLabels } from './layout'
 
@@ -24,6 +25,8 @@ export interface SceneDeps {
   inset?: () => { top: number; bottom: number }
   // walkTarget is set by the UI ("Keluar ruang") to walk to a map point.
   walkTarget?: () => { x: number; y: number; id: number } | null
+  // lit returns building keys with people inside; their windows glow (W10-03).
+  lit?: () => Set<string>
 }
 
 
@@ -62,6 +65,10 @@ export class CampusScene extends Phaser.Scene {
   private movementRevision = 0
   private walkId = 0
   private fitted = ''
+  private litKeys = ''
+  private ambient: Phaser.GameObjects.Graphics | null = null
+  private ambientFrame = -1
+  private art: Phaser.GameObjects.Image | null = null
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
   constructor() {
@@ -89,7 +96,11 @@ export class CampusScene extends Phaser.Scene {
         ? campusArt(map)
         : roomArt(map, this.deps.world.mapKey ?? 'classroom'),
     )
-    this.add.image(0, 0, 'campus-art').setOrigin(0).setDisplaySize(map.pixelWidth, map.pixelHeight)
+    this.art = this.add
+      .image(0, 0, 'campus-art')
+      .setOrigin(0)
+      .setDisplaySize(map.pixelWidth, map.pixelHeight)
+    if (this.deps.world.mapKey === 'campus') this.ambient = this.add.graphics().setDepth(0.5)
     this.fitCamera()
     this.scale.on('resize', this.fitCamera, this)
     this.events.once('shutdown', () => this.scale.off('resize', this.fitCamera, this))
@@ -167,6 +178,13 @@ export class CampusScene extends Phaser.Scene {
     }
     const inset = this.deps.inset?.()
     if (inset && `${inset.top},${inset.bottom}` !== this.fitted) this.fitCamera()
+    this.relight()
+    const ambientFrame = this.reducedMotion.matches ? -1 : Math.floor(time / 350) % 4
+    if (this.ambient && ambientFrame !== this.ambientFrame) {
+      this.ambientFrame = ambientFrame
+      if (ambientFrame < 0) this.ambient.clear()
+      else drawCampusAmbient(this.ambient, map, ambientFrame)
+    }
 
     this.focused = this.game.canvas.parentElement === document.activeElement
     // A UI walk ("Keluar ruang") runs without canvas focus; keys still need it.
@@ -374,6 +392,19 @@ export class CampusScene extends Phaser.Scene {
     const tag = this.makeTag(name, kind)
     tag.setPosition(x, y + 6)
     return { body, tag, name }
+  }
+
+  // relight repaints the campus when the set of occupied buildings changes
+  // (buildings arrive every 5 s), so this is rare and off the hot path.
+  private relight() {
+    if (this.deps.world.mapKey !== 'campus' || !this.art) return
+    const lit = this.deps.lit?.() ?? new Set<string>()
+    const key = [...lit].sort().join(',')
+    if (key === this.litKeys) return
+    this.litKeys = key
+    const texture = this.textures.get('campus-art') as Phaser.Textures.CanvasTexture
+    texture.context.drawImage(campusArt(this.deps.map, lit), 0, 0)
+    texture.refresh()
   }
 
   private sizeAvatar(body: Phaser.GameObjects.Image) {

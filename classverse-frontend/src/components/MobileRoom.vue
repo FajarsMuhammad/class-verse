@@ -346,6 +346,10 @@ h2 {
 .buildings > li.canteen {
   --bar: var(--roof-canteen);
 }
+.buildings > li.lab { --bar: var(--roof-lab); }
+.buildings > li.studio { --bar: var(--roof-studio); }
+.buildings > li.mosque { --bar: var(--roof-mosque); }
+.buildings > li.clinic { --bar: var(--roof-clinic); }
 .building {
   width: 100%;
   min-height: var(--touch-min);

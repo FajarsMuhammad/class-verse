@@ -30,6 +30,13 @@ const STYLES: TileStyle[] = [
   { token: '--map-path', shade: -0.06, draw: 'flag' }, // 16 flag pole
   { token: '--map-grass', draw: 'tree' }, // 17 tree
   { token: '--map-grass' }, // 18 collision marker (never drawn)
+  { token: '--roof-lab' }, // 19
+  { token: '--roof-studio' }, // 20
+  { token: '--roof-mosque' }, // 21
+  { token: '--roof-clinic' }, // 22
+  { token: '--map-lamp' }, // 23 lamp
+  { token: '--map-flower' }, // 24 flower bed
+  { token: '--map-sand' }, // 25 sand
 ]
 
 export const TILE_COUNT = STYLES.length
