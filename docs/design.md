@@ -94,7 +94,7 @@ Struktur frontend:
 classverse-frontend/
 ├── src/
 │   ├── api/                  # pemanggil REST (fetch), satu file per fitur
-│   ├── assets/avatars/       # avatar preset (SVG)
+│   ├── assets/avatars/       # legacy SVG + sporty PNG spritesheets
 │   ├── assets/fonts/         # Fredoka, Nunito (SIL OFL, self-hosted)
 │   ├── realtime/             # klien WebSocket; messages.ts mencerminkan internal/realtime/message.go
 │   ├── router/
@@ -491,13 +491,21 @@ Contoh potongan OpenAPI untuk satu endpoint:
   nama OAuth tidak valid diganti `Pengguna`. Filter awal daftar kecil milik proyek Indonesia/English,
   case-insensitive kata utuh (huruf/angka sebagai batas), bukan substring; belum mendeteksi semua obfuscation.
 - `PATCH /api/me`: `display_name?`, `avatar_key?`, `birth_date?`; omitted tidak berubah, null ditolak,
-  validasi atomik sebelum update. Avatar allowlist enam aksesori × `nila`/`mangga`, key `<aksesori>-<warna>`;
-  `default` tetap sah dan fallback renderer. Tidak ada upload/URL bebas.
+  validasi atomik sebelum update. Revisi US-04 setelah slice 9: avatar sporty memakai key
+  `sporty-<gaya>-<warna>`; gaya `runner`, `cap`, `headphones`, `varsity`, `ponytail`, `hoodie`, `glasses`,
+  warna `nila`, `mangga`, `zamrud`, `laut`, `koral`, `grafit` (42 kombinasi).
+  Allowlist lama enam aksesori × `nila`/`mangga` dan `default` tetap diterima dan dirender tanpa migrasi paksa.
+  Tidak ada upload/URL bebas. Kontrak OpenAPI dan tipe kedua project mencakup kedua kelompok.
 - Setelah DB commit, publish identitas melalui inbox room: `profile_updated {id, name, avatar}`.
   DB sumber kebenaran; publish gagal tidak mengubah sukses simpan. Reconnect membaca identitas terbaru.
   Room hanya memperbarui peserta yang ada, tanpa mengubah posisi/kehadiran.
-- Header membuka dialog Profil: preview, nama, 12 radio avatar, Simpan/Batal; fokus native dialog,
-  loading, error per field dan status sukses. Nilai tersimpan hanya diganti respons server.
+- Header membuka dialog Profil: preview, nama, tujuh radio gaya dan enam radio warna, Simpan/Batal;
+  fokus native dialog, loading, error per field dan status sukses. Pilihan avatar lama tidak diganti jika
+  pengguna hanya mengubah nama. Nilai tersimpan hanya diganti respons server.
+- Peta memuat PNG spritesheet 32×48 px/frame, baris depan/kiri/kanan/belakang, lima kolom (diam + empat
+  frame jalan 8 fps). Ukuran layar 32×48 px, anchor kaki (16,46), nearest-neighbor. Animasi mengikuti perubahan
+  posisi render, bukan tombol saja; berhenti/kurangi gerakan menampilkan frame diam sesuai arah.
+  Aset tidak mengubah collision, koordinat, protokol movement, atau voice. Avatar SVG lama tetap 36×36 px.
 
 ## Slice 5 — Ruang dan travel (R5-01…R5-08 disetujui)
 

@@ -73,6 +73,23 @@ func validAvatar(key string) bool {
 	if key == "default" {
 		return true
 	}
+	if sporty, ok := strings.CutPrefix(key, "sporty-"); ok {
+		style, color, found := strings.Cut(sporty, "-")
+		if !found {
+			return false
+		}
+		switch color {
+		case "nila", "mangga", "zamrud", "laut", "koral", "grafit":
+		default:
+			return false
+		}
+		switch style {
+		case "runner", "cap", "headphones", "varsity", "ponytail", "hoodie", "glasses":
+			return true
+		default:
+			return false
+		}
+	}
 	accessory, color, ok := strings.Cut(key, "-")
 	if !ok || (color != "nila" && color != "mangga") {
 		return false

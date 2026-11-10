@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avatar sporty — aset dan animasi jalan</title>
+<link rel="stylesheet" href="../../classverse-frontend/src/styles/tokens.css">
+<style>
+*{box-sizing:border-box}body{margin:0;padding:var(--space-8);font:var(--text-base)/var(--line-relaxed) var(--font-body);color:var(--color-ink);background:var(--color-bg)}main{max-width:1240px;margin:auto}h1,h2,p,figure{margin:0}h1,h2{font-family:var(--font-display);font-weight:var(--weight-semibold)}h1{font-size:var(--text-3xl);line-height:var(--line-tight)}h2{font-size:var(--text-xl)}header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);margin-bottom:var(--space-6)}.muted{font-size:var(--text-md);color:var(--color-ink-muted)}.controls{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;margin:var(--space-6) 0}.controls strong{margin-right:var(--space-2)}button{min-height:var(--touch-min);min-width:var(--touch-min);padding:var(--space-2) var(--space-4);border:2px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-ink);font:inherit;font-weight:var(--weight-bold);cursor:pointer}button[aria-pressed=true]{background:var(--color-primary);color:var(--color-surface);border-color:var(--color-primary)}button:focus-visible{outline:3px solid var(--color-ink);outline-offset:3px}.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--space-4)}.preset{background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);text-align:center}.pair{display:flex;justify-content:center;gap:var(--space-4);padding:var(--space-4) 0 var(--space-6)}canvas{image-rendering:pixelated;width:64px;height:96px}.pair canvas{width:48px;height:72px}.directions{display:flex;justify-content:space-evenly;align-items:end;background:var(--map-grass);border-radius:var(--radius-lg);padding:var(--space-6);gap:var(--space-4);margin:var(--space-6) 0}figure{display:grid;justify-items:center;gap:var(--space-3)}figcaption{font-size:var(--text-sm);font-weight:var(--weight-bold)}.spec{display:flex;gap:var(--space-8);padding:var(--space-5) 0;border-top:1px solid var(--color-border);flex-wrap:wrap}.spec strong{display:block}.size-row{display:flex;gap:var(--space-8);align-items:end;margin-top:var(--space-4)}.size-row canvas{width:32px;height:48px}.size-row .large{width:64px;height:96px}.note{margin-top:var(--space-6);font-size:var(--text-sm);color:var(--color-ink-muted)}@media(max-width:1000px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:600px){body{padding:var(--space-4)}header{display:block}header p{margin-top:var(--space-3)}.grid{grid-template-columns:repeat(2,1fr);gap:var(--space-3)}.preset{padding:var(--space-3)}.pair{gap:var(--space-2)}.directions{padding:var(--space-4) var(--space-2);gap:var(--space-2)}.directions canvas{width:48px;height:72px}}
+</style>
+</head>
+<body><main>
+<header><h1>Avatar sporty.<br>Sekarang bisa berjalan.</h1><p class="muted">42 spritesheet transparan<br>Empat arah · headphone tanpa mikrofon</p></header>
+<section aria-label="Empat arah berjalan"><div class="directions" id="directions"></div></section>
+<div class="controls"><strong>Arah galeri</strong><div role="group" aria-label="Pilih arah avatar" id="buttons"></div><button id="toggle" type="button">Jeda animasi</button><span id="status" class="muted" role="status"></span></div>
+<section class="grid" id="gallery" aria-label="Contoh variasi avatar"></section>
+<div class="spec"><p><strong>32 × 48 px</strong><span class="muted">Ukuran setiap frame</span></p><p><strong>4 frame jalan per arah</strong><span class="muted">8 fps, ditambah pose diam</span></p><p><strong>Titik kaki tetap</strong><span class="muted">Anchor (16, 46), latar transparan</span></p></div>
+<section><h2>Ukuran layar dan pembesaran</h2><div class="size-row"><figure><canvas data-key="headphones-nila" width="32" height="48"></canvas><figcaption>48 px</figcaption></figure><figure><canvas class="large" data-key="headphones-nila" width="32" height="48"></canvas><figcaption>96 px · 2×</figcaption></figure></div></section>
+<p class="note">Preview aset, bukan integrasi aplikasi. Peta dan profil belum diganti. Pengaturan kurangi gerakan memulai preview dalam pose diam; animasi dapat dijalankan lewat tombol.</p>
+</main><script>
+const base='../../classverse-frontend/src/assets/avatars/sporty/';
+const styles=[['runner','Pelari'],['cap','Topi sport'],['headphones','Headphone'],['varsity','Varsity'],['ponytail','Kuncir'],['hoodie','Hoodie'],['glasses','Kacamata']];
+const dirs=[['down','Depan'],['left','Kiri'],['right','Kanan'],['up','Belakang']];
+const canvas=(key,dir)=>`<canvas data-key="${key}" ${dir?`data-dir="${dir}"`:''} width="32" height="48" role="img" aria-label="${key}${dir?' '+dir:''}"></canvas>`;
+document.querySelector('#directions').innerHTML=dirs.map(([key,label])=>`<figure>${canvas('headphones-nila',key)}<figcaption>${label}</figcaption></figure>`).join('');
+document.querySelector('#gallery').innerHTML=styles.map(([key,name])=>`<div class="preset"><div class="pair">${canvas(key+'-nila')}${canvas(key+'-mangga')}</div><h2>${name}</h2></div>`).join('');
+document.querySelector('#buttons').innerHTML=dirs.map(([key,label])=>`<button type="button" data-direction="${key}" aria-pressed="${key==='down'}">${label}</button>`).join(' ');
+const images=new Map(), motion=matchMedia('(prefers-reduced-motion: reduce)');
+let paused=motion.matches, direction='down', ready=false;
+const canvases=[...document.querySelectorAll('canvas')];
+for(const c of canvases){if(!c.getAttribute('role')){c.setAttribute('role','img');c.setAttribute('aria-label',c.dataset.key)}}
+function controls(){document.querySelector('#toggle').textContent=paused?'Jalankan animasi':'Jeda animasi';document.querySelector('#status').textContent=paused?'Pose diam':'Berjalan · 8 fps';document.querySelectorAll('[data-direction]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.direction===direction)))}
+document.querySelector('#toggle').onclick=()=>{paused=!paused;controls()};
+document.querySelector('#buttons').onclick=e=>{const b=e.target.closest('[data-direction]');if(b){direction=b.dataset.direction;controls()}};
+motion.addEventListener('change',e=>{paused=e.matches;controls()});
+async function load(){await Promise.all(styles.flatMap(([key])=>['nila','mangga'].map(async color=>{const image=new Image();image.src=base+key+'-'+color+'.png';await image.decode();if(image.width!==160||image.height!==192)throw Error('Invalid sheet dimensions');images.set(key+'-'+color,image)})));ready=true;document.body.dataset.ready='true';}
+function render(time){if(ready){const col=paused?0:1+Math.floor(time/125)%4;for(const c of canvases){const ctx=c.getContext('2d'),row=dirs.findIndex(([key])=>key===(c.dataset.dir||direction));ctx.imageSmoothingEnabled=false;ctx.clearRect(0,0,32,48);ctx.drawImage(images.get(c.dataset.key),col*32,row*48,32,48,0,0,32,48)}}requestAnimationFrame(render)}
+controls();load().catch(error=>{document.querySelector('#status').textContent='Gagal memuat aset: '+error.message;throw error});requestAnimationFrame(render);
+</script></body></html>

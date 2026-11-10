@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konsep avatar manusia mini — Kelasverse</title>
+<link rel="stylesheet" href="../../classverse-frontend/src/styles/tokens.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; padding: var(--space-10); color: var(--color-ink); font: var(--text-base)/var(--line-normal) var(--font-body); }
+main { max-width: 1360px; margin: auto; }
+header { display:flex; justify-content:space-between; gap:var(--space-6); align-items:center; padding-bottom:var(--space-6); border-bottom:1px solid var(--color-border); }
+h1,h2,p { margin:0; }
+h1,h2,.brand { font-family:var(--font-display); font-weight:var(--weight-semibold); }
+h1 { font-size:var(--text-4xl); line-height:var(--line-tight); margin-bottom:var(--space-4); }
+h2 { font-size:var(--text-2xl); }
+.brand { font-size:var(--text-2xl); }
+.caption { color:var(--color-ink-muted); font-size:var(--text-md); }
+.hero { display:grid; grid-template-columns: 300px 1fr 300px; gap:var(--space-10); align-items:center; padding:var(--space-8) 0; }
+.portrait { height:260px; background:var(--color-primary-soft); border-radius:var(--radius-2xl); display:grid; place-items:center; position:relative; }
+.portrait svg { width:220px; height:220px; }
+.copy p { max-width:46ch; }
+.details { border-left:2px solid var(--color-border); padding-left:var(--space-6); display:grid; gap:var(--space-4); }
+.details strong { display:block; font-weight:var(--weight-bold); }
+.gallery { background:var(--color-surface); padding:var(--space-6); border-radius:var(--radius-2xl); }
+.section-title { display:flex; justify-content:space-between; align-items:baseline; gap:var(--space-4); margin-bottom:var(--space-4); }
+.lineup { display:grid; grid-template-columns:repeat(6,1fr); gap:var(--space-4); }
+.preset { text-align:center; }
+.pair { display:flex; align-items:end; justify-content:center; gap:var(--space-2); padding:var(--space-2) 0 var(--space-3); }
+.pair svg { width:84px; height:84px; }
+.name { font-weight:var(--weight-bold); font-size:var(--text-md); }
+.bottom { display:grid; grid-template-columns:1.1fr 1fr; gap:var(--space-6); padding-top:var(--space-6); }
+.scene { margin-top:var(--space-3); min-height:154px; border-radius:var(--radius-lg); background:var(--map-path); display:flex; align-items:center; justify-content:space-evenly; padding:var(--space-4); }
+.person { display:flex; flex-direction:column; align-items:center; gap:var(--space-1); }
+.person svg { width:36px; height:36px; }
+.person span { font-size:var(--text-xs); background:var(--color-surface); padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); }
+.person.self span { background:var(--color-ink); color:var(--color-surface); }
+.scales { display:flex; align-items:end; gap:var(--space-6); padding:var(--space-4) 0; }
+.scales figure { display:grid; justify-items:center; gap:var(--space-2); margin:0; }
+.scales figcaption { font-size:var(--text-sm); color:var(--color-ink-muted); }
+footer { margin-top:var(--space-6); font-size:var(--text-sm); color:var(--color-ink-muted); }
+svg.avatar { overflow:visible; --shirt:var(--avatar-nila); --skin:var(--map-path); --hair:var(--color-ink); }
+svg.mangga { --shirt:var(--avatar-mangga); }
+svg.skin-medium { --skin:var(--map-wood); }
+.shirt { fill:var(--shirt); }
+.skin { fill:var(--skin); }
+.hair { fill:var(--hair); }
+.ink { fill:var(--color-ink); }
+.paper { fill:var(--color-surface); }
+.accent { fill:var(--color-accent); }
+.stroke { stroke:var(--color-ink); fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+@media(max-width:1050px) { .hero { grid-template-columns:220px 1fr; } .details { display:none; } .portrait svg { width:190px; height:190px; } .lineup { grid-template-columns:repeat(3,1fr); } }
+@media(max-width:600px) { body { padding:var(--space-4); } header { align-items:start; } header .caption { max-width:18ch; text-align:right; } .hero { grid-template-columns:1fr; gap:var(--space-6); } .portrait { height:220px; } h1 { font-size:var(--text-3xl); } .lineup { grid-template-columns:repeat(2,1fr); } .pair svg { width:64px; height:64px; } .section-title { display:block; } .bottom { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+<!-- One foot anchor and silhouette shared by all proposed presets. -->
+<g id="human">
+ <ellipse cx="48" cy="88" rx="21" ry="4" class="ink" opacity=".13"/>
+ <path d="M35 69h11l-1 15H34zM49 69h11l3 15H51z" class="ink"/>
+ <path d="M33 82h12v6H31q-2-4 2-6M52 82h11q5 2 4 6H52z" class="paper"/>
+ <path d="M31 54q-5 2-6 14l4 5 7-12M61 53q8 3 10 13l-3 6-8-12" class="shirt"/>
+ <path d="M25 67q-2 9 3 10 5 0 5-7M64 67q0 9 5 9 5-2 1-9" class="skin"/>
+ <path d="M35 50q12-5 24 0l5 24q-16 6-32 0z" class="shirt"/>
+ <path d="M40 49q9 11 16 0" class="paper"/>
+ <path d="M43 43h12v10q-6 5-12-1z" class="skin"/>
+ <rect x="26" y="12" width="40" height="35" rx="16" class="hair"/>
+ <ellipse cx="31" cy="34" rx="4" ry="5" class="skin"/>
+ <path d="M34 22q8-10 25-3 9 9 6 21-2 12-15 12-16-1-16-16z" class="skin"/>
+ <path d="M29 33q-4-22 15-23 19-2 24 13-13 5-23-3-1 13-13 17z" class="hair"/>
+ <ellipse cx="47" cy="34" rx="1.8" ry="2.4" class="ink"/>
+ <ellipse cx="60" cy="33" rx="1.8" ry="2.4" class="ink"/>
+ <path d="M51 43q4 2 7-1" class="stroke"/>
+ <path d="M37 62v8h7v-8z" class="paper" opacity=".8"/>
+</g>
+<g id="short"><use href="#human"/></g>
+<g id="cap"><use href="#human"/><path d="M26 25q-2-18 19-18 19 0 22 15z" class="shirt"/><path d="M44 21h28q7 0 6 5-11 5-34 0z" class="ink"/><path d="M40 11v6" class="stroke" opacity=".3"/></g>
+<g id="glasses"><use href="#human"/><g class="stroke"><rect x="39" y="28" width="14" height="12" rx="5"/><rect x="56" y="27" width="13" height="12" rx="5"/><path d="M53 32h3M33 30l6 2"/></g></g>
+<g id="headset"><use href="#human"/><path d="M25 32q-1-26 22-26 25 0 25 25" class="stroke" style="stroke-width:5"/><rect x="22" y="28" width="10" height="17" rx="5" class="ink"/><rect x="67" y="27" width="8" height="16" rx="4" class="ink"/><path d="M71 42q0 10-11 10" class="stroke"/><rect x="56" y="49" width="8" height="4" rx="2" class="ink"/></g>
+<g id="bun"><circle cx="33" cy="10" r="10" class="hair"/><path d="M25 17l13-3" class="stroke" style="stroke:var(--shirt);stroke-width:4"/><use href="#human"/><path d="M29 29q2-21 21-19 21 3 19 20-15-1-24-12-1 13-16 18" class="hair"/></g>
+<g id="beret"><use href="#human"/><path d="M22 20Q17 7 41 6q22-1 28 12l-6 6H28z" class="accent"/><path d="M28 23q20 5 37-1" class="stroke"/><path d="M48 7l2-5" class="stroke"/></g>
+</defs></svg>
+<main>
+<header><div class="brand">Kelasverse</div><p class="caption">Konsep avatar · belum diterapkan</p></header>
+<section class="hero" aria-labelledby="title">
+ <div class="portrait" id="portrait"></div>
+ <div class="copy"><h1 id="title">Teman sekelas,<br>bukan lagi bulatan.</h1><p>Manusia mini tampak ¾. Kepala besar, badan ringkas, sepatu berpijak jelas. Ramah untuk SMA dan kampus, tanpa terasa seperti karakter balita.</p></div>
+ <div class="details"><p><strong>Siluet dahulu</strong><span class="caption">Rambut dan aksesori tetap terbaca saat avatar kecil.</span></p><p><strong>Warna di pakaian</strong><span class="caption">Nila dan Mangga tetap jadi identitas Kelasverse.</span></p><p><strong>Detail seperlunya</strong><span class="caption">Saku kecil sebagai ciri pelajar. Tanpa tas besar yang menutup badan.</span></p></div>
+</section>
+<section class="gallery" aria-labelledby="presets">
+ <div class="section-title"><h2 id="presets">Enam gaya, dua warna pakaian</h2><p class="caption">12 kombinasi awal · warna kulit contoh, belum pilihan final</p></div>
+ <div class="lineup" id="lineup"></div>
+</section>
+<div class="bottom">
+ <section aria-labelledby="map-title"><h2 id="map-title">Saat bertemu di peta</h2><p class="caption">Avatar 36 px, ukuran layar saat ini. Nama tetap di bawah.</p><div class="scene" id="scene"></div></section>
+ <section aria-labelledby="scale-title"><h2 id="scale-title">Kecil tetap dikenali</h2><div class="scales" id="scales"></div><p class="caption">Wajah bukan pembeda utama pada 36 px. Topi, rambut, headset, dan warna pakaian membawa identitas.</p></section>
+</div>
+<footer>Usulan visual, bukan perubahan produk. Pilihan avatar tersimpan tetap dipertahankan saat penerapan. Pose arah lain dan animasi berjalan belum dibuat.</footer>
+</main>
+<script>
+const styles = [['short','Rambut pendek'],['cap','Topi'],['glasses','Kacamata'],['headset','Headset'],['bun','Sanggul'],['beret','Baret']];
+const avatar = (key, color = 'nila', size) => `<svg class="avatar ${color} ${['glasses','bun'].includes(key) ? 'skin-medium' : ''}" viewBox="0 0 96 96" role="img" aria-label="Avatar ${styles.find(s => s[0] === key)[1]}, pakaian ${color}" ${size ? `width="${size}" height="${size}"` : ''}><use href="#${key}"/></svg>`;
+document.querySelector('#portrait').innerHTML = avatar('headset');
+document.querySelector('#lineup').innerHTML = styles.map(([key,name]) => `<div class="preset"><div class="pair">${avatar(key)}${avatar(key,'mangga')}</div><p class="name">${name}</p></div>`).join('');
+document.querySelector('#scene').innerHTML = [['cap','nila','Dimas'],['bun','mangga','Naya'],['headset','nila','Kamu'],['glasses','mangga','Budi']].map(([key,color,name]) => `<div class="person ${name === 'Kamu' ? 'self' : ''}">${avatar(key,color)}<span>${name}</span></div>`).join('');
+document.querySelector('#scales').innerHTML = [36,48,80].map(size => `<figure>${avatar('cap','nila',size)}<figcaption>${size} px</figcaption></figure>`).join('');
+console.assert(document.querySelectorAll('#lineup svg').length === 12, 'Expected twelve avatar previews');
+</script>
+</body>
+</html>

@@ -136,7 +136,7 @@ function reported() {
         <p v-if="!near.length" class="muted">Belum ada orang di dekatmu.</p>
         <ul v-else class="faces" aria-label="Orang di dekatmu">
           <li v-for="a in near.slice(0, 6)" :key="a.id">
-            <img :src="avatarURL(a.avatar)" :alt="a.name" width="40" height="40" />
+            <img :src="avatarURL(a.avatar)" :alt="a.name" width="40" height="40" style="object-fit: contain; image-rendering: pixelated" />
           </li>
         </ul>
         <p v-if="lastNear" class="preview">{{ lastNear.fromName }}: {{ lastNear.text }}</p>
@@ -200,7 +200,7 @@ function reported() {
       <section v-if="myPlace" class="card mates" aria-live="polite">
         <ul v-if="myPlace.people.length" class="faces" aria-hidden="true">
           <li v-for="a in myPlace.people.slice(0, 4)" :key="a.id">
-            <img :src="avatarURL(a.avatar)" alt="" width="40" height="40" />
+            <img :src="avatarURL(a.avatar)" alt="" width="40" height="40" style="object-fit: contain; image-rendering: pixelated" />
           </li>
         </ul>
         <div>

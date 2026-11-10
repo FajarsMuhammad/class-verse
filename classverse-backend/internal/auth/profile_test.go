@@ -40,7 +40,14 @@ func TestAvatarAllowlist(t *testing.T) {
 			}
 		}
 	}
-	for _, key := range []string{"https://example.com/a.svg", "../cap-nila", "cap", "cap-red", "cap-nila-extra", ""} {
+	for _, style := range []string{"runner", "cap", "headphones", "varsity", "ponytail", "hoodie", "glasses"} {
+		for _, color := range []string{"nila", "mangga", "zamrud", "laut", "koral", "grafit"} {
+			if !validAvatar("sporty-" + style + "-" + color) {
+				t.Fatalf("missing sporty preset %s-%s", style, color)
+			}
+		}
+	}
+	for _, key := range []string{"https://example.com/a.svg", "../cap-nila", "cap", "cap-red", "cap-nila-extra", "", "sporty-cap-red", "sporty-round-nila", "sporty-cap-nila-extra", "sporty-../cap-nila", "cap-zamrud"} {
 		if validAvatar(key) {
 			t.Errorf("accepted %q", key)
 		}
