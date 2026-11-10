@@ -8,7 +8,8 @@ import type { World } from '@/realtime/world'
 import { avatarChoices, avatarKey, avatarURL } from './avatars'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
-import { roomArt } from './roomArt'
+import { roomArt, roomLandmarks } from './roomArt'
+import { stackLabels } from './layout'
 
 export interface SceneDeps {
   map: MapData
@@ -18,10 +19,13 @@ export interface SceneDeps {
   currentZone?: () => string
   // speaking returns ids (self included) talking right now (voice, slice 9).
   speaking?: () => Set<string>
+  // inset is the screen space (px) covered by the floating toolbars; the map
+  // is fitted inside it so the toolbars never hide the floor.
+  inset?: () => { top: number; bottom: number }
+  // walkTarget is set by the UI ("Keluar ruang") to walk to a map point.
+  walkTarget?: () => { x: number; y: number; id: number } | null
 }
 
-// Near-chat radius (docs/design.md, slice 6): 5 tiles.
-const NEAR_RADIUS = 160
 
 interface Sprite {
   body: Phaser.GameObjects.Image
@@ -30,6 +34,8 @@ interface Sprite {
 }
 
 const AVATAR_SIZE = 36
+// Extra A* cost per tile inside a table you are not walking to (see tablePenalty).
+const TABLE_PENALTY = 20
 const MAX_FRAME_MS = 100
 
 // CampusScene draws the map and avatars from World and turns keyboard and
@@ -53,6 +59,8 @@ export class CampusScene extends Phaser.Scene {
   private rings: Phaser.GameObjects.Graphics | null = null
   private focused = false
   private movementRevision = 0
+  private walkId = 0
+  private fitted = ''
 
   constructor() {
     super('campus')
@@ -83,16 +91,22 @@ export class CampusScene extends Phaser.Scene {
 
     for (const b of map.buildings)
       this.labels.push(this.buildingLabel(b.name, b.x + b.w / 2, b.y, b.staffOnly))
+    // Campus reuses the board tile id for the flagpole; landmarks are room-only.
+    if (this.deps.world.mapKey !== 'campus')
+      for (const l of roomLandmarks(map))
+        this.labels.push(this.buildingLabel(l.text, l.x, l.y, false, l.dark))
     if (map.zones.length) {
       this.zoneLayer = this.add.graphics().setDepth(1)
       for (const z of map.zones) {
+        // Bottom-left: seats sit at the top of a table, where a label would be covered.
         const label = this.add
-          .text(z.x + 8, z.y + 6, z.name, {
+          .text(z.x + 8, z.y + z.h - 6, z.name, {
             fontFamily: cssToken('--font-body'),
             fontSize: cssToken('--text-sm'),
             fontStyle: '700',
             color: cssToken('--color-accent-ink'),
           })
+          .setOrigin(0, 1)
           .setResolution(Math.min(window.devicePixelRatio || 1, 2) * 2)
           .setDepth(2)
         this.zoneLabels.push(label)
@@ -126,10 +140,8 @@ export class CampusScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       const self = this.deps.world.self
       if (!self) return
-      this.path = findPath(this.deps.map, self, {
-        x: Math.round(p.worldX),
-        y: Math.round(p.worldY),
-      })
+      const to = { x: Math.round(p.worldX), y: Math.round(p.worldY) }
+      this.path = findPath(this.deps.map, self, to, this.tablePenalty(self, to))
     })
   }
 
@@ -143,9 +155,17 @@ export class CampusScene extends Phaser.Scene {
     }
     const dt = Math.min(delta, MAX_FRAME_MS)
     const self = world.self
+    const target = this.deps.walkTarget?.()
+    if (self && target && target.id !== this.walkId) {
+      this.walkId = target.id
+      this.path = findPath(map, self, target, this.tablePenalty(self, target))
+    }
+    const inset = this.deps.inset?.()
+    if (inset && `${inset.top},${inset.bottom}` !== this.fitted) this.fitCamera()
 
     this.focused = this.game.canvas.parentElement === document.activeElement
-    if (self && this.focused) {
+    // A UI walk ("Keluar ruang") runs without canvas focus; keys still need it.
+    if (self && (this.focused || this.path.length > 0)) {
       const k = this.keys
       const dx = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0)
       const dy = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0)
@@ -171,6 +191,21 @@ export class CampusScene extends Phaser.Scene {
     this.drawZones()
     this.drawRadius()
     this.drawSpeaking()
+  }
+
+  // tablePenalty makes walks go around other tables. Every table is its own
+  // voice channel, so cutting through one costs a voice reconnect (and holds
+  // the avatar until the old audio is confirmed gone).
+  private tablePenalty(from: Vec, to: Vec) {
+    const { map } = this.deps
+    const ts = map.tileSize
+    const at = (x: number, y: number) =>
+      map.zones.find((z) => x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h)
+    const keep = new Set([at(from.x, from.y), at(to.x, to.y)])
+    return (tx: number, ty: number) => {
+      const z = at(tx * ts + ts / 2, ty * ts + ts / 2)
+      return z && !keep.has(z) ? TABLE_PENALTY : 0
+    }
   }
 
   // drawZones outlines discussion tables: dashed Mangga, the player's own zone
@@ -232,7 +267,7 @@ export class CampusScene extends Phaser.Scene {
       const a0 = (i / segments) * Math.PI * 2
       const a1 = ((i + 1) / segments) * Math.PI * 2
       g.beginPath()
-      g.arc(self.x, self.y, NEAR_RADIUS, a0, a1)
+      g.arc(self.x, self.y, this.deps.map.nearRadius, a0, a1)
       g.strokePath()
     }
   }
@@ -240,8 +275,13 @@ export class CampusScene extends Phaser.Scene {
   private fitCamera() {
     const { map } = this.deps
     const camera = this.cameras.main
-    const zoom = Math.min(this.scale.width / map.pixelWidth, this.scale.height / map.pixelHeight)
-    camera.setZoom(zoom).centerOn(map.pixelWidth / 2, map.pixelHeight / 2)
+    const inset = this.deps.inset?.() ?? { top: 0, bottom: 0 }
+    this.fitted = `${inset.top},${inset.bottom}`
+    const free = Math.max(1, this.scale.height - inset.top - inset.bottom)
+    const zoom = Math.min(this.scale.width / map.pixelWidth, free / map.pixelHeight)
+    // Centre the map in the band between the toolbars, not the whole canvas.
+    const shift = (inset.top - inset.bottom) / 2 / zoom
+    camera.setZoom(zoom).centerOn(map.pixelWidth / 2, map.pixelHeight / 2 - shift)
     for (const label of this.labels) label.setScale(1 / zoom)
     for (const s of [...this.sprites.values(), ...(this.self ? [this.self] : [])]) {
       s.tag.setScale(1 / zoom)
@@ -300,6 +340,20 @@ export class CampusScene extends Phaser.Scene {
       this.self.body.setPosition(self.x, self.y).setDepth(self.y)
       this.self.tag.setPosition(self.x, self.y + 6).setDepth(self.y + 1)
     }
+    this.unstackTags()
+  }
+
+  // unstackTags moves overlapping name tags apart; positions come from syncSprites.
+  private unstackTags() {
+    const tags = [...this.sprites.values(), ...(this.self ? [this.self] : [])]
+      .map((s) => s.tag)
+      .filter((t) => t.visible)
+    if (tags.length < 2) return
+    const boxes = tags.map((t) => {
+      const size = t.getData('size') as { w: number; h: number }
+      return { x: t.x, y: t.y, w: size.w * t.scaleX, h: size.h * t.scaleY }
+    })
+    stackLabels(boxes).forEach((y, i) => tags[i]!.setY(y))
   }
 
   private makeSprite(
@@ -327,11 +381,11 @@ export class CampusScene extends Phaser.Scene {
     return tag
   }
 
-  private buildingLabel(name: string, x: number, y: number, locked: boolean) {
+  private buildingLabel(name: string, x: number, y: number, locked: boolean, dark = false) {
     const c = this.pill(
       name,
-      cssToken('--color-surface'),
-      cssToken('--color-ink'),
+      cssToken(dark ? '--color-ink' : '--color-surface'),
+      cssToken(dark ? '--color-surface' : '--color-ink'),
       cssToken('--text-md'),
       locked,
     )
@@ -378,7 +432,8 @@ export class CampusScene extends Phaser.Scene {
       lock.strokePath()
       parts.push(lock)
     }
-    return this.add.container(0, 0, parts)
+    // Containers have no reliable bounds for Graphics children; keep the pill size.
+    return this.add.container(0, 0, parts).setData('size', { w, h })
   }
 }
 

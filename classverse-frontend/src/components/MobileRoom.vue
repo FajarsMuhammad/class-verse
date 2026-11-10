@@ -59,7 +59,7 @@ const zoneKey = computed(() => {
 const near = computed(() => {
   void tick.value
   void online.value
-  return nearby(world, 160)
+  return nearby(world, map.value?.nearRadius ?? 160)
 })
 const lastNear = computed(() => {
   void chatVersion.value
@@ -298,7 +298,6 @@ h2 {
 }
 .label {
   font-size: var(--text-md);
-  text-transform: uppercase;
   color: var(--color-ink-muted);
 }
 .faces {

@@ -28,6 +28,10 @@ type MapData struct {
 	// WalkSpeed is the maximum walking speed in px per second (map property
 	// walk_speed). The client reads the same property for prediction.
 	WalkSpeed int
+	// NearRadius is the near-chat range in px (map property near_tiles times
+	// the tile size). Rooms use a smaller range than the campus; zone chat
+	// and voice remain separate from this distance-based range.
+	NearRadius int
 }
 
 // Building returns the building with key.
@@ -39,6 +43,13 @@ func (m *MapData) Building(key string) (Building, bool) {
 	}
 	return Building{}, false
 }
+
+// Near-chat range (docs/design.md, slice 6 and the post-slice-9 revision).
+const (
+	defaultNearTiles = 5  // when a map sets no near_tiles (campus)
+	minNearTiles     = 1  // bounds for the near_tiles map property
+	maxNearTiles     = 10 //
+)
 
 // Rect is an axis-aligned rectangle in pixels.
 type Rect struct{ X, Y, W, H int }
@@ -139,14 +150,20 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 		return nil, fmt.Errorf("parse map %s: invalid size", key)
 	}
 	md := &MapData{Key: key, Width: m.Width, Height: m.Height, TileSize: m.TileWidth, WalkSpeed: defaultWalkSpeed}
+	nearTiles := defaultNearTiles
 	for _, p := range m.Properties {
-		if p.Name != "walk_speed" {
-			continue
-		}
-		if json.Unmarshal(p.Value, &md.WalkSpeed) != nil || md.WalkSpeed < minWalkSpeed || md.WalkSpeed > maxWalkSpeed {
-			return nil, fmt.Errorf("parse map %s: walk_speed must be an integer %d-%d", key, minWalkSpeed, maxWalkSpeed)
+		switch p.Name {
+		case "walk_speed":
+			if json.Unmarshal(p.Value, &md.WalkSpeed) != nil || md.WalkSpeed < minWalkSpeed || md.WalkSpeed > maxWalkSpeed {
+				return nil, fmt.Errorf("parse map %s: walk_speed must be an integer %d-%d", key, minWalkSpeed, maxWalkSpeed)
+			}
+		case "near_tiles":
+			if json.Unmarshal(p.Value, &nearTiles) != nil || nearTiles < minNearTiles || nearTiles > maxNearTiles {
+				return nil, fmt.Errorf("parse map %s: near_tiles must be an integer %d-%d", key, minNearTiles, maxNearTiles)
+			}
 		}
 	}
+	md.NearRadius = nearTiles * md.TileSize
 	var haveCollision, haveSpawn bool
 	doors := map[string][2]int{}
 	for _, l := range m.Layers {

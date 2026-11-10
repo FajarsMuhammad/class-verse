@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  ref,
+  watch,
+} from 'vue'
 import { useRoute } from 'vue-router'
 import DoorRooms from '@/components/DoorRooms.vue'
 import { useOrgStore } from '@/stores/org'
@@ -100,6 +108,53 @@ const canEnter = computed(
 )
 let timer: ReturnType<typeof setInterval> | undefined
 
+// Floating toolbars: the scene reads their height to keep the floor visible.
+// Plain (non-reactive) values; Phaser polls them every frame.
+const mapTop = ref<HTMLElement | null>(null)
+const mapBottom = ref<HTMLElement | null>(null)
+let inset = { top: 0, bottom: 0 }
+const measure = new ResizeObserver(() => {
+  const gap = 12 // --space-3 between a toolbar and the frame edge
+  inset = {
+    top: mapTop.value ? mapTop.value.offsetHeight + gap * 2 : 0,
+    bottom: mapBottom.value ? mapBottom.value.offsetHeight + gap * 2 : 0,
+  }
+})
+watch([mapTop, mapBottom], (els) => {
+  measure.disconnect()
+  for (const el of els) if (el) measure.observe(el)
+})
+
+// "Keluar ruang": walk to the exit, then travel. The server still requires the
+// avatar at the exit (doorRadius); no teleport.
+const EXIT_RADIUS = 40 // inside the server's 48 px doorRadius
+const LEAVE_TIMEOUT_MS = 15000 // a 30-tile room crosses in under 6 s
+let walkTarget: { x: number; y: number; id: number } | null = null
+let leaveStarted = 0
+const leaving = ref(false)
+const leaveError = ref('')
+function atExit() {
+  const exit = map.value?.exit
+  const self = world.self
+  return !!exit && !!self && Math.hypot(self.x - exit.x, self.y - exit.y) <= EXIT_RADIUS
+}
+function leaveRoom() {
+  const exit = map.value?.exit
+  leaveError.value = ''
+  if (!exit || atExit()) {
+    void travel(props.roomId)
+    return
+  }
+  leaving.value = true
+  leaveStarted = Date.now()
+  walkTarget = { x: exit.x, y: exit.y, id: (walkTarget?.id ?? 0) + 1 }
+}
+watch(campus, () => {
+  leaving.value = false
+  leaveError.value = ''
+  walkTarget = null
+})
+
 const reporting = ref<ChatLine | null>(null)
 const reportNotice = ref('')
 function reported() {
@@ -122,6 +177,14 @@ onMounted(() => {
   void start(props.roomId, 'campus', listMode ? 'list' : 'map')
   if (listMode) return
   timer = setInterval(() => {
+    if (leaving.value && atExit()) {
+      leaving.value = false
+      void travel(props.roomId)
+    } else if (leaving.value && Date.now() - leaveStarted > LEAVE_TIMEOUT_MS) {
+      // Path blocked or the user walked elsewhere: stop, never travel later by surprise.
+      leaving.value = false
+      leaveError.value = 'Belum sampai Pintu keluar. Jalan ke sana, lalu tekan Keluar ruang lagi.'
+    }
     const self = world.self
     nearDoor.value =
       campus.value && self
@@ -130,7 +193,10 @@ onMounted(() => {
         : null
   }, 150)
 })
-onBeforeUnmount(() => clearInterval(timer))
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  measure.disconnect()
+})
 </script>
 
 <template>
@@ -142,30 +208,6 @@ onBeforeUnmount(() => clearInterval(timer))
     :status-text="statusText"
   />
   <section v-else class="workspace" aria-labelledby="map-title">
-    <header class="heading">
-      <div>
-        <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
-        <p role="status" data-testid="connection-status">{{ error || statusText }}</p>
-      </div>
-      <button
-        v-if="campus"
-        ref="directoryButton"
-        class="btn-secondary"
-        :aria-expanded="directoryOpen"
-        aria-controls="building-directory"
-        @click="toggleDirectory"
-      >
-        Daftar gedung
-      </button>
-      <button
-        v-else-if="!kicked"
-        class="btn-secondary"
-        :disabled="traveling || status !== 'open'"
-        @click="travel(roomId)"
-      >
-        Kembali ke peta sekolah
-      </button>
-    </header>
     <div class="mobile-switch" aria-label="Tampilan ruang">
       <button
         class="btn-secondary"
@@ -185,18 +227,58 @@ onBeforeUnmount(() => clearInterval(timer))
     <div class="layout" :class="`show-${mobilePanel}`">
       <div class="map-column">
         <div class="map-frame">
-          <GameCanvas
-            v-if="map"
-            :key="current?.room_id"
-            :deps="{
-              map,
-              world,
-              sendMove,
-              currentZone: () => chat.zone.key,
-              speaking: () => voice?.speaking.value ?? new Set(),
-            }"
-            :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
-          />
+          <header ref="mapTop" class="map-top">
+            <button
+              v-if="!campus && !kicked"
+              type="button"
+              class="back"
+              :aria-busy="leaving"
+              :disabled="traveling || status !== 'open'"
+              @click="leaveRoom"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path
+                  d="M15 5l-7 7 7 7"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
+            </button>
+            <div class="title">
+              <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
+              <p role="status" data-testid="connection-status">{{ statusText }}</p>
+            </div>
+            <button
+              v-if="campus"
+              ref="directoryButton"
+              class="btn-secondary"
+              :aria-expanded="directoryOpen"
+              aria-controls="building-directory"
+              @click="toggleDirectory"
+            >
+              Daftar gedung
+            </button>
+            <TeacherPanel v-else-if="org.isTeacher && !kicked" :room="room" floating />
+          </header>
+          <div v-if="map" class="stage">
+            <GameCanvas
+              :key="current?.room_id"
+              :deps="{
+                map,
+                world,
+                sendMove,
+                currentZone: () => chat.zone.key,
+                speaking: () => voice?.speaking.value ?? new Set(),
+                inset: () => inset,
+                walkTarget: () => walkTarget,
+              }"
+              :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
+            />
+          </div>
           <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
           <div v-if="campus && nearDoor && !directoryOpen && !roomsOpen" class="door-prompt">
             <strong>{{ nearDoor.name }}</strong>
@@ -211,18 +293,30 @@ onBeforeUnmount(() => clearInterval(timer))
           <div v-else-if="map && status !== 'open'" class="connection-overlay" role="status">
             {{ statusText }}
           </div>
+          <footer ref="mapBottom" class="map-bottom">
+            <VoiceBar
+              v-if="voice && !campus && !kicked"
+              :voice="voice"
+              :chat="chat"
+              :version="chatVersion"
+              :self-id="world.selfId"
+              :teacher="org.isTeacher"
+              :disabled="status !== 'open'"
+              @broadcast="room.voiceBroadcast"
+            />
+            <p class="hint">
+              {{
+                campus
+                  ? 'Klik tujuan atau pakai WASD. Jalan ke pintu gedung untuk memilih ruang.'
+                  : 'Klik tujuan atau pakai WASD.'
+              }}
+              <span v-if="campus && selectedBuilding">Tujuan: {{ selectedBuilding.name }}.</span>
+            </p>
+            <p v-if="leaveError || error" class="float-note" role="alert">
+              {{ leaveError || error }}
+            </p>
+          </footer>
         </div>
-        <p class="hint">
-          Gerak dengan WASD, tombol panah, atau klik tujuan.
-          {{
-            campus
-              ? 'Jalan ke pintu gedung untuk memilih ruang.'
-              : 'Jalan ke pintu keluar sebelum kembali ke peta sekolah.'
-          }}
-          <span v-if="campus && selectedBuilding"
-            >Tujuan: {{ selectedBuilding.name }}. Jalan ke pintunya; tidak ada teleport.</span
-          >
-        </p>
       </div>
       <aside
         v-if="campus && (directoryOpen || roomsOpen)"
@@ -266,17 +360,6 @@ onBeforeUnmount(() => clearInterval(timer))
       </aside>
       <aside class="chat-sidebar" aria-label="Chat ruang">
         <h2>Chat</h2>
-        <VoiceBar
-          v-if="voice && !campus && !kicked"
-          :voice="voice"
-          :chat="chat"
-          :version="chatVersion"
-          :self-id="world.selfId"
-          :teacher="org.isTeacher"
-          :disabled="status !== 'open'"
-          @broadcast="room.voiceBroadcast"
-        />
-        <TeacherPanel v-if="!campus && org.isTeacher" :room="room" />
         <ChatPanel
           class="side-chat"
           :chat="chat"
@@ -335,10 +418,86 @@ onBeforeUnmount(() => clearInterval(timer))
   flex: 1;
   min-height: 0;
 }
+/* Two rails float over the map. Each is one line with a fixed height, so a
+   status change can never resize anything; the scene fits the floor between
+   them (`inset`). Overflowing content scrolls sideways instead of wrapping. */
+.map-top,
+.map-bottom {
+  position: absolute;
+  z-index: 2;
+  left: var(--space-3);
+  right: var(--space-3);
+  height: calc(var(--touch-min) + var(--space-4));
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raise);
+}
+.map-top {
+  top: var(--space-3);
+}
+.map-bottom {
+  bottom: var(--space-3);
+}
+.float-note {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-2));
+  max-width: min(28rem, 100%);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-raise);
+}
+.title {
+  flex: 1 1 auto;
+  min-width: 6rem;
+}
+.title p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+}
+.back {
+  flex: none;
+  min-height: var(--touch-min);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.back:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.back:focus-visible {
+  outline: 3px solid var(--color-primary-strong);
+  outline-offset: 2px;
+}
 .door-prompt {
   position: absolute;
-  bottom: var(--space-4);
-  left: var(--space-4);
+  z-index: 3;
+  bottom: calc(var(--space-14) + var(--space-10));
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: var(--shadow-raise);
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -372,21 +531,21 @@ onBeforeUnmount(() => clearInterval(timer))
   background: var(--color-primary-soft);
   color: var(--color-primary-strong);
 }
-.heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
 h1 {
   margin: 0;
-  font: var(--weight-semibold) var(--text-3xl)/var(--line-tight) var(--font-display);
+  font: var(--weight-semibold) var(--text-xl) / var(--line-tight) var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.heading p,
 .hint {
+  flex: 1 1 0;
+  min-width: 0;
   color: var(--color-ink-muted);
-  margin: var(--space-2) 0 0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .scope {
   background: var(--color-primary-soft);
@@ -403,6 +562,11 @@ h1 {
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: var(--space-4);
 }
+/* The map is fitted between the two toolbars so they never cover the floor. */
+.stage {
+  position: absolute;
+  inset: 0;
+}
 .map-frame {
   flex: 1;
   min-height: 0;
@@ -410,7 +574,7 @@ h1 {
   position: relative;
   background: var(--map-grass);
   border-radius: var(--radius-2xl);
-  overflow: hidden;
+  overflow: clip;
 }
 .loading {
   padding: var(--space-8);
@@ -427,9 +591,8 @@ h1 {
   font-weight: var(--weight-bold);
 }
 .hint {
-  font-size: var(--text-md);
-  text-align: center;
-  line-height: var(--line-relaxed);
+  font-size: var(--text-sm);
+  line-height: var(--line-normal);
 }
 .buildings {
   background: var(--color-surface);
@@ -438,7 +601,7 @@ h1 {
   min-height: 0;
   box-sizing: border-box;
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   top: var(--space-3);
   left: var(--space-3);
   width: min(360px, calc(100% - var(--space-6)));
@@ -498,9 +661,6 @@ li span {
   .show-map .chat-sidebar,
   .show-chat .map-column {
     display: none;
-  }
-  .heading {
-    flex-wrap: wrap;
   }
 }
 </style>

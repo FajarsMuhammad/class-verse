@@ -50,7 +50,26 @@ export function roomArt(map: MapData, key: string): HTMLCanvasElement {
     }
     g.globalAlpha = 1
   }
-  const exit = map.raw.layers.find((l) => l.name === 'exit')?.objects?.[0]
+  const exit = map.exit
   if (exit) rect(exit.x - 24, exit.y - 12, 48, 24, '--color-primary', 8)
   return canvas
+}
+
+const BOARD_TILE = 16
+
+// roomLandmarks names the board and the exit, so the hint "jalan ke pintu
+// keluar" points at something visible. Positions in map pixels (label top).
+export function roomLandmarks(map: MapData): { text: string; x: number; y: number; dark: boolean }[] {
+  const out: { text: string; x: number; y: number; dark: boolean }[] = []
+  const ground = map.raw.layers.find((l) => l.name === 'ground')?.data ?? []
+  const board = ground.flatMap((id, i) => (id === BOARD_TILE ? [i] : []))
+  if (board.length) {
+    const xs = board.map((i) => i % map.width)
+    const y = Math.floor(board[0]! / map.width)
+    const x = ((Math.min(...xs) + Math.max(...xs) + 1) / 2) * map.tileSize
+    out.push({ text: 'Papan tulis', x, y: y * map.tileSize + 8, dark: true })
+  }
+  const exit = map.exit
+  if (exit) out.push({ text: 'Pintu keluar', x: exit.x, y: exit.y - 44, dark: false })
+  return out
 }

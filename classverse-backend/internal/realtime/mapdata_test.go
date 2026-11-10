@@ -71,6 +71,23 @@ func TestMapWalkSpeeds(t *testing.T) {
 	}
 }
 
+func TestMapNearRadius(t *testing.T) {
+	// Rooms use 3 tiles so near chat stays at one table; the campus keeps 5.
+	for key, want := range map[string]int{"campus": 160, "classroom": 96, "garden": 96} {
+		raw, err := maps.Read(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, err := ParseMap(key, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.NearRadius != want {
+			t.Errorf("%s near radius = %d, want %d", key, m.NearRadius, want)
+		}
+	}
+}
+
 func TestMapZones(t *testing.T) {
 	raw, err := maps.Read("classroom")
 	if err != nil {
@@ -117,6 +134,12 @@ func TestParseMapErrors(t *testing.T) {
 			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]},
 			{"name":"zones","objects":[{"x":0,"y":0,"width":64,"height":32,"properties":[{"name":"key","value":"m"}]}]}]}`,
 		"walk_speed too fast": `{"properties":[{"name":"walk_speed","value":900}],"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[
+			{"name":"collision","type":"tilelayer","data":[0]},
+			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]}]}`,
+		"near_tiles too big": `{"properties":[{"name":"near_tiles","value":11}],"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[
+			{"name":"collision","type":"tilelayer","data":[0]},
+			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]}]}`,
+		"near_tiles not a number": `{"properties":[{"name":"near_tiles","value":"near"}],"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[
 			{"name":"collision","type":"tilelayer","data":[0]},
 			{"name":"spawn","objects":[{"x":0,"y":0,"width":32,"height":32}]}]}`,
 		"walk_speed not a number": `{"properties":[{"name":"walk_speed","value":"fast"}],"width":1,"height":1,"tilewidth":32,"tileheight":32,"layers":[

@@ -74,6 +74,11 @@ export class MapData {
   // Max walking speed in px/s from the map property walk_speed (same rule as
   // the server, internal/realtime/mapdata.go).
   readonly walkSpeed: number
+  // Near-chat range in px: map property near_tiles (default 5) times the tile
+  // size, same rule as the server.
+  readonly nearRadius: number
+  // Room exit point (classroom/garden); null on the campus map.
+  readonly exit: { x: number; y: number } | null
   private readonly blocked: Uint8Array
 
   constructor(readonly raw: TiledMap) {
@@ -96,6 +101,10 @@ export class MapData {
     }))
     const speed = raw.properties?.find((p) => p.name === 'walk_speed')?.value
     this.walkSpeed = typeof speed === 'number' ? speed : Movement.maxSpeed
+    const near = raw.properties?.find((p) => p.name === 'near_tiles')?.value
+    this.nearRadius = (typeof near === 'number' ? near : DEFAULT_NEAR_TILES) * this.tileSize
+    const exit = raw.layers.find((l) => l.name === 'exit')?.objects?.[0]
+    this.exit = exit ? { x: Math.round(exit.x), y: Math.round(exit.y) } : null
   }
 
   get pixelWidth() {
@@ -132,6 +141,8 @@ export class MapData {
     return true
   }
 }
+
+const DEFAULT_NEAR_TILES = 5
 
 function prop<T>(o: TiledObject, name: string, fallback: T): T {
   const p = o.properties?.find((q) => q.name === name)

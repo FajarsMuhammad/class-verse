@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { directionOf, moveToward, PREDICTION_FACTOR, step } from '../movement'
 import { findPath } from '../pathfind'
 import { smallMap } from './fixtures'
+import { MapData } from '../mapdata'
 
 const map = smallMap(['#####', '#...#', '#.#.#', '#...#', '#####'])
 
@@ -23,6 +24,15 @@ describe('MapData', () => {
 })
 
 describe('movement', () => {
+  it('reads near_tiles like the server: 5 tiles by default, per map otherwise', () => {
+    expect(map.nearRadius).toBe(160)
+    const room = new MapData({
+      ...map.raw,
+      properties: [{ name: 'near_tiles', type: 'int', value: 3 }],
+    })
+    expect(room.nearRadius).toBe(96)
+  })
+
   it('uses the map walk_speed so campus walks faster than default', () => {
     const fast = smallMap(['......', '......'], 320)
     expect(fast.walkSpeed).toBe(320)
@@ -73,6 +83,33 @@ describe('findPath', () => {
       at = wp
     }
     expect(at).toEqual({ x: 112, y: 80 })
+  })
+
+  it('walks around penalised tiles when a detour exists, through them otherwise', () => {
+    const open = smallMap(['.....', '.....', '.....'])
+    // Middle column of the middle row is a "table" to avoid.
+    const table = (tx: number, ty: number) => (tx === 2 && ty === 1 ? 20 : 0)
+    const tiles = (p: { x: number; y: number }[]) => {
+      // Sample every 8 px like the scene walks, from the start.
+      let at = { x: 16, y: 48 }
+      const out = new Set<string>()
+      for (const wp of p) {
+        const steps = Math.ceil(Math.hypot(wp.x - at.x, wp.y - at.y) / 8)
+        for (let s = 0; s <= steps; s++) {
+          const t = steps ? s / steps : 1
+          out.add(`${Math.floor((at.x + (wp.x - at.x) * t) / 32)},${Math.floor((at.y + (wp.y - at.y) * t) / 32)}`)
+        }
+        at = wp
+      }
+      return out
+    }
+    const around = findPath(open, { x: 16, y: 48 }, { x: 144, y: 48 }, table)
+    expect(tiles(around).has('2,1')).toBe(false)
+    expect(around[around.length - 1]).toEqual({ x: 144, y: 48 })
+
+    const corridor = smallMap(['#####', '.....', '#####'])
+    const through = findPath(corridor, { x: 16, y: 48 }, { x: 144, y: 48 }, table)
+    expect(through[through.length - 1]).toEqual({ x: 144, y: 48 })
   })
 
   it('returns nothing for a blocked target', () => {
