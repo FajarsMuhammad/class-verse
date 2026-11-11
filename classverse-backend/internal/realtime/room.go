@@ -761,10 +761,10 @@ func (r *room) seat(c seatCmd) {
 	m.dirty = true
 }
 
-// nearPoint returns a check that accepts avatars within doorRadius of (x, y).
-func nearPoint(x, y int) func(Participant) error {
+// nearPoint returns a check that accepts avatars within radius px of (x, y).
+func nearPoint(x, y int, radius float64) func(Participant) error {
 	return func(p Participant) error {
-		if math.Hypot(float64(p.X-x), float64(p.Y-y)) > doorRadius {
+		if math.Hypot(float64(p.X-x), float64(p.Y-y)) > radius {
 			return errNotAtDoor
 		}
 		return nil

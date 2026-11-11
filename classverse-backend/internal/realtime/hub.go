@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -379,22 +378,13 @@ func (h *Hub) travel(c *conn, from *room, dest Admission) (*room, error) {
 		if !ok {
 			return nil, ErrNoAccess
 		}
-		check = func(p Participant) error {
-			radius := b.InteractRadius
-			if radius == 0 {
-				radius = 48
-			}
-			if math.Hypot(float64(p.X-b.DoorX), float64(p.Y-b.DoorY)) > float64(radius) {
-				return errNotAtDoor
-			}
-			return nil
-		}
+		check = nearPoint(b.DoorX, b.DoorY, float64(b.InteractRadius))
 		var err error
 		if x, y, err = destMap.SpawnPoint(int(c.userID[0])); err != nil {
 			return nil, err
 		}
 	case !from.campus && dest.MapKey == campusKey:
-		check = nearPoint(from.mapd.ExitX, from.mapd.ExitY)
+		check = nearPoint(from.mapd.ExitX, from.mapd.ExitY, doorRadius)
 		b, ok := destMap.Building(from.buildingKey)
 		if !ok {
 			return nil, errUnavailable

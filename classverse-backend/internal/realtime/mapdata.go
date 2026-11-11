@@ -156,16 +156,20 @@ func (o tmjObject) boolean(name string) bool {
 	return false
 }
 
-func (o tmjObject) integer(name string, fallback int) int {
+// interactRadius reads interact_radius (px, 16–200, default 48). Invalid
+// values fail the map load: the client trusts the raw value, so a silent
+// fallback would offer an entrance the server always rejects.
+func (o tmjObject) interactRadius() (int, error) {
 	for _, p := range o.Properties {
-		if p.Name == name {
+		if p.Name == "interact_radius" {
 			var n int
-			if json.Unmarshal(p.Value, &n) == nil && n > 0 && n <= 200 {
-				return n
+			if json.Unmarshal(p.Value, &n) != nil || n < 16 || n > 200 {
+				return 0, fmt.Errorf("invalid interact_radius")
 			}
+			return n, nil
 		}
 	}
-	return fallback
+	return int(doorRadius), nil
 }
 
 // ParseMap reads a Tiled JSON map (see maps/README.md for the required layers).
@@ -232,8 +236,12 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 			for _, o := range l.Objects {
 				switch o.Type {
 				case "building":
+					radius, err := o.interactRadius()
+					if err != nil {
+						return nil, fmt.Errorf("parse map %s: building %q: %w", key, o.str("key"), err)
+					}
 					md.Buildings = append(md.Buildings, Building{
-						Key: o.str("key"), Name: o.str("name"), StaffOnly: o.boolean("staff_only"), InteractRadius: o.integer("interact_radius", 48),
+						Key: o.str("key"), Name: o.str("name"), StaffOnly: o.boolean("staff_only"), InteractRadius: radius,
 						Area: Rect{X: int(o.X), Y: int(o.Y), W: int(o.Width), H: int(o.Height)},
 					})
 				case "door":
