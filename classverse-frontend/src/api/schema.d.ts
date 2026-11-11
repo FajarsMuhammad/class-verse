@@ -468,11 +468,8 @@ export interface components {
             display_name?: string;
             /** Format: date */
             birth_date?: string;
-            /**
-             * @description Sporty presets use sporty-<style>-<color>; legacy SVG keys remain accepted.
-             * @enum {string}
-             */
-            avatar_key?: "default" | "round-nila" | "round-mangga" | "cap-nila" | "cap-mangga" | "glasses-nila" | "glasses-mangga" | "headset-nila" | "headset-mangga" | "bun-nila" | "bun-mangga" | "beret-nila" | "beret-mangga" | "sporty-runner-nila" | "sporty-runner-mangga" | "sporty-runner-zamrud" | "sporty-runner-laut" | "sporty-runner-koral" | "sporty-runner-grafit" | "sporty-cap-nila" | "sporty-cap-mangga" | "sporty-cap-zamrud" | "sporty-cap-laut" | "sporty-cap-koral" | "sporty-cap-grafit" | "sporty-headphones-nila" | "sporty-headphones-mangga" | "sporty-headphones-zamrud" | "sporty-headphones-laut" | "sporty-headphones-koral" | "sporty-headphones-grafit" | "sporty-varsity-nila" | "sporty-varsity-mangga" | "sporty-varsity-zamrud" | "sporty-varsity-laut" | "sporty-varsity-koral" | "sporty-varsity-grafit" | "sporty-ponytail-nila" | "sporty-ponytail-mangga" | "sporty-ponytail-zamrud" | "sporty-ponytail-laut" | "sporty-ponytail-koral" | "sporty-ponytail-grafit" | "sporty-hoodie-nila" | "sporty-hoodie-mangga" | "sporty-hoodie-zamrud" | "sporty-hoodie-laut" | "sporty-hoodie-koral" | "sporty-hoodie-grafit" | "sporty-glasses-nila" | "sporty-glasses-mangga" | "sporty-glasses-zamrud" | "sporty-glasses-laut" | "sporty-glasses-koral" | "sporty-glasses-grafit";
+            /** @description Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid. */
+            avatar_key?: string;
         };
         CreateOrgRequest: {
             name: string;
@@ -518,7 +515,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        RoomMap: "classroom" | "garden";
+        RoomMap: "classroom" | "garden" | "lab" | "baca";
         CreateRoomRequest: {
             name: string;
             map_key: components["schemas"]["RoomMap"];

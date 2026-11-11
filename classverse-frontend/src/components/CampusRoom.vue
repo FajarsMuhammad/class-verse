@@ -10,8 +10,15 @@ import {
 } from 'vue'
 import { useRoute } from 'vue-router'
 import DoorRooms from '@/components/DoorRooms.vue'
+import MapZoom from '@/components/MapZoom.vue'
+import MapMinimap from '@/components/MapMinimap.vue'
+import PlaceCard from '@/components/PlaceCard.vue'
+import SeatPicker from '@/components/SeatPicker.vue'
+import EmoteBar from '@/components/EmoteBar.vue'
 import { useOrgStore } from '@/stores/org'
-import type { Building } from '@/realtime/mapdata'
+import { useAuthStore } from '@/stores/auth'
+import { avatarURL } from '@/game/avatars'
+import type { Building, Seat } from '@/realtime/mapdata'
 
 import ChatPanel from '@/components/ChatPanel.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -54,10 +61,17 @@ const {
   rejoin,
 } = room
 const org = useOrgStore()
+const auth = useAuthStore()
+const learningClosed = ref(false)
+const chatClosed = ref(false)
 const route = useRoute()
 const nearDoor = ref<Building | null>(null)
+const zoom = ref(0.5)
+const position = ref<{ x: number; y: number } | null>(null)
+const otherPositions = ref<{ x: number; y: number }[]>([])
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
 const selectedKey = ref('')
+const dismissedPlace = ref('')
 const directoryButton = ref<HTMLButtonElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
 const directoryOpen = ref(false)
@@ -84,8 +98,27 @@ watch(
 )
 function selectBuilding(key: string) {
   selectedKey.value = key
+  dismissedPlace.value = ''
   directoryOpen.value = false
+  roomsOpen.value = false
+}
+function showPlaceRooms() {
   roomsOpen.value = true
+}
+function closePlace() {
+  dismissedPlace.value = panelBuilding.value?.key ?? ''
+  selectedKey.value = ''
+}
+function walkToSeat(seat: Seat) {
+  if (campus.value || status.value !== 'open' || leaving.value || traveling.value) return
+  if (!map.value?.seats.some((s) => s.key === seat.key && s.x === seat.x && s.y === seat.y)) return
+  if ([...world.avatars.values()].some((a) => !a.hidden && Math.hypot(a.x-seat.x, a.y-seat.y) <= 18)) return
+  walkTarget = { x: seat.x, y: seat.y, id: (walkTarget?.id ?? 0) + 1 }
+}
+function walkToPlace() {
+  const building = panelBuilding.value
+  if (!building || (building.staffOnly && !org.isTeacher) || status.value !== 'open') return
+  walkTarget = { x: building.doorX, y: building.doorY, id: (walkTarget?.id ?? 0) + 1 }
 }
 watch(campus, () => {
   directoryOpen.value = false
@@ -102,10 +135,11 @@ watch(
 const selectedBuilding = computed(() =>
   map.value?.buildings.find((b) => b.key === selectedKey.value),
 )
-const panelBuilding = computed(() => nearDoor.value ?? selectedBuilding.value)
-const canEnter = computed(
-  () => !!panelBuilding.value && panelBuilding.value.key === nearDoor.value?.key,
-)
+const panelBuilding = computed(() => selectedBuilding.value ?? nearDoor.value)
+const canEnter = computed(() => {
+  const b = panelBuilding.value, p = position.value
+  return !!b && !!p && Math.hypot(p.x-b.doorX, p.y-b.doorY) <= (b.interactRadius ?? 48)
+})
 let timer: ReturnType<typeof setInterval> | undefined
 
 // Floating toolbars: the scene reads their height to keep the floor visible.
@@ -186,9 +220,14 @@ onMounted(() => {
       leaveError.value = 'Belum sampai Pintu keluar. Jalan ke sana, lalu tekan Keluar ruang lagi.'
     }
     const self = world.self
+    position.value = self ? { x: self.x, y: self.y } : null
+    if (!campus.value) otherPositions.value = [...world.avatars.values()]
+      .filter((a) => !a.hidden).map((a) => ({ x: a.x, y: a.y }))
+    const dismissed = map.value?.buildings.find((b) => b.key === dismissedPlace.value)
+    if (dismissed && self && Math.hypot(self.x-dismissed.doorX, self.y-dismissed.doorY) > (dismissed.interactRadius ?? 48)) dismissedPlace.value = ''
     nearDoor.value =
       campus.value && self
-        ? (map.value?.buildings.find((b) => Math.hypot(self.x - b.doorX, self.y - b.doorY) <= 48) ??
+        ? (map.value?.buildings.find((b) => Math.hypot(self.x - b.doorX, self.y - b.doorY) <= (b.interactRadius ?? 48)) ??
           null)
         : null
   }, 150)
@@ -224,7 +263,27 @@ onBeforeUnmount(() => {
         Chat
       </button>
     </div>
-    <div class="layout" :class="`show-${mobilePanel}`">
+    <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed }]">
+      <aside class="learning-panel" aria-label="Panel belajar">
+        <header class="panel-heading">
+          <h2 v-if="!learningClosed">Panel belajar</h2>
+          <button class="btn-secondary" :aria-label="learningClosed ? 'Buka panel belajar' : 'Ciutkan panel belajar'"
+            :aria-expanded="!learningClosed" @click="learningClosed = !learningClosed">{{ learningClosed ? '›' : '‹' }}</button>
+        </header>
+        <template v-if="!learningClosed">
+          <div class="learner">
+            <img :src="avatarURL(world.selfAvatar)" alt="" width="42" height="57" />
+            <div><strong>{{ auth.me?.display_name }}</strong><p>{{ org.isTeacher ? 'Pengajar' : 'Peserta' }}</p></div>
+          </div>
+          <h3>{{ campus ? 'Jelajahi kampus' : 'Ruang belajar' }}</h3>
+          <p class="panel-note">{{ campus ? 'Klik gedung di peta atau buka Daftar gedung, lalu berjalan ke pintunya.' : current?.room_name }}</p>
+          <template v-if="!campus">
+            <p class="panel-note">{{ chat.zone.name || 'Area bersama' }}</p>
+            <SeatPicker :seats="map?.seats ?? []" :self="position" :others="otherPositions"
+              :disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
+          </template>
+        </template>
+      </aside>
       <div class="map-column">
         <div class="map-frame">
           <header ref="mapTop" class="map-top">
@@ -275,15 +334,20 @@ onBeforeUnmount(() => {
                 speaking: () => voice?.speaking.value ?? new Set(),
                 inset: () => inset,
                 walkTarget: () => walkTarget,
+                zoom: () => zoom,
+                selectBuilding,
               }"
               :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
             />
           </div>
           <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
-          <div v-if="campus && nearDoor && !directoryOpen && !roomsOpen" class="door-prompt">
-            <strong>{{ nearDoor.name }}</strong>
-            <button class="btn-primary" @click="roomsOpen = true">Pilih ruang</button>
-          </div>
+          <MapZoom v-if="campus && map" v-model="zoom" class="map-zoom" />
+          <MapMinimap v-if="campus && map" :map="map" :position="position" class="map-minimap" />
+          <PlaceCard v-if="campus && panelBuilding && panelBuilding.key !== dismissedPlace && !directoryOpen && !roomsOpen"
+            class="place-detail" :building="panelBuilding" :teacher="org.isTeacher" :at-door="canEnter"
+            :disabled="traveling || status !== 'open'"
+            :occupancy="buildings.find((item) => item.building_key === panelBuilding?.key)"
+            @walk="walkToPlace" @rooms="showPlaceRooms" @close="closePlace" />
           <div v-if="kicked" class="connection-overlay" role="alert">
             <p>
               Kamu dikeluarkan dari sesi ini oleh pengajar. Minta izin pengajar untuk masuk lagi.
@@ -294,6 +358,8 @@ onBeforeUnmount(() => {
             {{ statusText }}
           </div>
           <footer ref="mapBottom" class="map-bottom">
+            <EmoteBar :send="room.sendEmote"
+              :disabled="status !== 'open' || traveling || kicked" />
             <VoiceBar
               v-if="voice && !campus && !kicked"
               :voice="voice"
@@ -304,14 +370,7 @@ onBeforeUnmount(() => {
               :disabled="status !== 'open'"
               @broadcast="room.voiceBroadcast"
             />
-            <p class="hint">
-              {{
-                campus
-                  ? 'Klik tujuan atau pakai WASD. Jalan ke pintu gedung untuk memilih ruang.'
-                  : 'Klik tujuan atau pakai WASD.'
-              }}
-              <span v-if="campus && selectedBuilding">Tujuan: {{ selectedBuilding.name }}.</span>
-            </p>
+            <p v-if="campus && selectedBuilding" class="hint">Tujuan: {{ selectedBuilding.name }}.</p>
             <p v-if="leaveError || error" class="float-note" role="alert">
               {{ leaveError || error }}
             </p>
@@ -359,8 +418,13 @@ onBeforeUnmount(() => {
         </ul>
       </aside>
       <aside class="chat-sidebar" aria-label="Chat ruang">
-        <h2>Chat</h2>
+        <header class="panel-heading"><h2 v-if="!chatClosed">Chat</h2>
+          <button class="btn-secondary" :aria-label="chatClosed ? 'Buka panel chat' : 'Ciutkan panel chat'"
+            :aria-expanded="!chatClosed" @click="chatClosed = !chatClosed">{{ chatClosed ? '‹' : '›' }}</button>
+        </header>
+        <p v-if="!chatClosed" class="panel-note">Ngobrol dengan orang di sekitarmu</p>
         <ChatPanel
+          v-show="!chatClosed"
           class="side-chat"
           :chat="chat"
           :version="chatVersion"
@@ -441,8 +505,20 @@ onBeforeUnmount(() => {
 .map-top {
   top: var(--space-3);
 }
+.map-zoom {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--touch-min) + var(--space-4) + var(--space-6));
+  right: var(--space-3);
+}
 .map-bottom {
   bottom: var(--space-3);
+}
+.map-minimap {
+  position: absolute;
+  z-index: 2;
+  bottom: calc(var(--touch-min) + var(--space-4) + var(--space-6));
+  right: var(--space-3);
 }
 .float-note {
   position: absolute;
@@ -491,19 +567,11 @@ onBeforeUnmount(() => {
   outline: 3px solid var(--color-primary-strong);
   outline-offset: 2px;
 }
-.door-prompt {
+.place-detail {
   position: absolute;
   z-index: 3;
   bottom: calc(var(--space-14) + var(--space-10));
-  left: 50%;
-  transform: translateX(-50%);
-  box-shadow: var(--shadow-raise);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
+  left: var(--space-3);
 }
 .campus-chat {
   margin-top: var(--space-5);
@@ -559,10 +627,26 @@ h1 {
   min-height: 0;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: 264px minmax(0, 1fr) 300px;
   gap: var(--space-4);
 }
-/* The map is fitted between the two toolbars so they never cover the floor. */
+.layout.learning-closed { grid-template-columns: 76px minmax(0, 1fr) 300px; }
+.layout.chat-closed { grid-template-columns: 264px minmax(0, 1fr) 76px; }
+.layout.learning-closed.chat-closed { grid-template-columns: 76px minmax(0, 1fr) 76px; }
+.learning-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--kv-surface);
+  border-radius: var(--kv-radius-card);
+}
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.panel-heading h2 { margin: 0; font-size: var(--text-lg); }
+.panel-heading button { flex: none; padding: 0; min-width: var(--touch-min); }
+.panel-note { color: var(--kv-text-muted); font-size: var(--text-sm); }
+.learner { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
+.learner p { color: var(--kv-text-muted); margin: var(--space-1) 0; }
+/* HUD floats over the camera-follow viewport. */
 .stage {
   position: absolute;
   inset: 0;
@@ -572,8 +656,8 @@ h1 {
   min-height: 0;
   width: 100%;
   position: relative;
-  background: var(--map-grass);
-  border-radius: var(--radius-2xl);
+  background: var(--kv-map-ground);
+  border-radius: var(--kv-radius-map);
   overflow: clip;
 }
 .loading {
@@ -654,7 +738,8 @@ li span {
     gap: var(--space-2);
     margin-bottom: var(--space-3);
   }
-  .layout {
+  .learning-panel { display: none; }
+  .layout, .layout.learning-closed, .layout.chat-closed, .layout.learning-closed.chat-closed {
     grid-template-columns: minmax(0, 1fr);
     min-height: 400px;
   }

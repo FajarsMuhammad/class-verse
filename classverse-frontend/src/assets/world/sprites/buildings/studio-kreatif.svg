@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="168" viewBox="0 0 240 168" role="img" aria-label="Studio Kreatif">
+<polygon points="9,42 9,17 64,2 64,17 120,2 120,17 175,2 175,17 231,2 231,42" fill="#8b5cf6" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<rect x="16" y="42" width="208" height="112" rx="0" fill="#ede9fe" stroke="#1d2140" stroke-width="3"/>
+<circle cx="63" cy="87" r="28" fill="#ddd6fe" stroke="#1d2140" stroke-width="3"/>
+<g transform="translate(48 72) scale(1.25)"><path d="M12 3C7 3 3 7 3 12s4 9 9 9c1 0 2-1 2-2s-1-1-1-2 1-2 2-2h2a4 4 0 0 0 4-4c0-4-4-8-9-8z" fill="#fbbf24" stroke="#1d2140" stroke-width="1.6" stroke-linejoin="round"/><circle cx="8" cy="11" r="1.5" fill="#ef4444"/><circle cx="12" cy="7.5" r="1.5" fill="#2563eb"/><circle cx="16.5" cy="10" r="1.5" fill="#16a34a"/></g>
+<rect x="175" y="59" width="30" height="46" rx="4" fill="#ddd6fe" stroke="#1d2140" stroke-width="3"/>
+<rect x="100" y="104" width="40" height="50" rx="4" fill="#c8935a" stroke="#1d2140" stroke-width="3"/>
+<rect x="7" y="154" width="226" height="12" rx="4" fill="#cbd5e1" stroke="#1d2140" stroke-width="3"/>
+</svg>

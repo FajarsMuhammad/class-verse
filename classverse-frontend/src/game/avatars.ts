@@ -1,82 +1,57 @@
-import round from '@/assets/avatars/round.svg?raw'
-import cap from '@/assets/avatars/cap.svg?raw'
-import glasses from '@/assets/avatars/glasses.svg?raw'
-import headset from '@/assets/avatars/headset.svg?raw'
-import bun from '@/assets/avatars/bun.svg?raw'
-import beret from '@/assets/avatars/beret.svg?raw'
-import { cssToken } from './tiles'
-import type { Direction } from '@/realtime/messages'
+import palette from '@/assets/avatars/palette.json'
 
-const portraits = import.meta.glob<string>('../assets/avatars/sporty/*-idle.png', {
-  eager: true, query: '?url', import: 'default',
-})
-const sheets = import.meta.glob<string>('../assets/avatars/sporty/*.png', {
-  eager: true, query: '?url', import: 'default',
-})
+// Keep persisted profile keys valid while replacing their presentation with MVP 2 art.
 export const avatarStyles = [
-  { key: 'runner', label: 'Pelari' }, { key: 'cap', label: 'Topi sport' },
-  { key: 'headphones', label: 'Headphone' }, { key: 'varsity', label: 'Varsity' },
-  { key: 'ponytail', label: 'Kuncir' }, { key: 'hoodie', label: 'Hoodie' },
-  { key: 'glasses', label: 'Kacamata' },
+  { key: 'runner', label: 'Profil 1' }, { key: 'cap', label: 'Profil 2' },
+  { key: 'headphones', label: 'Profil 3' }, { key: 'varsity', label: 'Profil 4' },
+  { key: 'ponytail', label: 'Profil 5' }, { key: 'hoodie', label: 'Profil 6' },
+  { key: 'glasses', label: 'Profil 7' },
 ]
 export const avatarColors = [
-  { key: 'nila', label: 'Nila' }, { key: 'mangga', label: 'Mangga' },
-  { key: 'zamrud', label: 'Zamrud' }, { key: 'laut', label: 'Biru laut' },
-  { key: 'koral', label: 'Koral' }, { key: 'grafit', label: 'Grafit' },
+  { key: 'nila', label: 'Nila', color: palette.shirt[0]! },
+  { key: 'mangga', label: 'Mangga', color: palette.shirt[4]! },
+  { key: 'zamrud', label: 'Zamrud', color: palette.shirt[2]! },
+  { key: 'laut', label: 'Biru laut', color: palette.shirt[3]! },
+  { key: 'koral', label: 'Koral', color: palette.shirt[1]! },
+  { key: 'grafit', label: 'Grafit', color: palette.shirt[8]! },
 ]
 export const avatarChoices = avatarStyles.flatMap((style) => avatarColors.map((color) => ({
   key: `sporty-${style.key}-${color.key}`, label: `${style.label} ${color.label}`,
 })))
-
-// Row order and frame timing match assets/avatars/sporty/manifest.json.
-export function avatarFrame(dir: Direction, moving: boolean, time: number, reducedMotion = false) {
-  const row = ['down', 'left', 'right', 'up'].indexOf(dir)
-  return row * 5 + (moving && !reducedMotion ? 1 + Math.floor(time / 125) % 4 : 0)
-}
-
-export function avatarSheetURL(key: string): string | null {
-  if (!avatarChoices.some((a) => a.key === key)) return null
-  return sheets[`../assets/avatars/sporty/${key.slice(7)}.png`] ?? null
-}
-
-const accessories = { round, cap, glasses, headset, bun, beret }
-const names = {
-  round: 'Bulat',
-  cap: 'Topi',
-  glasses: 'Kacamata',
-  headset: 'Headset',
-  bun: 'Sanggul',
-  beret: 'Baret',
-}
-const bodyColors = {
-  round: '#7C83FD',
-  cap: '#FFB547',
-  glasses: '#2FB58A',
-  headset: '#5BB8F0',
-  bun: '#F48FB1',
-  beret: '#A78BFA',
-}
-const legacyChoices = Object.keys(accessories).flatMap((accessory) =>
-  ['nila', 'mangga'].map((color) => ({
-    key: `${accessory}-${color}`,
-    label: `${names[accessory as keyof typeof names]} ${color === 'nila' ? 'Nila' : 'Mangga'}`,
-  })),
-)
+export const avatarPalette = palette
+const legacyStyles = ['round', 'cap', 'glasses', 'headset', 'bun', 'beret']
+export const avatarKeys = ['default', ...avatarChoices.map(({ key }) => key),
+  ...legacyStyles.flatMap((style) => ['nila', 'mangga'].map((color) => `${style}-${color}`))]
 
 export function avatarKey(key: string): string {
-  return [...avatarChoices, ...legacyChoices].some((a) => a.key === key) ? key : 'default'
+  return /^look-[0-5]-[0-4]-[0-9]$/.test(key) || avatarKeys.includes(key) ? key : 'default'
 }
 
-export function avatarURL(key: string): string {
-  key = avatarKey(key)
-  if (key.startsWith('sporty-')) return portraits[`../assets/avatars/sporty/${key.slice(7)}-idle.png`]!
-  if (key === 'default') return `data:image/svg+xml;base64,${btoa(round)}`
-  const [accessory, color] = key.split('-')
-  const a = accessory as keyof typeof accessories
-  // Replace the body fill only; preserve accessory and facial detail colors.
-  const svg = accessories[a].replace(
-    new RegExp(`fill="${bodyColors[a]}"`, 'i'),
-    `fill="${cssToken(`--avatar-${color}`)}"`,
-  )
-  return `data:image/svg+xml;base64,${btoa(svg)}`
+export function avatarLook(value: string): { skin: number; hair: number; shirt: number } {
+  const key = avatarKey(value)
+  if (key.startsWith('look-')) {
+    const [, skin, hair, shirt] = key.split('-').map(Number)
+    return { skin: skin!, hair: hair!, shirt: shirt! }
+  }
+  const sporty = key.startsWith('sporty-'), parts = key.split('-')
+  const index = Math.max(0, sporty ? avatarStyles.findIndex((s) => s.key === parts[1]) : legacyStyles.indexOf(parts[0]!))
+  const color = avatarColors.find((c) => c.key === parts[sporty ? 2 : 1])?.color ?? palette.shirt[0]!
+  return { skin: index % palette.skin.length, hair: index % palette.hair.length, shirt: palette.shirt.indexOf(color) }
+}
+
+export function avatarURL(value: string): string {
+  const look = avatarLook(value)
+  const skin = palette.skin[look.skin]!
+  const hair = palette.hair[look.hair]!
+  const shirt = palette.shirt[look.shirt]!
+  // Adapted from the reference avatar renderer; interpolate only allowlisted palette values.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">
+<clipPath id="av-head"><circle cx="14" cy="12" r="9"/></clipPath>
+<rect x="3" y="20" width="22" height="16" rx="6" fill="${shirt}" stroke="#1d2140" stroke-width="2.5"/>
+<circle cx="14" cy="12" r="9" fill="${skin}"/>
+<rect x="0" y="0" width="28" height="9" fill="${hair}" clip-path="url(#av-head)"/>
+<circle cx="14" cy="12" r="9" fill="none" stroke="#1d2140" stroke-width="2.5"/>
+</svg>`
+  // Phaser's SVG loader decodes all data URLs as Base64.
+  return 'data:image/svg+xml;base64,' + btoa(svg)
 }

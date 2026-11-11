@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="194" viewBox="0 0 250 194" role="img" aria-label="Rumah Angka">
+<polygon points="58,8 94,72 22,72" fill="#ef4444" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<rect x="98" y="12" width="60" height="60" rx="6" fill="#60a5fa" stroke="#1d2140" stroke-width="3"/>
+<path d="M110 66 H152 V24" fill="none" stroke="#3b82f6" stroke-width="10" stroke-linecap="round"/>
+<path d="M128 30 v24 M116 42 h24" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+<path d="M162 72 A33 36 0 0 1 228 72 Z" fill="#facc15" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<rect x="10" y="72" width="230" height="108" rx="6" fill="#dbeafe" stroke="#1d2140" stroke-width="3"/>
+<circle cx="43" cy="103" r="14" fill="#fef9c3" stroke="#1d2140" stroke-width="3"/>
+<rect x="67" y="89" width="28" height="28" rx="5" fill="#fef9c3" stroke="#1d2140" stroke-width="3"/>
+<polygon points="167,89 183,119 151,119" fill="#fef9c3" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<circle cx="207" cy="103" r="14" fill="#fef9c3" stroke="#1d2140" stroke-width="3"/>
+<path d="M103 180 V148.0 A22.0 22.0 0 0 1 147 148.0 V180" fill="#f97316" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<rect x="2" y="180" width="246" height="12" rx="4" fill="#cbd5e1" stroke="#1d2140" stroke-width="3"/>
+</svg>

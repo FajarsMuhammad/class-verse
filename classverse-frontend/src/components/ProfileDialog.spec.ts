@@ -28,13 +28,14 @@ function setup(avatarKey = 'default') {
 describe('ProfileDialog', () => {
   it('submits selected preset and edited name only', async () => {
     const { wrapper, save } = setup()
-    expect(wrapper.findAll('input[type=radio]')).toHaveLength(13)
+    expect(wrapper.findAll('input[type=radio]')).toHaveLength(21)
     await wrapper.get('#profile-name').setValue('Ani Baru')
-    await wrapper.get('input[name="avatar-style"][value="glasses"]').setValue()
-    await wrapper.get('input[name="avatar-color"][value="zamrud"]').setValue()
+    await wrapper.get('input[name="avatar-skin"][value="5"]').setValue()
+    await wrapper.get('input[name="avatar-hair"][value="4"]').setValue()
+    await wrapper.get('input[name="avatar-shirt"][value="9"]').setValue()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect(save).toHaveBeenCalledWith({ display_name: 'Ani Baru', avatar_key: 'sporty-glasses-zamrud' })
+    expect(save).toHaveBeenCalledWith({ display_name: 'Ani Baru', avatar_key: 'look-5-4-9' })
     expect(wrapper.emitted('saved')).toHaveLength(1)
   })
   it('reports field error and keeps stored state on failure', async () => {
@@ -60,21 +61,21 @@ describe('ProfileDialog', () => {
     await flushPromises()
     expect(save).toHaveBeenCalledWith({ display_name: 'Ani Baru' })
   })
-  it('loads saved sporty choices and allows changing color only', async () => {
+  it('loads saved sporty colors and changes clothing without changing skin or hair', async () => {
     const { wrapper, save } = setup('sporty-headphones-koral')
-    expect((wrapper.get('input[value="headphones"]').element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.get('input[value="koral"]').element as HTMLInputElement).checked).toBe(true)
-    await wrapper.get('input[value="laut"]').setValue()
+    expect((wrapper.get('input[name="avatar-skin"][value="2"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('input[name="avatar-shirt"][value="1"]').element as HTMLInputElement).checked).toBe(true)
+    await wrapper.get('input[name="avatar-shirt"][value="3"]').setValue()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect(save).toHaveBeenCalledWith({ avatar_key: 'sporty-headphones-laut' })
+    expect(save).toHaveBeenCalledWith({ avatar_key: 'look-2-2-3' })
   })
-  it('color selection on a legacy avatar selects the default sporty style', async () => {
+  it('color selection on a legacy avatar preserves its skin and hair', async () => {
     const { wrapper, save } = setup()
-    await wrapper.get('input[value="grafit"]').setValue()
+    await wrapper.get('input[name="avatar-shirt"][value="8"]').setValue()
     await wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect(save).toHaveBeenCalledWith({ avatar_key: 'sporty-runner-grafit' })
+    expect(save).toHaveBeenCalledWith({ avatar_key: 'look-0-0-8' })
   })
   it('cancel does not save', async () => {
     const { wrapper, save } = setup()

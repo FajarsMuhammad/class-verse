@@ -5,16 +5,19 @@ import { directionOf, moveToward, SEND_INTERVAL_MS, step, type Vec } from '@/rea
 import type { Direction, MoveMsg } from '@/realtime/messages'
 import { findPath } from '@/realtime/pathfind'
 import type { World } from '@/realtime/world'
-import { avatarChoices, avatarKey, avatarURL, avatarSheetURL, avatarFrame } from './avatars'
+import { avatarKeys, avatarKey, avatarURL } from './avatars'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
 import { roomArt, roomLandmarks } from './roomArt'
 import { stackLabels } from './layout'
+import { drawWorld, preloadWorld } from './worldArt'
 
 export interface SceneDeps {
   map: MapData
   world: World
   sendMove: (m: MoveMsg) => void
+  zoom?: () => number
+  selectBuilding?: (key: string) => void
   // currentZone returns the server-reported zone key of the local avatar.
   currentZone?: () => string
   // speaking returns ids (self included) talking right now (voice, slice 9).
@@ -34,7 +37,6 @@ interface Sprite {
 }
 
 const AVATAR_SIZE = 36
-const SPORTY_HEIGHT = 48
 // Extra A* cost per tile inside a table you are not walking to (see tablePenalty).
 const TABLE_PENALTY = 20
 const MAX_FRAME_MS = 100
@@ -62,7 +64,8 @@ export class CampusScene extends Phaser.Scene {
   private movementRevision = 0
   private walkId = 0
   private fitted = ''
-  private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  private avatarLoads = new Set<string>()
+  private emoteBubbles = new Map<string, Phaser.GameObjects.Container>()
 
   constructor() {
     super('campus')
@@ -73,16 +76,15 @@ export class CampusScene extends Phaser.Scene {
   }
 
   preload() {
-    const legacy = ['default', ...['round', 'cap', 'glasses', 'headset', 'bun', 'beret']
-      .flatMap((style) => ['nila', 'mangga'].map((color) => `${style}-${color}`))]
-    for (const key of legacy) this.load.svg(`avatar-${key}`, avatarURL(key), { width: 128, height: 128 })
-    for (const { key } of avatarChoices) {
-      this.load.spritesheet(`avatar-${key}`, avatarSheetURL(key)!, { frameWidth: 32, frameHeight: 48 })
-    }
+    preloadWorld(this)
+    for (const key of avatarKeys)
+      this.load.svg(`avatar-${key}`, avatarURL(key), { width: 112, height: 152 })
   }
 
   create() {
     const { map } = this.deps
+    const newArt = drawWorld(this, this.deps.world.mapKey ?? 'campus')
+    if (!newArt) {
     this.textures.addCanvas(
       'campus-art',
       this.deps.world.mapKey === 'campus'
@@ -90,14 +92,15 @@ export class CampusScene extends Phaser.Scene {
         : roomArt(map, this.deps.world.mapKey ?? 'classroom'),
     )
     this.add.image(0, 0, 'campus-art').setOrigin(0).setDisplaySize(map.pixelWidth, map.pixelHeight)
+    }
     this.fitCamera()
     this.scale.on('resize', this.fitCamera, this)
     this.events.once('shutdown', () => this.scale.off('resize', this.fitCamera, this))
 
-    for (const b of map.buildings)
+    if (!newArt) for (const b of map.buildings)
       this.labels.push(this.buildingLabel(b.name, b.x + b.w / 2, b.y, b.staffOnly))
     // Campus reuses the board tile id for the flagpole; landmarks are room-only.
-    if (this.deps.world.mapKey !== 'campus')
+    if (!newArt && this.deps.world.mapKey !== 'campus')
       for (const l of roomLandmarks(map))
         this.labels.push(this.buildingLabel(l.text, l.x, l.y, false, l.dark))
     if (map.zones.length) {
@@ -120,7 +123,7 @@ export class CampusScene extends Phaser.Scene {
     this.radius = this.add.graphics().setDepth(1.5)
     this.rings = this.add.graphics().setDepth(1.6)
 
-    this.cameras.main.setBackgroundColor(cssToken('--map-grass'))
+    this.cameras.main.setBackgroundColor(cssToken('--kv-map-ground'))
 
     const kb = this.input.keyboard!
     const K = Phaser.Input.Keyboard.KeyCodes
@@ -146,6 +149,15 @@ export class CampusScene extends Phaser.Scene {
       const self = this.deps.world.self
       if (!self) return
       const to = { x: Math.round(p.worldX), y: Math.round(p.worldY) }
+      if (this.deps.world.mapKey === 'campus') {
+        const building = this.deps.map.buildings.find((b) =>
+          to.x >= b.x && to.x < b.x+b.w && to.y >= b.y && to.y < b.y+b.h)
+        if (building && this.deps.selectBuilding) {
+          this.path = []
+          this.deps.selectBuilding(building.key)
+          return
+        }
+      }
       this.path = findPath(this.deps.map, self, to, this.tablePenalty(self, to))
     })
   }
@@ -166,7 +178,9 @@ export class CampusScene extends Phaser.Scene {
       this.path = findPath(map, self, target, this.tablePenalty(self, target))
     }
     const inset = this.deps.inset?.()
-    if (inset && `${inset.top},${inset.bottom}` !== this.fitted) this.fitCamera()
+    if ((this.deps.world.mapKey === 'campus' &&
+      this.cameras.main.zoom !== Math.max(0.3, Math.min(1, this.deps.zoom?.() ?? 0.5))) ||
+      (inset && `${inset.top},${inset.bottom}` !== this.fitted)) this.fitCamera()
 
     this.focused = this.game.canvas.parentElement === document.activeElement
     // A UI walk ("Keluar ruang") runs without canvas focus; keys still need it.
@@ -192,10 +206,11 @@ export class CampusScene extends Phaser.Scene {
     }
 
     world.sample(performance.now())
-    this.syncSprites(time)
+    this.syncSprites()
     this.drawZones()
     this.drawRadius()
     this.drawSpeaking()
+    if (world.mapKey === 'campus' && self) this.cameras.main.centerOn(self.x, self.y)
   }
 
   // tablePenalty makes walks go around other tables. Every table is its own
@@ -205,7 +220,9 @@ export class CampusScene extends Phaser.Scene {
     const { map } = this.deps
     const ts = map.tileSize
     const at = (x: number, y: number) =>
-      map.zones.find((z) => x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h)
+      map.zones.find((z) => z.circle
+        ? ((x-z.x-z.w/2)/(z.w/2))**2 + ((y-z.y-z.h/2)/(z.h/2))**2 <= 1
+        : x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h)
     const keep = new Set([at(from.x, from.y), at(to.x, to.y)])
     return (tx: number, ty: number) => {
       const z = at(tx * ts + ts / 2, ty * ts + ts / 2)
@@ -228,6 +245,13 @@ export class CampusScene extends Phaser.Scene {
     this.deps.map.zones.forEach((z, i) => {
       const own = z.key === mine
       g.fillStyle(fill, own ? 0.75 : 0.35)
+      if (z.circle) {
+        g.fillEllipse(z.x+z.w/2, z.y+z.h/2, z.w, z.h)
+        g.lineStyle(own ? 4 : 2, own ? strong : line, 1)
+        g.strokeEllipse(z.x+z.w/2, z.y+z.h/2, z.w, z.h)
+        this.zoneLabels[i]?.setText(own ? `${z.name} · kamu di sini` : z.name)
+        return
+      }
       g.fillRoundedRect(z.x, z.y, z.w, z.h, 16)
       if (own) {
         g.lineStyle(4, strong, 1)
@@ -283,10 +307,17 @@ export class CampusScene extends Phaser.Scene {
     const inset = this.deps.inset?.() ?? { top: 0, bottom: 0 }
     this.fitted = `${inset.top},${inset.bottom}`
     const free = Math.max(1, this.scale.height - inset.top - inset.bottom)
-    const zoom = Math.min(this.scale.width / map.pixelWidth, free / map.pixelHeight)
+    const campus = this.deps.world.mapKey === 'campus'
+    const zoom = campus
+      ? Math.max(0.3, Math.min(1, this.deps.zoom?.() ?? 0.5))
+      : Math.min(this.scale.width / map.pixelWidth, free / map.pixelHeight)
     // Centre the map in the band between the toolbars, not the whole canvas.
     const shift = (inset.top - inset.bottom) / 2 / zoom
-    camera.setZoom(zoom).centerOn(map.pixelWidth / 2, map.pixelHeight / 2 - shift)
+    const target = campus ? this.deps.world.self : null
+    camera.setZoom(zoom).centerOn(target?.x ?? map.pixelWidth / 2, target?.y ?? map.pixelHeight / 2 - shift)
+    for (const child of this.children.list) {
+      if (child.name === 'world-label') (child as Phaser.GameObjects.Text).setScale(1 / zoom)
+    }
     for (const label of this.labels) label.setScale(1 / zoom)
     for (const s of [...this.sprites.values(), ...(this.self ? [this.self] : [])]) {
       s.tag.setScale(1 / zoom)
@@ -303,7 +334,7 @@ export class CampusScene extends Phaser.Scene {
     this.deps.sendMove({ x: Math.round(x), y: Math.round(y), dir })
   }
 
-  private syncSprites(time: number) {
+  private syncSprites() {
     const { world } = this.deps
     for (const [id, s] of this.sprites) {
       const a = world.avatars.get(id)
@@ -313,7 +344,7 @@ export class CampusScene extends Phaser.Scene {
         this.sprites.delete(id)
         continue
       }
-      this.drawAvatar(s.body, a.avatar, a.x, a.y, a.dir, time)
+      this.drawAvatar(s.body, a.avatar)
       if (s.name !== a.name) {
         s.tag.destroy()
         s.tag = this.makeTag(a.name, a.role === 'participant' ? 'other' : 'teacher')
@@ -336,7 +367,7 @@ export class CampusScene extends Phaser.Scene {
         this.self = this.makeSprite(world.selfName, 'self', self.x, self.y, world.selfAvatar)
         this.fitCamera()
       }
-      this.drawAvatar(this.self.body, world.selfAvatar, self.x, self.y, self.dir, time)
+      this.drawAvatar(this.self.body, world.selfAvatar)
       if (this.self.name !== world.selfName) {
         this.self.tag.destroy()
         this.self.tag = this.makeTag(world.selfName, 'self')
@@ -346,6 +377,31 @@ export class CampusScene extends Phaser.Scene {
       this.self.tag.setPosition(self.x, self.y + 6).setDepth(self.y + 1)
     }
     this.unstackTags()
+    this.syncEmotes()
+  }
+
+  private syncEmotes() {
+    const { world } = this.deps
+    for (const [id, bubble] of this.emoteBubbles) {
+      if (!world.emotes.has(id) || (id !== world.selfId && !world.avatars.has(id))) {
+        bubble.destroy()
+        this.emoteBubbles.delete(id)
+      }
+    }
+    for (const [id, emote] of world.emotes) {
+      const avatar = id === world.selfId ? world.self : world.avatars.get(id)
+      if (!avatar) continue
+      let bubble = this.emoteBubbles.get(id)
+      if (bubble?.getData('text') !== emote.text) {
+        bubble?.destroy()
+        bubble = this.pill(emote.text, cssToken('--color-primary'), cssToken('--color-surface'), cssToken('--text-sm'))
+        bubble.setData('text', emote.text)
+        this.emoteBubbles.set(id, bubble)
+      }
+      const zoom = this.cameras.main.zoom
+      bubble!.setScale(1 / zoom).setPosition(avatar.x, avatar.y - 66 / zoom)
+        .setDepth(100001).setVisible(id === world.selfId || !world.avatars.get(id)?.hidden)
+    }
   }
 
   // unstackTags moves overlapping name tags apart; positions come from syncSprites.
@@ -369,30 +425,34 @@ export class CampusScene extends Phaser.Scene {
     avatar = 'default',
   ): Sprite {
     const body = this.add
-      .image(x, y, `avatar-${avatarKey(avatar)}`, avatar.startsWith('sporty-') ? 0 : undefined)
+      .image(x, y, this.ensureAvatar(avatar))
     this.sizeAvatar(body)
     const tag = this.makeTag(name, kind)
     tag.setPosition(x, y + 6)
     return { body, tag, name }
   }
 
-  private sizeAvatar(body: Phaser.GameObjects.Image) {
-    const sporty = body.texture.key.startsWith('avatar-sporty-')
-    const zoom = this.cameras.main.zoom
-    body.setOrigin(0.5, sporty ? 46 / 48 : 0.9)
-      .setDisplaySize((sporty ? 32 : AVATAR_SIZE) / zoom, (sporty ? SPORTY_HEIGHT : AVATAR_SIZE) / zoom)
-    if (sporty) body.texture.setFilter(Phaser.Textures.FilterMode.NEAREST)
+  private ensureAvatar(value: string) {
+    const key = avatarKey(value), texture = `avatar-${key}`
+    if (!this.textures.exists(texture) && !this.avatarLoads.has(key)) {
+      this.avatarLoads.add(key)
+      this.load.svg(texture, avatarURL(key), { width: 112, height: 152 })
+      this.load.start()
+    }
+    return this.textures.exists(texture) ? texture : 'avatar-default'
   }
 
-  private drawAvatar(body: Phaser.GameObjects.Image, key: string, x: number, y: number, dir: Direction, time: number) {
-    const texture = `avatar-${avatarKey(key)}`
-    // Compare rendered positions: held keys alone must not animate blocked movement.
-    const distance = Math.hypot(body.x - x, body.y - y)
-    const moving = body.visible && distance > 0.01 && distance < this.deps.map.walkSpeed * 0.2
-    const frame = texture.startsWith('avatar-sporty-')
-      ? avatarFrame(dir, moving, time, this.reducedMotion.matches) : undefined
-    body.setTexture(texture, frame)
-    this.sizeAvatar(body)
+  private sizeAvatar(body: Phaser.GameObjects.Image) {
+    const zoom = this.cameras.main.zoom
+    body.setOrigin(0.5, 1).setDisplaySize(28 / zoom, 38 / zoom)
+  }
+
+  private drawAvatar(body: Phaser.GameObjects.Image, key: string) {
+    const texture = this.ensureAvatar(key)
+    if (body.texture.key !== texture) {
+      body.setTexture(texture)
+      this.sizeAvatar(body)
+    }
   }
 
   private makeTag(name: string, kind: 'self' | 'teacher' | 'other') {

@@ -78,7 +78,9 @@ async function save() {
           <label for="room-map">Peta ruang</label>
           <select id="room-map" v-model="mapKey">
             <option value="classroom">Ruang kelas</option>
-            <option value="garden">Taman diskusi</option>
+            <option value="garden">Ruang diskusi</option>
+          <option value="lab">Lab sains</option>
+          <option value="baca">Ruang baca</option>
           </select>
         </template>
         <label class="check"><input v-model="scheduled" type="checkbox" /> Jadwalkan ruang</label>
