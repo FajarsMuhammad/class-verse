@@ -13,9 +13,12 @@ onMounted(() => {
   game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: host.value,
-    backgroundColor: 'transparent',
+    // backgroundColor: 'transparent' parses as black in Phaser 3.90.
+    transparent: true,
     scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
     render: { antialias: true, roundPixels: false },
+    // Use elapsed time for server-synced movement, not Phaser's smoothed 60 Hz delta.
+    fps: { smoothStep: false },
     banner: false,
     audio: { noAudio: true },
     input: { keyboard: { target: host.value } },

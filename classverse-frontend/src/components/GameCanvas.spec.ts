@@ -10,6 +10,7 @@ class FakeRenderer {
   }
 }
 class FakeGame {
+  config: { fps?: { smoothStep?: boolean }; transparent?: boolean; backgroundColor?: string }
   renderer = new FakeRenderer()
   private handlers: Record<string, (() => void)[]> = {}
   events = {
@@ -23,7 +24,8 @@ class FakeGame {
     this.renderer.gl = null
     void gl
   })
-  constructor() {
+  constructor(config: { fps?: { smoothStep?: boolean }; transparent?: boolean; backgroundColor?: string }) {
+    this.config = config
     created.push(this)
   }
 }
@@ -47,7 +49,13 @@ describe('GameCanvas', () => {
       w.unmount()
     }
     expect(created).toHaveLength(3)
-    for (const g of created) expect(g.destroy).toHaveBeenCalledWith(true)
+    for (const g of created) {
+      expect(g.destroy).toHaveBeenCalledWith(true)
+      expect(g.config.fps?.smoothStep).toBe(false)
+      // Phaser parses backgroundColor 'transparent' as black; only `transparent` clears it.
+      expect(g.config.transparent).toBe(true)
+      expect(g.config.backgroundColor).toBeUndefined()
+    }
     expect(lose).toHaveBeenCalledTimes(3)
   })
 })
