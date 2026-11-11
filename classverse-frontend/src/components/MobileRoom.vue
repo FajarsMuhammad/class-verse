@@ -60,6 +60,11 @@ watch(map, (m) => {
 const openKey = ref('')
 // Collapse on every room change so an opened building reloads fresh counts.
 watch(current, () => (openKey.value = ''))
+// ChatState is not reactive; chatVersion changes with it (room_state carries muted).
+const muted = computed(() => {
+  void chatVersion.value
+  return chat.muted && !campus.value
+})
 const zoneKey = computed(() => {
   void chatVersion.value
   return chat.zone.key
@@ -226,7 +231,7 @@ function reported() {
     </template>
 
     <section v-if="!kicked" class="card chat" aria-label="Chat">
-      <EmoteBar :send="room.sendEmote" :disabled="status !== 'open' || traveling || kicked" />
+      <EmoteBar :send="room.sendEmote" :disabled="status !== 'open' || traveling || kicked || muted" />
       <div role="status">
         <p v-for="reaction in activeEmotes" :key="reaction.id">{{ reaction.name }}: {{ reaction.text }}</p>
       </div>

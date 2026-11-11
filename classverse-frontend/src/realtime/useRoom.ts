@@ -74,6 +74,8 @@ export function useRoom(): RoomHandle {
   const chatError = ref('')
   const chatErrors = new Set(['rate_limited', 'not_in_zone', 'all_chat_disabled'])
   let lastChatSeq = -1
+  // Seqs of sent emotes; their rejections are transient and never block the map.
+  const emoteSeqs = new Set<number>()
   let client: RealtimeClient | null = null
   let lastVersion = -1
   const abort = new AbortController()
@@ -107,6 +109,7 @@ export function useRoom(): RoomHandle {
           mutedIds.value = msg.d!.muted ?? []
         }
         if (msg.t === 'error' && msg.d!.code === 'kicked') kicked.value = true
+        if (msg.t === 'welcome') emoteSeqs.clear() // seq restarts after every auth
         if (msg.t === 'welcome' || msg.t === 'traveled') {
           kicked.value = false
           banned.value = []
@@ -126,7 +129,9 @@ export function useRoom(): RoomHandle {
                 error.value = 'Peta gagal dimuat. Muat ulang halaman.'
             })
         } else if (msg.t === 'buildings') buildings.value = msg.d!.items
-        else if (
+        else if (msg.t === 'error' && emoteSeqs.delete(msg.d!.seq ?? -1)) {
+          // The bar already cools down and is disabled while muted.
+        } else if (
           msg.t === 'error' &&
           (chatErrors.has(msg.d!.code) ||
             (msg.d!.code === 'bad_message' && msg.d!.seq === lastChatSeq))
@@ -218,7 +223,11 @@ export function useRoom(): RoomHandle {
     },
     sendEmote: (key) => {
       if (status.value !== 'open' || traveling.value || kicked.value) return false
-      return client?.send('emote', { kind: key }) ?? false
+      const seq = client?.sendSeq('emote', { kind: key }) ?? null
+      if (seq === null) return false
+      emoteSeqs.add(seq)
+      if (emoteSeqs.size > 20) emoteSeqs.delete(emoteSeqs.values().next().value!)
+      return true
     },
     sendMove: (m) => {
       if (!traveling.value && map.value) void client?.send('move', m)

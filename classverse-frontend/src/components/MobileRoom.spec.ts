@@ -121,6 +121,19 @@ describe('MobileRoom', () => {
     expect(w.find('canvas').exists()).toBe(false)
   })
 
+  it('disables emotes while the teacher mutes this participant', async () => {
+    const room = handle(inRoom, classroom)
+    const w = mount(MobileRoom, {
+      props: { room, roomId: 'campus-1', schoolName: 'SMA 1', statusText: '' },
+    })
+    const toggle = () => w.get<HTMLButtonElement>('.emote .toggle').element
+    expect(toggle().disabled).toBe(false)
+    room.chat.apply({ t: 'room_state', seq: 2, d: { all_chat_enabled: true, muted: true } })
+    room.chatVersion.value = room.chat.version
+    await w.vm.$nextTick()
+    expect(toggle().disabled).toBe(true)
+  })
+
   it('back button travels to the campus', async () => {
     const room = handle(inRoom, classroom)
     const w = mount(MobileRoom, {

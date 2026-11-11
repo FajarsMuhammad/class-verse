@@ -70,6 +70,11 @@ const zoom = ref(0.5)
 const position = ref<{ x: number; y: number } | null>(null)
 const otherPositions = ref<{ x: number; y: number }[]>([])
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
+// ChatState is not reactive; chatVersion changes with it (room_state carries muted).
+const muted = computed(() => {
+  void chatVersion.value
+  return chat.muted && !campus.value
+})
 const selectedKey = ref('')
 const dismissedPlace = ref('')
 const directoryButton = ref<HTMLButtonElement | null>(null)
@@ -359,7 +364,7 @@ onBeforeUnmount(() => {
           </div>
           <footer ref="mapBottom" class="map-bottom">
             <EmoteBar :send="room.sendEmote"
-              :disabled="status !== 'open' || traveling || kicked" />
+              :disabled="status !== 'open' || traveling || kicked || muted" />
             <VoiceBar
               v-if="voice && !campus && !kicked"
               :voice="voice"
