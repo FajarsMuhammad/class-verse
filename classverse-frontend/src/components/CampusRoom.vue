@@ -13,11 +13,10 @@ import DoorRooms from '@/components/DoorRooms.vue'
 import MapZoom from '@/components/MapZoom.vue'
 import MapMinimap from '@/components/MapMinimap.vue'
 import PlaceCard from '@/components/PlaceCard.vue'
-import SeatPicker from '@/components/SeatPicker.vue'
+import LearningPanel from '@/components/LearningPanel.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import { useOrgStore } from '@/stores/org'
 import { useAuthStore } from '@/stores/auth'
-import { avatarURL } from '@/game/avatars'
 import type { Building, Seat } from '@/realtime/mapdata'
 
 import ChatPanel from '@/components/ChatPanel.vue'
@@ -269,26 +268,10 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed }]">
-      <aside class="learning-panel" aria-label="Panel belajar">
-        <header class="panel-heading">
-          <h2 v-if="!learningClosed">Panel belajar</h2>
-          <button class="btn-secondary" :aria-label="learningClosed ? 'Buka panel belajar' : 'Ciutkan panel belajar'"
-            :aria-expanded="!learningClosed" @click="learningClosed = !learningClosed">{{ learningClosed ? '›' : '‹' }}</button>
-        </header>
-        <template v-if="!learningClosed">
-          <div class="learner">
-            <img :src="avatarURL(world.selfAvatar)" alt="" width="42" height="57" />
-            <div><strong>{{ auth.me?.display_name }}</strong><p>{{ org.isTeacher ? 'Pengajar' : 'Peserta' }}</p></div>
-          </div>
-          <h3>{{ campus ? 'Jelajahi kampus' : 'Ruang belajar' }}</h3>
-          <p class="panel-note">{{ campus ? 'Klik gedung di peta atau buka Daftar gedung, lalu berjalan ke pintunya.' : current?.room_name }}</p>
-          <template v-if="!campus">
-            <p class="panel-note">{{ chat.zone.name || 'Area bersama' }}</p>
-            <SeatPicker :seats="map?.seats ?? []" :self="position" :others="otherPositions"
-              :disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
-          </template>
-        </template>
-      </aside>
+      <LearningPanel v-model:closed="learningClosed" class="learning-panel" :name="auth.me?.display_name ?? ''"
+        :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
+        :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
+        :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
       <div class="map-column">
         <div class="map-frame">
           <header ref="mapTop" class="map-top">
@@ -638,19 +621,10 @@ h1 {
 .layout.learning-closed { grid-template-columns: 76px minmax(0, 1fr) 300px; }
 .layout.chat-closed { grid-template-columns: 264px minmax(0, 1fr) 76px; }
 .layout.learning-closed.chat-closed { grid-template-columns: 76px minmax(0, 1fr) 76px; }
-.learning-panel {
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-4);
-  background: var(--kv-surface);
-  border-radius: var(--kv-radius-card);
-}
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .panel-heading h2 { margin: 0; font-size: var(--text-lg); }
 .panel-heading button { flex: none; padding: 0; min-width: var(--touch-min); }
 .panel-note { color: var(--kv-text-muted); font-size: var(--text-sm); }
-.learner { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
-.learner p { color: var(--kv-text-muted); margin: var(--space-1) 0; }
 /* HUD floats over the camera-follow viewport. */
 .stage {
   position: absolute;
