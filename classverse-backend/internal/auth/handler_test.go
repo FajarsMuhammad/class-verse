@@ -149,6 +149,10 @@ func TestHandlerProfilePartial(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"avatar_key":"sporty-headphones-zamrud"`) {
 		t.Fatal("sporty profile update failed")
 	}
+	rec = do(h, http.MethodPatch, "/api/me", `{"avatar_key":"look-5-4-9"}`, withBearer(session.AccessToken))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"avatar_key":"look-5-4-9"`) {
+		t.Fatal("composed avatar update failed")
+	}
 	if rec := do(h, http.MethodPatch, "/api/me", `{}`); rec.Code != http.StatusUnauthorized {
 		t.Fatal("unauthenticated patch accepted")
 	}

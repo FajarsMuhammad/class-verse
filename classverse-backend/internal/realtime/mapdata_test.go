@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 
 func loadCampus(t *testing.T) *MapData {
 	t.Helper()
-	raw, err := maps.Read("campus")
+	raw, err := os.ReadFile("testdata/campus.tmj")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +58,7 @@ func TestParseCampus(t *testing.T) {
 
 func TestMapWalkSpeeds(t *testing.T) {
 	for key, want := range map[string]int{"campus": 320, "classroom": 160, "garden": 160} {
-		raw, err := maps.Read(key)
+		raw, err := os.ReadFile("testdata/" + key + ".tmj")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,7 +75,7 @@ func TestMapWalkSpeeds(t *testing.T) {
 func TestMapNearRadius(t *testing.T) {
 	// Rooms use 3 tiles so near chat stays at one table; the campus keeps 5.
 	for key, want := range map[string]int{"campus": 160, "classroom": 96, "garden": 96} {
-		raw, err := maps.Read(key)
+		raw, err := os.ReadFile("testdata/" + key + ".tmj")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,7 +90,7 @@ func TestMapNearRadius(t *testing.T) {
 }
 
 func TestMapZones(t *testing.T) {
-	raw, err := maps.Read("classroom")
+	raw, err := os.ReadFile("testdata/classroom.tmj")
 	if err != nil {
 		t.Fatal(err)
 	}

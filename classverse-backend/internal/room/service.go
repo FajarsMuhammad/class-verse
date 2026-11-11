@@ -34,6 +34,8 @@ const (
 const (
 	MapClassroom = "classroom"
 	MapGarden    = "garden"
+	MapLab       = "lab"
+	MapReading   = "baca"
 )
 
 // Domain errors.
@@ -136,8 +138,8 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 	}
 	var v ValidationError
 	name := validateName(&v, in.Name)
-	if in.MapKey != MapClassroom && in.MapKey != MapGarden {
-		v.add("map_key", "Pilih peta kelas atau taman diskusi")
+	if in.MapKey != MapClassroom && in.MapKey != MapGarden && in.MapKey != MapLab && in.MapKey != MapReading {
+		v.add("map_key", "Pilih peta kelas, diskusi, lab, atau ruang baca")
 	}
 	if _, ok := s.buildings.Building(in.BuildingKey); !ok {
 		v.add("building_key", "Gedung tidak ditemukan")

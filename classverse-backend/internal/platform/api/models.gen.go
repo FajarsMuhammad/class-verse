@@ -119,193 +119,22 @@ func (e Role) Valid() bool {
 
 // Defines values for RoomMap.
 const (
+	Baca      RoomMap = "baca"
 	Classroom RoomMap = "classroom"
 	Garden    RoomMap = "garden"
+	Lab       RoomMap = "lab"
 )
 
 // Valid indicates whether the value is a known member of the RoomMap enum.
 func (e RoomMap) Valid() bool {
 	switch e {
+	case Baca:
+		return true
 	case Classroom:
 		return true
 	case Garden:
 		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for UpdateMeRequestAvatarKey.
-const (
-	BeretMangga            UpdateMeRequestAvatarKey = "beret-mangga"
-	BeretNila              UpdateMeRequestAvatarKey = "beret-nila"
-	BunMangga              UpdateMeRequestAvatarKey = "bun-mangga"
-	BunNila                UpdateMeRequestAvatarKey = "bun-nila"
-	CapMangga              UpdateMeRequestAvatarKey = "cap-mangga"
-	CapNila                UpdateMeRequestAvatarKey = "cap-nila"
-	Default                UpdateMeRequestAvatarKey = "default"
-	GlassesMangga          UpdateMeRequestAvatarKey = "glasses-mangga"
-	GlassesNila            UpdateMeRequestAvatarKey = "glasses-nila"
-	HeadsetMangga          UpdateMeRequestAvatarKey = "headset-mangga"
-	HeadsetNila            UpdateMeRequestAvatarKey = "headset-nila"
-	RoundMangga            UpdateMeRequestAvatarKey = "round-mangga"
-	RoundNila              UpdateMeRequestAvatarKey = "round-nila"
-	SportyCapGrafit        UpdateMeRequestAvatarKey = "sporty-cap-grafit"
-	SportyCapKoral         UpdateMeRequestAvatarKey = "sporty-cap-koral"
-	SportyCapLaut          UpdateMeRequestAvatarKey = "sporty-cap-laut"
-	SportyCapMangga        UpdateMeRequestAvatarKey = "sporty-cap-mangga"
-	SportyCapNila          UpdateMeRequestAvatarKey = "sporty-cap-nila"
-	SportyCapZamrud        UpdateMeRequestAvatarKey = "sporty-cap-zamrud"
-	SportyGlassesGrafit    UpdateMeRequestAvatarKey = "sporty-glasses-grafit"
-	SportyGlassesKoral     UpdateMeRequestAvatarKey = "sporty-glasses-koral"
-	SportyGlassesLaut      UpdateMeRequestAvatarKey = "sporty-glasses-laut"
-	SportyGlassesMangga    UpdateMeRequestAvatarKey = "sporty-glasses-mangga"
-	SportyGlassesNila      UpdateMeRequestAvatarKey = "sporty-glasses-nila"
-	SportyGlassesZamrud    UpdateMeRequestAvatarKey = "sporty-glasses-zamrud"
-	SportyHeadphonesGrafit UpdateMeRequestAvatarKey = "sporty-headphones-grafit"
-	SportyHeadphonesKoral  UpdateMeRequestAvatarKey = "sporty-headphones-koral"
-	SportyHeadphonesLaut   UpdateMeRequestAvatarKey = "sporty-headphones-laut"
-	SportyHeadphonesMangga UpdateMeRequestAvatarKey = "sporty-headphones-mangga"
-	SportyHeadphonesNila   UpdateMeRequestAvatarKey = "sporty-headphones-nila"
-	SportyHeadphonesZamrud UpdateMeRequestAvatarKey = "sporty-headphones-zamrud"
-	SportyHoodieGrafit     UpdateMeRequestAvatarKey = "sporty-hoodie-grafit"
-	SportyHoodieKoral      UpdateMeRequestAvatarKey = "sporty-hoodie-koral"
-	SportyHoodieLaut       UpdateMeRequestAvatarKey = "sporty-hoodie-laut"
-	SportyHoodieMangga     UpdateMeRequestAvatarKey = "sporty-hoodie-mangga"
-	SportyHoodieNila       UpdateMeRequestAvatarKey = "sporty-hoodie-nila"
-	SportyHoodieZamrud     UpdateMeRequestAvatarKey = "sporty-hoodie-zamrud"
-	SportyPonytailGrafit   UpdateMeRequestAvatarKey = "sporty-ponytail-grafit"
-	SportyPonytailKoral    UpdateMeRequestAvatarKey = "sporty-ponytail-koral"
-	SportyPonytailLaut     UpdateMeRequestAvatarKey = "sporty-ponytail-laut"
-	SportyPonytailMangga   UpdateMeRequestAvatarKey = "sporty-ponytail-mangga"
-	SportyPonytailNila     UpdateMeRequestAvatarKey = "sporty-ponytail-nila"
-	SportyPonytailZamrud   UpdateMeRequestAvatarKey = "sporty-ponytail-zamrud"
-	SportyRunnerGrafit     UpdateMeRequestAvatarKey = "sporty-runner-grafit"
-	SportyRunnerKoral      UpdateMeRequestAvatarKey = "sporty-runner-koral"
-	SportyRunnerLaut       UpdateMeRequestAvatarKey = "sporty-runner-laut"
-	SportyRunnerMangga     UpdateMeRequestAvatarKey = "sporty-runner-mangga"
-	SportyRunnerNila       UpdateMeRequestAvatarKey = "sporty-runner-nila"
-	SportyRunnerZamrud     UpdateMeRequestAvatarKey = "sporty-runner-zamrud"
-	SportyVarsityGrafit    UpdateMeRequestAvatarKey = "sporty-varsity-grafit"
-	SportyVarsityKoral     UpdateMeRequestAvatarKey = "sporty-varsity-koral"
-	SportyVarsityLaut      UpdateMeRequestAvatarKey = "sporty-varsity-laut"
-	SportyVarsityMangga    UpdateMeRequestAvatarKey = "sporty-varsity-mangga"
-	SportyVarsityNila      UpdateMeRequestAvatarKey = "sporty-varsity-nila"
-	SportyVarsityZamrud    UpdateMeRequestAvatarKey = "sporty-varsity-zamrud"
-)
-
-// Valid indicates whether the value is a known member of the UpdateMeRequestAvatarKey enum.
-func (e UpdateMeRequestAvatarKey) Valid() bool {
-	switch e {
-	case BeretMangga:
-		return true
-	case BeretNila:
-		return true
-	case BunMangga:
-		return true
-	case BunNila:
-		return true
-	case CapMangga:
-		return true
-	case CapNila:
-		return true
-	case Default:
-		return true
-	case GlassesMangga:
-		return true
-	case GlassesNila:
-		return true
-	case HeadsetMangga:
-		return true
-	case HeadsetNila:
-		return true
-	case RoundMangga:
-		return true
-	case RoundNila:
-		return true
-	case SportyCapGrafit:
-		return true
-	case SportyCapKoral:
-		return true
-	case SportyCapLaut:
-		return true
-	case SportyCapMangga:
-		return true
-	case SportyCapNila:
-		return true
-	case SportyCapZamrud:
-		return true
-	case SportyGlassesGrafit:
-		return true
-	case SportyGlassesKoral:
-		return true
-	case SportyGlassesLaut:
-		return true
-	case SportyGlassesMangga:
-		return true
-	case SportyGlassesNila:
-		return true
-	case SportyGlassesZamrud:
-		return true
-	case SportyHeadphonesGrafit:
-		return true
-	case SportyHeadphonesKoral:
-		return true
-	case SportyHeadphonesLaut:
-		return true
-	case SportyHeadphonesMangga:
-		return true
-	case SportyHeadphonesNila:
-		return true
-	case SportyHeadphonesZamrud:
-		return true
-	case SportyHoodieGrafit:
-		return true
-	case SportyHoodieKoral:
-		return true
-	case SportyHoodieLaut:
-		return true
-	case SportyHoodieMangga:
-		return true
-	case SportyHoodieNila:
-		return true
-	case SportyHoodieZamrud:
-		return true
-	case SportyPonytailGrafit:
-		return true
-	case SportyPonytailKoral:
-		return true
-	case SportyPonytailLaut:
-		return true
-	case SportyPonytailMangga:
-		return true
-	case SportyPonytailNila:
-		return true
-	case SportyPonytailZamrud:
-		return true
-	case SportyRunnerGrafit:
-		return true
-	case SportyRunnerKoral:
-		return true
-	case SportyRunnerLaut:
-		return true
-	case SportyRunnerMangga:
-		return true
-	case SportyRunnerNila:
-		return true
-	case SportyRunnerZamrud:
-		return true
-	case SportyVarsityGrafit:
-		return true
-	case SportyVarsityKoral:
-		return true
-	case SportyVarsityLaut:
-		return true
-	case SportyVarsityMangga:
-		return true
-	case SportyVarsityNila:
-		return true
-	case SportyVarsityZamrud:
+	case Lab:
 		return true
 	default:
 		return false
@@ -533,16 +362,13 @@ type RoomMap string
 
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
-	// AvatarKey Sporty presets use sporty-<style>-<color>; legacy SVG keys remain accepted.
-	AvatarKey *UpdateMeRequestAvatarKey `json:"avatar_key,omitempty"`
-	BirthDate *openapi_types.Date       `json:"birth_date,omitempty"`
+	// AvatarKey Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid.
+	AvatarKey *string             `json:"avatar_key,omitempty"`
+	BirthDate *openapi_types.Date `json:"birth_date,omitempty"`
 
 	// DisplayName NFC, trimmed, repeated spaces collapsed; prohibited words rejected
 	DisplayName *string `json:"display_name,omitempty"`
 }
-
-// UpdateMeRequestAvatarKey Sporty presets use sporty-<style>-<color>; legacy SVG keys remain accepted.
-type UpdateMeRequestAvatarKey string
 
 // UpdateRoomRequest defines model for UpdateRoomRequest.
 type UpdateRoomRequest struct {

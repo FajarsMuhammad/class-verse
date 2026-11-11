@@ -5,18 +5,17 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-
-	"github.com/FajarsMuhammad/class-verse/classverse-backend/maps"
 )
 
-// newMapRoom builds a goroutine-less room on a real embedded map.
+// newMapRoom uses the fixed MVP 1 geometry fixture to isolate protocol regressions.
 func newMapRoom(t *testing.T, mapKey string, allChat bool) (*room, *fakeClock) {
 	t.Helper()
-	raw, err := maps.Read(mapKey)
+	raw, err := os.ReadFile("testdata/" + mapKey + ".tmj")
 	if err != nil {
 		t.Fatal(err)
 	}

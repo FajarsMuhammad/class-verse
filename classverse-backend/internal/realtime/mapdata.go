@@ -31,7 +31,8 @@ type MapData struct {
 	// NearRadius is the near-chat range in px (map property near_tiles times
 	// the tile size). Rooms use a smaller range than the campus; zone chat
 	// and voice remain separate from this distance-based range.
-	NearRadius int
+	NearRadius              int
+	worldWidth, worldHeight int
 }
 
 // Building returns the building with key.
@@ -59,15 +60,29 @@ func (r Rect) Contains(x, y int) bool { return x >= r.X && y >= r.Y && x < r.X+r
 
 // Zone is a discussion area: everyone inside shares zone chat.
 type Zone struct {
-	Key  string
-	Name string
-	Area Rect
+	Key    string
+	Name   string
+	Area   Rect
+	Circle bool
+}
+
+// Contains tests the zone's authoritative rectangular or circular boundary.
+func (z Zone) Contains(x, y int) bool {
+	if !z.Area.Contains(x, y) {
+		return false
+	}
+	if !z.Circle {
+		return true
+	}
+	rx, ry := float64(z.Area.W)/2, float64(z.Area.H)/2
+	dx, dy := (float64(x-z.Area.X)-rx)/rx, (float64(y-z.Area.Y)-ry)/ry
+	return dx*dx+dy*dy <= 1
 }
 
 // ZoneAt returns the zone containing (x, y), or the zero Zone.
 func (m *MapData) ZoneAt(x, y int) Zone {
 	for _, z := range m.Zones {
-		if z.Area.Contains(x, y) {
+		if z.Contains(x, y) {
 			return z
 		}
 	}
@@ -81,8 +96,9 @@ type Building struct {
 	StaffOnly bool
 	Area      Rect
 	// Door is where travellers stand to enter and where they return.
-	DoorX int
-	DoorY int
+	DoorX          int
+	DoorY          int
+	InteractRadius int
 }
 
 type tmjMap struct {
@@ -140,6 +156,18 @@ func (o tmjObject) boolean(name string) bool {
 	return false
 }
 
+func (o tmjObject) integer(name string, fallback int) int {
+	for _, p := range o.Properties {
+		if p.Name == name {
+			var n int
+			if json.Unmarshal(p.Value, &n) == nil && n > 0 && n <= 200 {
+				return n
+			}
+		}
+	}
+	return fallback
+}
+
 // ParseMap reads a Tiled JSON map (see maps/README.md for the required layers).
 func ParseMap(key string, raw []byte) (*MapData, error) {
 	var m tmjMap
@@ -164,6 +192,22 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 		}
 	}
 	md.NearRadius = nearTiles * md.TileSize
+	for _, p := range m.Properties {
+		switch p.Name {
+		case "near_radius":
+			if json.Unmarshal(p.Value, &md.NearRadius) != nil || md.NearRadius < 16 || md.NearRadius > 320 {
+				return nil, fmt.Errorf("parse map %s: invalid near_radius", key)
+			}
+		case "world_width":
+			if json.Unmarshal(p.Value, &md.worldWidth) != nil || md.worldWidth <= 0 || md.worldWidth > md.Width*md.TileSize {
+				return nil, fmt.Errorf("parse map %s: invalid world_width", key)
+			}
+		case "world_height":
+			if json.Unmarshal(p.Value, &md.worldHeight) != nil || md.worldHeight <= 0 || md.worldHeight > md.Height*md.TileSize {
+				return nil, fmt.Errorf("parse map %s: invalid world_height", key)
+			}
+		}
+	}
 	var haveCollision, haveSpawn bool
 	doors := map[string][2]int{}
 	for _, l := range m.Layers {
@@ -189,7 +233,7 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 				switch o.Type {
 				case "building":
 					md.Buildings = append(md.Buildings, Building{
-						Key: o.str("key"), Name: o.str("name"), StaffOnly: o.boolean("staff_only"),
+						Key: o.str("key"), Name: o.str("name"), StaffOnly: o.boolean("staff_only"), InteractRadius: o.integer("interact_radius", 48),
 						Area: Rect{X: int(o.X), Y: int(o.Y), W: int(o.Width), H: int(o.Height)},
 					})
 				case "door":
@@ -199,7 +243,7 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 		case "zones":
 			for _, o := range l.Objects {
 				md.Zones = append(md.Zones, Zone{
-					Key: o.str("key"), Name: o.Name,
+					Key: o.str("key"), Name: o.Name, Circle: o.str("shape") == "circle",
 					Area: Rect{X: int(o.X), Y: int(o.Y), W: int(o.Width), H: int(o.Height)},
 				})
 			}
@@ -254,10 +298,20 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 }
 
 // PixelWidth is the world width in pixels.
-func (m *MapData) PixelWidth() int { return m.Width * m.TileSize }
+func (m *MapData) PixelWidth() int {
+	if m.worldWidth > 0 {
+		return m.worldWidth
+	}
+	return m.Width * m.TileSize
+}
 
 // PixelHeight is the world height in pixels.
-func (m *MapData) PixelHeight() int { return m.Height * m.TileSize }
+func (m *MapData) PixelHeight() int {
+	if m.worldHeight > 0 {
+		return m.worldHeight
+	}
+	return m.Height * m.TileSize
+}
 
 // Blocked reports whether the pixel point is outside the map or on a
 // collision tile.
@@ -302,7 +356,23 @@ func (m *MapData) SpawnPoint(n int) (int, int, error) {
 func (m *MapData) SeatPoint(key string, n int) (int, int, bool) {
 	for _, z := range m.Zones {
 		if z.Key == key {
-			return m.freePoint(z.Area, n)
+			var points [][2]int
+			for y := z.Area.Y / m.TileSize; y*m.TileSize < z.Area.Y+z.Area.H; y++ {
+				for x := z.Area.X / m.TileSize; x*m.TileSize < z.Area.X+z.Area.W; x++ {
+					px, py := x*m.TileSize+m.TileSize/2, y*m.TileSize+m.TileSize/2
+					if z.Contains(px, py) && !m.Blocked(px, py) {
+						points = append(points, [2]int{px, py})
+					}
+				}
+			}
+			if len(points) == 0 {
+				return 0, 0, false
+			}
+			if n < 0 {
+				n = 0
+			}
+			p := points[n%len(points)]
+			return p[0], p[1], true
 		}
 	}
 	return 0, 0, false
