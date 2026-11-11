@@ -1,7 +1,7 @@
 import unittest
 from collections import deque
 import json
-from generate_world import campus, interior, DATA, TILE
+from generate_world import campus, interior, DATA, OUT, TILE
 
 
 class WorldTests(unittest.TestCase):
@@ -37,6 +37,18 @@ class WorldTests(unittest.TestCase):
         for room in r['rooms'].values():
             self.assert_reachable(interior(r, room))
 
+
+    def test_committed_server_maps_match_frontend_data(self):
+        # Editing world.json/rooms.json without regenerating leaves the
+        # server enforcing old collision, doors and zones.
+        w = json.loads((DATA/'world.json').read_text())
+        r = json.loads((DATA/'rooms.json').read_text())
+        want = {'campus': campus(w)}
+        for key, layout in [('classroom', 'kelas'), ('garden', 'diskusi'), ('lab', 'lab'), ('baca', 'baca')]:
+            want[key] = interior(r, r['rooms'][layout])
+        for key, data in want.items():
+            self.assertEqual(json.loads((OUT/f'{key}.tmj').read_text()), data,
+                             f'{key}.tmj is stale: run python3 scripts/generate_world.py')
 
 if __name__ == '__main__':
     unittest.main()
