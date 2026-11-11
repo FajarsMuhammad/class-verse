@@ -3,6 +3,8 @@ import type { Direction, Participant, Position, ServerMessage } from './messages
 // Remote avatars are drawn this far in the past so there are always two
 // snapshots to interpolate between (one server tick).
 export const RENDER_DELAY_MS = 100
+export const EMOTE_MS = 3000
+export const emoteLabels = { wave: 'Halo!', hand: 'Aku mau tanya!', quiz: 'Ayo ke Arena!', cheer: 'Hore!' } as const
 
 interface Sample {
   at: number
@@ -41,6 +43,7 @@ export class World {
   // Bumped whenever avatars are added or removed (for UI lists and counts).
   version = 0
   movementRevision = 0
+  readonly emotes = new Map<string, { text: string; until: number }>()
 
   apply(msg: ServerMessage, now: number) {
     switch (msg.t) {
@@ -50,6 +53,7 @@ export class World {
         this.selfId = d.self_id
         this.mapKey = d.map_key
         this.avatars.clear()
+        this.emotes.clear()
         this.self = null
         for (const p of d.participants) {
           if (p.id === d.self_id) {
@@ -91,7 +95,14 @@ export class World {
         this.version++
         break
       }
+      case 'emote': {
+        const { id, kind: key } = msg.d!
+        if (Object.prototype.hasOwnProperty.call(emoteLabels, key) && (id === this.selfId || this.avatars.has(id)))
+          this.emotes.set(id, { text: emoteLabels[key], until: now + EMOTE_MS })
+        break
+      }
       case 'left':
+        this.emotes.delete(msg.d!.id)
         if (this.avatars.delete(msg.d!.id)) this.version++
         break
       case 'snapshot':
@@ -159,6 +170,7 @@ export class World {
 
   // sample updates every avatar's rendered position for time `now`.
   sample(now: number) {
+    for (const [id, emote] of this.emotes) if (emote.until <= now) this.emotes.delete(id)
     const t = now - RENDER_DELAY_MS
     for (const a of this.avatars.values()) {
       const s = a.samples

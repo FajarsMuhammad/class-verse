@@ -7,6 +7,7 @@ export interface Envelope<T extends string = string, D = unknown> {
   d?: D
 }
 
+export type EmoteKey = 'wave' | 'hand' | 'quiz' | 'cheer'
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
 // Client → server
@@ -30,6 +31,7 @@ export interface PingMsg {
 }
 
 export interface ClientMessages {
+  emote: { kind: EmoteKey }
   cmd: CommandMsg
   auth: AuthMsg
   move: MoveMsg
@@ -162,6 +164,7 @@ export interface RoomStateMsg {
 }
 
 export interface ServerMessages {
+  emote: { id: string; kind: EmoteKey }
   event: EventMsg
   welcome: WelcomeMsg
   traveled: WelcomeMsg

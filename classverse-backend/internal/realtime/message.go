@@ -23,8 +23,9 @@ const (
 	TypeMove   = "move"
 	TypePing   = "ping"
 	TypeTravel = "travel"
-	TypeChat   = "chat" // both directions
-	TypeSeat   = "seat" // mode HP only
+	TypeChat   = "chat"  // both directions
+	TypeEmote  = "emote" // both directions
+	TypeSeat   = "seat"  // mode HP only
 )
 
 // Server → client message types.
@@ -42,6 +43,17 @@ const (
 	TypeZone           = "zone"
 	TypeRoomState      = "room_state"
 )
+
+// EmoteMsg requests an allowlisted transient reaction.
+type EmoteMsg struct {
+	Key string `json:"kind"`
+}
+
+// EmoteOut identifies the actor; clients display the reaction for three seconds.
+type EmoteOut struct {
+	ID  uuid.UUID `json:"id"`
+	Key string    `json:"kind"`
+}
 
 // CommandMsg requests a teacher action in the current room.
 type CommandMsg struct {

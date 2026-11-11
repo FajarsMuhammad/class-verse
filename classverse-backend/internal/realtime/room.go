@@ -117,6 +117,7 @@ type member struct {
 	seen          map[uuid.UUID]bool // ids the client currently shows (area of interest)
 	zone          Zone               // zone the avatar stands in, zero when none
 	chat          chatBudget
+	emoteAt       time.Time
 	seatAt        time.Time // last accepted seat (mode HP), 1 per second
 	voiceIdentity string
 	voiceChannel  string
@@ -233,6 +234,8 @@ func (r *room) handle(cmd any) {
 		c.result <- r.join(c.c, c.adm)
 	case leaveCmd:
 		r.leave(c.c)
+	case emoteCmd:
+		r.emote(c)
 	case moveCmd:
 		r.move(c.c, c.seq, c.m)
 	case reserveCmd:

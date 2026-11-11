@@ -82,6 +82,7 @@ function handle(welcome: WelcomeMsg, map: MapData): RoomHandle {
     people: ref([]),
     rejoin: vi.fn<RoomHandle['rejoin']>(),
     sendMove: vi.fn<RoomHandle['sendMove']>(),
+    sendEmote: vi.fn<RoomHandle['sendEmote']>(() => true),
     seat: vi.fn<RoomHandle['seat']>(),
     start: vi.fn<RoomHandle['start']>(),
   } as RoomHandle

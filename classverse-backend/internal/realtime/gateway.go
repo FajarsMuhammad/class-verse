@@ -247,6 +247,15 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur
 				continue
 			}
 			cur.Store(to)
+		case TypeEmote:
+			var m EmoteMsg
+			if json.Unmarshal(env.D, &m) != nil {
+				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Emote tidak valid", Seq: env.Seq})
+				continue
+			}
+			if !cur.Load().post(emoteCmd{c: c, seq: env.Seq, key: m.Key}) {
+				return
+			}
 		case TypeSeat:
 			var m SeatMsg
 			if json.Unmarshal(env.D, &m) != nil {

@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import ChatPanel from '@/components/ChatPanel.vue'
+import EmoteBar from '@/components/EmoteBar.vue'
 import DoorRooms from '@/components/DoorRooms.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import TeacherPanel from '@/components/TeacherPanel.vue'
@@ -41,6 +42,14 @@ onMounted(() => {
   timer = setInterval(() => tick.value++, 500)
 })
 onBeforeUnmount(() => clearInterval(timer))
+
+const activeEmotes = computed(() => {
+  void tick.value
+  const now = performance.now()
+  return [...world.emotes].filter(([, e]) => e.until > now).map(([id, e]) => ({
+    id, text: e.text, name: id === world.selfId ? world.selfName : world.avatars.get(id)?.name ?? '',
+  }))
+})
 
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
 // Building names are only on the campus map; remember them for the room header.
@@ -217,6 +226,10 @@ function reported() {
     </template>
 
     <section v-if="!kicked" class="card chat" aria-label="Chat">
+      <EmoteBar :send="room.sendEmote" :disabled="status !== 'open' || traveling || kicked" />
+      <div role="status">
+        <p v-for="reaction in activeEmotes" :key="reaction.id">{{ reaction.name }}: {{ reaction.text }}</p>
+      </div>
       <ChatPanel
         :chat="chat"
         :version="chatVersion"

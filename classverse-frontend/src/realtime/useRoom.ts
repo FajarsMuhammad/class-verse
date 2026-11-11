@@ -10,6 +10,7 @@ import type {
   ChatScope,
   ConnectionMode,
   MoveMsg,
+  EmoteKey,
   WelcomeMsg,
 } from './messages'
 import { World } from './world'
@@ -46,6 +47,7 @@ export interface RoomHandle {
   people: Ref<{ id: string; name: string; role: string }[]>
   rejoin: () => void
   sendMove: (m: MoveMsg) => void
+  sendEmote: (key: EmoteKey) => boolean
   // seat picks a zone in mode HP ('' = general area).
   seat: (zone: string) => void
   start: (roomId: string, mapKey: string, mode?: ConnectionMode) => Promise<void>
@@ -213,6 +215,10 @@ export function useRoom(): RoomHandle {
     },
     seat: (zone) => {
       if (status.value === 'open' && !traveling.value) client?.send('seat', { zone })
+    },
+    sendEmote: (key) => {
+      if (status.value !== 'open' || traveling.value || kicked.value) return false
+      return client?.send('emote', { kind: key }) ?? false
     },
     sendMove: (m) => {
       if (!traveling.value && map.value) void client?.send('move', m)

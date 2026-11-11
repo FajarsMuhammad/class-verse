@@ -133,7 +133,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 | `auth` | `token`, `mode?` (`map`/`list`) | Validasi JWT dan membership organisasi; `list` = mode HP (slice 8) |
 | `move` | `x`, `y`, `dir` | Maks 15 pesan/detik; ditolak jika menembus collision atau melebihi kecepatan maksimum |
 | `chat` | `text`, `scope` (`near` / `zone` / `room`) | Maks 3 pesan/detik; difilter; `room` ditolak jika chat semua ruangan dimatikan |
-| `emote` | `kind` | Maks 1/detik |
+| `emote` | `kind` (`wave`, `hand`, `quiz`, `cheer`) | Maks 1/detik; ditolak saat dibisukan; hanya koneksi aktif |
 | `cmd` | `name` (`broadcast`, `gather`, `mute`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
 | `ping` | `ts` | Dibalas `pong` untuk mengukur latency |
 | `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali mode HP); koneksi dipindah tanpa reconnect |
@@ -149,6 +149,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 | `zone` | `zoneId` atau kosong | Peserta masuk/keluar zona |
 | `chat` | `from`, `text`, `scope`, `at` | Dikirim hanya ke penerima yang memenuhi radius/zona |
 | `event` | `name`, `by`, data | Hasil `cmd` pengajar (misalnya gather, mute) |
+| `emote` | `id`, `kind` | Reaksi sementara 3 detik; satu ruang, campus hanya area of interest. Tidak disimpan atau diputar ulang saat reconnect/travel |
 | `error` | `code`, `message`, `seq` | Pesan ditolak |
 | `traveled` | isi welcome untuk ruang tujuan | Setelah travel berhasil, termasuk saat kembali ke peta sekolah |
 | `buildings` | jumlah orang dan kelas live per gedung | Setiap 5 detik, hanya di peta sekolah |

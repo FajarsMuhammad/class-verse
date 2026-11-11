@@ -1,0 +1,27 @@
+import { mount } from '@vue/test-utils'
+import { afterEach, expect, it, vi } from 'vitest'
+import EmoteBar from './EmoteBar.vue'
+afterEach(() => vi.useRealTimers())
+it('opens a four-choice menu, sends a fixed key, closes and cools down for one second', async () => {
+  vi.useFakeTimers()
+  const send = vi.fn<() => boolean>(() => true)
+  const w = mount(EmoteBar, { props: { disabled: false, send }, attachTo: document.body })
+  const toggle = w.get<HTMLButtonElement>('.toggle')
+  expect(w.find('[aria-label="Pilih emote"]').exists()).toBe(false)
+  await toggle.trigger('click')
+  expect(toggle.attributes('aria-expanded')).toBe('true')
+  expect(w.findAll('.menu button').map((b) => b.text())).toEqual(['Halo', 'Angkat tangan', 'Ayo kuis', 'Hore'])
+  await w.get('.menu button').trigger('click')
+  expect(send).toHaveBeenCalledWith('wave')
+  expect(w.find('.menu').exists()).toBe(false)
+  expect(w.get('[role=status]').text()).toBe('Emote Halo dikirim')
+  expect(toggle.element.disabled).toBe(true)
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(toggle.element.disabled).toBe(false)
+  await toggle.trigger('click')
+  await w.get('.emote').trigger('keydown', { key: 'Escape' })
+  expect(w.find('.menu').exists()).toBe(false)
+  await w.setProps({ disabled: true })
+  expect(toggle.element.disabled).toBe(true)
+  w.unmount()
+})
