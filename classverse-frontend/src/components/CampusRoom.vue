@@ -505,8 +505,9 @@ onBeforeUnmount(() => {
 .map-minimap {
   position: absolute;
   z-index: 2;
-  bottom: calc(var(--touch-min) + var(--space-4) + var(--space-6));
-  right: var(--space-3);
+  /* Below the top rail, mirroring the zoom control on the right. */
+  top: calc(var(--touch-min) + var(--space-4) + var(--space-6));
+  left: var(--space-3);
 }
 .float-note {
   position: absolute;
