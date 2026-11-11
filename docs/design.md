@@ -158,7 +158,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 **Reconnect.** Client otomatis menyambung ulang dengan backoff 1, 2, 4, 8 detik. Jika kembali dalam 30 detik, posisi terakhir dipertahankan dan peserta lain tidak melihat `left`.
 
-**Proximity.** Penerima chat `near` dihitung server dari jarak Euclid titik kaki. Properti peta Tiled `near_tiles` menentukan radius (bilangan bulat 1–10, default 5), dikalikan ukuran tile: peta sekolah 5 tile (160 px), kelas/taman 3 tile (96 px), sesuai revisi yang disetujui setelah slice 9. Server dan frontend membaca properti yang sama. Zona dibaca dari layer objek di file Tiled. Untuk 40 orang per room, perhitungan O(n²) per tick masih sangat murah, jadi spatial index belum diperlukan.
+**Proximity.** Penerima chat `near` dihitung server dari jarak Euclid titik kaki. Properti peta Tiled `near_radius` (px, 16–320) menentukan radius; MVP 2 memakai 85 px di semua peta (paket desain revamp). Peta tanpa `near_radius` masih memakai `near_tiles` × ukuran tile (rentang 1–10, default 5). Server dan frontend membaca properti yang sama. Zona dibaca dari layer objek di file Tiled. Untuk 40 orang per room, perhitungan O(n²) per tick masih sangat murah, jadi spatial index belum diperlukan.
 
 **Peta sekolah.** Setiap organisasi punya satu room dengan `map_key = 'campus'`, dibuat otomatis saat organisasi dibuat; semua peserta muncul di sini setelah masuk. Kapasitasnya 200, jadi `snapshot` hanya berisi avatar dalam radius 24 tile dari penerima (area of interest berbasis grid sel 8×8 tile), agar bandwidth per peserta tetap kecil. Gedung dan pintunya didefinisikan di layer objek file Tiled peta sekolah; setiap ruang menyimpan `building_key` gedungnya. Satu koneksi WebSocket dipakai sepanjang sesi: `travel` memindahkan peserta antar room di dalam hub, dan keluar dari ruang mengembalikannya ke pintu gedung asal.
 
@@ -168,7 +168,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 - *Room peta sekolah.* `GET /api/orgs/{org_id}` mengembalikan `campus_room_id`; client membuka `/ws/rooms/{campus_room_id}`.
 - *Auth WebSocket.* Upgrade hanya dari Origin `FRONTEND_URL`. Pesan pertama wajib `auth {token}` dalam 5 detik; server memverifikasi JWT dan membership organisasi pemilik room lalu mengirim `welcome`. Gagal → `error` lalu close 4401 (token), 4403 (tidak boleh), 4404 (room tidak ada/bukan anggota).
 - *Satu koneksi per user.* Koneksi baru user yang sama menggantikan yang lama; yang lama ditutup dengan 4409 `replaced` dan client tidak reconnect otomatis.
-- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum per peta dari properti peta Tiled `walk_speed` (px/detik, bilangan bulat 80–400, default 160; disetujui setelah review slice 5 karena peta sekolah tampil di zoom ±0,4 sehingga 160 px/detik terasa lambat): `campus` 320, `classroom`/`garden` 160. Server dan client membaca angka yang sama dari file peta. Kecepatan ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah `walk_speed` × 1,25 px per detik, maksimal setengah detik gerak, dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi dan menghentikan jalur klik. Koreksi posisi setelah perpindahan zona voice berhasil memakai envelope sama dengan `continue_path: true` agar jalur klik tetap berlanjut; field ini tidak dikirim untuk penolakan.
+- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum per peta dari properti peta Tiled `walk_speed` (px/detik, bilangan bulat 80–400, default 160; disetujui setelah review slice 5 karena peta sekolah tampil di zoom ±0,4 sehingga 160 px/detik terasa lambat): `campus` 320, interior (`classroom`/`garden`/`lab`/`baca`) 160. Batas dunia memakai `world_width`/`world_height` (px) bila ada; MVP 2: kampus 2200×1500, interior 1044×684 (lantai 1000×640 + dinding 22 px). Server dan client membaca angka yang sama dari file peta. Kecepatan ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah `walk_speed` × 1,25 px per detik, maksimal setengah detik gerak, dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi dan menghentikan jalur klik. Koreksi posisi setelah perpindahan zona voice berhasil memakai envelope sama dengan `continue_path: true` agar jalur klik tetap berlanjut; field ini tidak dikirim untuk penolakan.
 - *Pesan.* `welcome {self_id, room_id, map_key, participants: [{id, name, avatar, role, x, y, dir}]}`; `joined` = satu participant; `left {id}`; `snapshot {p: [{id, x, y, dir}], out: [id]}` dengan `out` = id yang keluar dari area of interest penerima; `ping {ts}` → `pong {ts}`. `seq` server naik per koneksi.
 - *Area of interest* hanya di peta sekolah: grid sel 8×8 tile, radius 24 tile; penerima mendapat avatar yang berubah di radius dan avatar yang baru masuk radius. `joined`/`left` dikirim ke seluruh room.
 - *Reconnect.* Putus → avatar ditahan 30 detik dan tetap terlihat. Kembali ke room yang sama dalam 30 detik → posisi lama tanpa `left`/`joined`. Client backoff 1, 2, 4, 8 detik (8 berulang).
@@ -333,7 +333,7 @@ CREATE TABLE rooms (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id           uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name             text NOT NULL,
-    map_key          text NOT NULL,      -- 'campus' | 'classroom' | 'garden'
+    map_key          text NOT NULL,      -- 'campus' | 'classroom' | 'garden' | 'lab' | 'baca' (MVP 2)
     building_key     text,               -- gedung di peta sekolah; null untuk peta sekolah
     capacity         int NOT NULL DEFAULT 40,
     all_chat_enabled boolean NOT NULL DEFAULT true,
@@ -511,7 +511,8 @@ Contoh potongan OpenAPI untuk satu endpoint:
 ## Slice 5 — Ruang dan travel (R5-01…R5-08 disetujui)
 
 - *Akses masuk.* Semua role wajib berdiri di pintu gedung; tidak ada teleport dari daftar/kelola ruang.
-  CTA kelola memakai **Lihat di peta**. Server memakai posisi resmi room asal, radius 48 px dari titik `door`.
+  CTA kelola memakai **Lihat di peta**. Server memakai posisi resmi room asal, radius `interact_radius` gedung dari titik `door` (16–200 px, default 48;
+  MVP 2: 60 px, Arena 180 px; nilai di luar rentang menggagalkan load peta). Keluar ruang tetap 48 px dari titik `exit`.
   Ruang Guru (`staff_only`) hanya teacher/admin. Non-member dan room organisasi lain tetap `not_found`.
 - *Jadwal.* `scheduled_at` null bisa dimasuki sekarang. Jadwal masa depan menolak participant (`scheduled`);
   teacher/admin boleh masuk lebih awal. **Buka sekarang** = PATCH `scheduled_at: null`. Sesi dimulai saat kedatangan
@@ -540,11 +541,11 @@ Contoh potongan OpenAPI untuk satu endpoint:
 ## Slice 6 — Chat dan zona (C6-01…C6-10 disetujui)
 
 - *Dekat.* Penerima `near` = avatar terhubung dengan jarak Euclid titik kaki ≤ radius peta saat pesan diterima server:
-  peta sekolah 160 px (5 tile), kelas/taman 96 px (3 tile), dari properti Tiled `near_tiles` (default 5, rentang 1–10).
-  Revisi setelah slice 9 ini memperkecil jangkauan ruang, bukan mengubah isolasi suara atau chat zona.
+  85 px di semua peta MVP 2, dari properti Tiled `near_radius`; peta lama tanpa properti itu memakai `near_tiles` × tile.
+  Radius tidak mengubah isolasi suara atau chat zona.
   Pengirim selalu menerima salinannya. Avatar dalam grace reconnect tidak menerima.
-- *Zona.* Layer objek `zones` pada classroom/garden: persegi dengan properti `key` unik, nama objek = label. Zona aktif =
-  persegi yang memuat titik kaki, dihitung server tiap tick; perubahan dikirim `zone {key, name}` hanya ke pemiliknya
+- *Zona.* Layer objek `zones` pada peta interior: properti `key` unik, nama objek = label; `shape: "circle"` berarti elips di
+  dalam kotak objek (MVP 2 memakai lingkaran voice dari `rooms.json`), tanpa properti itu persegi. Zona aktif = bentuk yang memuat titik kaki, dihitung server tiap tick; perubahan dikirim `zone {key, name}` hanya ke pemiliknya
   (`key` kosong = keluar zona). Peta sekolah tanpa zona.
 - *Scope.* Tab Zona (hanya saat di zona) / Dekat / Semua. `zone` ditolak `not_in_zone` jika pengirim tidak di zona saat
   diterima. `broadcast` untuk slice 7.
@@ -614,12 +615,12 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
   Ruang Guru, schedule, capacity, lock, ban and travel serialization still apply. Arrival at spawn, return to the
   origin building door as before. Accepted risk: a desktop client can forge `list` to skip walking; the door is
   presence UX, not access control.
-- *Seat.* Client → server `seat {zone}` (list mode, classroom/garden only, 1 per second → `rate_limited`). Server
+- *Seat.* Client → server `seat {zone}` (list mode, interior maps only, 1 per second → `rate_limited`). Server
   places the avatar on a walkable tile inside the zone (zone centres are tables, so not the literal centre; spread
   like spawn); `zone: ""` returns to the spawn ("Area umum"). Unknown zone → `bad_message`; campus or map
   connection → `forbidden`. Zone/snapshot follow on the next tick; gather still moves everyone to spawn. Map parsing
   rejects zones without a walkable tile.
-- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (within the map's `near_tiles` radius) are computed from welcome/snapshot
+- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (within the map's proximity radius) are computed from welcome/snapshot
   positions; building counts reuse `buildings`, room rows reuse the rooms list (`people`, `live`).
 - *Teacher.* Phone keeps the announcement tab and the teacher panel (collapsible).
 

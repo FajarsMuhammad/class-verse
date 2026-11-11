@@ -14,6 +14,24 @@ Use domain names for production tables, columns, symbols, and new migration desc
 
 `kelasverse-assets/` is reference-only. Copy needed assets/data into `classverse-frontend/src/assets/` and replace existing production implementations in place. Do not import or read the reference folder from application code, tests, or build scripts. Frontend must build and test without that folder. Keep original reference assets unchanged; do not copy unused prototypes wholesale.
 
+## Not built yet (and the assets kept for it)
+
+| Feature | Reference | Kept assets | Blocked on |
+| --- | --- | --- | --- |
+| Modul, Kuis, Rapor pages | `Room.dc.html`, `Quiz.dc.html`, header nav | none copied | persisted modules/quizzes/reports, permissions |
+| Panel belajar: XP/level, bintang, beruntun, lencana, Lanjutkan belajar, Misi hari ini | `Main.dc.html` left panel | none copied | progress + missions service; never show prototype numbers |
+| Papan Misi and Panggung on the Alun-alun | `Main.dc.html`, Kiko chat line | `src/assets/world/pending/papan-misi.svg`, `panggung.svg` | missions/events + positions in `world.json` |
+| Campus decoration | `world.json` reference | `pending/fountain.svg`, `pending/flowers.svg` | positions + collision via `generate_world.py` |
+| Leaderboard, stars, bell in header | `Main.dc.html` header | none | weekly points service |
+| Mic/camera in action bar | `Main.dc.html` action bar | none | camera feature; voice already in `VoiceBar` |
+| `Server 1 · N/500` capacity chip | `Main.dc.html` HUD | none | backend admission capacity + load test (campus is 200 today) |
+| Host spot and seat snapping/pose | `rooms.json` `host`, `seats` | seats already in maps | host semantics decision |
+| Walk frames / directions | README rule 9 | none | not designed yet; idle front pose only |
+
+`pending/` sits outside `sprites/`, so these files are not bundled or loaded. Avatar preset SVGs
+(`avatar-*.svg`, `avatar-template.svg`) were removed: avatars are composed from `assets/avatars/palette.json`, and
+the reference README calls presets examples only.
+
 ## Delivery slices
 
 - [x] Tokens and locally hosted Plus Jakarta Sans; keep Fredoka. Existing components temporarily consume aliases of `--kv-*` tokens.
