@@ -22,6 +22,7 @@ const org = useOrgStore()
       :key="`upload-${org.active.id}-${auth.me.id}`"
       :org-id="org.active.id"
       :user-id="auth.me.id"
+      :is-admin="org.active.role === 'admin'"
     />
     <InvitePanel
       v-if="org.active && auth.me"

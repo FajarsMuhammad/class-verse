@@ -103,9 +103,23 @@ lokal sudah dibuat (lihat progres di bawah); MinIO OSS legacy tidak dipakai.
   chunk yang belum ada dikirim ulang. SHA-256 file utuh diverifikasi saat assemble; sesi 24 jam, cleanup kedaluwarsa
   saat startup dan tiap menit melepas kuota. Panel uji di Kelola ruang (guru/admin). File tetap `pending` sampai
   validasi format ada.
-- [ ] Belum reader PDF/audio browser, kontrak auth transport, validasi isi format, upload worker/reconciler,
-  backup/restore atau endpoint upload. Reservasi tertinggal sudah bisa ditandai untuk cleanup, tetapi cleanup
-  otomatis saat restart belum terhubung. F1-01 dan F1-02 keseluruhan belum selesai.
+- [x] Validasi isi saat assemble: header/trailer PDF, tolak PDF berpassword (`pdf_encrypted`), MP3 (ID3/frame)
+  dan M4A (`ftyp`); file palsu dibuang dan kuota langsung dilepas. File valid → `ready` dengan `content_type`.
+- [x] Baca: `GET /files` (daftar + kuota + posisi), `GET /files/{id}/content` lewat origin aplikasi dengan Bearer,
+  satu Range `bytes=`, membership dicek tiap request; `PUT /files/{id}/position`; `DELETE /files/{id}` oleh
+  pengunggah/admin. Storage tidak pernah terbuka ke browser.
+- [x] **Keputusan transport (F1-01):** klien mengambil isi file utuh dengan Bearer dan memakai Blob URL untuk
+  `<audio>` (native tak bisa kirim header) dan data PDF.js. Tanpa presigned URL, tanpa token di query, tanpa
+  perubahan auth. Batas: file ≤50 MB diunduh penuh sebelum diputar; ganti ke range transport PDF.js bila PDF besar
+  terasa lambat di HP.
+- [x] Reader: `pdfjs-dist` 6.5.438 (Apache-2.0, dipin persis, worker lokal versi sama, dimuat lazy hanya saat PDF
+  dibuka); navigasi halaman, lompat halaman, zoom, panah kiri/kanan, text layer untuk seleksi/screen reader, render
+  dibatalkan saat pindah/tutup. Audio `<audio>` native. Posisi (halaman/detik) disimpan ter-debounce dan saat tutup.
+- [x] Verifikasi browser Chrome desktop 1440 px dan 390 px (`/tmp/kv-e2e/reader.mjs`, fixture CC0 buatan sendiri):
+  chunk 2 diputus lalu dilanjutkan tanpa mengirim ulang chunk 1, satu reservasi; PDF berpassword, WAV, WAV
+  diganti nama `.mp3` ditolak; kuota hanya file diterima; PDF 2 halaman + text layer; seek audio; posisi pulih
+  setelah reload; peserta bisa baca dan Range 206 tetapi upload/hapus 403, tanpa token 401.
+- [ ] Belum: Safari/iOS dan HP fisik, backup/restore objek+metadata, file dipakai konten (L1/M1) dan aturan draf.
 
 #### Evaluasi AIStor Free — hasil sumber resmi
 

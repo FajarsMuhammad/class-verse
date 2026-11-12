@@ -102,9 +102,15 @@ func TestRoomLifecycle(t *testing.T) {
 	if err != nil || opened.ScheduledAt != nil {
 		t.Fatalf("open now=%+v err=%v", opened, err)
 	}
+	// Both rooms share the fake clock's created_at, so order between them is by random UUID.
 	page, err := svc.List(ctx, user.ID, school.ID, "kelas-a", 1, "")
-	if err != nil || len(page.Items) != 1 || page.Items[0].ID != created.ID {
+	if err != nil || len(page.Items) != 1 || page.NextCursor == "" {
 		t.Fatalf("page=%+v err=%v", page, err)
+	}
+	next, err := svc.List(ctx, user.ID, school.ID, "kelas-a", 1, page.NextCursor)
+	if err != nil || len(next.Items) != 1 || next.Items[0].ID == page.Items[0].ID ||
+		(page.Items[0].ID != created.ID && next.Items[0].ID != created.ID) {
+		t.Fatalf("pages=%+v %+v err=%v", page, next, err)
 	}
 	if _, err := svc.Get(ctx, uuid.New(), created.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("outsider error=%v", err)
