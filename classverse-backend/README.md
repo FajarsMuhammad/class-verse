@@ -72,9 +72,22 @@ mendapat 403. Objek smoke dibersihkan, volume data dipertahankan. License/health
 berfungsi; expiry/capacity perlu dipantau terpisah. Free single-node tidak memberi HA atau encryption at rest
 bawaan; backup di luar VPS tetap wajib sebelum pilot.
 
-Ini **baru adapter storage dan smoke check**, belum endpoint upload peserta/pengajar, validasi PDF/audio,
-kuota organisasi, atau reader browser. Akun aplikasi bisa mengakses bucket; isolasi antar organisasi harus
-menjadi tanggung jawab service file sebelum endpoint dipublikasikan. Tidak ada route baru yang dibuka sekarang.
+Sesudah `make storage-up`, `make run` dan `make seed-library` otomatis memakai kredensial aplikasi lokal
+dari `../.config/storage-app.env` jika seluruh `STORAGE_*` belum diatur. Kredensial tidak disalin ke `.env`
+atau dicetak. Jika konfigurasi `STORAGE_*` diberikan, konfigurasi tersebut dipakai utuh; konfigurasi parsial
+tetap ditolak oleh backend, bukan dilengkapi dengan kredensial lokal. Perintah langsung `go run` tidak
+memuat konfigurasi lokal Makefile ini.
+
+```sh
+make seed-library org=<org-id>
+make run
+```
+
+Seed menambahkan satu e-book contoh CC0 ke sekolah yang dipilih; aman diulang. Restart server yang sudah
+berjalan tanpa storage menggunakan `make run` agar endpoint file dan reader aktif. Upload, kuota, reader,
+dan katalog kini tersedia; akses peserta dibatasi pada file buku terbit di sekolahnya.
+
+Cek regresi konfigurasi lokal tanpa DB/storage: `python3 scripts/test_storage_make.py`.
 
 ## Real-time (slice 3)
 

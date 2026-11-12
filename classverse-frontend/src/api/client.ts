@@ -156,6 +156,7 @@ export function errorMessage(err: unknown): string {
       return 'Data tidak ditemukan.'
     case 'forbidden':
       return err.message || 'Kamu tidak punya akses untuk ini.'
+    case 'room_busy':
     case 'conflict':
     case 'invite_expired':
       return err.message
