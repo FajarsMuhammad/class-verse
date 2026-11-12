@@ -17,41 +17,63 @@ const color = (hex: string) => Phaser.Display.Color.HexStringToColor(hex).color
 // Floor plank spacing per floors[] description ("planks every 40px", "grid 50px").
 const plankStep = (desc: string) => Number(/(\d+)px/.exec(desc)?.[1] ?? 44)
 
-function label(scene: Phaser.Scene, x: number, y: number, text: string, depth: number) {
-  return scene.add.text(x, y, text, {
-    fontFamily: cssToken('--kv-font-ui'), fontSize: '11px', fontStyle: '800',
-    color: cssToken('--kv-ink'), backgroundColor: cssToken('--kv-surface'), padding: { x: 8, y: 3 },
-  }).setOrigin(0.5).setDepth(depth).setResolution(2)
+// pill draws a rounded sign (reference: white chip, 11px/800). Returns the container.
+export function pill(scene: Phaser.Scene, x: number, y: number, text: string, depth: number,
+  bg = cssToken('--kv-surface'), fg = cssToken('--kv-ink')) {
+  const t = scene.add.text(0, 0, text, {
+    fontFamily: cssToken('--kv-font-ui'), fontSize: '11px', fontStyle: '800', color: fg,
+  }).setOrigin(0.5).setResolution(2)
+  const w = t.width + 16, h = t.height + 6
+  const g = scene.add.graphics()
+  g.fillStyle(color(bg)).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2)
+  return scene.add.container(x, y, [g, t]).setDepth(depth).setSize(w, h)
+}
+
+function dashed(g: Phaser.GameObjects.Graphics, x0: number, y0: number, x1: number, y1: number) {
+  const len = Math.hypot(x1 - x0, y1 - y0)
+  for (let d = 0; d < len; d += 16) {
+    const a = d / len, b = Math.min(d + 9, len) / len
+    g.lineBetween(x0 + (x1 - x0) * a, y0 + (y1 - y0) * a, x0 + (x1 - x0) * b, y0 + (y1 - y0) * b)
+  }
 }
 
 function drawRoom(scene: Phaser.Scene, key: string) {
   const layout = roomLayout(key)
   if (!layout) return false
   const { wall, floor, width, height, door } = layout
+  const ink = color(cssToken('--kv-ink'))
+  const accent = cssToken('--kv-subject-bahasa')
   const g = scene.add.graphics().setDepth(-10)
-  g.fillStyle(color(rooms.wall.color))
-  g.fillRect(0, 0, width, height)
+  // Shell: rounded wall with an ink outline (reference rooms), pink in the library.
+  g.fillStyle(color(layout.quiet ? cssToken('--kv-library-wall') : rooms.wall.color))
+  g.fillRoundedRect(0, 0, width, height, 30)
+  g.lineStyle(3, ink).strokeRoundedRect(1.5, 1.5, width - 3, height - 3, 30)
   const desc = rooms.floors[layout.floorKind as keyof typeof rooms.floors]
   const floorColor = color(desc.split(' ')[0]!)
   g.fillStyle(floorColor)
-  g.fillRect(wall, wall, floor.w, floor.h)
-  g.lineStyle(1, color(cssToken('--kv-ink')), 0.08)
-  for (let y = wall; y < floor.h + wall; y += plankStep(desc)) g.lineBetween(wall, y, floor.w + wall, y)
-  g.fillStyle(floorColor)
-  g.fillRect(door.x, door.y, door.w, door.h)
-  // Library areas: dashed outline, drawn into the baked floor.
-  g.lineStyle(3, color(cssToken('--kv-primary')), 0.6)
+  g.fillRoundedRect(wall, wall, floor.w, floor.h, 14)
+  // Planks run top to bottom (repeating-linear-gradient 90deg in the reference).
+  g.lineStyle(2, color('#78481e'), 0.12)
+  for (let x = wall + plankStep(desc); x < floor.w + wall; x += plankStep(desc)) g.lineBetween(x, wall, x, floor.h + wall)
+  // Windows on the top wall.
+  for (const cx of [0.22, 0.5, 0.78]) {
+    g.fillStyle(color(cssToken('--kv-room-window'))).fillRoundedRect(width * cx - 70, 5, 140, 10, 4)
+    g.lineStyle(2, ink).strokeRoundedRect(width * cx - 70, 5, 140, 10, 4)
+  }
+  // Door: wooden tab on the bottom wall, centred on the server exit.
+  g.fillStyle(color(cssToken('--kv-room-door'))).fillRoundedRect(door.x, door.y - 3, door.w, door.h + 3, { tl: 8, tr: 8, bl: 0, br: 0 })
+  g.lineStyle(3, ink).strokeRoundedRect(door.x, door.y - 3, door.w, door.h + 3, { tl: 8, tr: 8, bl: 0, br: 0 })
+  // Library areas: soft fill + dashed accent outline, baked into the floor.
   for (const a of layout.areas) {
-    for (let x = a.x; x < a.x + a.w; x += 16) {
-      g.lineBetween(x, a.y, Math.min(x + 8, a.x + a.w), a.y)
-      g.lineBetween(x, a.y + a.h, Math.min(x + 8, a.x + a.w), a.y + a.h)
-    }
-    for (let y = a.y; y < a.y + a.h; y += 16) {
-      g.lineBetween(a.x, y, a.x, Math.min(y + 8, a.y + a.h))
-      g.lineBetween(a.x + a.w, y, a.x + a.w, Math.min(y + 8, a.y + a.h))
-    }
+    g.fillStyle(color(accent), 0.05).fillRoundedRect(a.x, a.y, a.w, a.h, 24)
+    g.lineStyle(3, color(accent))
+    dashed(g, a.x + 24, a.y, a.x + a.w - 24, a.y)
+    dashed(g, a.x + 24, a.y + a.h, a.x + a.w - 24, a.y + a.h)
+    dashed(g, a.x, a.y + 24, a.x, a.y + a.h - 24)
+    dashed(g, a.x + a.w, a.y + 24, a.x + a.w, a.y + a.h - 24)
   }
   freezeGround(scene, g, width, height)
+  pill(scene, door.x + door.w / 2, door.y + door.h / 2, 'Pintu', 100000, cssToken('--kv-room-door'), cssToken('--kv-surface'))
   const flat = new Set(['rug', 'kidsrug'])
   for (const item of layout.items) {
     const sprite = rooms.furniture_sprites[item.kind as keyof typeof rooms.furniture_sprites]
@@ -60,13 +82,16 @@ function drawRoom(scene: Phaser.Scene, key: string) {
     if (item.kind === 'shelf' && item.h > item.w) {
       image.setPosition(item.x + item.w, item.y).setDisplaySize(item.h, item.w).setAngle(90)
     }
-    if (item.label) label(scene, item.x + item.w / 2, item.y + item.h / 2, item.label, depth + 1)
+    if (item.label) pill(scene, item.x + item.w / 2, item.y + item.h / 2, item.label, depth + 1)
   }
   for (const s of layout.shelves) {
     scene.add.image(s.x, s.y, rooms.furniture_sprites.bookshelf).setOrigin(0).setDisplaySize(s.w, s.h).setDepth(s.y + s.h - 12)
-    label(scene, s.x + s.w / 2, s.y - 14, s.label, 100000)
+    pill(scene, s.x + s.w / 2, s.y - 22, s.label, 100000).setName(`shelf-${s.cat}`)
   }
-  for (const a of layout.areas) label(scene, a.x + 16 + a.label.length * 3.5, a.y, a.label, 100000)
+  for (const a of layout.areas) {
+    const sign = pill(scene, 0, a.y, a.label, 100000, cssToken('--kv-surface'), accent)
+    sign.setX(a.x + 16 + sign.width / 2)
+  }
   return true
 }
 

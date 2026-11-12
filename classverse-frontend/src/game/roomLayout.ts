@@ -6,7 +6,7 @@ export const roomLayouts = {
 } as const
 
 interface Box { x: number; y: number; w: number; h: number }
-interface Labelled extends Box { label: string }
+interface Labelled extends Box { label: string; cat?: string }
 interface RoomData {
   floor: string
   floor_size?: { w: number; h: number }

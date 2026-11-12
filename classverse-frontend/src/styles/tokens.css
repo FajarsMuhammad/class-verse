@@ -45,6 +45,10 @@
   --kv-arena-text: #c2410c;
   --kv-map-ground: #eef1f6;
   --kv-map-lawn: #a9de92;
+  /* Room shell details from reference/Library.dc.html. */
+  --kv-room-window: #bfe6ff;
+  --kv-room-door: #c8935a;
+  --kv-library-wall: #e8cfd9;
   --kv-subject-matematika: #2563eb;
   --kv-subject-ipa: #0f766e;
   --kv-subject-bahasa: #be185d;
