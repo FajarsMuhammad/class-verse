@@ -2,6 +2,7 @@
 import AppShell from '@/components/AppShell.vue'
 import InvitePanel from '@/components/InvitePanel.vue'
 import RoomPanel from '@/components/RoomPanel.vue'
+import FileUploadPanel from '@/components/FileUploadPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
@@ -16,6 +17,12 @@ const org = useOrgStore()
       <p class="sub">Atur ruang di setiap gedung. Peserta masuk lewat pintu di peta sekolah.</p>
     </header>
     <RoomPanel v-if="org.active" :key="org.active.id" :org-id="org.active.id" />
+    <FileUploadPanel
+      v-if="org.active && auth.me && org.active.role !== 'participant'"
+      :key="`upload-${org.active.id}-${auth.me.id}`"
+      :org-id="org.active.id"
+      :user-id="auth.me.id"
+    />
     <InvitePanel
       v-if="org.active && auth.me"
       :key="org.active.id"

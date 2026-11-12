@@ -27,7 +27,8 @@ func TestRoomLocationHistoryRename(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.Down(ctx); err != nil {
+	// Target migration 5 explicitly; newer migrations must not change this regression.
+	if _, err := provider.DownTo(ctx, 4); err != nil {
 		t.Fatal(err)
 	}
 	var reverted uint32
@@ -37,7 +38,7 @@ func TestRoomLocationHistoryRename(t *testing.T) {
 	if reverted != original {
 		t.Fatal("rollback must rename the same table, not recreate it")
 	}
-	if _, err := provider.Up(ctx); err != nil {
+	if _, err := provider.UpTo(ctx, 5); err != nil {
 		t.Fatal(err)
 	}
 	var restored uint32

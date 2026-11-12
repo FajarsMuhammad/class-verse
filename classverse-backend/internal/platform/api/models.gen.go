@@ -9,6 +9,45 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for FileItemContentType.
+const (
+	Applicationpdf FileItemContentType = "application/pdf"
+	Audiomp4       FileItemContentType = "audio/mp4"
+	Audiompeg      FileItemContentType = "audio/mpeg"
+)
+
+// Valid indicates whether the value is a known member of the FileItemContentType enum.
+func (e FileItemContentType) Valid() bool {
+	switch e {
+	case Applicationpdf:
+		return true
+	case Audiomp4:
+		return true
+	case Audiompeg:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileItemKind.
+const (
+	FileItemKindAudio FileItemKind = "audio"
+	FileItemKindPdf   FileItemKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the FileItemKind enum.
+func (e FileItemKind) Valid() bool {
+	switch e {
+	case FileItemKindAudio:
+		return true
+	case FileItemKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InviteRole.
 const (
 	InviteRoleParticipant InviteRole = "participant"
@@ -144,6 +183,45 @@ func (e RoomMap) Valid() bool {
 	}
 }
 
+// Defines values for StartUploadRequestKind.
+const (
+	StartUploadRequestKindAudio StartUploadRequestKind = "audio"
+	StartUploadRequestKindPdf   StartUploadRequestKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the StartUploadRequestKind enum.
+func (e StartUploadRequestKind) Valid() bool {
+	switch e {
+	case StartUploadRequestKindAudio:
+		return true
+	case StartUploadRequestKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UploadProgressState.
+const (
+	Assembled UploadProgressState = "assembled"
+	Canceled  UploadProgressState = "canceled"
+	Uploading UploadProgressState = "uploading"
+)
+
+// Valid indicates whether the value is a known member of the UploadProgressState enum.
+func (e UploadProgressState) Valid() bool {
+	switch e {
+	case Assembled:
+		return true
+	case Canceled:
+		return true
+	case Uploading:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessTokenResponse defines model for AccessTokenResponse.
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -192,6 +270,31 @@ type ErrorResponse struct {
 		Fields  *map[string]string `json:"fields,omitempty"`
 		Message string             `json:"message"`
 	} `json:"error"`
+}
+
+// FileItem defines model for FileItem.
+type FileItem struct {
+	ContentType FileItemContentType `json:"content_type"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Id          openapi_types.UUID  `json:"id"`
+	Kind        FileItemKind        `json:"kind"`
+	Name        string              `json:"name"`
+	Position    int                 `json:"position"`
+	Size        int64               `json:"size"`
+	UploadedBy  openapi_types.UUID  `json:"uploaded_by"`
+}
+
+// FileItemContentType defines model for FileItem.ContentType.
+type FileItemContentType string
+
+// FileItemKind defines model for FileItem.Kind.
+type FileItemKind string
+
+// FileList defines model for FileList.
+type FileList struct {
+	Items      []FileItem `json:"items"`
+	QuotaBytes int64      `json:"quota_bytes"`
+	UsedBytes  int64      `json:"used_bytes"`
 }
 
 // Invite defines model for Invite.
@@ -363,6 +466,18 @@ type RoomList struct {
 // RoomMap defines model for RoomMap.
 type RoomMap string
 
+// StartUploadRequest defines model for StartUploadRequest.
+type StartUploadRequest struct {
+	Id     openapi_types.UUID     `json:"id"`
+	Kind   StartUploadRequestKind `json:"kind"`
+	Name   string                 `json:"name"`
+	Sha256 string                 `json:"sha256"`
+	Size   int64                  `json:"size"`
+}
+
+// StartUploadRequestKind defines model for StartUploadRequest.Kind.
+type StartUploadRequestKind string
+
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
 	// AvatarKey Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid.
@@ -380,6 +495,20 @@ type UpdateRoomRequest struct {
 	Name           *string    `json:"name,omitempty"`
 	ScheduledAt    *time.Time `json:"scheduled_at,omitempty"`
 }
+
+// UploadProgress defines model for UploadProgress.
+type UploadProgress struct {
+	// ChunkSize 5242880 (5 MiB)
+	ChunkSize int64               `json:"chunk_size"`
+	ExpiresAt time.Time           `json:"expires_at"`
+	Id        openapi_types.UUID  `json:"id"`
+	Parts     []int               `json:"parts"`
+	Size      int64               `json:"size"`
+	State     UploadProgressState `json:"state"`
+}
+
+// UploadProgressState defines model for UploadProgress.State.
+type UploadProgressState string
 
 // UserRef defines model for UserRef.
 type UserRef struct {
@@ -403,6 +532,9 @@ type VoiceToken struct {
 	// Url URL ws(s):// gerbang izin voice publik untuk browser; bukan alamat LiveKit privat
 	Url string `json:"url"`
 }
+
+// FileID defines model for FileID.
+type FileID = openapi_types.UUID
 
 // InviteCode defines model for InviteCode.
 type InviteCode = string
@@ -439,6 +571,16 @@ type ValidationFailed = ErrorResponse
 
 // VoiceUnavailable defines model for VoiceUnavailable.
 type VoiceUnavailable = ErrorResponse
+
+// GetFileContentParams defines parameters for GetFileContent.
+type GetFileContentParams struct {
+	Range *string `json:"Range,omitempty"`
+}
+
+// SaveFilePositionJSONBody defines parameters for SaveFilePosition.
+type SaveFilePositionJSONBody struct {
+	Position int `json:"position"`
+}
 
 // ListInvitesParams defines parameters for ListInvites.
 type ListInvitesParams struct {
@@ -484,11 +626,17 @@ type UpdateMeJSONRequestBody = UpdateMeRequest
 // CreateOrgJSONRequestBody defines body for CreateOrg for application/json ContentType.
 type CreateOrgJSONRequestBody = CreateOrgRequest
 
+// SaveFilePositionJSONRequestBody defines body for SaveFilePosition for application/json ContentType.
+type SaveFilePositionJSONRequestBody SaveFilePositionJSONBody
+
 // CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
 type CreateInviteJSONRequestBody = CreateInviteRequest
 
 // CreateRoomJSONRequestBody defines body for CreateRoom for application/json ContentType.
 type CreateRoomJSONRequestBody = CreateRoomRequest
+
+// StartUploadJSONRequestBody defines body for StartUpload for application/json ContentType.
+type StartUploadJSONRequestBody = StartUploadRequest
 
 // CreateReportJSONRequestBody defines body for CreateReport for application/json ContentType.
 type CreateReportJSONRequestBody = CreateReportRequest

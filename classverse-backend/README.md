@@ -49,6 +49,33 @@ Test store dan service auth memakai PostgreSQL asli. `dbtest.New` membuat databa
 (`kv_test_*`), menjalankan semua migration, lalu menghapusnya. Test ini di-skip jika `TEST_DATABASE_URL`
 kosong; nilainya sudah ada di `.env.example` (user `kelasverse` dari compose boleh membuat database).
 
+## Storage privat — fondasi F1
+
+AIStor opsional, tidak dijalankan oleh `make up`. License **Free**, bukan trial, harus diperoleh operator dari
+MinIO dan diterima sesuai [agreement](https://www.min.io/legal/aistor-free-agreement). Simpan di
+`../.config/minio.license` (izin `600`), atau atur `STORAGE_LICENSE_FILE` ke file di luar repo.
+Jangan commit license/kredensial; `../.config/.gitignore` dan root `.dockerignore` melindungi direktori lokal.
+Jangan jalankan script dengan shell tracing (`bash -x`).
+
+```sh
+make storage-up
+```
+
+Target ini menjalankan image AIStor yang dipin digest (RELEASE.2026-09-19T17-05-25Z), mount license read-only,
+membuat bucket privat `materials`, serta user aplikasi yang hanya punya izin bucket tersebut.
+Secret root dan aplikasi dibuat acak sekali di `../.config/`, izin `600`; tidak dicetak. Console root hanya
+untuk operator, **bukan** kredensial backend. Endpoint lokal `127.0.0.1:9100`, console `127.0.0.1:9101`;
+bisa diubah dengan `STORAGE_PORT`/`STORAGE_CONSOLE_PORT`.
+
+Smoke test benar-benar menjalankan PUT/GET/range/DELETE dengan akun aplikasi dan memastikan akses anonim
+mendapat 403. Objek smoke dibersihkan, volume data dipertahankan. License/health bukan bukti operasi S3 selalu
+berfungsi; expiry/capacity perlu dipantau terpisah. Free single-node tidak memberi HA atau encryption at rest
+bawaan; backup di luar VPS tetap wajib sebelum pilot.
+
+Ini **baru adapter storage dan smoke check**, belum endpoint upload peserta/pengajar, validasi PDF/audio,
+kuota organisasi, atau reader browser. Akun aplikasi bisa mengakses bucket; isolasi antar organisasi harus
+menjadi tanggung jawab service file sebelum endpoint dipublikasikan. Tidak ada route baru yang dibuka sekarang.
+
 ## Real-time (slice 3)
 
 `GET /api/maps/campus` publik menyajikan `.tmj` embed (ETag, revalidasi 304).

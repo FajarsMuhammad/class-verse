@@ -426,6 +426,166 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/orgs/{org_id}/uploads:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    post:
+      operationId: startUpload
+      description: |
+        Pengajar/admin. Memesan kuota sekali untuk seluruh file. `id` dibuat klien dan disimpan sebelum
+        request agar retry setelah respons hilang tidak memesan kuota dua kali (POST ulang dengan isi sama → 201
+        dengan status yang sama). Isi dicek dari byte file (PDF, MP3, M4A), bukan ekstensi.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StartUploadRequest" }
+      responses:
+        "201":
+          description: Sesi upload (baru atau yang sudah ada)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadProgress" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/orgs/{org_id}/uploads/{file_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/FileID"
+    get:
+      operationId: getUpload
+      description: Chunk yang sudah tersimpan menurut storage; klien hanya mengirim nomor yang belum ada.
+      responses:
+        "200":
+          description: Progres upload
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadProgress" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: cancelUpload
+      description: Batalkan upload yang belum siap; chunk dihapus dan kuota dilepas. Idempoten.
+      responses:
+        "204": { description: Dibatalkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/uploads/{file_id}/parts/{part}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/FileID"
+      - { name: part, in: path, required: true, schema: { type: integer, minimum: 1, maximum: 10 } }
+    put:
+      operationId: putUploadPart
+      description: Chunk ke-n, tepat `chunk_size` byte kecuali chunk terakhir. Mengirim ulang chunk yang sama aman.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "204": { description: Chunk tersimpan }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/orgs/{org_id}/uploads/{file_id}/complete:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/FileID"
+    post:
+      operationId: completeUpload
+      description: |
+        Gabungkan chunk, cek SHA-256 dan format. Berhasil → file `ready` dan tampil di daftar. Gagal format →
+        400 (`validation_failed` atau `pdf_encrypted`), file dibuang dan kuota dilepas. Idempoten.
+      responses:
+        "200":
+          description: File siap
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadProgress" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/files:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listFiles
+      description: File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota.
+      responses:
+        "200":
+          description: Daftar file
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/orgs/{org_id}/files/{file_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/FileID"
+    delete:
+      operationId: deleteFile
+      description: Pengunggah atau admin. Kuota dilepas setelah objek terhapus. Idempoten.
+      responses:
+        "204": { description: Dihapus }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/files/{file_id}/content:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/FileID"
+    get:
+      operationId: getFileContent
+      description: |
+        Isi file lewat origin aplikasi dengan Bearer token; membership dicek ulang setiap request termasuk tiap
+        Range. Satu rentang `bytes=` saja. Storage tidak pernah terbuka ke browser.
+      parameters:
+        - { name: Range, in: header, schema: { type: string, example: "bytes=0-65535" } }
+      responses:
+        "200":
+          description: Seluruh file
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            audio/mpeg: { schema: { type: string, format: binary } }
+            audio/mp4: { schema: { type: string, format: binary } }
+        "206": { description: Sebagian file; lihat Content-Range }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "416": { description: "range_not_satisfiable; Content-Range: bytes */size" }
+  /api/orgs/{org_id}/files/{file_id}/position:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/FileID"
+    put:
+      operationId: saveFilePosition
+      description: Halaman PDF (mulai 1) atau detik audio terakhir milik pemanggil.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [position]
+              properties:
+                position: { type: integer, minimum: 0, maximum: 1000000 }
+      responses:
+        "204": { description: Tersimpan }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     bearer:
@@ -436,6 +596,11 @@ components:
   parameters:
     OrgID:
       name: org_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FileID:
+      name: file_id
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -499,6 +664,44 @@ components:
           schema: { $ref: "#/components/schemas/AccessTokenResponse" }
 
   schemas:
+    StartUploadRequest:
+      type: object
+      required: [id, name, size, kind, sha256]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        size: { type: integer, format: int64, minimum: 1, maximum: 50000000 }
+        kind: { type: string, enum: [pdf, audio] }
+        sha256: { type: string, pattern: "^[0-9a-f]{64}$" }
+    UploadProgress:
+      type: object
+      required: [id, size, chunk_size, parts, state, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        size: { type: integer, format: int64 }
+        chunk_size: { type: integer, format: int64, description: "5242880 (5 MiB)" }
+        parts: { type: array, items: { type: integer } }
+        state: { type: string, enum: [uploading, assembled, canceled] }
+        expires_at: { type: string, format: date-time }
+    FileItem:
+      type: object
+      required: [id, name, kind, content_type, size, uploaded_by, created_at, position]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string, enum: [pdf, audio] }
+        content_type: { type: string, enum: [application/pdf, audio/mpeg, audio/mp4] }
+        size: { type: integer, format: int64 }
+        uploaded_by: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        position: { type: integer }
+    FileList:
+      type: object
+      required: [items, used_bytes, quota_bytes]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/FileItem" } }
+        used_bytes: { type: integer, format: int64 }
+        quota_bytes: { type: integer, format: int64 }
     ErrorResponse:
       type: object
       required: [error]

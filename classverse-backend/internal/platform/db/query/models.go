@@ -207,6 +207,37 @@ type EmailOtp struct {
 	ConsumedAt pgtype.Timestamptz
 }
 
+type File struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	UploadedBy  uuid.UUID
+	Kind        string
+	Name        string
+	ContentType pgtype.Text
+	SizeBytes   int64
+	Sha256      []byte
+	ObjectKey   string
+	Status      string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+}
+
+type FileStorage struct {
+	OrgID      uuid.UUID
+	QuotaBytes int64
+	UsedBytes  int64
+}
+
+type FileUpload struct {
+	OrgID          uuid.UUID
+	FileID         uuid.UUID
+	ExpectedSha256 []byte
+	MultipartID    string
+	State          string
+	ExpiresAt      pgtype.Timestamptz
+}
+
 type Invite struct {
 	ID        uuid.UUID
 	OrgID     uuid.UUID
@@ -246,6 +277,14 @@ type Organization struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type ReaderPosition struct {
+	OrgID     uuid.UUID
+	FileID    uuid.UUID
+	UserID    uuid.UUID
+	Position  int32
+	UpdatedAt pgtype.Timestamptz
+}
+
 type RefreshToken struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -283,6 +322,12 @@ type Room struct {
 	CreatedBy      uuid.UUID
 	CreatedAt      pgtype.Timestamptz
 	ArchivedAt     pgtype.Timestamptz
+}
+
+type RoomLocationHistory struct {
+	RoomID      uuid.UUID
+	BuildingKey pgtype.Text
+	MapKey      string
 }
 
 type RoomSession struct {

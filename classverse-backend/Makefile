@@ -5,10 +5,13 @@ export
 MIGRATIONS := db/migrations
 GOOSE      := go tool goose -dir $(MIGRATIONS)
 
-.PHONY: up down migrate migrate-down migrate-new sqlc api run test lint keys
+.PHONY: up down migrate migrate-down migrate-new sqlc api run test lint keys storage-up
 
 up: ## Start Postgres and Mailpit, wait until Postgres is healthy
 	docker compose up -d --wait
+
+storage-up: ## Provision optional private AIStor and verify signed upload/read/range
+	bash scripts/storage-dev.sh
 
 down: ## Stop the dev services (data volume is kept)
 	docker compose down

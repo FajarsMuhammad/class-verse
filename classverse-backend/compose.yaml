@@ -33,5 +33,40 @@ services:
       - "7881:7881" # WebRTC over TCP
       - "7882:7882/udp" # WebRTC media (single muxed UDP port in --dev)
 
+  # Optional private learning storage. Start with: make storage-up
+  storage:
+    profiles: [storage]
+    image: quay.io/minio/aistor/minio@sha256:107cf2014a9583c74c11e3cdbd6903d89c2244355886b89ce532f4ecae9c23f3
+    command: minio server /mnt/data --license /minio.license --console-address :9001
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/storage_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/storage_root_password
+    ports:
+      - "127.0.0.1:${STORAGE_PORT:-9100}:9000"
+      - "127.0.0.1:${STORAGE_CONSOLE_PORT:-9101}:9001"
+    volumes:
+      - storage_data:/mnt/data
+      - type: bind
+        source: ${STORAGE_LICENSE_FILE:-../.config/minio.license}
+        target: /minio.license
+        read_only: true
+        bind:
+          create_host_path: false
+    secrets:
+      - storage_root_user
+      - storage_root_password
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:9000/minio/health/live]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+secrets:
+  storage_root_user:
+    file: ../.config/storage-root-user
+  storage_root_password:
+    file: ../.config/storage-root-password
+
 volumes:
   pgdata:
+  storage_data:

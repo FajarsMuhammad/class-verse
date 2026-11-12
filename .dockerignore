@@ -1,0 +1,6 @@
+.git
+.config
+**/.env
+**/.env.*
+**/node_modules
+**/*.license

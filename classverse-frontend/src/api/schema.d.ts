@@ -407,10 +407,229 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Pengajar/admin. Memesan kuota sekali untuk seluruh file. `id` dibuat klien dan disimpan sebelum
+         *     request agar retry setelah respons hilang tidak memesan kuota dua kali (POST ulang dengan isi sama → 201
+         *     dengan status yang sama). Isi dicek dari byte file (PDF, MP3, M4A), bukan ekstensi.
+         */
+        post: operations["startUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/uploads/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        /** @description Chunk yang sudah tersimpan menurut storage; klien hanya mengirim nomor yang belum ada. */
+        get: operations["getUpload"];
+        put?: never;
+        post?: never;
+        /** @description Batalkan upload yang belum siap; chunk dihapus dan kuota dilepas. Idempoten. */
+        delete: operations["cancelUpload"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/uploads/{file_id}/parts/{part}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+                part: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Chunk ke-n, tepat `chunk_size` byte kecuali chunk terakhir. Mengirim ulang chunk yang sama aman. */
+        put: operations["putUploadPart"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/uploads/{file_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Gabungkan chunk, cek SHA-256 dan format. Berhasil → file `ready` dan tampil di daftar. Gagal format →
+         *     400 (`validation_failed` atau `pdf_encrypted`), file dibuang dan kuota dilepas. Idempoten.
+         */
+        post: operations["completeUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota. */
+        get: operations["listFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Pengunggah atau admin. Kuota dilepas setelah objek terhapus. Idempoten. */
+        delete: operations["deleteFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files/{file_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Isi file lewat origin aplikasi dengan Bearer token; membership dicek ulang setiap request termasuk tiap
+         *     Range. Satu rentang `bytes=` saja. Storage tidak pernah terbuka ke browser.
+         */
+        get: operations["getFileContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files/{file_id}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Halaman PDF (mulai 1) atau detik audio terakhir milik pemanggil. */
+        put: operations["saveFilePosition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        StartUploadRequest: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: int64 */
+            size: number;
+            /** @enum {string} */
+            kind: "pdf" | "audio";
+            sha256: string;
+        };
+        UploadProgress: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            size: number;
+            /**
+             * Format: int64
+             * @description 5242880 (5 MiB)
+             */
+            chunk_size: number;
+            parts: number[];
+            /** @enum {string} */
+            state: "uploading" | "assembled" | "canceled";
+            /** Format: date-time */
+            expires_at: string;
+        };
+        FileItem: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "pdf" | "audio";
+            /** @enum {string} */
+            content_type: "application/pdf" | "audio/mpeg" | "audio/mp4";
+            /** Format: int64 */
+            size: number;
+            /** Format: uuid */
+            uploaded_by: string;
+            /** Format: date-time */
+            created_at: string;
+            position: number;
+        };
+        FileList: {
+            items: components["schemas"]["FileItem"][];
+            /** Format: int64 */
+            used_bytes: number;
+            /** Format: int64 */
+            quota_bytes: number;
+        };
         ErrorResponse: {
             error: {
                 code: string;
@@ -737,6 +956,7 @@ export interface components {
     };
     parameters: {
         OrgID: string;
+        FileID: string;
         /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
         InviteCode: string;
     };
@@ -1450,6 +1670,268 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModerationLog"];
                 };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Sesi upload (baru atau yang sudah ada) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadProgress"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Progres upload */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadProgress"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    cancelUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dibatalkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    putUploadPart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+                part: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Chunk tersimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    completeUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File siap */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadProgress"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listFiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dihapus */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getFileContent: {
+        parameters: {
+            query?: never;
+            header?: {
+                Range?: string;
+            };
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Seluruh file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "audio/mpeg": string;
+                    "audio/mp4": string;
+                };
+            };
+            /** @description Sebagian file; lihat Content-Range */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description range_not_satisfiable; Content-Range: bytes *\/size */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    saveFilePosition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    position: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Tersimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];

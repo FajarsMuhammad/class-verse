@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/file"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/invite"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/config"
@@ -145,6 +146,16 @@ func (p voicePresence) VoiceMember(ctx context.Context, roomID, userID uuid.UUID
 func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (*app, error) {
 	now := func() time.Time { return time.Now().UTC() }
 
+	var uploads *file.Handler
+	if cfg.Storage.Endpoint != "" {
+		s, err := file.NewStorage(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.AccessKey, cfg.Storage.SecretKey, cfg.Storage.Secure)
+		if err != nil {
+			return nil, err
+		}
+		uploader := file.NewUploader(file.NewService(file.NewStore(pool), now), s)
+		go uploader.RunCleanup(ctx, log)
+		uploads = file.NewHandler(uploader, log, now)
+	}
 	orgSvc := org.NewService(org.NewStore(pool), now, log)
 	inviteSvc := invite.NewService(invite.NewStore(pool), orgSvc, now, log)
 
@@ -214,6 +225,9 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				roomHandler.Routes(r)
 				reportHandler.Routes(r)
 				voiceHandler.Routes(r)
+				if uploads != nil {
+					uploads.Routes(r)
+				}
 			})
 		},
 		ws: func(r chi.Router) {

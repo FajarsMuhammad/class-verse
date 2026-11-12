@@ -1,0 +1,3 @@
+# Local licenses and credentials must never enter Git.
+*
+!.gitignore

@@ -42,6 +42,16 @@ type Config struct {
 	OTPHMACKey    []byte
 	Google        Google
 	LiveKit       LiveKit
+	Storage       Storage
+}
+
+// Storage is optional; credentials are never logged.
+type Storage struct {
+	Endpoint  string
+	Bucket    string
+	AccessKey string
+	SecretKey string
+	Secure    bool
 }
 
 // LiveKit configures voice (slice 9). All empty disables voice; validation
@@ -118,6 +128,18 @@ func Load(getenv func(string) string) (Config, error) {
 		} else {
 			cfg.OTPHMACKey = key
 		}
+	}
+	cfg.Storage = Storage{Endpoint: optional("STORAGE_ENDPOINT", ""), Bucket: optional("STORAGE_BUCKET", ""), AccessKey: optional("STORAGE_ACCESS_KEY", ""), SecretKey: optional("STORAGE_SECRET_KEY", ""), Secure: optional("STORAGE_SECURE", "true") != "false"}
+	if cfg.Storage.Endpoint == "" && cfg.Storage.Bucket == "" && cfg.Storage.AccessKey == "" && cfg.Storage.SecretKey == "" {
+		cfg.Storage = Storage{}
+	} else if countSet(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.AccessKey, cfg.Storage.SecretKey) != 4 {
+		errs = append(errs, errors.New("STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY, and STORAGE_SECRET_KEY must be set together"))
+	}
+	if raw := optional("STORAGE_SECURE", "true"); raw != "true" && raw != "false" {
+		errs = append(errs, errors.New("STORAGE_SECURE must be true or false"))
+	}
+	if cfg.IsProduction() && cfg.Storage.Endpoint != "" && !cfg.Storage.Secure {
+		errs = append(errs, errors.New("production storage requires TLS"))
 	}
 	g := cfg.Google
 	if set := countSet(g.ClientID, g.ClientSecret, g.RedirectURL); set != 0 && set != 3 {

@@ -87,6 +87,7 @@ interface RequestOptions {
   method?: string
   body?: unknown
   auth?: boolean
+  signal?: AbortSignal
 }
 
 // api calls an /api endpoint and returns the parsed JSON (or undefined for
@@ -110,12 +111,14 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 
 function send(path: string, opts: RequestOptions, auth: boolean): Promise<Response> {
   const headers: Record<string, string> = {}
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  const binary = opts.body instanceof Blob
+  if (opts.body !== undefined) headers['Content-Type'] = binary ? 'application/octet-stream' : 'application/json'
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`
   return fetch(path, {
     method: opts.method ?? 'GET',
     headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    body: binary ? (opts.body as Blob) : opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    signal: opts.signal,
     credentials: 'same-origin',
   })
 }
