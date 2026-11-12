@@ -241,6 +241,7 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-008 | `sqlc` + `pgx`, bukan GORM | Query eksplisit, performa terprediksi, konsisten dengan prinsip kode sederhana | — |
 | ADR-009 | Peta sekolah adalah room biasa (`map_key = campus`) dengan area of interest | Memakai ulang hub dan protokol yang sama, tanpa service terpisah | Satu sekolah butuh lebih dari 200 orang di peta bersamaan |
 | ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
+| ADR-011 | Redis hanya untuk leaderboard mingguan (sorted set per organisasi per minggu WIB); Postgres `point_events` tetap sumber kebenaran | Top-N dan peringkat per user O(log n) tanpa agregasi `SUM` tiap request; reset mingguan lewat kunci berganti tanpa job; bisa dibangun ulang dari Postgres | Redis dipakai untuk state room (ADR-002) atau data yang tidak bisa dibangun ulang |
 
 ## Data model
 

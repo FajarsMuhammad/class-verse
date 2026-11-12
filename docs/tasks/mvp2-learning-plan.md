@@ -1,7 +1,15 @@
 # MVP 2 — Rencana fitur belajar
 
-Status: **draf untuk disetujui.** Belum ada kode. Keputusan bertanda **(putuskan)** harus dijawab sebelum slice
-terkait dimulai, lalu dicatat ke `docs/design.md` (aturan `CLAUDE.md`).
+Status: **draf; sebagian keputusan sudah diambil** (lihat *Keputusan*). Belum ada kode. Keputusan bertanda
+**(putuskan)** harus dijawab sebelum slice terkait dimulai, lalu dicatat ke `docs/design.md` (aturan `CLAUDE.md`).
+
+## Keputusan
+
+| Tanggal | Keputusan | Akibat |
+| --- | --- | --- |
+| 2026-11-11 | Modul dan e-book **dibaca di dalam aplikasi**, bukan tautan keluar | File diunggah dan disimpan di Kelasverse (slice F1), lalu dirender oleh pembaca di aplikasi |
+| 2026-11-11 | **Belum perlu RAG** | Tidak ada embedding, vector store, atau LLM; "Tanya pustakawan" membuka chat ke pengajar |
+| 2026-11-11 | **Leaderboard memakai Redis** | ADR-011 di `docs/design.md`; Redis ditambahkan ke compose; Postgres tetap sumber kebenaran poin |
 
 Sumber: `kelasverse-assets/README.md`, `reference/Main.dc.html` (header, panel belajar, leaderboard), `Room.dc.html`
 (modul berjenjang di gedung), `Quiz.dc.html` (Arena Kuis live), `Library.dc.html` + gambar
@@ -22,11 +30,11 @@ Sumber: `kelasverse-assets/README.md`, `reference/Main.dc.html` (header, panel b
 ## Urutan dan ketergantungan
 
 ```
-L0 Penyimpanan file (opsional, lihat keputusan berkas)
+F1 Penyimpanan file + pembaca di aplikasi
  │
-L1 Katalog perpustakaan (baca saja) ──► L2 Pinjam/kembalikan
+ ├──► L1 Katalog perpustakaan ──► L2 Pinjam/kembalikan
  │
-M1 Modul + langkah (materi/video/tautan) ──► M2 Progres modul
+ └──► M1 Modul + langkah (materi/berkas/video) ──► M2 Progres modul
                                               │
 Q1 Bank soal + kuis mandiri ──► Q2 Arena Kuis live (realtime) ──┐
                                               │                 │
@@ -37,52 +45,58 @@ Q1 Bank soal + kuis mandiri ──► Q2 Arena Kuis live (realtime) ──┐
                                                        B2 Bintang, beruntun, misi, lencana (panel belajar)
 ```
 
-Urutan kerja yang diusulkan: **L1 → L2 → M1 → M2 → Q1 → R1 → Q2 → B1 → B2.** Perpustakaan lebih dulu karena
-ruangnya sudah ada dan paling kecil risikonya. Arena live (Q2) paling berisiko (realtime + kapasitas) sehingga
+Urutan kerja yang diusulkan: **F1 → L1 → L2 → M1 → M2 → Q1 → R1 → Q2 → B1 → B2.** Penyimpanan file lebih dulu
+karena katalog e-book dan modul sama-sama dibaca di aplikasi. Perpustakaan menyusul karena ruangnya sudah ada. Arena live (Q2) paling berisiko (realtime + kapasitas) sehingga
 didahului kuis mandiri (Q1) yang memakai bank soal yang sama.
 
-## Keputusan berkas: upload ke server atau RAG?
+## Berkas: dibaca di aplikasi
 
-Keduanya menjawab kebutuhan yang berbeda, jadi bukan pilihan salah satu:
-
-| | Menyimpan file (upload) | RAG |
-| --- | --- | --- |
-| Gunanya | Siswa **membuka** e-book/audio/PDF | **Menjawab pertanyaan** dari isi dokumen ("Tanya pustakawan") |
-| Butuh | Penyimpanan file | Tetap butuh file aslinya, plus ekstraksi teks, embedding, vector store (pgvector), dan LLM |
-| Biaya/risiko | Disk + bandwidth; validasi tipe & ukuran; malware | Biaya API LLM per pertanyaan; jawaban bisa salah; data siswa ke pihak ketiga (UU PDP, peserta < 18 th) |
-
-RAG tidak menggantikan penyimpanan: untuk dijawab, dokumen tetap harus diunggah dan disimpan. Jadi urutan wajarnya
-**simpan dulu, RAG belakangan**.
-
-**Usulan bertahap:**
-
-1. **Sekarang (L1/M1): tautan saja.** Buku/modul digital menyimpan `url` (Google Drive, YouTube, situs penerbit).
-   Tanpa upload, tanpa biaya penyimpanan. Validasi: hanya `https://`, dibuka di tab baru dengan `rel="noopener"`.
-2. **Berikutnya (L0): upload sendiri** bila sekolah tidak mau bergantung pada Drive. Disimpan di **object storage
-   S3-compatible** (MinIO di VPS pilot, nanti S3/R2), bukan di kolom DB atau disk aplikasi. Unduh lewat URL bertanda
-   tangan berumur pendek setelah cek membership. Batas: PDF/EPUB/MP3/M4A, maks 50 MB, cek magic bytes, kuota per
-   organisasi. Butuh migration + service `storage` + backup.
-3. **Nanti (bila diminta): RAG "Tanya pustakawan"**, hanya atas dokumen yang sudah diunggah sekolah. Butuh keputusan
-   penyedia LLM, persetujuan data, filter jawaban, dan batas biaya. Sampai saat itu tombol "Tanya pustakawan"
-   cukup membuka chat ke pengajar/pustakawan yang sedang di ruang.
-
-**(putuskan)** Setuju mulai dari tautan saja (langkah 1)?
+Diputuskan: e-book dan materi modul dibuka di dalam Kelasverse. RAG tidak dipakai sekarang; bila nanti diperlukan,
+RAG memakai berkas yang sama (dokumen tetap harus tersimpan dulu), jadi F1 tidak sia-sia.
 
 ## Slices
+
+### F1 — Penyimpanan file dan pembaca di aplikasi
+
+Fondasi untuk L1 (e-book/audio) dan M1 (materi berkas).
+
+- **Penyimpanan:** object storage S3-compatible. Dev dan pilot: **MinIO** di compose/VPS yang sama; nanti S3/R2 tanpa
+  ubah kode. Tidak disimpan di Postgres atau disk aplikasi. **(putuskan)** MinIO di VPS pilot oke, atau langsung
+  layanan terkelola (Cloudflare R2)?
+- **DB:** `files(id, org_id, kind{pdf,epub,audio,image}, size_bytes, sha256, object_key, uploaded_by, created_at,
+  deleted_at)`. Objek dirujuk dari `library_books.file_id` dan `module_steps.file_id`.
+- **Upload:** hanya pengajar/admin; PDF, EPUB, MP3/M4A, PNG/JPEG; maks 50 MB (gambar 5 MB); tipe dicek dari
+  *magic bytes*, bukan nama file; kuota per organisasi (usul 2 GB pilot). Unggah lewat server Go (streaming ke
+  storage, hitung SHA-256), sehingga validasi tidak bisa dilewati. URL presigned PUT langsung ke storage bisa
+  menyusul bila server jadi bottleneck.
+- **Baca:** `GET /api/files/{id}` cek membership organisasi, lalu redirect ke URL presigned berumur 5 menit dengan
+  `Content-Disposition: inline`. Tidak ada URL publik permanen.
+- **Pembaca di aplikasi:**
+  - **PDF:** `pdfjs-dist` (Mozilla pdf.js, dependency baru) dirender ke canvas di komponen `Reader.vue`;
+    navigasi halaman, zoom, simpan halaman terakhir. Iframe viewer bawaan browser tidak dipakai karena tidak jalan
+    di Safari iOS dan tidak bisa menyimpan posisi.
+  - **EPUB:** **(putuskan)** dukung EPUB sekarang (butuh `epubjs`) atau PDF saja dulu? Usul: PDF saja dulu.
+  - **Audio:** elemen `<audio>` bawaan.
+  - **Materi teks:** markdown pendek dirender aman (tanpa HTML mentah).
+- **Unduh:** pembaca tidak menyediakan tombol unduh, tetapi file yang bisa dibaca di browser tetap bisa disalin;
+  ini bukan DRM. Hak cipta materi menjadi tanggung jawab sekolah yang mengunggah (dicatat di syarat penggunaan).
+- **Backup:** bucket MinIO ikut jadwal backup VPS; penghapusan file = soft delete lalu objek dihapus oleh job.
+- **Test:** validasi tipe/ukuran (file palsu ber-ekstensi `.pdf` ditolak), akses lintas organisasi ditolak, URL
+  kedaluwarsa, uji browser membuka PDF contoh.
 
 ### L1 — Katalog perpustakaan (baca saja)
 
 Siswa di ruang `library` melihat katalog: cari, tab kategori (sama dengan 8 rak), kartu buku. Klik rak di peta
 memilih kategori. Pengajar/admin menambah, mengubah, menghapus buku dari halaman Kelola.
 
-- **DB:** `library_books(id, org_id, title, author, shelf, level, format{buku,ebook,audio}, copies, url, cover_color,
-  created_by, created_at, archived_at)`. `shelf` ∈ kunci rak di `rooms.json` (dongeng … referensi). `url` wajib untuk
-  ebook/audio, kosong untuk buku fisik.
+- **DB:** `library_books(id, org_id, title, author, shelf, level, format{buku,ebook,audio}, copies, file_id,
+  cover_color, created_by, created_at, archived_at)`. `shelf` ∈ kunci rak di `rooms.json` (dongeng … referensi).
+  `file_id` (F1) wajib untuk ebook/audio, kosong untuk buku fisik.
 - **API:** `GET /api/orgs/{org}/library/books?shelf=&q=` (anggota), `POST/PATCH/DELETE` (pengajar/admin).
   Pencarian `ILIKE` judul/penulis cukup untuk ratusan judul; full-text menyusul bila perlu.
 - **UI:** panel Katalog menggantikan panel Chat di perpustakaan, dengan tab "Katalog | Chat" agar chat tetap bisa.
   Rak di Phaser jadi bisa diklik (`selectShelf`). Kartu: sampul warna, judul, penulis, chip level + format, status.
-  Ebook/Audio → tombol "Baca sekarang"/"Dengarkan" membuka `url`.
+  Ebook/Audio → "Baca sekarang"/"Dengarkan" membuka pembaca F1 di dalam aplikasi (overlay di atas peta).
 - **Contoh awal:** satu buku contoh disisipkan per organisasi oleh migration (lihat bagian akhir).
 - **Test:** service table-driven (validasi, otorisasi lintas org), handler, komponen katalog, uji browser klik rak.
 
@@ -100,9 +114,11 @@ memilih kategori. Pengajar/admin menambah, mengubah, menghapus buku dari halaman
 Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah berurutan.
 
 - **DB:** `modules(id, org_id, building_key, level, title, description, position, published_at, archived_at)`,
-  `module_steps(id, module_id, position, kind{materi,video,tautan,kuis}, title, body_md, url, quiz_id, minutes)`.
-- **Konten:** `materi` = markdown pendek (dirender aman, tanpa HTML mentah); `video`/`tautan` = `url`;
-  `kuis` = merujuk kuis Q1 (diisi setelah Q1).
+  `module_steps(id, module_id, position, kind{materi,berkas,video,kuis}, title, body_md, file_id, url, quiz_id,
+  minutes)`.
+- **Konten:** `materi` = markdown pendek; `berkas` = PDF/audio dari F1, dibaca di aplikasi; `video` = URL YouTube
+  yang di-embed di aplikasi (`youtube-nocookie.com`, bukan diunggah: video besar di luar kuota F1); `kuis` = merujuk
+  kuis Q1.
 - **UI peserta:** detail gedung (PlaceCard → "Lihat modul") menampilkan jalur seperti `Room.dc.html`.
 - **UI pengajar:** halaman Kelola → Modul (buat, urutkan langkah, terbitkan).
 
@@ -138,14 +154,22 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 - **Pengajar/admin:** tabel per kelas/ruang: siapa sudah/belum menyelesaikan modul, rata-rata nilai, ekspor CSV.
 - Tidak ada tabel baru; query agregasi atas M2/Q1. Hanya pengajar/admin organisasi yang melihat data siswa lain.
 
-### B1 — Poin dan leaderboard mingguan
+### B1 — Poin dan leaderboard mingguan (Redis)
 
-- **DB:** `point_events(id, org_id, user_id, source{quiz,module,mission}, ref_id, points, created_at)`; append-only,
-  satu event per sumber (indeks unik `(source, ref_id, user_id)`) agar tidak bisa dobel.
-- **Leaderboard:** `SUM(points)` sejak Senin 00:00 **WIB** per organisasi, top 10 + posisi saya. Reset otomatis
-  karena hanya rentang waktu.
-- **Privasi (putuskan):** peserta < 18 tahun: tampilkan nama tampilan lengkap atau inisial saja? Opsi
-  organisasi untuk menyembunyikan leaderboard?
+- **Sumber kebenaran:** Postgres `point_events(id, org_id, user_id, source{quiz,module,mission}, ref_id, points,
+  created_at)`, append-only, indeks unik `(source, ref_id, user_id)` sehingga poin tidak bisa dobel.
+- **Leaderboard:** Redis sorted set per organisasi per minggu: `lb:{org_id}:{tahun-minggu ISO, WIB}`.
+  - Tulis: setelah `point_events` ter-commit, `ZINCRBY` skor user; `EXPIRE` 35 hari supaya minggu lama terhapus
+    sendiri. Reset Senin 00:00 WIB terjadi karena kunci minggu berganti, tanpa job.
+  - Baca: `ZREVRANGE … 0 9 WITHSCORES` (top 10) + `ZREVRANK`/`ZSCORE` untuk posisi saya; nama diambil dari
+    Postgres untuk 10 id itu.
+  - **Konsistensi:** bila `ZINCRBY` gagal setelah commit, poin tidak hilang (Postgres). Job rebuild membangun ulang
+    sorted set minggu berjalan dari `point_events` saat startup dan bila kunci tidak ada; perintah admin
+    `make leaderboard-rebuild`.
+  - **Redis mati:** leaderboard menampilkan "Peringkat sementara tidak tersedia"; kuis dan poin tetap jalan.
+- **Infrastruktur:** Redis 7 di `compose.yaml` (dev) dan VPS (pilot), tanpa persistensi wajib (bisa dibangun ulang),
+  hanya bisa diakses dari jaringan privat, dengan password. Client Go: `github.com/redis/go-redis/v9`.
+- **Privasi (putuskan):** peserta < 18 tahun: nama tampilan lengkap atau inisial? Opsi sekolah mematikan leaderboard?
 
 ### B2 — Bintang, beruntun, misi, lencana
 
@@ -155,15 +179,16 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 
 ## Di luar rencana ini
 
-Kamera/video, editor peta, toko item, antre buku, denda, RAG (sampai diputuskan), integrasi LMS.
+Kamera/video, editor peta, toko item, antre buku, denda, RAG, upload video, integrasi LMS.
 
 ## Pertanyaan untuk disetujui
 
-1. Urutan **L1 → L2 → M1 → M2 → Q1 → R1 → Q2 → B1 → B2**?
-2. E-book/audio/modul digital mulai dengan **tautan saja**; upload (object storage) menyusul; RAG hanya bila nanti
-   diminta?
-3. Antre buku ditunda?
-4. Leaderboard untuk siswa di bawah 18 tahun: nama lengkap atau inisial, dan bisa dimatikan per sekolah?
+1. Urutan **F1 → L1 → L2 → M1 → M2 → Q1 → R1 → Q2 → B1 → B2**?
+2. Penyimpanan file: **MinIO** di VPS pilot, atau layanan terkelola (Cloudflare R2)?
+3. Format yang dibaca di aplikasi: **PDF + audio dulu**, EPUB menyusul?
+4. Kuota per sekolah **2 GB** dan batas **50 MB** per file cukup?
+5. Antre buku ditunda?
+6. Leaderboard untuk siswa < 18 tahun: nama lengkap atau inisial, dan bisa dimatikan per sekolah?
 
 ## Contoh katalog (L1)
 
@@ -177,5 +202,5 @@ Satu buku contoh per organisasi, ditandai sebagai contoh agar tidak dikira kolek
 | level | SD |
 | format | ebook |
 | copies | 0 (digital) |
-| url | kosong sampai pengajar mengisi tautan; tombol "Baca sekarang" nonaktif dengan teks "Tautan belum diisi" |
+| file | PDF contoh 1–2 halaman buatan sendiri (bebas hak cipta) di `classverse-backend/db/seed/`, diunggah ke storage saat seed; dibuka di pembaca aplikasi |
 | cover_color | `--kv-subject-ipa` |
