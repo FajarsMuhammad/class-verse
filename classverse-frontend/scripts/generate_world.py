@@ -7,6 +7,10 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / 'classverse-frontend/src/assets/world'
 OUT = ROOT / 'classverse-backend/maps'
 TILE = 32
+# Server map key -> rooms.json layout.
+LAYOUTS = {'classroom': 'kelas', 'garden': 'diskusi', 'lab': 'lab', 'baca': 'baca', 'library': 'perpustakaan'}
+# Furniture you cannot walk through; seats stay free (see build).
+SOLID = ('desk', 'table', 'shelf', 'sink', 'counter', 'display', 'returnbox', 'booth')
 
 
 def props(**values):
@@ -20,7 +24,7 @@ def obj(label, x, y, w=0, h=0, kind='', **values):
                 properties=props(**values))
 
 
-def build(width, height, spawn, blocks, buildings=(), zones=(), exit_point=None, seats=(), speed=160):
+def build(width, height, spawn, blocks, buildings=(), zones=(), exit_point=None, seats=(), speed=160, quiet=False):
     cols, rows = math.ceil(width / TILE), math.ceil(height / TILE)
     collision = [int(any(x <= tx*TILE+TILE/2 < x+w and y <= ty*TILE+TILE/2 < y+h
                          for x, y, w, h in blocks))
@@ -45,7 +49,8 @@ def build(width, height, spawn, blocks, buildings=(), zones=(), exit_point=None,
             item['id'] = i*1000+j
     return dict(type='map', version='1.10', orientation='orthogonal', renderorder='right-down',
                 width=cols, height=rows, tilewidth=TILE, tileheight=TILE, layers=layers,
-                properties=props(walk_speed=speed, near_radius=85, world_width=width, world_height=height),
+                properties=props(walk_speed=speed, near_radius=85, world_width=width, world_height=height,
+                                 **({'quiet': True} if quiet else {})),
                 tilesets=[dict(firstgid=1, name='kelasverse', tilecount=18)])
 
 
@@ -71,24 +76,26 @@ def campus(world):
 
 def interior(data, room):
     wall = data['wall']['thickness']
-    width, height = data['floor_size']['w']+2*wall, data['floor_size']['h']+2*wall
+    floor = room.get('floor_size', data['floor_size'])
+    width, height = floor['w']+2*wall, floor['h']+2*wall
     blocks = [(0, 0, width, wall), (0, 0, wall, height), (width-wall, 0, wall, height),
               (0, height-wall, width/2-50, wall), (width/2+50, height-wall, width/2-50, wall)]
-    for item in room['items']:
-        if item['kind'] in ('desk', 'table', 'shelf', 'sink'):
+    for item in [*room['items'], *room.get('shelves', [])]:
+        if item.get('kind', 'shelf') in SOLID:
             blocks.append((item['x']+wall, item['y']+wall, item['w'], item['h']))
     seats = [(s['x']+wall, s['y']+wall) for s in room['seats']]
     zones = [obj(z['label'], z['x']+wall-z['d']/2, z['y']+wall-z['d']/2,
                  z['d'], z['d'], key=f'table-{i+1}', shape='circle') for i, z in enumerate(room['zones'])]
+    # The library is a quiet zone: chat only, no voice (reference README rule 7).
     return build(width, height, (width/2, height-60), blocks, zones=zones,
-                 exit_point=(width/2, height-wall/2), seats=seats)
+                 exit_point=(width/2, height-wall/2), seats=seats, quiet='shelves' in room)
 
 
 def generate():
     world = json.loads((DATA / 'world.json').read_text())
     rooms = json.loads((DATA / 'rooms.json').read_text())
     maps = {'campus': campus(world)}
-    for key, layout in [('classroom', 'kelas'), ('garden', 'diskusi'), ('lab', 'lab'), ('baca', 'baca')]:
+    for key, layout in LAYOUTS.items():
         maps[key] = interior(rooms, rooms['rooms'][layout])
     for key, data in maps.items():
         (OUT / f'{key}.tmj').write_text(json.dumps(data, separators=(',', ':'))+'\n')

@@ -33,6 +33,8 @@ type MapData struct {
 	// and voice remain separate from this distance-based range.
 	NearRadius              int
 	worldWidth, worldHeight int
+	// Quiet maps (the library) are chat only: no voice identity is issued.
+	Quiet bool
 }
 
 // Building returns the building with key.
@@ -201,6 +203,10 @@ func ParseMap(key string, raw []byte) (*MapData, error) {
 		case "near_radius":
 			if json.Unmarshal(p.Value, &md.NearRadius) != nil || md.NearRadius < 16 || md.NearRadius > 320 {
 				return nil, fmt.Errorf("parse map %s: invalid near_radius", key)
+			}
+		case "quiet":
+			if json.Unmarshal(p.Value, &md.Quiet) != nil {
+				return nil, fmt.Errorf("parse map %s: invalid quiet", key)
 			}
 		case "world_width":
 			if json.Unmarshal(p.Value, &md.worldWidth) != nil || md.worldWidth <= 0 || md.worldWidth > md.Width*md.TileSize {

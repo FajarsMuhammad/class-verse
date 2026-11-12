@@ -99,6 +99,7 @@
       "interact_radius": 60,
       "capacity": 100,
       "room_types": [
+        "perpustakaan",
         "baca"
       ]
     },

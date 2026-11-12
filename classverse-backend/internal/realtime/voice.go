@@ -28,7 +28,7 @@ type voiceCleanedCmd struct {
 }
 
 func (r *room) initVoice(m *member) {
-	if r.campus {
+	if r.campus || r.mapd.Quiet {
 		return
 	}
 	m.voiceIdentity = m.p.ID.String() + ":" + uuid.NewString()
@@ -151,7 +151,7 @@ func (r *room) voiceCleaned(c voiceCleanedCmd) {
 // stay in the current channel are always allowed, even while an eviction is
 // pending, so a LiveKit outage never freezes the avatar.
 func (r *room) voicePosition(m *member, x, y int, dir Direction) bool {
-	if r.campus || r.hub.voice == nil {
+	if r.campus || r.mapd.Quiet || r.hub.voice == nil {
 		return true
 	}
 	if r.voiceChannel(x, y) == m.voiceChannel {

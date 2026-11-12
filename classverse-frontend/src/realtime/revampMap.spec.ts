@@ -18,4 +18,12 @@ it('uses exact pixel bounds, interaction radius and circular-zone metadata', () 
   expect(map.isBlocked(20, 50)).toBe(true)
   expect(map.zones[0]?.circle).toBe(true)
   expect(map.buildings[0]?.interactRadius).toBe(180)
+  expect(map.quiet).toBe(false)
+})
+
+it('reads the quiet map property (library: chat only)', () => {
+  const map = new MapData({ width: 1, height: 1, tilewidth: 32, tileheight: 32, tilesets: [],
+    properties: [{ name: 'quiet', value: true }],
+    layers: [{ name: 'collision', type: 'tilelayer', data: [0] }] })
+  expect(map.quiet).toBe(true)
 })

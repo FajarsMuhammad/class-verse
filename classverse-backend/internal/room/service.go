@@ -36,6 +36,7 @@ const (
 	MapGarden    = "garden"
 	MapLab       = "lab"
 	MapReading   = "baca"
+	MapLibrary   = "library" // quiet zone: chat only, no voice
 )
 
 // Domain errors.
@@ -138,8 +139,10 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 	}
 	var v ValidationError
 	name := validateName(&v, in.Name)
-	if in.MapKey != MapClassroom && in.MapKey != MapGarden && in.MapKey != MapLab && in.MapKey != MapReading {
-		v.add("map_key", "Pilih peta kelas, diskusi, lab, atau ruang baca")
+	switch in.MapKey {
+	case MapClassroom, MapGarden, MapLab, MapReading, MapLibrary:
+	default:
+		v.add("map_key", "Pilih peta kelas, diskusi, lab, ruang baca, atau perpustakaan")
 	}
 	if _, ok := s.buildings.Building(in.BuildingKey); !ok {
 		v.add("building_key", "Gedung tidak ditemukan")

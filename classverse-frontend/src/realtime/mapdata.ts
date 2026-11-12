@@ -80,6 +80,8 @@ export class MapData {
   readonly buildings: Building[]
   readonly zones: Zone[]
   readonly seats: Seat[]
+  // Quiet maps (the library) are chat only; the server issues no voice identity.
+  readonly quiet: boolean
   // Max walking speed in px/s from the map property walk_speed (same rule as
   // the server, internal/realtime/mapdata.go).
   readonly walkSpeed: number
@@ -111,6 +113,7 @@ export class MapData {
     }))
     const speed = raw.properties?.find((p) => p.name === 'walk_speed')?.value
     this.walkSpeed = typeof speed === 'number' ? speed : Movement.maxSpeed
+    this.quiet = raw.properties?.find((p) => p.name === 'quiet')?.value === true
     const near = raw.properties?.find((p) => p.name === 'near_tiles')?.value
     const radius = raw.properties?.find((p) => p.name === 'near_radius')?.value
     this.nearRadius = typeof radius === 'number' ? radius : (typeof near === 'number' ? near : DEFAULT_NEAR_TILES) * this.tileSize

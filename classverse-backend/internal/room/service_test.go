@@ -90,6 +90,9 @@ func TestRoomLifecycle(t *testing.T) {
 	if created.Capacity != 40 || created.Name != "Biologi" {
 		t.Fatalf("room=%+v", created)
 	}
+	if lib, err := svc.Create(ctx, user.ID, school.ID, CreateInput{Name: "Literasi", MapKey: MapLibrary, BuildingKey: "kelas-a"}); err != nil || lib.MapKey != MapLibrary {
+		t.Fatalf("library room=%+v err=%v", lib, err)
+	}
 	renamed := "Kimia"
 	updated, err := svc.Update(ctx, user.ID, created.ID, UpdateInput{Name: &renamed})
 	if err != nil || updated.ScheduledAt == nil || !updated.ScheduledAt.Equal(scheduled) {

@@ -348,8 +348,9 @@ onBeforeUnmount(() => {
           <footer ref="mapBottom" class="map-bottom">
             <EmoteBar :send="room.sendEmote"
               :disabled="status !== 'open' || traveling || kicked || muted" />
+            <p v-if="map?.quiet && !campus" class="quiet-chip">Zona tenang — suara mati, chat tetap bisa</p>
             <VoiceBar
-              v-if="voice && !campus && !kicked"
+              v-else-if="voice && !campus && !kicked"
               :voice="voice"
               :chat="chat"
               :version="chatVersion"
@@ -492,6 +493,19 @@ onBeforeUnmount(() => {
 }
 .map-top {
   top: var(--space-3);
+}
+.quiet-chip {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  border-radius: var(--radius-pill);
 }
 .map-zoom {
   position: absolute;

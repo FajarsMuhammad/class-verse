@@ -123,6 +123,7 @@ const (
 	Classroom RoomMap = "classroom"
 	Garden    RoomMap = "garden"
 	Lab       RoomMap = "lab"
+	Library   RoomMap = "library"
 )
 
 // Valid indicates whether the value is a known member of the RoomMap enum.
@@ -135,6 +136,8 @@ func (e RoomMap) Valid() bool {
 	case Garden:
 		return true
 	case Lab:
+		return true
+	case Library:
 		return true
 	default:
 		return false

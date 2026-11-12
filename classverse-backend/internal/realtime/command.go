@@ -46,6 +46,10 @@ func (r *room) command(c commandCmd) {
 			reject(CodeForbidden, "Suara ke semua hanya tersedia di ruang")
 			return
 		}
+		if r.mapd.Quiet {
+			reject(CodeForbidden, "Perpustakaan zona tenang, suara mati")
+			return
+		}
 		on := c.name == "voice_broadcast"
 		if on == r.voiceOn[m.p.ID] {
 			return

@@ -127,7 +127,8 @@ export function useVoice(opts: {
     const gen = generation
     await closing
     if (gen !== generation) return
-    if (stopped || !cur || cur.map_key === 'campus') {
+    // Campus and the library (quiet zone, chat only) never get a voice identity.
+    if (stopped || !cur || cur.map_key === 'campus' || cur.map_key === 'library') {
       status.value = 'off'
       return
     }

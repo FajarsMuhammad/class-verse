@@ -1,7 +1,7 @@
 import unittest
 from collections import deque
 import json
-from generate_world import campus, interior, DATA, OUT, TILE
+from generate_world import campus, interior, DATA, LAYOUTS, OUT, TILE
 
 
 class WorldTests(unittest.TestCase):
@@ -38,13 +38,31 @@ class WorldTests(unittest.TestCase):
             self.assert_reachable(interior(r, room))
 
 
+    def test_library_uses_its_own_floor_and_is_quiet(self):
+        r = json.loads((DATA/'rooms.json').read_text())
+        m = interior(r, r['rooms']['perpustakaan'])
+        wall = r['wall']['thickness']
+        props = {p['name']: p['value'] for p in m['properties']}
+        self.assertEqual((props['world_width'], props['world_height']), (1200+2*wall, 720+2*wall))
+        self.assertIs(props['quiet'], True)
+        self.assertEqual(len(m['layers'][-1]['objects']), 29)
+        # Category shelves and counters are solid: a shelf centre tile is blocked.
+        cols = m['width']
+        sh = r['rooms']['perpustakaan']['shelves'][0]
+        tx, ty = int((sh['x']+wall+sh['w']/2)//TILE), int((sh['y']+wall+sh['h']/2)//TILE)
+        self.assertEqual(m['layers'][1]['data'][ty*cols+tx], 1)
+        # Regular rooms keep the default floor and stay voice-enabled.
+        kelas = {p['name']: p['value'] for p in interior(r, r['rooms']['kelas'])['properties']}
+        self.assertEqual(kelas['world_width'], 1000+2*wall)
+        self.assertNotIn('quiet', kelas)
+
     def test_committed_server_maps_match_frontend_data(self):
         # Editing world.json/rooms.json without regenerating leaves the
         # server enforcing old collision, doors and zones.
         w = json.loads((DATA/'world.json').read_text())
         r = json.loads((DATA/'rooms.json').read_text())
         want = {'campus': campus(w)}
-        for key, layout in [('classroom', 'kelas'), ('garden', 'diskusi'), ('lab', 'lab'), ('baca', 'baca')]:
+        for key, layout in LAYOUTS.items():
             want[key] = interior(r, r['rooms'][layout])
         for key, data in want.items():
             self.assertEqual(json.loads((OUT/f'{key}.tmj').read_text()), data,

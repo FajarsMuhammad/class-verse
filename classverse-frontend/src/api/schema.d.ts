@@ -515,7 +515,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        RoomMap: "classroom" | "garden" | "lab" | "baca";
+        RoomMap: "classroom" | "garden" | "lab" | "baca" | "library";
         CreateRoomRequest: {
             name: string;
             map_key: components["schemas"]["RoomMap"];
