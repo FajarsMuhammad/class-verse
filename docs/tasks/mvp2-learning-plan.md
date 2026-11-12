@@ -10,6 +10,9 @@ Status: **draf; sebagian keputusan sudah diambil** (lihat *Keputusan*). Belum ad
 | 2026-11-11 | Modul dan e-book **dibaca di dalam aplikasi**, bukan tautan keluar | File diunggah dan disimpan di Kelasverse (slice F1), lalu dirender oleh pembaca di aplikasi |
 | 2026-11-11 | **Belum perlu RAG** | Tidak ada embedding, vector store, atau LLM; "Tanya pustakawan" membuka chat ke pengajar |
 | 2026-11-11 | **Leaderboard memakai Redis** | ADR-011 di `docs/design.md`; Redis ditambahkan ke compose; Postgres tetap sumber kebenaran poin |
+| 2026-11-11 | Penyimpanan file: **MinIO** di VPS pilot | MinIO di `compose.yaml` dev dan VPS; client S3-compatible sehingga bisa pindah ke S3/R2 |
+| 2026-11-11 | Pembaca: **PDF + audio dulu**, EPUB menyusul | `pdfjs-dist` + `<audio>`; tidak ada `epubjs` di F1 |
+| 2026-11-11 | **Antre buku ditunda** | L2 hanya Pinjam/Kembalikan dan "Sedang dipinjam" |
 
 Sumber: `kelasverse-assets/README.md`, `reference/Main.dc.html` (header, panel belajar, leaderboard), `Room.dc.html`
 (modul berjenjang di gedung), `Quiz.dc.html` (Arena Kuis live), `Library.dc.html` + gambar
@@ -61,8 +64,7 @@ RAG memakai berkas yang sama (dokumen tetap harus tersimpan dulu), jadi F1 tidak
 Fondasi untuk L1 (e-book/audio) dan M1 (materi berkas).
 
 - **Penyimpanan:** object storage S3-compatible. Dev dan pilot: **MinIO** di compose/VPS yang sama; nanti S3/R2 tanpa
-  ubah kode. Tidak disimpan di Postgres atau disk aplikasi. **(putuskan)** MinIO di VPS pilot oke, atau langsung
-  layanan terkelola (Cloudflare R2)?
+  ubah kode. Tidak disimpan di Postgres atau disk aplikasi.
 - **DB:** `files(id, org_id, kind{pdf,epub,audio,image}, size_bytes, sha256, object_key, uploaded_by, created_at,
   deleted_at)`. Objek dirujuk dari `library_books.file_id` dan `module_steps.file_id`.
 - **Upload:** hanya pengajar/admin; PDF, EPUB, MP3/M4A, PNG/JPEG; maks 50 MB (gambar 5 MB); tipe dicek dari
@@ -75,7 +77,7 @@ Fondasi untuk L1 (e-book/audio) dan M1 (materi berkas).
   - **PDF:** `pdfjs-dist` (Mozilla pdf.js, dependency baru) dirender ke canvas di komponen `Reader.vue`;
     navigasi halaman, zoom, simpan halaman terakhir. Iframe viewer bawaan browser tidak dipakai karena tidak jalan
     di Safari iOS dan tidak bisa menyimpan posisi.
-  - **EPUB:** **(putuskan)** dukung EPUB sekarang (butuh `epubjs`) atau PDF saja dulu? Usul: PDF saja dulu.
+  - **EPUB:** menyusul setelah F1 (diputuskan).
   - **Audio:** elemen `<audio>` bawaan.
   - **Materi teks:** markdown pendek dirender aman (tanpa HTML mentah).
 - **Unduh:** pembaca tidak menyediakan tombol unduh, tetapi file yang bisa dibaca di browser tetap bisa disalin;
@@ -107,7 +109,7 @@ memilih kategori. Pengajar/admin menambah, mengubah, menghapus buku dari halaman
 - **Aturan:** hanya format `buku`; maks **5** pinjaman aktif per anggota; 14 hari; stok = `copies` − pinjaman aktif,
   dicek dalam transaksi `SELECT … FOR UPDATE` agar dua siswa tidak meminjam eksemplar terakhir bersamaan.
 - **UI:** tombol Pinjam / Kembalikan / "Sedang dipinjam"; bagian **Pinjamanku** (maks 5) dengan jatuh tempo.
-- **Ditunda:** antre (reservasi) dan denda. **(putuskan)** antre perlu di pilot?
+- **Ditunda (diputuskan):** antre (reservasi) dan denda.
 
 ### M1 — Modul
 
@@ -181,14 +183,42 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 
 Kamera/video, editor peta, toko item, antre buku, denda, RAG, upload video, integrasi LMS.
 
+## Opsi kuota file (belum diputuskan)
+
+Kuota = total ukuran semua file yang boleh diunggah satu sekolah. Gunanya menjaga disk VPS, biaya backup, dan
+mencegah satu sekolah menghabiskan ruang sekolah lain. Batas per file dan kuota total adalah dua hal berbeda.
+
+Perkiraan ukuran: PDF modul teks 10–30 halaman 1–5 MB; e-book bergambar 20–50 MB; audio MP3 mono 64 kbps ±30 MB/jam.
+
+| Opsi | Isi | Cocok bila |
+| --- | --- | --- |
+| A | Tanpa kuota total; hanya batas 50 MB per file; admin Kelasverse memantau disk | Pilot 1–3 sekolah, disk VPS lega |
+| B | Kuota tetap per sekolah (mis. 5 GB, satu nilai konfigurasi `ORG_STORAGE_QUOTA`), admin sekolah melihat pemakaian | Banyak sekolah berbagi satu VPS |
+| C | Kuota per paket langganan | Setelah model langganan berjalan |
+
+Usul: **B dengan 5 GB** (±1.000 PDF modul 5 MB), nilai bisa diubah tanpa deploy, dan pemakaian tampil di Kelola
+("1,2 GB dari 5 GB"). Upload yang melewati kuota ditolak dengan pesan jelas.
+
+## Opsi cakupan leaderboard (belum diputuskan)
+
+| Cakupan | Arti | Catatan |
+| --- | --- | --- |
+| Per kuis (klasemen live) | Urutan pemain selama satu sesi Arena | Sudah bagian Q2; bukan leaderboard mingguan |
+| Sekolah | Semua anggota organisasi, mingguan | Kunci Redis `lb:{org}:{minggu}` |
+| Per gedung/mapel | Mis. hanya poin dari Menara Sains (IPA) | Kunci `lb:{org}:{minggu}:{building_key}`; poin sudah tahu gedung asalnya |
+| Per kelas | Hanya siswa satu kelas (mis. XI IPA 2) | **Konsep "kelas" belum ada**: ruang saat ini terbuka untuk semua anggota sekolah, tanpa daftar siswa. Butuh fitur rombel/roster sendiri |
+| Per modul | Siapa tercepat/terbaik di satu modul | Modul berbasis selesai, bukan lomba; lebih cocok di Rapor sebagai progres |
+
+Usul: **klasemen per kuis (Q2) + leaderboard mingguan sekolah dengan filter per gedung/mapel (B1).** Satu poin
+ditulis ke dua sorted set (`ZINCRBY` sekolah dan gedung) dalam satu pipeline Redis. Per kelas ditunda sampai ada
+fitur rombel; per modul ditampilkan di Rapor, bukan di leaderboard.
+
 ## Pertanyaan untuk disetujui
 
 1. Urutan **F1 → L1 → L2 → M1 → M2 → Q1 → R1 → Q2 → B1 → B2**?
-2. Penyimpanan file: **MinIO** di VPS pilot, atau layanan terkelola (Cloudflare R2)?
-3. Format yang dibaca di aplikasi: **PDF + audio dulu**, EPUB menyusul?
-4. Kuota per sekolah **2 GB** dan batas **50 MB** per file cukup?
-5. Antre buku ditunda?
-6. Leaderboard untuk siswa < 18 tahun: nama lengkap atau inisial, dan bisa dimatikan per sekolah?
+2. Kuota: opsi **A**, **B (5 GB)**, atau C?
+3. Cakupan leaderboard: usul di atas, atau perlu per kelas (berarti fitur rombel masuk rencana)?
+4. Leaderboard untuk siswa < 18 tahun: nama lengkap atau inisial, dan bisa dimatikan per sekolah?
 
 ## Contoh katalog (L1)
 
