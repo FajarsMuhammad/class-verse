@@ -326,3 +326,31 @@ func (u *Uploader) discard(ctx context.Context, q *query.Queries, f query.GetOwn
 	}
 	return q.MarkUploadCanceled(ctx, query.MarkUploadCanceledParams{OrgID: f.OrgID, FileID: f.ID})
 }
+
+// UploadSample stores small trusted bytes through the same path as browser uploads.
+// Retrying with the same id reuses the session and skips parts that already exist.
+func (u *Uploader) UploadSample(ctx context.Context, userID, orgID, id uuid.UUID, name, kind string, data []byte) error {
+	digest := sha256.Sum256(data)
+	s, err := u.StartWithID(ctx, userID, orgID, id, name, int64(len(data)), kind, digest[:])
+	if err != nil {
+		return err
+	}
+	if s.State == "assembled" {
+		return nil
+	}
+	done := map[int]bool{}
+	for _, p := range s.Parts {
+		done[p] = true
+	}
+	for part := 1; int64(part-1)*ChunkBytes < int64(len(data)); part++ {
+		if done[part] {
+			continue
+		}
+		start := int64(part-1) * ChunkBytes
+		if err := u.Part(ctx, userID, orgID, id, part, bytes.NewReader(data[start:min(start+ChunkBytes, int64(len(data)))])); err != nil {
+			return err
+		}
+	}
+	_, err = u.Assemble(ctx, userID, orgID, id)
+	return err
+}

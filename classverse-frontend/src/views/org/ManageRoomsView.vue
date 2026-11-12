@@ -3,6 +3,7 @@ import AppShell from '@/components/AppShell.vue'
 import InvitePanel from '@/components/InvitePanel.vue'
 import RoomPanel from '@/components/RoomPanel.vue'
 import FileUploadPanel from '@/components/FileUploadPanel.vue'
+import LibraryManager from '@/components/LibraryManager.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
@@ -24,6 +25,8 @@ const org = useOrgStore()
       :user-id="auth.me.id"
       :is-admin="org.active.role === 'admin'"
     />
+    <LibraryManager v-if="org.active && org.active.role !== 'participant'" :key="`library-${org.active.id}`"
+      :org-id="org.active.id" />
     <InvitePanel
       v-if="org.active && auth.me"
       :key="org.active.id"

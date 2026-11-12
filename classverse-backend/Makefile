@@ -35,6 +35,10 @@ api: ## Generate Go models from api/openapi.yaml
 run: ## Run the server on the host
 	go run ./cmd/server
 
+seed-library: ## Add the CC0 sample e-book to one school: make seed-library org=<org-id>
+	@test -n "$(org)" || (echo "usage: make seed-library org=<org-id>" && exit 1)
+	go run ./cmd/server seed-library $(org)
+
 test: ## Run all tests (PostgreSQL integration tests need TEST_DATABASE_URL)
 	go test -race ./...
 

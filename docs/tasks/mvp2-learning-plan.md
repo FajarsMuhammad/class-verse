@@ -119,7 +119,7 @@ lokal sudah dibuat (lihat progres di bawah); MinIO OSS legacy tidak dipakai.
   chunk 2 diputus lalu dilanjutkan tanpa mengirim ulang chunk 1, satu reservasi; PDF berpassword, WAV, WAV
   diganti nama `.mp3` ditolak; kuota hanya file diterima; PDF 2 halaman + text layer; seek audio; posisi pulih
   setelah reload; peserta bisa baca dan Range 206 tetapi upload/hapus 403, tanpa token 401.
-- [ ] Belum: Safari/iOS dan HP fisik, backup/restore objek+metadata, file dipakai konten (L1/M1) dan aturan draf.
+- [ ] Belum: Safari/iOS dan HP fisik, backup/restore objek+metadata. Aturan file draf/terbit kini lewat L1.
 
 #### Evaluasi AIStor Free — hasil sumber resmi
 
@@ -208,6 +208,30 @@ memilih kategori. Pengajar/admin menambah, mengubah, menghapus buku dari halaman
 - **Contoh awal:** satu PDF contoh lewat perintah seed eksplisit untuk organisasi uji (lihat bagian akhir),
   idempotent dan berlabel Contoh. Migration hanya skema, tidak memanggil MinIO atau mengisi koleksi sekolah nyata.
 - **Test:** service table-driven (validasi, otorisasi lintas org), handler, komponen katalog, uji browser klik rak.
+
+#### Progres L1
+
+- [x] Migration `00008_library_books.sql`: `library_books` dengan `shelf`/`level`/`format`/`cover` ber-CHECK, FK
+  komposit `(org_id, file_id)` ke `files` (file wajib milik sekolah yang sama), buku fisik tanpa file, digital
+  `copies = 0`, `sample`, draf = `published_at IS NULL`, arsip = `archived_at`. `cover` adalah kunci token
+  `--kv-subject-*`, bukan hex.
+- [x] `internal/library`: CRUD pengajar/admin (`PUT` ganti semua field, `DELETE` = arsip), daftar urut judul
+  dengan cursor, cari `ILIKE` judul/penulis dengan escape `%`/`_`, filter rak, posisi baca pemanggil.
+  File harus `ready`, milik sekolah, dan sesuai format (e-book → PDF, audio → MP3/M4A).
+- [x] Akses file diperketat: peserta hanya membaca file dari buku **terbit** non-arsip (selain itu 404, tidak
+  membocorkan draf); daftar file `/files` khusus staf; file yang dipakai buku aktif tidak bisa dihapus (409
+  `file_in_use`).
+- [x] Seed eksplisit `make seed-library org=<id>`: PDF 2 halaman CC0 buatan sendiri (`db/seed/`) diunggah lewat
+  jalur upload yang sama (kuota, checksum, format) sebagai admin pertama; ID turunan org sehingga idempoten;
+  label "Contoh". Bukan migration.
+- [x] UI: Kelola punya "Katalog perpustakaan" (tambah/ubah/terbit/draf/arsip, pratinjau). Ruang `library`
+  membuka panel kanan "Perpustakaan" dengan tab Katalog | Chat; klik rak atau labelnya di peta memilih rak dan
+  menyorotnya; cari ter-debounce, respons usang dibuang, "Muat lagi". Mode HP menampilkan kartu Katalog.
+- [x] Verifikasi: integration Postgres+AIStor (peran, lintas org, draf, escape, paginasi, akses file, seed dua
+  kali), komponen, browser Chrome (guru membuat draf → peserta tidak melihat dan file 404 → terbit → klik rak
+  Sains → cari → baca di overlay; hapus file terpakai 409).
+- [ ] Belum: status "Sedang dipinjam"/Pinjam (L2), Safari/iOS, ruang `perpus` lama (map `baca`) tidak mendapat
+  katalog sampai dimigrasi ke `library`.
 
 ### L2 — Pinjam dan kembalikan
 
@@ -381,8 +405,8 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | F1-01 | [ ] Spike PDF/audio privat: PDF 2 halaman dan seek audio bekerja dengan auth/range di desktop dan HP; dokumentasikan keputusan transport | Auth/org existing | `internal/file/`, `src/components/Reader.vue`, `compose.yaml` | Browser + unauthorized/range checks; belum seed sekolah |
 | F1-02 | [ ] Upload tervalidasi dan kuota atomik; tepat batas diterima, melebihi/serentak/batal/crash tidak melewati limit atau bocor reservasi | F1-01 | migration `files`/quota, `db/queries/`, `internal/file/` | Unit validasi, integration Postgres + MinIO, failpoint cleanup |
 | F1-03 | [ ] Kelola unggah/hapus file, baca PDF/audio, lanjut halaman terakhir; error/retry jelas dan kontrol keyboard/tap bekerja | F1-02 | OpenAPI, API client, Kelola, `Reader.vue`, reader positions | Component + E2E upload/baca/restore posisi/lintas org |
-| L1-01 | [ ] Pengajar CRUD katalog draf/terbit/arsip; peserta hanya konten terbit, file wajib sesuai format dan org | F1 | migration/books queries, `internal/library/`, Kelola | Unit role, integration FK/org, UI authoring |
-| L1-02 | [ ] Cari/paginasi/filter kategori dan klik rak membuka katalog; Chat tetap tersedia; contoh hanya dari seed eksplisit | L1-01 | library UI, `CampusScene.ts`, game events, seed | Component + browser klik rak/baca desktop dan HP |
+| L1-01 | [x] Pengajar CRUD katalog draf/terbit/arsip; peserta hanya konten terbit, file wajib sesuai format dan org | F1 | migration/books queries, `internal/library/`, Kelola | Unit role, integration FK/org, UI authoring |
+| L1-02 | [x] Cari/paginasi/filter kategori dan klik rak membuka katalog; Chat tetap tersedia; contoh hanya dari seed eksplisit | L1-01 | library UI, `CampusScene.ts`, game events, seed | Component + browser klik rak/baca desktop dan HP |
 | L2-01 | [ ] Pinjam/kembali dan Pinjamanku; transaksi menahan pinjaman ke-6 dan dua peminjam eksemplar terakhir; retry aman | L1, aturan pinjam disetujui | migration/loans queries, `internal/library/`, library UI | Integration concurrent, UI stok/jatuh tempo/empty |
 | M1-01 | [ ] Pengajar membuat draf modul/urutan langkah dan menerbitkan; peserta tidak bisa membaca draf atau file yang hanya terikat draf | F1, aturan revisi disetujui | migration/modules queries, `internal/module/`, Kelola | Unit validasi + role/org/draft integration + UI authoring |
 | M1-02 | [ ] Lihat modul per gedung/level dan buka materi di aplikasi tanpa meninggalkan ruang; kosong/error/focus tertangani | M1-01 | PlaceCard, module UI, Reader, tokens | Component + browser materi PDF/audio/teks |

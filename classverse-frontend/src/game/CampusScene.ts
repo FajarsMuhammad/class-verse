@@ -4,6 +4,7 @@ import type { MapData } from '@/realtime/mapdata'
 import { directionOf, moveToward, SEND_INTERVAL_MS, step, type Vec } from '@/realtime/movement'
 import type { Direction, MoveMsg } from '@/realtime/messages'
 import { findPath } from '@/realtime/pathfind'
+import { roomLayout, shelfAt } from './roomLayout'
 import type { World } from '@/realtime/world'
 import { avatarKeys, avatarKey, avatarURL } from './avatars'
 import { cssToken } from './tiles'
@@ -18,6 +19,10 @@ export interface SceneDeps {
   sendMove: (m: MoveMsg) => void
   zoom?: () => number
   selectBuilding?: (key: string) => void
+  // selectShelf opens the library catalog on a shelf category (library rooms only).
+  selectShelf?: (cat: string) => void
+  // shelf returns the selected category so the map can highlight it.
+  shelf?: () => string
   // currentZone returns the server-reported zone key of the local avatar.
   currentZone?: () => string
   // speaking returns ids (self included) talking right now (voice, slice 9).
@@ -66,6 +71,8 @@ export class CampusScene extends Phaser.Scene {
   private fitted = ''
   private avatarLoads = new Set<string>()
   private emoteBubbles = new Map<string, Phaser.GameObjects.Container>()
+  private shelfShown = ''
+  private shelfRing: Phaser.GameObjects.Graphics | null = null
 
   constructor() {
     super('campus')
@@ -158,6 +165,12 @@ export class CampusScene extends Phaser.Scene {
           return
         }
       }
+      const cat = this.deps.selectShelf && shelfAt(this.deps.world.mapKey ?? '', to.x, to.y)
+      if (cat) {
+        // Choosing a shelf opens the catalog; walking there is still one more click on the floor.
+        this.deps.selectShelf!(cat)
+        return
+      }
       this.path = findPath(this.deps.map, self, to, this.tablePenalty(self, to))
     })
   }
@@ -177,6 +190,7 @@ export class CampusScene extends Phaser.Scene {
       this.walkId = target.id
       this.path = findPath(map, self, target, this.tablePenalty(self, target))
     }
+    this.highlightShelf()
     const inset = this.deps.inset?.()
     if ((this.deps.world.mapKey === 'campus' &&
       this.cameras.main.zoom !== Math.max(0.3, Math.min(1, this.deps.zoom?.() ?? 0.5))) ||
@@ -517,6 +531,20 @@ export class CampusScene extends Phaser.Scene {
     }
     // Containers have no reliable bounds for Graphics children; keep the pill size.
     return this.add.container(0, 0, parts).setData('size', { w, h })
+  }
+
+  // highlightShelf outlines the shelf chosen in the catalog, like the reference design.
+  private highlightShelf() {
+    const cat = this.deps.shelf?.() ?? ''
+    if (cat === this.shelfShown) return
+    this.shelfShown = cat
+    this.shelfRing?.destroy()
+    this.shelfRing = null
+    const shelf = cat && roomLayout(this.deps.world.mapKey ?? '')?.shelves.find((s) => s.cat === cat)
+    if (!shelf) return
+    this.shelfRing = this.add.graphics().setDepth(shelf.y + shelf.h - 11)
+      .lineStyle(4, Phaser.Display.Color.HexStringToColor(cssToken('--kv-subject-bahasa')).color)
+      .strokeRoundedRect(shelf.x - 4, shelf.y - 4, shelf.w + 8, shelf.h + 8, 6)
   }
 }
 

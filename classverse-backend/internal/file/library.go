@@ -17,12 +17,11 @@ import (
 // maxPosition matches the reader_positions check constraint.
 const maxPosition = 1_000_000
 
-// List returns ready files with the caller's last position.
-// shortcut: no draft/published split yet; every ready file is visible to members until L1/M1 add content access rules.
+// List returns ready files with the caller's last position. Staff only: it is the Kelola file manager.
 func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID) ([]query.ListReadyFilesRow, error) {
 	var rows []query.ListReadyFilesRow
 	err := s.store.inTx(ctx, func(q *query.Queries) error {
-		if err := member(ctx, q, userID, orgID, false); err != nil {
+		if err := member(ctx, q, userID, orgID, true); err != nil {
 			return err
 		}
 		var err error
@@ -32,16 +31,31 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID) ([]query.Li
 	return rows, err
 }
 
-// readable rechecks membership on every request, including every range request.
+// readable rechecks access on every request, including every range request.
+// Staff read any ready file; participants only files of published library books.
 func (s *Service) readable(ctx context.Context, userID, orgID, id uuid.UUID) (query.File, error) {
 	var f query.File
 	err := s.store.inTx(ctx, func(q *query.Queries) error {
-		if err := member(ctx, q, userID, orgID, false); err != nil {
+		staff, err := isStaff(ctx, q, userID, orgID)
+		if err != nil {
 			return err
 		}
-		var err error
 		f, err = q.GetReadyFile(ctx, query.GetReadyFileParams{OrgID: orgID, ID: id})
-		return fileError(err)
+		if err != nil {
+			return fileError(err)
+		}
+		if staff {
+			return nil
+		}
+		published, err := q.FilePublished(ctx, query.FilePublishedParams{OrgID: orgID, FileID: uuid.NullUUID{UUID: id, Valid: true}})
+		if err != nil {
+			return fmt.Errorf("check published file: %w", err)
+		}
+		if !published {
+			// Same answer as a missing file: drafts must not be discoverable by ID.
+			return ErrNotFound
+		}
+		return nil
 	})
 	return f, err
 }
@@ -82,6 +96,9 @@ func (u *Uploader) Open(ctx context.Context, f query.File, start, end int64) (Co
 	return Content{Body: body, Header: header, Partial: start != 0 || end != f.SizeBytes-1}, nil
 }
 
+// ErrInUse protects files still referenced by an active library book.
+var ErrInUse = errors.New("file in use")
+
 // ErrRange maps to 416 so the browser can retry without Range.
 var ErrRange = errors.New("unsatisfiable range")
 
@@ -104,6 +121,13 @@ func (u *Uploader) Delete(ctx context.Context, userID, orgID, id uuid.UUID) erro
 		}
 		if f.Status != "ready" && f.Status != "deleting" {
 			return ErrState
+		}
+		inUse, err := q.FileInUse(ctx, query.FileInUseParams{OrgID: orgID, FileID: uuid.NullUUID{UUID: id, Valid: true}})
+		if err != nil {
+			return fmt.Errorf("check file use: %w", err)
+		}
+		if inUse {
+			return ErrInUse
 		}
 		if err := u.meta.MarkDeleting(ctx, orgID, id); err != nil {
 			return err

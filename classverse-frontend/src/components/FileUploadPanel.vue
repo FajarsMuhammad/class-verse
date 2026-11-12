@@ -94,7 +94,7 @@ async function remove(file: FileItem) {
     await load()
     message.value = `${file.name} dihapus.`
   } catch (err) {
-    error.value = errorMessage(err)
+    error.value = err instanceof ApiError && err.code === 'file_in_use' ? err.message : errorMessage(err)
   }
 }
 

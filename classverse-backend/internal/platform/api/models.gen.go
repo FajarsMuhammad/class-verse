@@ -9,6 +9,168 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for BookCover.
+const (
+	BookCoverArena      BookCover = "arena"
+	BookCoverBahasa     BookCover = "bahasa"
+	BookCoverDiskusi    BookCover = "diskusi"
+	BookCoverIpa        BookCover = "ipa"
+	BookCoverKelas      BookCover = "kelas"
+	BookCoverKreatif    BookCover = "kreatif"
+	BookCoverMatematika BookCover = "matematika"
+	BookCoverSejarah    BookCover = "sejarah"
+)
+
+// Valid indicates whether the value is a known member of the BookCover enum.
+func (e BookCover) Valid() bool {
+	switch e {
+	case BookCoverArena:
+		return true
+	case BookCoverBahasa:
+		return true
+	case BookCoverDiskusi:
+		return true
+	case BookCoverIpa:
+		return true
+	case BookCoverKelas:
+		return true
+	case BookCoverKreatif:
+		return true
+	case BookCoverMatematika:
+		return true
+	case BookCoverSejarah:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookFormat.
+const (
+	BookFormatAudio BookFormat = "audio"
+	BookFormatBuku  BookFormat = "buku"
+	BookFormatEbook BookFormat = "ebook"
+)
+
+// Valid indicates whether the value is a known member of the BookFormat enum.
+func (e BookFormat) Valid() bool {
+	switch e {
+	case BookFormatAudio:
+		return true
+	case BookFormatBuku:
+		return true
+	case BookFormatEbook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookLevel.
+const (
+	BookLevelSD   BookLevel = "SD"
+	BookLevelSMA  BookLevel = "SMA"
+	BookLevelSMP  BookLevel = "SMP"
+	BookLevelUmum BookLevel = "Umum"
+)
+
+// Valid indicates whether the value is a known member of the BookLevel enum.
+func (e BookLevel) Valid() bool {
+	switch e {
+	case BookLevelSD:
+		return true
+	case BookLevelSMA:
+		return true
+	case BookLevelSMP:
+		return true
+	case BookLevelUmum:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookInputCover.
+const (
+	BookInputCoverArena      BookInputCover = "arena"
+	BookInputCoverBahasa     BookInputCover = "bahasa"
+	BookInputCoverDiskusi    BookInputCover = "diskusi"
+	BookInputCoverIpa        BookInputCover = "ipa"
+	BookInputCoverKelas      BookInputCover = "kelas"
+	BookInputCoverKreatif    BookInputCover = "kreatif"
+	BookInputCoverMatematika BookInputCover = "matematika"
+	BookInputCoverSejarah    BookInputCover = "sejarah"
+)
+
+// Valid indicates whether the value is a known member of the BookInputCover enum.
+func (e BookInputCover) Valid() bool {
+	switch e {
+	case BookInputCoverArena:
+		return true
+	case BookInputCoverBahasa:
+		return true
+	case BookInputCoverDiskusi:
+		return true
+	case BookInputCoverIpa:
+		return true
+	case BookInputCoverKelas:
+		return true
+	case BookInputCoverKreatif:
+		return true
+	case BookInputCoverMatematika:
+		return true
+	case BookInputCoverSejarah:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookInputFormat.
+const (
+	BookInputFormatAudio BookInputFormat = "audio"
+	BookInputFormatBuku  BookInputFormat = "buku"
+	BookInputFormatEbook BookInputFormat = "ebook"
+)
+
+// Valid indicates whether the value is a known member of the BookInputFormat enum.
+func (e BookInputFormat) Valid() bool {
+	switch e {
+	case BookInputFormatAudio:
+		return true
+	case BookInputFormatBuku:
+		return true
+	case BookInputFormatEbook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookInputLevel.
+const (
+	BookInputLevelSD   BookInputLevel = "SD"
+	BookInputLevelSMA  BookInputLevel = "SMA"
+	BookInputLevelSMP  BookInputLevel = "SMP"
+	BookInputLevelUmum BookInputLevel = "Umum"
+)
+
+// Valid indicates whether the value is a known member of the BookInputLevel enum.
+func (e BookInputLevel) Valid() bool {
+	switch e {
+	case BookInputLevelSD:
+		return true
+	case BookInputLevelSMA:
+		return true
+	case BookInputLevelSMP:
+		return true
+	case BookInputLevelUmum:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FileItemContentType.
 const (
 	Applicationpdf FileItemContentType = "application/pdf"
@@ -183,6 +345,42 @@ func (e RoomMap) Valid() bool {
 	}
 }
 
+// Defines values for Shelf.
+const (
+	ShelfDongeng    Shelf = "dongeng"
+	ShelfInggris    Shelf = "inggris"
+	ShelfKomik      Shelf = "komik"
+	ShelfMatematika Shelf = "matematika"
+	ShelfNovel      Shelf = "novel"
+	ShelfReferensi  Shelf = "referensi"
+	ShelfSains      Shelf = "sains"
+	ShelfSejarah    Shelf = "sejarah"
+)
+
+// Valid indicates whether the value is a known member of the Shelf enum.
+func (e Shelf) Valid() bool {
+	switch e {
+	case ShelfDongeng:
+		return true
+	case ShelfInggris:
+		return true
+	case ShelfKomik:
+		return true
+	case ShelfMatematika:
+		return true
+	case ShelfNovel:
+		return true
+	case ShelfReferensi:
+		return true
+	case ShelfSains:
+		return true
+	case ShelfSejarah:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StartUploadRequestKind.
 const (
 	StartUploadRequestKindAudio StartUploadRequestKind = "audio"
@@ -225,6 +423,66 @@ func (e UploadProgressState) Valid() bool {
 // AccessTokenResponse defines model for AccessTokenResponse.
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
+}
+
+// Book defines model for Book.
+type Book struct {
+	Author string `json:"author"`
+
+	// Copies Eksemplar fisik; selalu 0 untuk ebook/audio
+	Copies    int                 `json:"copies"`
+	Cover     BookCover           `json:"cover"`
+	FileId    *openapi_types.UUID `json:"file_id,omitempty"`
+	Format    BookFormat          `json:"format"`
+	Id        openapi_types.UUID  `json:"id"`
+	Level     BookLevel           `json:"level"`
+	Position  int                 `json:"position"`
+	Published bool                `json:"published"`
+
+	// Sample Buku contoh dari seed, boleh dihapus
+	Sample    bool      `json:"sample"`
+	Shelf     Shelf     `json:"shelf"`
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// BookCover defines model for Book.Cover.
+type BookCover string
+
+// BookFormat defines model for Book.Format.
+type BookFormat string
+
+// BookLevel defines model for Book.Level.
+type BookLevel string
+
+// BookInput defines model for BookInput.
+type BookInput struct {
+	Author string `json:"author"`
+
+	// Copies Eksemplar fisik; selalu 0 untuk ebook/audio
+	Copies    int                 `json:"copies"`
+	Cover     BookInputCover      `json:"cover"`
+	FileId    *openapi_types.UUID `json:"file_id,omitempty"`
+	Format    BookInputFormat     `json:"format"`
+	Level     BookInputLevel      `json:"level"`
+	Published bool                `json:"published"`
+	Shelf     Shelf               `json:"shelf"`
+	Title     string              `json:"title"`
+}
+
+// BookInputCover defines model for BookInput.Cover.
+type BookInputCover string
+
+// BookInputFormat defines model for BookInput.Format.
+type BookInputFormat string
+
+// BookInputLevel defines model for BookInput.Level.
+type BookInputLevel string
+
+// BookList defines model for BookList.
+type BookList struct {
+	Items      []Book  `json:"items"`
+	NextCursor *string `json:"next_cursor"`
 }
 
 // CreateInviteRequest defines model for CreateInviteRequest.
@@ -466,6 +724,9 @@ type RoomList struct {
 // RoomMap defines model for RoomMap.
 type RoomMap string
 
+// Shelf defines model for Shelf.
+type Shelf string
+
 // StartUploadRequest defines model for StartUploadRequest.
 type StartUploadRequest struct {
 	Id     openapi_types.UUID     `json:"id"`
@@ -588,6 +849,17 @@ type ListInvitesParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ListBooksParams defines parameters for ListBooks.
+type ListBooksParams struct {
+	Shelf *Shelf `form:"shelf,omitempty" json:"shelf,omitempty"`
+
+	// Q Cari judul/penulis, teks literal
+	Q      *string `form:"q,omitempty" json:"q,omitempty"`
+	Drafts *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // ListModerationLogParams defines parameters for ListModerationLog.
 type ListModerationLogParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
@@ -631,6 +903,12 @@ type SaveFilePositionJSONRequestBody SaveFilePositionJSONBody
 
 // CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
 type CreateInviteJSONRequestBody = CreateInviteRequest
+
+// CreateBookJSONRequestBody defines body for CreateBook for application/json ContentType.
+type CreateBookJSONRequestBody = BookInput
+
+// UpdateBookJSONRequestBody defines body for UpdateBook for application/json ContentType.
+type UpdateBookJSONRequestBody = BookInput
 
 // CreateRoomJSONRequestBody defines body for CreateRoom for application/json ContentType.
 type CreateRoomJSONRequestBody = CreateRoomRequest

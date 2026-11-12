@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { roomLayout } from './roomLayout'
+import { roomLayout, shelfAt } from './roomLayout'
 
 it('uses the default floor for regular rooms and the larger library floor', () => {
   const kelas = roomLayout('classroom')!
@@ -17,4 +17,12 @@ it('uses the default floor for regular rooms and the larger library floor', () =
   expect(lib.areas.map((a) => a.label)).toEqual(['Pojok Anak · SD', 'Bilik hening'])
   expect(lib.quiet).toBe(true)
   expect(kelas.quiet).toBe(false)
+})
+
+it('shelfAt hits a library shelf and its label, nothing in other rooms', () => {
+  const sains = roomLayout('library')!.shelves.find((s) => s.cat === 'sains')!
+  expect(shelfAt('library', sains.x + 5, sains.y + 100)).toBe('sains')
+  expect(shelfAt('library', sains.x + 5, sains.y - 20)).toBe('sains')
+  expect(shelfAt('library', sains.x + 5, sains.y + sains.h + 5)).toBeUndefined()
+  expect(shelfAt('classroom', sains.x + 5, sains.y + 100)).toBeUndefined()
 })

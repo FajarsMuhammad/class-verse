@@ -46,17 +46,26 @@ func validateUpload(size int64, kind string) error {
 }
 
 func member(ctx context.Context, q *query.Queries, userID, orgID uuid.UUID, write bool) error {
-	role, err := q.GetMemberRole(ctx, query.GetMemberRoleParams{OrgID: orgID, UserID: userID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return org.ErrNotMember
-	}
+	staff, err := isStaff(ctx, q, userID, orgID)
 	if err != nil {
-		return fmt.Errorf("file membership: %w", err)
+		return err
 	}
-	if write && role != query.OrgRoleTeacher && role != query.OrgRoleAdmin {
+	if write && !staff {
 		return org.ErrForbidden
 	}
 	return nil
+}
+
+// isStaff reports teacher/admin; non-members get org.ErrNotMember.
+func isStaff(ctx context.Context, q *query.Queries, userID, orgID uuid.UUID) (bool, error) {
+	role, err := q.GetMemberRole(ctx, query.GetMemberRoleParams{OrgID: orgID, UserID: userID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, org.ErrNotMember
+	}
+	if err != nil {
+		return false, fmt.Errorf("file membership: %w", err)
+	}
+	return role == query.OrgRoleTeacher || role == query.OrgRoleAdmin, nil
 }
 
 // Reserve creates a pending upload and charges its whole declared size atomically.

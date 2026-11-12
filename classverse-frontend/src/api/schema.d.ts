@@ -577,10 +577,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/library/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Katalog urut judul. Peserta hanya melihat buku terbit; `drafts=true` menyertakan draf untuk
+         *     pengajar/admin (diabaikan untuk peserta). Arsip tidak pernah tampil. `position` = posisi baca pemanggil.
+         */
+        get: operations["listBooks"];
+        put?: never;
+        /** @description Pengajar/admin. E-book memakai file PDF siap milik sekolah, audio memakai MP3/M4A, buku fisik tanpa file. */
+        post: operations["createBook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/books/{book_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Mengganti semua field; `published=false` mengembalikan ke draf. */
+        put: operations["updateBook"];
+        post?: never;
+        /** @description Pengajar/admin. Arsipkan; file tidak ikut terhapus. */
+        delete: operations["archiveBook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
+        BookInput: {
+            title: string;
+            author: string;
+            shelf: components["schemas"]["Shelf"];
+            /** @enum {string} */
+            level: "SD" | "SMP" | "SMA" | "Umum";
+            /** @enum {string} */
+            format: "buku" | "ebook" | "audio";
+            /** @description Eksemplar fisik; selalu 0 untuk ebook/audio */
+            copies: number;
+            /** Format: uuid */
+            file_id?: string | null;
+            /** @enum {string} */
+            cover: "ipa" | "matematika" | "sejarah" | "bahasa" | "kreatif" | "diskusi" | "kelas" | "arena";
+            published: boolean;
+        };
+        Book: components["schemas"]["BookInput"] & {
+            /** Format: uuid */
+            id: string;
+            /** @description Buku contoh dari seed, boleh dihapus */
+            sample: boolean;
+            position: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        BookList: {
+            items: components["schemas"]["Book"][];
+            next_cursor: string | null;
+        };
         StartUploadRequest: {
             /** Format: uuid */
             id: string;
@@ -1934,6 +2009,122 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listBooks: {
+        parameters: {
+            query?: {
+                shelf?: components["schemas"]["Shelf"];
+                /** @description Cari judul/penulis, teks literal */
+                q?: string;
+                drafts?: boolean;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Satu halaman katalog */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookInput"];
+            };
+        };
+        responses: {
+            /** @description Buku dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookInput"];
+            };
+        };
+        responses: {
+            /** @description Buku diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

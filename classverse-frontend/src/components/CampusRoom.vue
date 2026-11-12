@@ -20,6 +20,8 @@ import { useAuthStore } from '@/stores/auth'
 import type { Building, Seat } from '@/realtime/mapdata'
 
 import ChatPanel from '@/components/ChatPanel.vue'
+import LibraryCatalog from '@/components/LibraryCatalog.vue'
+import type { Shelf } from '@/api/types'
 import ReportDialog from '@/components/ReportDialog.vue'
 import type { ChatLine } from '@/realtime/chat'
 import MobileRoom from '@/components/MobileRoom.vue'
@@ -63,12 +65,21 @@ const org = useOrgStore()
 const auth = useAuthStore()
 const learningClosed = ref(false)
 const chatClosed = ref(false)
+// Library rooms open on the catalog; chat stays one tab away.
+const sideTab = ref<'catalog' | 'chat'>('catalog')
+const shelf = ref<Shelf | ''>('')
 const route = useRoute()
 const nearDoor = ref<Building | null>(null)
 const zoom = ref(0.5)
 const position = ref<{ x: number; y: number } | null>(null)
 const otherPositions = ref<{ x: number; y: number }[]>([])
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
+const library = computed(() => current.value?.map_key === 'library')
+function selectShelf(cat: string) {
+  shelf.value = cat as Shelf
+  sideTab.value = 'catalog'
+  chatClosed.value = false
+}
 // ChatState is not reactive; chatVersion changes with it (room_state carries muted).
 const muted = computed(() => {
   void chatVersion.value
@@ -128,6 +139,10 @@ watch(campus, () => {
   directoryOpen.value = false
   roomsOpen.value = false
   selectedKey.value = ''
+})
+watch(() => current.value?.room_id, () => {
+  shelf.value = ''
+  sideTab.value = 'catalog'
 })
 watch(
   () => route.query.building,
@@ -267,7 +282,7 @@ onBeforeUnmount(() => {
         Chat
       </button>
     </div>
-    <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed }]">
+    <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed, library }]">
       <LearningPanel v-model:closed="learningClosed" class="learning-panel" :name="auth.me?.display_name ?? ''"
         :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
         :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
@@ -365,6 +380,8 @@ onBeforeUnmount(() => {
                 walkTarget: () => walkTarget,
                 zoom: () => zoom,
                 selectBuilding,
+                selectShelf,
+                shelf: () => shelf,
               }"
               :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
             />
@@ -406,14 +423,20 @@ onBeforeUnmount(() => {
           </footer>
         </div>
       </div>
-      <aside class="chat-sidebar" aria-label="Chat ruang">
-        <header class="panel-heading"><h2 v-if="!chatClosed">Chat</h2>
-          <button class="btn-secondary" :aria-label="chatClosed ? 'Buka panel chat' : 'Ciutkan panel chat'"
+      <aside class="chat-sidebar" :aria-label="library ? 'Katalog dan chat' : 'Chat ruang'">
+        <header class="panel-heading"><h2 v-if="!chatClosed">{{ library ? 'Perpustakaan' : 'Chat' }}</h2>
+          <button class="btn-secondary" :aria-label="chatClosed ? 'Buka panel samping' : 'Ciutkan panel samping'"
             :aria-expanded="!chatClosed" @click="chatClosed = !chatClosed">{{ chatClosed ? '‹' : '›' }}</button>
         </header>
-        <p v-if="!chatClosed" class="panel-note">Ngobrol dengan orang di sekitarmu</p>
+        <div v-if="library && !chatClosed" class="side-tabs" role="group" aria-label="Isi panel">
+          <button type="button" :aria-pressed="sideTab === 'catalog'" @click="sideTab = 'catalog'">Katalog</button>
+          <button type="button" :aria-pressed="sideTab === 'chat'" @click="sideTab = 'chat'">Chat</button>
+        </div>
+        <LibraryCatalog v-if="library && org.active && sideTab === 'catalog'" v-show="!chatClosed"
+          v-model:shelf="shelf" class="side-catalog" :org-id="org.active.id" />
+        <p v-if="!chatClosed && (!library || sideTab === 'chat')" class="panel-note">Ngobrol dengan orang di sekitarmu</p>
         <ChatPanel
-          v-show="!chatClosed"
+          v-show="!chatClosed && (!library || sideTab === 'chat')"
           class="side-chat"
           :chat="chat"
           :version="chatVersion"
@@ -470,6 +493,37 @@ onBeforeUnmount(() => {
 .side-chat {
   flex: 1;
   min-height: 0;
+}
+.side-catalog {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: var(--space-3);
+}
+.side-tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+}
+.side-tabs button {
+  flex: 1;
+  min-height: 44px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+.side-tabs button[aria-pressed='true'] {
+  background: var(--color-surface);
+  box-shadow: var(--kv-shadow-card);
+}
+.side-tabs button:focus-visible {
+  outline: 3px solid var(--color-primary-strong);
 }
 /* Two rails float over the map. Each is one line with a fixed height, so a
    status change can never resize anything; the scene fits the floor between
@@ -635,10 +689,12 @@ h1 {
   min-height: 0;
   position: relative;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr) 300px;
+  grid-template-columns: 264px minmax(0, 1fr) var(--side-width, 300px);
   gap: var(--space-4);
 }
-.layout.learning-closed { grid-template-columns: 76px minmax(0, 1fr) 300px; }
+.layout.learning-closed { grid-template-columns: 76px minmax(0, 1fr) var(--side-width, 300px); }
+/* The catalog needs room for book cards. */
+.layout.library { --side-width: 360px; }
 .layout.chat-closed { grid-template-columns: 264px minmax(0, 1fr) 76px; }
 .layout.learning-closed.chat-closed { grid-template-columns: 76px minmax(0, 1fr) 76px; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }

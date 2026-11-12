@@ -7,7 +7,9 @@ import type { FileItem } from '@/api/types'
 // PDF.js (~1.7 MB with worker) loads only when a PDF is opened.
 const PdfReader = defineAsyncComponent(() => import('./PdfReader.vue'))
 
-const props = defineProps<{ orgId: string; file: FileItem }>()
+// Only what the reader needs, so both file rows and catalog books can open it.
+export type ReadableFile = Pick<FileItem, 'id' | 'name' | 'kind' | 'position'>
+const props = defineProps<{ orgId: string; file: ReadableFile }>()
 const emit = defineEmits<{ close: [position: number] }>()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')

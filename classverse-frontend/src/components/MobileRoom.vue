@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import ChatPanel from '@/components/ChatPanel.vue'
+import LibraryCatalog from '@/components/LibraryCatalog.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import DoorRooms from '@/components/DoorRooms.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -230,6 +231,11 @@ function reported() {
       </section>
     </template>
 
+    <section v-if="!kicked && current?.map_key === 'library' && org.active" class="card" aria-labelledby="catalog-title">
+      <h2 id="catalog-title" class="catalog-title">Katalog</h2>
+      <LibraryCatalog :key="current.room_id" :org-id="org.active.id" />
+    </section>
+
     <section v-if="!kicked" class="card chat" aria-label="Chat">
       <EmoteBar :send="room.sendEmote" :disabled="status !== 'open' || traveling || kicked || muted" />
       <div role="status">
@@ -433,5 +439,9 @@ h2 {
   min-height: 420px;
   display: flex;
   flex-direction: column;
+}
+.catalog-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
 }
 </style>

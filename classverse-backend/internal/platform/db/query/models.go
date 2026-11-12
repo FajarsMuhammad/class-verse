@@ -251,6 +251,25 @@ type Invite struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type LibraryBook struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	Title       string
+	Author      string
+	Shelf       string
+	Level       string
+	Format      string
+	Copies      int32
+	FileID      uuid.NullUUID
+	Cover       string
+	Sample      bool
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	PublishedAt pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+}
+
 type Membership struct {
 	OrgID    uuid.UUID
 	UserID   uuid.UUID

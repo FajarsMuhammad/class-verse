@@ -586,6 +586,77 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/orgs/{org_id}/library/books:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listBooks
+      description: |
+        Katalog urut judul. Peserta hanya melihat buku terbit; `drafts=true` menyertakan draf untuk
+        pengajar/admin (diabaikan untuk peserta). Arsip tidak pernah tampil. `position` = posisi baca pemanggil.
+      parameters:
+        - { name: shelf, in: query, schema: { $ref: "#/components/schemas/Shelf" } }
+        - { name: q, in: query, description: "Cari judul/penulis, teks literal", schema: { type: string, maxLength: 100 } }
+        - { name: drafts, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Satu halaman katalog
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookList" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createBook
+      description: Pengajar/admin. E-book memakai file PDF siap milik sekolah, audio memakai MP3/M4A, buku fisik tanpa file.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookInput" }
+      responses:
+        "201":
+          description: Buku dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/orgs/{org_id}/library/books/{book_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: book_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: updateBook
+      description: Pengajar/admin. Mengganti semua field; `published=false` mengembalikan ke draf.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookInput" }
+      responses:
+        "200":
+          description: Buku diperbarui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: archiveBook
+      description: Pengajar/admin. Arsipkan; file tidak ikut terhapus.
+      responses:
+        "204": { description: Diarsipkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     bearer:
@@ -664,6 +735,38 @@ components:
           schema: { $ref: "#/components/schemas/AccessTokenResponse" }
 
   schemas:
+    Shelf:
+      type: string
+      enum: [dongeng, novel, komik, sains, matematika, sejarah, inggris, referensi]
+    BookInput:
+      type: object
+      required: [title, author, shelf, level, format, copies, cover, published]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        author: { type: string, minLength: 1, maxLength: 120 }
+        shelf: { $ref: "#/components/schemas/Shelf" }
+        level: { type: string, enum: [SD, SMP, SMA, Umum] }
+        format: { type: string, enum: [buku, ebook, audio] }
+        copies: { type: integer, minimum: 0, maximum: 999, description: "Eksemplar fisik; selalu 0 untuk ebook/audio" }
+        file_id: { type: string, format: uuid, nullable: true }
+        cover: { type: string, enum: [ipa, matematika, sejarah, bahasa, kreatif, diskusi, kelas, arena] }
+        published: { type: boolean }
+    Book:
+      allOf:
+        - $ref: "#/components/schemas/BookInput"
+        - type: object
+          required: [id, sample, position, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            sample: { type: boolean, description: "Buku contoh dari seed, boleh dihapus" }
+            position: { type: integer }
+            updated_at: { type: string, format: date-time }
+    BookList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Book" } }
+        next_cursor: { type: string, nullable: true }
     StartUploadRequest:
       type: object
       required: [id, name, size, kind, sha256]

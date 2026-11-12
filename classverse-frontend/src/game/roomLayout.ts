@@ -38,3 +38,13 @@ export function roomLayout(mapKey: string) {
     quiet: room.shelves !== undefined,
   }
 }
+
+// Label pills sit 22 px above a shelf; clicking the label or the shelf selects it.
+const SHELF_LABEL_GAP = 34
+
+// shelfAt returns the library shelf category at a world point, if any.
+export function shelfAt(mapKey: string, x: number, y: number): string | undefined {
+  const layout = roomLayout(mapKey)
+  return layout?.shelves.find((s) =>
+    x >= s.x - 8 && x < s.x + s.w + 8 && y >= s.y - SHELF_LABEL_GAP && y < s.y + s.h)?.cat
+}

@@ -17,9 +17,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/db/seed"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/file"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/invite"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/library"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/config"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
@@ -55,6 +57,10 @@ func run() error {
 		return fmt.Errorf("connect database: %w", err)
 	}
 	defer pool.Close()
+
+	if len(os.Args) > 1 {
+		return runCommand(ctx, cfg, pool, os.Args[1:])
+	}
 
 	a, err := newApp(ctx, cfg, pool, log)
 	if err != nil {
@@ -190,6 +196,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	}
 	roomSvc := room.NewService(room.NewStore(pool), orgSvc, campusBuildings{mapData["campus"]}, roomOccupancy{hub}, now, log)
 	roomHandler := room.NewHandler(roomSvc, log)
+	libraryHandler := library.NewHandler(library.NewService(pool, orgSvc, now), log)
 	reportHandler := report.NewHandler(report.NewService(report.NewStore(pool), orgSvc, now), log)
 	lk, err := voice.NewLiveKit(cfg.LiveKit.URL, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, now)
 	if err != nil {
@@ -225,6 +232,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				roomHandler.Routes(r)
 				reportHandler.Routes(r)
 				voiceHandler.Routes(r)
+				libraryHandler.Routes(r)
 				if uploads != nil {
 					uploads.Routes(r)
 				}
@@ -261,4 +269,31 @@ func newAuth(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, orgs au
 		log.Warn("google login disabled: GOOGLE_* not set")
 	}
 	return auth.NewHandler(svc, tokens, google, orgs, cfg.FrontendURL, now, log), tokens, nil
+}
+
+// runCommand runs an explicit operator command instead of the server.
+func runCommand(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, args []string) error {
+	if len(args) != 2 || args[0] != "seed-library" {
+		return errors.New("usage: server seed-library <org-id>")
+	}
+	orgID, err := uuid.Parse(args[1])
+	if err != nil {
+		return fmt.Errorf("seed-library: invalid org id: %w", err)
+	}
+	if cfg.Storage.Endpoint == "" {
+		return errors.New("seed-library: STORAGE_* not configured")
+	}
+	s, err := file.NewStorage(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.AccessKey, cfg.Storage.SecretKey, cfg.Storage.Secure)
+	if err != nil {
+		return err
+	}
+	now := func() time.Time { return time.Now().UTC() }
+	uploads := file.NewUploader(file.NewService(file.NewStore(pool), now), s)
+	books := library.NewService(pool, org.NewService(org.NewStore(pool), now, slog.Default()), now)
+	b, err := books.SeedSample(ctx, uploads, orgID, seed.TataSurya)
+	if err != nil {
+		return fmt.Errorf("seed-library: %w", err)
+	}
+	fmt.Printf("sample book ready: %s (%s)\n", b.Title, b.ID)
+	return nil
 }
