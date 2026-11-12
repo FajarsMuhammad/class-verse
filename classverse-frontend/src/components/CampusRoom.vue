@@ -311,6 +311,47 @@ onBeforeUnmount(() => {
             </button>
             <TeacherPanel v-else-if="org.isTeacher && !kicked" :room="room" floating />
           </header>
+          <aside
+            v-if="campus && (directoryOpen || roomsOpen)"
+            id="building-directory"
+            class="buildings"
+            aria-label="Pilihan gedung dan ruang"
+            @keydown.esc="closeDirectory"
+          >
+            <header class="dropdown-head">
+              <h2 v-if="directoryOpen">Daftar gedung</h2>
+              <span v-else></span>
+              <button ref="closeButton" class="btn-secondary close" aria-label="Tutup pilihan" @click="closeDirectory">×</button>
+            </header>
+            <DoorRooms
+              v-if="roomsOpen && panelBuilding && org.active"
+              :org-id="org.active.id"
+              :building="panelBuilding"
+              :disabled="!canEnter || traveling || status !== 'open'"
+              :at-door="canEnter"
+              @travel="travel"
+            />
+            <p v-if="directoryOpen">
+              Pilih gedung untuk melihat ruang, lalu jalan ke pintunya untuk masuk.
+            </p>
+            <ul v-if="directoryOpen">
+              <li v-for="b in map?.buildings ?? []" :key="b.key" :class="b.key">
+                <button
+                  class="building-choice"
+                  :aria-pressed="panelBuilding?.key === b.key"
+                  @click="selectBuilding(b.key)"
+                >
+                  {{ b.name }}
+                </button>
+                <span>{{ b.staffOnly ? 'Khusus pengajar dan admin' : b.description }}</span>
+                <span v-if="buildings.find((item) => item.building_key === b.key)"
+                  >{{ buildings.find((item) => item.building_key === b.key)?.people }} orang ·
+                  {{ buildings.find((item) => item.building_key === b.key)?.live_rooms }} ruang
+                  live</span
+                >
+              </li>
+            </ul>
+          </aside>
           <div v-if="map" class="stage">
             <GameCanvas
               :key="current?.room_id"
@@ -365,46 +406,6 @@ onBeforeUnmount(() => {
           </footer>
         </div>
       </div>
-      <aside
-        v-if="campus && (directoryOpen || roomsOpen)"
-        id="building-directory"
-        class="buildings"
-        aria-label="Pilihan gedung dan ruang"
-        @keydown.esc="closeDirectory"
-      >
-        <button ref="closeButton" class="btn-secondary" @click="closeDirectory">
-          Tutup pilihan
-        </button>
-        <h2 v-if="directoryOpen">Daftar gedung</h2>
-        <DoorRooms
-          v-if="roomsOpen && panelBuilding && org.active"
-          :org-id="org.active.id"
-          :building="panelBuilding"
-          :disabled="!canEnter || traveling || status !== 'open'"
-          :at-door="canEnter"
-          @travel="travel"
-        />
-        <p v-if="directoryOpen">
-          Pilih gedung untuk melihat ruang, lalu jalan ke pintunya untuk masuk.
-        </p>
-        <ul v-if="directoryOpen">
-          <li v-for="b in map?.buildings ?? []" :key="b.key" :class="b.key">
-            <button
-              class="building-choice"
-              :aria-pressed="panelBuilding?.key === b.key"
-              @click="selectBuilding(b.key)"
-            >
-              {{ b.name }}
-            </button>
-            <span>{{ b.staffOnly ? 'Khusus pengajar dan admin' : b.description }}</span>
-            <span v-if="buildings.find((item) => item.building_key === b.key)"
-              >{{ buildings.find((item) => item.building_key === b.key)?.people }} orang ·
-              {{ buildings.find((item) => item.building_key === b.key)?.live_rooms }} ruang
-              live</span
-            >
-          </li>
-        </ul>
-      </aside>
       <aside class="chat-sidebar" aria-label="Chat ruang">
         <header class="panel-heading"><h2 v-if="!chatClosed">Chat</h2>
           <button class="btn-secondary" :aria-label="chatClosed ? 'Buka panel chat' : 'Ciutkan panel chat'"
@@ -672,6 +673,9 @@ h1 {
   text-align: center;
   font-weight: var(--weight-bold);
 }
+.dropdown-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
+.dropdown-head h2 { margin: 0; font-size: var(--text-lg); }
+.dropdown-head .close { flex: none; min-width: var(--touch-min); padding: 0; }
 .buildings {
   background: var(--color-surface);
   border-radius: var(--radius-2xl);
@@ -680,10 +684,12 @@ h1 {
   box-sizing: border-box;
   position: absolute;
   z-index: 4;
-  top: var(--space-3);
-  left: var(--space-3);
+  /* Dropdown under the "Daftar gedung" button at the right end of the top rail. */
+  top: calc(var(--touch-min) + var(--space-3) + var(--space-2));
+  right: var(--space-3);
   width: min(360px, calc(100% - var(--space-6)));
-  max-height: calc(100% - var(--space-6));
+  max-height: calc(100% - var(--touch-min) - var(--space-8));
+  box-shadow: var(--shadow-raise);
   border: 2px solid var(--color-border);
   overflow-y: auto;
 }
