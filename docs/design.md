@@ -243,6 +243,39 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
 | ADR-011 | Redis hanya untuk leaderboard mingguan (sorted set per organisasi per minggu WIB); Postgres `point_events` tetap sumber kebenaran | Top-N dan peringkat per user O(log n) tanpa agregasi `SUM` tiap request; reset mingguan lewat kunci berganti tanpa job; bisa dibangun ulang dari Postgres | Redis dipakai untuk state room (ADR-002) atau data yang tidak bisa dibangun ulang |
 
+## MVP 2 fitur belajar — keputusan dan batas perencanaan
+
+Status: cakupan/urutan disetujui, kode belum dibuat. Rencana dan checklist tunggal:
+[`docs/tasks/mvp2-learning-plan.md`](tasks/mvp2-learning-plan.md). Keputusan ini tidak mengubah ADR-002:
+state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
+
+- **Berkas:** MinIO dipilih; verifikasi upstream menghentikan penggunaan OSS legacy yang diarsipkan.
+  Setelah evaluasi dan license dari pengguna, fondasi dev memakai **AIStor Free** single-node, image dipin digest
+  di profile Compose `storage`. PDF + audio dibaca di aplikasi, EPUB ditunda, tanpa RAG. Metadata dan kuota di
+  Postgres, objek privat di MinIO. Kuota **5.000.000.000 byte/org**, batas **50.000.000 byte/file**; reservasi
+  upload ikut dihitung. Batas kapasitas VPS tetap perlu dipantau di luar kuota per sekolah.
+- **Urutan:** F1 → L1 → L2 → M1 → M2 → Q1 → C1 → R1 → Q2 → B1 → B2. Langkah kuis ditambahkan setelah Q1, riwayat
+  Arena di Rapor setelah Q2; migration tidak boleh bergantung tabel dari slice mendatang.
+- **Leaderboard:** klasemen live per sesi kuis; ranking mingguan sekolah dengan filter gedung/mapel di Redis.
+  Progres per modul di Rapor, ranking rombel ditunda. UTC untuk penyimpanan; minggu ditentukan `Asia/Jakarta`.
+- **Identitas leaderboard:** inisial, detail hover/focus/tap nama lengkap + kelas; hanya anggota organisasi.
+  `users.display_name` bukan jaminan nama legal; sumber nama tooltip masih perlu konfirmasi. Kelas berasal dari
+  C1, bukan label bebas membership dan bukan room aktif.
+- **Kelas/rombel (C1):** satu kelas aktif per siswa per organisasi per tahun ajaran, disetujui. Usul tabel
+  `academic_years`, `classes`, `class_enrollments` dengan FK komposit organisasi dan unique parsial penempatan
+  aktif `(org_id, academic_year_id, user_id) WHERE ended_at IS NULL`. Pindah kelas atomik, riwayat tetap;
+  pengajar/admin mengelola roster, admin memilih satu tahun ajaran aktif per sekolah (disetujui). Tahun lama
+  tetap bisa dipilih di Rapor, tanpa kenaikan otomatis. Schema detail masih perlu ditinjau sebelum migration C1.
+  Tidak mengubah izin masuk ruang atau membuat leaderboard per kelas secara otomatis.
+- **Antre buku:** ditunda; tidak ada reservasi/denda dalam L2.
+
+Rincian teknis **masih usulan**, tidak menimpa ADR lama: transport baca autentikasi/range (proxy vs presigned)
+perlu spike; PDF.js/Redis belum dipin. SDK storage `minio-go/v7` v7.4.1 sudah diuji di AIStor lokal. Redis memakai proyeksi idempotent total absolut dari
+Postgres dengan pekerjaan durable, bukan increment buta setelah commit; detail worker/rebuild harus diuji.
+Nama package mengikuti domain (`file`, `library`, `module`, `quiz`, `leaderboard`). Package `report` yang sudah
+ada menangani laporan moderasi, bukan Rapor; gunakan package berbeda saat R1 agar izin tidak tercampur.
+Tidak menambah service generik, ORM, atau akses langsung store fitur lain.
+
 ## Data model
 
 ```
