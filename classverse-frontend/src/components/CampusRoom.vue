@@ -359,7 +359,6 @@ onBeforeUnmount(() => {
               :disabled="status !== 'open'"
               @broadcast="room.voiceBroadcast"
             />
-            <p v-if="campus && selectedBuilding" class="hint">Tujuan: {{ selectedBuilding.name }}.</p>
             <p v-if="leaveError || error" class="float-note" role="alert">
               {{ leaveError || error }}
             </p>
@@ -474,26 +473,28 @@ onBeforeUnmount(() => {
 /* Two rails float over the map. Each is one line with a fixed height, so a
    status change can never resize anything; the scene fits the floor between
    them (`inset`). Overflowing content scrolls sideways instead of wrapping. */
+/* Rails are transparent; only their pill-shaped children take space and clicks,
+   so the map stays visible (and clickable) between them. */
 .map-top,
 .map-bottom {
   position: absolute;
   z-index: 2;
   left: var(--space-3);
   right: var(--space-3);
-  height: calc(var(--touch-min) + var(--space-4));
   box-sizing: border-box;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-2);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
+  gap: var(--space-2);
+  pointer-events: none;
+}
+.map-top > *,
+.map-bottom > * {
+  pointer-events: auto;
   box-shadow: var(--shadow-raise);
+  border-radius: var(--radius-pill);
 }
-.map-top {
-  top: var(--space-3);
-}
+.map-bottom { justify-content: center; }
 .quiet-chip {
   margin: 0;
   display: flex;
@@ -505,7 +506,9 @@ onBeforeUnmount(() => {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   white-space: nowrap;
-  border-radius: var(--radius-pill);
+}
+.map-top {
+  top: var(--space-3);
 }
 .map-zoom {
   position: absolute;
@@ -538,13 +541,23 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-raise);
 }
 .title {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 6rem;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding: var(--space-1) var(--space-4);
+  box-sizing: border-box;
+  background: var(--color-surface);
+  overflow: hidden;
 }
+.title + * { margin-left: auto; flex: none; white-space: nowrap; }
 .title p {
   margin: 0;
   font-size: var(--text-sm);
   color: var(--color-ink-muted);
+  white-space: nowrap;
 }
 .back {
   flex: none;
@@ -609,15 +622,6 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hint {
-  flex: 1 1 0;
-  min-width: 0;
-  color: var(--color-ink-muted);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .scope {
   background: var(--color-primary-soft);
   color: var(--color-primary-strong);
@@ -667,10 +671,6 @@ h1 {
   opacity: 0.95;
   text-align: center;
   font-weight: var(--weight-bold);
-}
-.hint {
-  font-size: var(--text-sm);
-  line-height: var(--line-normal);
 }
 .buildings {
   background: var(--color-surface);
@@ -733,6 +733,15 @@ li span {
     margin-bottom: var(--space-3);
   }
   .learning-panel { display: none; }
+  /* Teacher controls overflow narrow screens: scroll the rail, keep pills whole. */
+  .map-top { overflow-x: auto; padding: var(--space-1) 0; scrollbar-width: none; }
+  .map-top > * { flex: none; }
+  .map-top .title { flex: 0 1 auto; max-width: 55vw; }
+  .quiet-chip { white-space: normal; min-width: 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-lg); }
+  /* Keep the place name readable; the status stays available to screen readers. */
+  .title p {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
+  }
   .layout, .layout.learning-closed, .layout.chat-closed, .layout.learning-closed.chat-closed {
     grid-template-columns: minmax(0, 1fr);
     min-height: 400px;
