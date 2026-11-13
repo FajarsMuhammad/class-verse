@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -51,13 +52,19 @@ type Gateway struct {
 	log      *slog.Logger
 }
 
-// NewGateway accepts WebSocket upgrades only from frontendURL's origin.
-func NewGateway(hub *Hub, tokens TokenVerifier, admit Admitter, frontendURL string, log *slog.Logger) (*Gateway, error) {
+// NewGateway accepts WebSocket upgrades only from frontendURL's origin, plus
+// devOrigins (development LAN testing; config refuses them in production).
+func NewGateway(hub *Hub, tokens TokenVerifier, admit Admitter, frontendURL string, log *slog.Logger, devOrigins ...string) (*Gateway, error) {
 	u, err := url.Parse(frontendURL)
 	if err != nil || u.Host == "" {
 		return nil, fmt.Errorf("realtime: invalid frontend url %q", frontendURL)
 	}
-	return &Gateway{hub: hub, tokens: tokens, admit: admit, patterns: []string{u.Scheme + "://" + u.Host}, log: log}, nil
+	patterns := append([]string{u.Scheme + "://" + u.Host}, devOrigins...)
+	return &Gateway{hub: hub, tokens: tokens, admit: admit, patterns: patterns, log: log}, nil
+}
+
+func (g *Gateway) allowed(origin string) bool {
+	return origin != "" && slices.Contains(g.patterns, origin)
 }
 
 // Routes mounts GET /ws/rooms/{room_id}.
@@ -70,7 +77,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request) {
 	// cross-site WebSocket hijacking with the user's cookies.
 	// Accept also permits same-host origins by default. Enforce the configured
 	// scheme, host and port explicitly before handing off to the library.
-	if r.Header.Get("Origin") != g.patterns[0] {
+	if !g.allowed(r.Header.Get("Origin")) {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}

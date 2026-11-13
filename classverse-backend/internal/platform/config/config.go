@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -32,10 +33,12 @@ func (g Google) Enabled() bool {
 
 // Config holds all settings the server needs at startup.
 type Config struct {
-	AppEnv        string
-	HTTPAddr      string
-	DatabaseURL   string
-	FrontendURL   string
+	AppEnv      string
+	HTTPAddr    string
+	DatabaseURL string
+	FrontendURL string
+	// DevOrigins are extra plain-HTTP frontend origins (LAN testing), development only.
+	DevOrigins    []string
 	SMTPAddr      string
 	SMTPFrom      string
 	JWTPrivateKey ed25519.PrivateKey
@@ -140,6 +143,20 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if cfg.IsProduction() && cfg.Storage.Endpoint != "" && !cfg.Storage.Secure {
 		errs = append(errs, errors.New("production storage requires TLS"))
+	}
+	if raw := optional("DEV_ALLOWED_ORIGINS", ""); raw != "" {
+		if cfg.IsProduction() {
+			errs = append(errs, errors.New("DEV_ALLOWED_ORIGINS is not allowed in production"))
+		}
+		for _, o := range strings.Split(raw, ",") {
+			o = strings.TrimRight(strings.TrimSpace(o), "/")
+			u, err := url.Parse(o)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil {
+				errs = append(errs, fmt.Errorf("DEV_ALLOWED_ORIGINS entry %q must be an origin like http://10.0.0.5:5173", o))
+				continue
+			}
+			cfg.DevOrigins = append(cfg.DevOrigins, o)
+		}
 	}
 	g := cfg.Google
 	if set := countSet(g.ClientID, g.ClientSecret, g.RedirectURL); set != 0 && set != 3 {

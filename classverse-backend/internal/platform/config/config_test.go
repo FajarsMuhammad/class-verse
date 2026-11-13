@@ -95,6 +95,30 @@ func TestLoad(t *testing.T) {
 			wantErr: []string{"JWT_PRIVATE_KEY", "OTP_HMAC_KEY"},
 		},
 		{
+			name: "development LAN origins are normalized",
+			modify: func(m map[string]string) {
+				m["DEV_ALLOWED_ORIGINS"] = " http://10.80.3.43:5173/ , http://192.168.1.5:5173"
+			},
+			want: func() Config {
+				c := baseConfig()
+				c.DevOrigins = []string{"http://10.80.3.43:5173", "http://192.168.1.5:5173"}
+				return c
+			},
+		},
+		{
+			name: "production rejects development origins",
+			modify: func(m map[string]string) {
+				m["APP_ENV"] = "production"
+				m["DEV_ALLOWED_ORIGINS"] = "http://10.80.3.43:5173"
+			},
+			wantErr: []string{"DEV_ALLOWED_ORIGINS"},
+		},
+		{
+			name:    "invalid development origin",
+			modify:  func(m map[string]string) { m["DEV_ALLOWED_ORIGINS"] = "10.80.3.43:5173,http://h/path,*" },
+			wantErr: []string{"DEV_ALLOWED_ORIGINS"},
+		},
+		{
 			name:    "partial google config",
 			modify:  func(m map[string]string) { m["GOOGLE_CLIENT_ID"] = "id" },
 			wantErr: []string{"GOOGLE_CLIENT_SECRET"},

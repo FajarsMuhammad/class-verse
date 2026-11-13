@@ -78,7 +78,7 @@ Aturan:
 
 - Semua data dibatasi per organisasi: setiap query yang menyentuh data organisasi wajib memfilter `org_id` dan memeriksa membership.
 - Access token JWT Ed25519 15 menit, claim minimal (`sub`, `iat`, `exp`, `jti`), role tidak di token.
-- Refresh token opaque, disimpan sebagai hash SHA-256, rotasi dengan deteksi reuse per family, di cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`.
+- Refresh token opaque, disimpan sebagai hash SHA-256, rotasi dengan deteksi reuse per family, di cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`. Satu-satunya pengecualian: origin `DEV_ALLOWED_ORIGINS` (HTTP LAN, development saja, ditolak di production) mendapat cookie tanpa `Secure`.
 - Tidak ada DM antar peserta. Voice tidak direkam. Chat dihapus setelah 30 hari.
 - Jangan pernah log token, password, OTP, atau isi chat.
 

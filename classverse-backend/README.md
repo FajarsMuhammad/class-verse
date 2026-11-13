@@ -115,6 +115,13 @@ Cek regresi konfigurasi lokal tanpa DB/storage: `python3 scripts/test_storage_ma
 `GET /api/maps/campus` publik menyajikan `.tmj` embed (ETag, revalidasi 304).
 `GET /ws/rooms/{room_id}` hanya menerima Origin yang sama persis dengan origin `FRONTEND_URL`;
 konfigurasi dev harus `http://localhost:5173`, bukan `127.0.0.1` jika browser memakai `localhost`.
+
+**Akses dari perangkat lain di jaringan (development saja).** Tambahkan origin frontend ke
+`DEV_ALLOWED_ORIGINS` (pisahkan koma), misalnya `DEV_ALLOWED_ORIGINS=http://10.80.3.43:5173`, lalu restart
+backend dan buka alamat itu. Origin tersebut diterima untuk refresh login dan WebSocket peta; cookie
+refresh untuk origin `http://` tersebut **tanpa `Secure`** karena browser membuang cookie `Secure` di HTTP non-localhost.
+Server menolak start jika variabel ini diisi saat `APP_ENV=production`. Voice/mikrofon tetap butuh HTTPS atau
+`localhost`; login Google lewat alamat ini tidak didukung.
 Pesan pertama `auth` wajib dalam 5 detik. JWT dan membership diperiksa sebelum join.
 Kontrak envelope dan close codes ada di `../docs/design.md`, aturan peta di `maps/README.md`.
 

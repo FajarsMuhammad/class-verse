@@ -191,7 +191,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	}
 	go runChatRetention(ctx, rtStore, now, purgeInterval, log)
 	authHandler.SetProfilePublisher(hub)
-	gateway, err := realtime.NewGateway(hub, tokens, rtStore, cfg.FrontendURL, log)
+	gateway, err := realtime.NewGateway(hub, tokens, rtStore, cfg.FrontendURL, log, cfg.DevOrigins...)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +271,9 @@ func newAuth(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, orgs au
 	} else {
 		log.Warn("google login disabled: GOOGLE_* not set")
 	}
-	return auth.NewHandler(svc, tokens, google, orgs, cfg.FrontendURL, now, log), tokens, nil
+	h := auth.NewHandler(svc, tokens, google, orgs, cfg.FrontendURL, now, log)
+	h.DevOrigins = cfg.DevOrigins
+	return h, tokens, nil
 }
 
 // runCommand runs an explicit operator command instead of the server.
