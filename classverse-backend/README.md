@@ -67,6 +67,27 @@ Secret root dan aplikasi dibuat acak sekali di `../.config/`, izin `600`; tidak 
 untuk operator, **bukan** kredensial backend. Endpoint lokal `127.0.0.1:9100`, console `127.0.0.1:9101`;
 bisa diubah dengan `STORAGE_PORT`/`STORAGE_CONSOLE_PORT`.
 
+Nilai lokal untuk backend yang berjalan di host:
+
+```dotenv
+STORAGE_ENDPOINT=127.0.0.1:9100
+STORAGE_BUCKET=materials
+STORAGE_SECURE=false
+```
+
+`STORAGE_ENDPOINT` adalah alamat API S3 tanpa `http://`/`https://`, bukan alamat console `9101`.
+`STORAGE_BUCKET` adalah nama bucket yang dibuat oleh `make storage-up`, bukan nama organisasi;
+semua sekolah memakai bucket privat yang sama dengan isolasi akses di backend. Jika backend berjalan
+sebagai container pada jaringan Compose yang sama, endpoint internal adalah `storage:9000`, bukan
+`127.0.0.1:9100`.
+
+Untuk lokal, gunakan otomatisasi `make run` di bawah; **jangan menyalin hanya tiga nilai di atas ke `.env`**.
+Konfigurasi manual juga wajib menyertakan `STORAGE_ACCESS_KEY` dan `STORAGE_SECRET_KEY` akun aplikasi.
+Sumber lokalnya `../.config/storage-app.env`: `TEST_STORAGE_ACCESS_KEY` dipetakan ke `STORAGE_ACCESS_KEY`,
+dan `TEST_STORAGE_SECRET_KEY` ke `STORAGE_SECRET_KEY`. Jangan gunakan akun root atau commit nilainya.
+Untuk deployment lain, endpoint, bucket privat, dan kredensial diperoleh dari operator/provider S3;
+production wajib `STORAGE_SECURE=true` dengan endpoint TLS.
+
 Smoke test benar-benar menjalankan PUT/GET/range/DELETE dengan akun aplikasi dan memastikan akses anonim
 mendapat 403. Objek smoke dibersihkan, volume data dipertahankan. License/health bukan bukti operasi S3 selalu
 berfungsi; expiry/capacity perlu dipantau terpisah. Free single-node tidak memberi HA atau encryption at rest
