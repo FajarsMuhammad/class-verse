@@ -44,6 +44,9 @@
   --kv-arena-soft: #fff1e8;
   --kv-arena-text: #c2410c;
   --kv-map-ground: #eef1f6;
+  --kv-learning-ground: #ccfbf1;
+  --kv-learning-dot: #99f6e4;
+  --kv-learning-surface: #fffef5;
   --kv-map-lawn: #a9de92;
   /* Room shell details from reference/Library.dc.html. */
   --kv-room-window: #bfe6ff;

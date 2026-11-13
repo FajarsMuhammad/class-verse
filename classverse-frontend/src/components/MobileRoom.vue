@@ -5,6 +5,7 @@ import ChatPanel from '@/components/ChatPanel.vue'
 import LibraryCatalog from '@/components/LibraryCatalog.vue'
 import BuildingModules from '@/components/BuildingModules.vue'
 import ResumeLearning from '@/components/ResumeLearning.vue'
+import RoomStations from '@/components/RoomStations.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import DoorRooms from '@/components/DoorRooms.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -39,6 +40,7 @@ const {
 const org = useOrgStore()
 const modulesOf = ref<Building | null>(null)
 const progressKey = ref(0)
+const station = ref('')
 
 // Positions arrive in snapshots without a reactive signal; refresh lists twice a second.
 const tick = ref(0)
@@ -240,6 +242,9 @@ function reported() {
       </section>
     </template>
 
+    <RoomStations v-if="!kicked && org.active && ['science', 'staff'].includes(current?.map_key ?? '')"
+      :key="current?.room_id" class="card" :org-id="org.active.id" :map-key="current!.map_key" :station="station"
+      :teacher="org.isTeacher" @select="station = $event" />
     <ResumeLearning v-if="!kicked && org.active" class="card" :org-id="org.active.id" :refresh-key="progressKey" />
     <section v-if="!kicked && current?.map_key === 'library' && org.active" class="card" aria-labelledby="catalog-title">
       <h2 id="catalog-title" class="catalog-title">Katalog</h2>

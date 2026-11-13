@@ -2,7 +2,7 @@ import rooms from '@/assets/world/rooms.json'
 
 // Server map key -> rooms.json layout; mirrors LAYOUTS in scripts/generate_world.py.
 export const roomLayouts = {
-  classroom: 'kelas', garden: 'diskusi', lab: 'lab', baca: 'baca', library: 'perpustakaan',
+  classroom: 'kelas', garden: 'diskusi', lab: 'lab', baca: 'baca', library: 'perpustakaan', science: 'sains', staff: 'guru',
 } as const
 
 interface Box { x: number; y: number; w: number; h: number }
@@ -13,6 +13,7 @@ interface RoomData {
   items: (Box & { kind: string; label?: string })[]
   shelves?: Labelled[]
   areas?: Labelled[]
+  stations?: (Labelled & { id: string; kind: string; group?: string })[]
 }
 
 const DOOR_W = 100
@@ -34,9 +35,16 @@ export function roomLayout(mapKey: string) {
     items: room.items.map(shift),
     shelves: (room.shelves ?? []).map(shift),
     areas: (room.areas ?? []).map(shift),
+    stations: (room.stations ?? []).map(shift),
     // Same rule as generate_world.py: only the library has category shelves.
     quiet: room.shelves !== undefined,
   }
+}
+
+// stationAt selects an interior station, including its label above the object.
+export function stationAt(mapKey: string, x: number, y: number) {
+  return roomLayout(mapKey)?.stations.find((s) =>
+    x >= s.x && x < s.x + s.w && y >= s.y - 24 && y < s.y + s.h)
 }
 
 // Label pills sit 22 px above a shelf; clicking the label or the shelf selects it.

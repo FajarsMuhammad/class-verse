@@ -79,6 +79,15 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
 - Mode HP: kontrol pengajar sama (dalam kartu lipat), label tanpa huruf kapital, header satu baris akun
   + satu baris navigasi yang bisa digeser.
 
+## D1 — Referensi Menara Sains dan Ruang Guru
+
+Referensi lokal terbaru: `kelasverse-assets/reference/m2/` (export HTML dan PNG pengguna).
+Implementasi dan batas: [`tasks/design-science-staff.md`](tasks/design-science-staff.md).
+Interior baru dipilih eksplisit saat membuat ruang; ruang lama tidak diganti. Jalur modul mengikuti header
+teal/latar mint/node bulat referensi dengan progres nyata, tanpa gembok urutan katalog. Pemutar materi/video
+memakai daftar isi dan navigasi bebas. Jadwal, XP, simulasi, rekaman dan statistik contoh tidak ditampilkan
+sebagai layanan/data nyata. Modul tetap dapat dibuka dari luar ruang.
+
 ## Peta (Phaser)
 
 - Gaya top-down, flat, sudut membulat; palet `--map-*` dan `--roof-*` di `tokens.css`.

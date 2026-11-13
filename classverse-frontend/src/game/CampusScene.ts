@@ -4,7 +4,8 @@ import type { MapData } from '@/realtime/mapdata'
 import { directionOf, moveToward, SEND_INTERVAL_MS, step, type Vec } from '@/realtime/movement'
 import type { Direction, MoveMsg } from '@/realtime/messages'
 import { findPath } from '@/realtime/pathfind'
-import { roomLayout, shelfAt } from './roomLayout'
+import { roomLayout, shelfAt, stationAt } from './roomLayout'
+import { drawStations } from './stationArt'
 import type { World } from '@/realtime/world'
 import { avatarKeys, avatarKey, avatarURL } from './avatars'
 import { cssToken } from './tiles'
@@ -21,6 +22,8 @@ export interface SceneDeps {
   selectBuilding?: (key: string) => void
   // selectShelf opens the library catalog on a shelf category (library rooms only).
   selectShelf?: (cat: string) => void
+  selectStation?: (id: string) => void
+  station?: () => string
   // shelf returns the selected category so the map can highlight it.
   shelf?: () => string
   // currentZone returns the server-reported zone key of the local avatar.
@@ -91,6 +94,7 @@ export class CampusScene extends Phaser.Scene {
   create() {
     const { map } = this.deps
     const newArt = drawWorld(this, this.deps.world.mapKey ?? 'campus')
+    drawStations(this, this.deps.world.mapKey ?? 'campus')
     if (!newArt) {
     this.textures.addCanvas(
       'campus-art',
@@ -164,6 +168,11 @@ export class CampusScene extends Phaser.Scene {
           this.deps.selectBuilding(building.key)
           return
         }
+      }
+      const station = this.deps.selectStation && stationAt(this.deps.world.mapKey ?? '', to.x, to.y)
+      if (station) {
+        this.deps.selectStation!(station.id)
+        return
       }
       const cat = this.deps.selectShelf && shelfAt(this.deps.world.mapKey ?? '', to.x, to.y)
       if (cat) {
@@ -535,15 +544,18 @@ export class CampusScene extends Phaser.Scene {
 
   // highlightShelf outlines the shelf chosen in the catalog, like the reference design.
   private highlightShelf() {
+    const station = this.deps.station?.() ?? ''
     const cat = this.deps.shelf?.() ?? ''
-    if (cat === this.shelfShown) return
-    this.shelfShown = cat
+    const selected = station || cat
+    if (selected === this.shelfShown) return
+    this.shelfShown = selected
     this.shelfRing?.destroy()
     this.shelfRing = null
-    const shelf = cat && roomLayout(this.deps.world.mapKey ?? '')?.shelves.find((s) => s.cat === cat)
+    const layout = roomLayout(this.deps.world.mapKey ?? '')
+    const shelf = station ? layout?.stations.find((s) => s.id === station) : cat && layout?.shelves.find((s) => s.cat === cat)
     if (!shelf) return
     this.shelfRing = this.add.graphics().setDepth(shelf.y + shelf.h - 11)
-      .lineStyle(4, Phaser.Display.Color.HexStringToColor(cssToken('--kv-subject-bahasa')).color)
+      .lineStyle(4, Phaser.Display.Color.HexStringToColor(cssToken(station ? '--kv-star' : '--kv-subject-bahasa')).color)
       .strokeRoundedRect(shelf.x - 4, shelf.y - 4, shelf.w + 8, shelf.h + 8, 6)
   }
 }

@@ -1256,7 +1256,7 @@ components:
         created_at: { type: string, format: date-time }
     RoomMap:
       type: string
-      enum: [classroom, garden, lab, baca, library]
+      enum: [classroom, garden, lab, baca, library, science, staff]
     CreateRoomRequest:
       type: object
       additionalProperties: false

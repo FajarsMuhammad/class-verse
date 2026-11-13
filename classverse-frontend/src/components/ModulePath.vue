@@ -16,6 +16,7 @@ const modules = ref<Module[]>([])
 const loading = ref(false)
 const error = ref('')
 const viewing = ref<ModuleStep | null>(null)
+const viewingModule = computed(() => modules.value.find((m) => m.steps.some((s) => s.id === viewing.value?.id)))
 const reading = ref<ReadableFile | null>(null)
 const saving = ref(false)
 let generation = 0
@@ -55,6 +56,7 @@ async function setDone(m: Module, step: ModuleStep) {
     modules.value = modules.value.map((item) => item.id === m.id
       ? { ...item, steps: item.steps.map((s) => s.id === step.id ? { ...s, done: !step.done } : s) }
       : item)
+    if (viewing.value?.id === step.id) viewing.value = { ...step, done: !step.done }
     emit('changed')
   } catch (err) {
     if (mine === generation) error.value = errorMessage(err)
@@ -65,6 +67,7 @@ async function setDone(m: Module, step: ModuleStep) {
 
 function open(step: ModuleStep) {
   if (step.kind === 'berkas' && step.file_id) {
+    viewing.value = null
     reading.value = { id: step.file_id, name: step.title, kind: step.file_kind ?? 'pdf', position: step.reader_position }
   } else viewing.value = step
 }
@@ -97,7 +100,7 @@ function closed(position: number) {
         <p class="muted small" role="status">{{ m.steps.filter((s) => s.done).length }} dari {{ m.steps.length }} selesai</p>
         <ol class="steps">
           <li v-for="(s, i) in m.steps" :key="s.id" :class="['step', s.kind, { done: s.done }]">
-            <span class="dot" aria-hidden="true">{{ s.done ? '✓' : i + 1 }}</span>
+            <span class="dot" aria-hidden="true">{{ s.done ? '✓' : s.kind === 'video' ? '▷' : s.kind === 'berkas' ? '▤' : '▱' }}<small>{{ i + 1 }}</small></span>
             <span class="text"><strong>{{ s.title }}</strong><small>{{ kindLabel[s.kind] }} · {{ s.minutes }} mnt</small></span>
             <div class="actions">
               <button type="button" class="btn-secondary open" @click="open(s)">
@@ -112,7 +115,8 @@ function closed(position: number) {
         <p v-if="!m.steps.length" class="muted small">Modul ini belum punya langkah.</p>
       </article>
     </div>
-    <StepViewer v-if="viewing" :step="viewing" @close="viewing = null" />
+    <StepViewer v-if="viewing" :step="viewing" :steps="viewingModule?.steps" :module-title="viewingModule?.title"
+      :saving="saving" @select="open" @done="viewingModule && setDone(viewingModule, $event)" @close="viewing = null" />
     <FileReader v-if="reading" :key="reading.id" :org-id="orgId" :file="reading" @close="closed" />
   </section>
 </template>
@@ -153,10 +157,11 @@ function closed(position: number) {
   gap: var(--space-3);
 }
 .module {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  padding: var(--space-5);
+  border: 3px solid var(--kv-ink);
+  border-radius: var(--kv-radius-card);
+  background: var(--kv-learning-surface);
+  box-shadow: 0 7px 0 var(--kv-ink);
 }
 .module h3 {
   margin: 0;
@@ -172,8 +177,8 @@ function closed(position: number) {
 .steps {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin: var(--space-3) 0 0;
+  gap: var(--space-6);
+  margin: var(--space-5) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -181,10 +186,10 @@ function closed(position: number) {
   border-color: var(--color-primary-strong);
 }
 .actions {
-  flex: 0 0 100%;
   display: flex;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 .complete {
   min-height: 44px;
@@ -193,32 +198,45 @@ function closed(position: number) {
   background: var(--color-primary-soft);
 }
 .step {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
   gap: var(--space-2);
+  text-align: center;
+  padding-bottom: var(--space-5);
+}
+.step:not(:last-child)::after {
+  content: '••';
+  position: absolute;
+  bottom: calc(-1 * var(--space-3));
+  color: var(--kv-subject-ipa);
+  letter-spacing: var(--space-1);
 }
 .dot {
   flex: none;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 2px solid var(--kv-ink);
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border: 3px solid var(--kv-ink);
+  box-shadow: 0 5px 0 var(--kv-ink);
+  font-size: var(--text-2xl);
   border-radius: 50%;
-  background: var(--kv-subject-ipa);
-  color: var(--color-surface);
+  background: var(--kv-star);
+  color: var(--kv-ink);
   font-weight: var(--weight-semibold);
 }
-.step.video .dot {
-  background: var(--kv-subject-arena);
-}
-.step.berkas .dot {
-  background: var(--kv-subject-matematika);
+.step.done .dot { background: var(--kv-subject-ipa); color: var(--kv-surface); }
+.dot small { position: absolute; right: -8px; top: -6px; display: grid; place-items: center; width: 26px; height: 26px; border: 2px solid var(--kv-ink); border-radius: 50%; background: var(--kv-surface); color: var(--kv-ink); font-size: var(--text-xs); }
+@media (min-width: 900px) {
+  .step:nth-child(4n + 2) { margin-left: 20%; }
+  .step:nth-child(4n) { margin-right: 20%; }
 }
 .text {
   display: flex;
-  flex: 1 1 60%;
+  flex: 1;
   flex-direction: column;
   min-width: 0;
   overflow-wrap: anywhere;

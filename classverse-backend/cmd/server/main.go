@@ -174,7 +174,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	inviteHandler := invite.NewHandler(inviteSvc, cfg.FrontendURL, now, log)
 	mapHandler := realtime.NewMapHandler(log)
 
-	mapData, err := realtime.LoadMaps("campus", "classroom", "garden", "lab", "baca", "library")
+	mapData, err := realtime.LoadMaps("campus", "classroom", "garden", "lab", "baca", "library", "science", "staff")
 	if err != nil {
 		return nil, fmt.Errorf("load maps: %w", err)
 	}

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { roomLayout, shelfAt } from './roomLayout'
+import { roomLayout, shelfAt, stationAt } from './roomLayout'
 
 it('uses the default floor for regular rooms and the larger library floor', () => {
   const kelas = roomLayout('classroom')!
@@ -17,6 +17,18 @@ it('uses the default floor for regular rooms and the larger library floor', () =
   expect(lib.areas.map((a) => a.label)).toEqual(['Pojok Anak · SD', 'Bilik hening'])
   expect(lib.quiet).toBe(true)
   expect(kelas.quiet).toBe(false)
+})
+
+it('maps science and staff stations to shifted coordinates without quiet mode', () => {
+  const science = roomLayout('science')!
+  expect([science.width, science.height]).toEqual([1244, 764])
+  expect(science.quiet).toBe(false)
+  expect(stationAt('science', 100, 500)?.id).toBe('tatasurya')
+  expect(stationAt('science', 100, 440)?.id).toBe('tatasurya')
+  expect(stationAt('science', 600, 720)).toBeUndefined()
+  expect(roomLayout('staff')!.stations.map((s) => s.id)).toEqual(['kerja', 'rapat', 'studio', 'nilai'])
+  expect(stationAt('staff', 100, 100)?.id).toBe('kerja')
+  expect(stationAt('library', 100, 100)).toBeUndefined()
 })
 
 it('shelfAt hits a library shelf and its label, nothing in other rooms', () => {

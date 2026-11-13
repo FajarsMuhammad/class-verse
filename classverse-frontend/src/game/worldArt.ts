@@ -42,7 +42,7 @@ function drawRoom(scene: Phaser.Scene, key: string) {
   if (!layout) return false
   const { wall, floor, width, height, door } = layout
   const ink = color(cssToken('--kv-ink'))
-  const accent = cssToken('--kv-subject-bahasa')
+  const accent = cssToken(key === 'science' ? '--kv-subject-ipa' : key === 'staff' ? '--kv-text-muted' : '--kv-subject-bahasa')
   const g = scene.add.graphics().setDepth(-10)
   // Shell: rounded wall with an ink outline (reference rooms), pink in the library.
   g.fillStyle(color(layout.quiet ? cssToken('--kv-library-wall') : rooms.wall.color))
@@ -52,9 +52,21 @@ function drawRoom(scene: Phaser.Scene, key: string) {
   const floorColor = color(desc.split(' ')[0]!)
   g.fillStyle(floorColor)
   g.fillRoundedRect(wall, wall, floor.w, floor.h, 14)
-  // Planks run top to bottom (repeating-linear-gradient 90deg in the reference).
-  g.lineStyle(2, color('#78481e'), 0.12)
-  for (let x = wall + plankStep(desc); x < floor.w + wall; x += plankStep(desc)) g.lineBetween(x, wall, x, floor.h + wall)
+  g.lineStyle(1, ink, 0.1)
+  const step = plankStep(desc)
+  if (layout.floorKind === 'carpet') {
+    g.fillStyle(ink, 0.03)
+    for (let y = wall; y < floor.h + wall; y += step) {
+      for (let x = wall; x < floor.w + wall; x += step) {
+        if ((Math.round((x - wall) / step) + Math.round((y - wall) / step)) % 2 === 0)
+          g.fillRect(x, y, Math.min(step, floor.w + wall - x), Math.min(step, floor.h + wall - y))
+      }
+    }
+  } else {
+    for (let x = wall + step; x < floor.w + wall; x += step) g.lineBetween(x, wall, x, floor.h + wall)
+    if (layout.floorKind === 'tile')
+      for (let y = wall + step; y < floor.h + wall; y += step) g.lineBetween(wall, y, floor.w + wall, y)
+  }
   // Windows on the top wall.
   for (const cx of [0.22, 0.5, 0.78]) {
     g.fillStyle(color(cssToken('--kv-room-window'))).fillRoundedRect(width * cx - 70, 5, 140, 10, 4)
@@ -76,8 +88,13 @@ function drawRoom(scene: Phaser.Scene, key: string) {
   pill(scene, door.x + door.w / 2, door.y + door.h / 2, 'Pintu', 100000, cssToken('--kv-room-door'), cssToken('--kv-surface'))
   const flat = new Set(['rug', 'kidsrug'])
   for (const item of layout.items) {
-    const sprite = rooms.furniture_sprites[item.kind as keyof typeof rooms.furniture_sprites]
-    const depth = flat.has(item.kind) ? -8 : item.y + item.h - 12
+    const aliases: Record<string, keyof typeof rooms.furniture_sprites> = {
+      seatdark: 'chair', locker: 'shelf', printer: 'computer', camera: 'computer',
+      sofa: 'armchair', greenscreen: 'screen', telescope: 'globe',
+    }
+    const sprite = rooms.furniture_sprites[(aliases[item.kind] ?? item.kind) as keyof typeof rooms.furniture_sprites]
+    const onDesk = ['computer', 'beaker', 'sink', 'printer'].includes(item.kind)
+    const depth = flat.has(item.kind) ? -8 : item.y + item.h - 12 + (onDesk ? 40 : 0)
     const image = scene.add.image(item.x, item.y, sprite).setOrigin(0).setDisplaySize(item.w, item.h).setDepth(depth)
     if (item.kind === 'shelf' && item.h > item.w) {
       image.setPosition(item.x + item.w, item.y).setDisplaySize(item.h, item.w).setAngle(90)

@@ -63,7 +63,7 @@ func TestParseMapRejectsInvalidInteractRadius(t *testing.T) {
 }
 
 func TestRevampMaps(t *testing.T) {
-	for _, key := range []string{"campus", "classroom", "garden", "lab", "baca", "library"} {
+	for _, key := range []string{"campus", "classroom", "garden", "lab", "baca", "library", "science", "staff"} {
 		raw, err := maps.Read(key)
 		if err != nil {
 			t.Fatal(err)

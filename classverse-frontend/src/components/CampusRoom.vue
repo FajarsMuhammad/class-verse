@@ -22,6 +22,7 @@ import type { Building, Seat } from '@/realtime/mapdata'
 
 import ChatPanel from '@/components/ChatPanel.vue'
 import LibraryCatalog from '@/components/LibraryCatalog.vue'
+import RoomStations from '@/components/RoomStations.vue'
 import type { Shelf } from '@/api/types'
 import ReportDialog from '@/components/ReportDialog.vue'
 import type { ChatLine } from '@/realtime/chat'
@@ -76,6 +77,14 @@ const position = ref<{ x: number; y: number } | null>(null)
 const otherPositions = ref<{ x: number; y: number }[]>([])
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
 const library = computed(() => current.value?.map_key === 'library')
+const stationRoom = computed(() => ['science', 'staff'].includes(current.value?.map_key ?? ''))
+const contentRoom = computed(() => library.value || stationRoom.value)
+const station = ref('')
+function selectStation(id: string) {
+  station.value = id
+  sideTab.value = 'catalog'
+  chatClosed.value = false
+}
 function selectShelf(cat: string) {
   shelf.value = cat as Shelf
   sideTab.value = 'catalog'
@@ -145,6 +154,7 @@ watch(campus, () => {
 })
 watch(() => current.value?.room_id, () => {
   shelf.value = ''
+  station.value = ''
   sideTab.value = 'catalog'
 })
 watch(
@@ -285,7 +295,7 @@ onBeforeUnmount(() => {
         Chat
       </button>
     </div>
-    <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed, library }]">
+    <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed, library: contentRoom }]">
       <LearningPanel v-model:closed="learningClosed" class="learning-panel" :org-id="org.active?.id" :progress-key="progressKey" :name="auth.me?.display_name ?? ''"
         :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
         :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
@@ -384,6 +394,8 @@ onBeforeUnmount(() => {
                 zoom: () => zoom,
                 selectBuilding,
                 selectShelf,
+                selectStation,
+                station: () => station,
                 shelf: () => shelf,
               }"
               :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
@@ -428,20 +440,23 @@ onBeforeUnmount(() => {
           </footer>
         </div>
       </div>
-      <aside class="chat-sidebar" :aria-label="library ? 'Katalog dan chat' : 'Chat ruang'">
-        <header class="panel-heading"><h2 v-if="!chatClosed">{{ library ? 'Perpustakaan' : 'Chat' }}</h2>
+      <aside class="chat-sidebar" :aria-label="contentRoom ? 'Belajar dan chat' : 'Chat ruang'">
+        <header class="panel-heading"><h2 v-if="!chatClosed">{{ library ? 'Perpustakaan' : stationRoom ? (current?.map_key === 'staff' ? 'Alat guru' : 'Menara Sains') : 'Chat' }}</h2>
           <button class="btn-secondary" :aria-label="chatClosed ? 'Buka panel samping' : 'Ciutkan panel samping'"
             :aria-expanded="!chatClosed" @click="chatClosed = !chatClosed">{{ chatClosed ? '‹' : '›' }}</button>
         </header>
-        <div v-if="library && !chatClosed" class="side-tabs" role="group" aria-label="Isi panel">
-          <button type="button" :aria-pressed="sideTab === 'catalog'" @click="sideTab = 'catalog'">Katalog</button>
+        <div v-if="contentRoom && !chatClosed" class="side-tabs" role="group" aria-label="Isi panel">
+          <button type="button" :aria-pressed="sideTab === 'catalog'" @click="sideTab = 'catalog'">{{ library ? 'Katalog' : 'Stasiun' }}</button>
           <button type="button" :aria-pressed="sideTab === 'chat'" @click="sideTab = 'chat'">Chat</button>
         </div>
         <LibraryCatalog v-if="library && org.active && sideTab === 'catalog'" v-show="!chatClosed"
           v-model:shelf="shelf" class="side-catalog" :org-id="org.active.id" />
-        <p v-if="!chatClosed && (!library || sideTab === 'chat')" class="panel-note">Ngobrol dengan orang di sekitarmu</p>
+        <RoomStations v-if="stationRoom && org.active && sideTab === 'catalog' && !chatClosed"
+          :key="current?.room_id" class="side-catalog" :org-id="org.active.id" :map-key="current!.map_key"
+          :station="station" :teacher="org.isTeacher" @select="selectStation" />
+        <p v-if="!chatClosed && (!contentRoom || sideTab === 'chat')" class="panel-note">Ngobrol dengan orang di sekitarmu</p>
         <ChatPanel
-          v-show="!chatClosed && (!library || sideTab === 'chat')"
+          v-show="!chatClosed && (!contentRoom || sideTab === 'chat')"
           class="side-chat"
           :chat="chat"
           :version="chatVersion"
@@ -569,7 +584,10 @@ onBeforeUnmount(() => {
 }
 .map-top {
   top: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.map-top .title { flex-shrink: 0; }
 .map-zoom {
   position: absolute;
   z-index: 2;

@@ -23,3 +23,18 @@ it('embeds YouTube through the privacy-enhanced domain in a sandboxed frame', ()
   expect(frame.attributes('sandbox')).toContain('allow-scripts')
   expect(frame.attributes('title')).toBe('Video: Bab')
 })
+
+it('navigates freely without completing a step implicitly', async () => {
+  const steps = [
+    { ...base, kind: 'materi' as const, body: 'isi', video_id: null },
+    { ...base, id: 's2', title: 'Bab dua', kind: 'materi' as const, body: 'dua', video_id: null },
+  ]
+  const w = mount(StepViewer, { props: { step: steps[0]!, steps, moduleTitle: 'Modul IPA' } })
+  expect(w.get('[aria-current=step]').text()).toContain('Bab')
+  expect(w.findAll('.controls button')[0]!.attributes('disabled')).toBeDefined()
+  await w.findAll('.controls button')[2]!.trigger('click')
+  expect(w.emitted('select')?.[0]).toEqual([steps[1]])
+  expect(w.emitted('done')).toBeUndefined()
+  await w.findAll('.controls button')[1]!.trigger('click')
+  expect(w.emitted('done')?.[0]).toEqual([steps[0]])
+})

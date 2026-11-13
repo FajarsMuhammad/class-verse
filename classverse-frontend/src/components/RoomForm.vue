@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef } from 'vue'
+import { onMounted, ref, useTemplateRef, watch } from 'vue'
 import { errorMessage } from '@/api/client'
 import { roomApi } from '@/api/rooms'
 import type { Room, RoomMap } from '@/api/types'
@@ -11,6 +11,9 @@ const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const name = ref(props.room?.name ?? '')
 const building = ref(props.room?.building_key ?? props.buildings[0]?.key ?? '')
 const mapKey = ref<RoomMap>(props.room?.map_key ?? 'classroom')
+watch(building, (key) => {
+  if (!props.room) mapKey.value = key === 'ruang-guru' ? 'staff' : key === 'sains' ? 'science' : 'classroom'
+}, { immediate: !props.room })
 const scheduled = ref(!!props.room?.scheduled_at)
 const localTime = ref(toLocalInput(props.room?.scheduled_at))
 const busy = ref(false)
@@ -80,6 +83,8 @@ async function save() {
             <option value="classroom">Ruang kelas</option>
             <option value="garden">Ruang diskusi</option>
             <option value="lab">Lab sains</option>
+            <option value="science">Menara Sains — planetarium & stasiun</option>
+            <option v-if="building === 'ruang-guru'" value="staff">Ruang Guru — meja kerja & rapat</option>
             <option value="baca">Ruang baca</option>
             <option value="library">Perpustakaan (zona tenang, chat saja)</option>
           </select>

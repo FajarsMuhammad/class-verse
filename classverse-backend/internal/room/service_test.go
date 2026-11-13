@@ -73,6 +73,7 @@ func TestRoomLifecycle(t *testing.T) {
 	}{
 		{"unknown building", CreateInput{Name: "Biologi", MapKey: MapClassroom, BuildingKey: "fake"}},
 		{"campus map", CreateInput{Name: "Biologi", MapKey: "campus", BuildingKey: "kelas-a"}},
+		{"staff interior in public building", CreateInput{Name: "Guru", MapKey: "staff", BuildingKey: "kelas-a"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := svc.Create(ctx, user.ID, school.ID, tt.input)
@@ -111,6 +112,14 @@ func TestRoomLifecycle(t *testing.T) {
 	if err != nil || len(next.Items) != 1 || next.Items[0].ID == page.Items[0].ID ||
 		(page.Items[0].ID != created.ID && next.Items[0].ID != created.ID) {
 		t.Fatalf("pages=%+v %+v err=%v", page, next, err)
+	}
+	for _, input := range []CreateInput{
+		{Name: "Menara Sains", MapKey: "science", BuildingKey: "kelas-a"},
+		{Name: "Ruang Guru", MapKey: "staff", BuildingKey: "ruang-guru"},
+	} {
+		if r, err := svc.Create(ctx, user.ID, school.ID, input); err != nil || r.MapKey != input.MapKey {
+			t.Fatalf("new interior=%+v err=%v", r, err)
+		}
 	}
 	if _, err := svc.Get(ctx, uuid.New(), created.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("outsider error=%v", err)

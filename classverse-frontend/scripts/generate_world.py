@@ -8,7 +8,7 @@ DATA = ROOT / 'classverse-frontend/src/assets/world'
 OUT = ROOT / 'classverse-backend/maps'
 TILE = 32
 # Server map key -> rooms.json layout.
-LAYOUTS = {'classroom': 'kelas', 'garden': 'diskusi', 'lab': 'lab', 'baca': 'baca', 'library': 'perpustakaan'}
+LAYOUTS = {'classroom': 'kelas', 'garden': 'diskusi', 'lab': 'lab', 'baca': 'baca', 'library': 'perpustakaan', 'science': 'sains', 'staff': 'guru'}
 # Furniture you cannot walk through; seats stay free (see build).
 SOLID = ('desk', 'table', 'shelf', 'sink', 'counter', 'display', 'returnbox', 'booth')
 
@@ -81,8 +81,11 @@ def interior(data, room):
     blocks = [(0, 0, width, wall), (0, 0, wall, height), (width-wall, 0, wall, height),
               (0, height-wall, width/2-50, wall), (width/2+50, height-wall, width/2-50, wall)]
     for item in [*room['items'], *room.get('shelves', [])]:
-        if item.get('kind', 'shelf') in SOLID:
+        if item.get('kind', 'shelf') in SOLID or (room.get('stations') and item.get('kind') in ('bench', 'locker', 'printer', 'camera', 'greenscreen')):
             blocks.append((item['x']+wall, item['y']+wall, item['w'], item['h']))
+    for station in room.get('stations', []):
+        if station['kind'].startswith('ex-') or station['kind'] in ('vrpod', 'deck'):
+            blocks.append((station['x']+wall, station['y']+wall, station['w'], station['h']))
     seats = [(s['x']+wall, s['y']+wall) for s in room['seats']]
     zones = [obj(z['label'], z['x']+wall-z['d']/2, z['y']+wall-z['d']/2,
                  z['d'], z['d'], key=f'table-{i+1}', shape='circle') for i, z in enumerate(room['zones'])]
