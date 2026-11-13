@@ -114,6 +114,7 @@ type member struct {
 	stride        stride
 	moves         moveBudget
 	dirty         bool
+	viewReady     bool               // visibility has been synchronized since join/reconnect
 	seen          map[uuid.UUID]bool // ids the client currently shows (area of interest)
 	zone          Zone               // zone the avatar stands in, zero when none
 	chat          chatBudget
@@ -317,6 +318,7 @@ func (r *room) join(c *conn, adm Admission) error {
 		m.conn, m.heldUntil = c, time.Time{}
 		m.p.Name, m.p.Avatar, m.p.Role = adm.Name, adm.Avatar, adm.Role
 		m.seen = map[uuid.UUID]bool{}
+		m.viewReady = false
 		m.stride = newStride(r.mapd.WalkSpeed, r.now())
 		r.sendWelcome(m, TypeWelcome)
 		return nil
@@ -516,35 +518,7 @@ func (r *room) tick(now time.Time) (stopped bool) {
 	r.retryVoice(now)
 	r.updateZones()
 
-	for _, recv := range r.members {
-		if recv.conn == nil {
-			continue
-		}
-		var snap SnapshotMsg
-		for id, o := range r.members {
-			if id == recv.p.ID {
-				continue
-			}
-			visible := !r.campus || inAOI(r.mapd, recv.p.X, recv.p.Y, o.p.X, o.p.Y)
-			switch {
-			case visible && (!recv.seen[id] || o.dirty):
-				recv.seen[id] = true
-				snap.P = append(snap.P, Position{ID: id, X: o.p.X, Y: o.p.Y, Dir: o.p.Dir})
-			case !visible && recv.seen[id]:
-				delete(recv.seen, id)
-				snap.Out = append(snap.Out, id)
-			}
-		}
-		if len(snap.P) > 0 || len(snap.Out) > 0 {
-			if snap.P == nil {
-				snap.P = []Position{}
-			}
-			recv.conn.send(newOut(TypeSnapshot, snap))
-		}
-	}
-	for _, m := range r.members {
-		m.dirty = false
-	}
+	r.sendSnapshots()
 
 	r.ticks++
 	if r.campus && r.ticks%buildingsEvery == 0 {
