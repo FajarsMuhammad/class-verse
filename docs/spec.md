@@ -100,7 +100,7 @@ Setiap story punya ID agar bisa dirujuk di ticket, API spec, dan test. Story M1 
 - Tersedia minimal 12 avatar preset dengan beberapa pilihan warna.
 - Nama tampilan 3–24 karakter dan melewati filter kata kasar.
 
-**US-05** Sebagai peserta, saya ingin berjalan dengan keyboard (WASD/panah) atau klik agar bisa berpindah tempat.
+**US-05** Sebagai peserta, saya ingin berjalan dengan keyboard (WASD/panah) atau klik dua kali tujuan agar bisa berpindah tempat.
 
 - Posisi peserta lain terlihat bergerak mulus, jeda di bawah 200 ms pada koneksi normal.
 - Avatar tidak bisa menembus dinding atau objek.

@@ -48,6 +48,8 @@ const AVATAR_SIZE = 36
 // Extra A* cost per tile inside a table you are not walking to (see tablePenalty).
 const TABLE_PENALTY = 20
 const MAX_FRAME_MS = 100
+const DOUBLE_CLICK_MS = 400
+const DOUBLE_CLICK_PX = 24
 
 // CampusScene draws the map and avatars from World and turns keyboard and
 // clicks into predicted local movement plus `move` messages.
@@ -60,6 +62,7 @@ export class CampusScene extends Phaser.Scene {
     Phaser.Input.Keyboard.Key
   >
   private path: Vec[] = []
+  private lastClick: { time: number; x: number; y: number } | null = null
   private lastSent = 0
   private lastSentPos: { x: number; y: number; dir: Direction } | null = null
   private labels: Phaser.GameObjects.Container[] = []
@@ -151,43 +154,55 @@ export class CampusScene extends Phaser.Scene {
     const clearInput = () => {
       kb.resetKeys()
       this.path = []
+      this.lastClick = null
     }
     this.game.canvas.parentElement?.addEventListener('blur', clearInput)
     this.events.once('shutdown', () =>
       this.game.canvas.parentElement?.removeEventListener('blur', clearInput),
     )
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      const self = this.deps.world.self
-      if (!self) return
-      const to = { x: Math.round(p.worldX), y: Math.round(p.worldY) }
-      if (this.deps.world.mapKey === 'campus') {
-        const building = this.deps.map.buildings.find((b) =>
-          to.x >= b.x && to.x < b.x+b.w && to.y >= b.y && to.y < b.y+b.h)
-        if (building && this.deps.selectBuilding) {
-          this.path = []
-          this.deps.selectBuilding(building.key)
-          return
-        }
-      }
-      const station = this.deps.selectStation && stationAt(this.deps.world.mapKey ?? '', to.x, to.y)
-      if (station) {
-        this.deps.selectStation!(station.id)
+    this.input.on('pointerdown', this.onPointerDown, this)
+  }
+
+  private onPointerDown(p: Phaser.Input.Pointer) {
+    if (!p.leftButtonDown()) return
+    const self = this.deps.world.self
+    if (!self) return
+    const to = { x: Math.round(p.worldX), y: Math.round(p.worldY) }
+    if (this.deps.world.mapKey === 'campus') {
+      const building = this.deps.map.buildings.find((b) =>
+        to.x >= b.x && to.x < b.x+b.w && to.y >= b.y && to.y < b.y+b.h)
+      if (building && this.deps.selectBuilding) {
+        this.lastClick = null
+        this.path = []
+        this.deps.selectBuilding(building.key)
         return
       }
-      const cat = this.deps.selectShelf && shelfAt(this.deps.world.mapKey ?? '', to.x, to.y)
-      if (cat) {
-        // Choosing a shelf opens the catalog; walking there is still one more click on the floor.
-        this.deps.selectShelf!(cat)
-        return
-      }
-      this.path = findPath(this.deps.map, self, to, this.tablePenalty(self, to))
-    })
+    }
+    const station = this.deps.selectStation && stationAt(this.deps.world.mapKey ?? '', to.x, to.y)
+    if (station) {
+      this.lastClick = null
+      this.deps.selectStation!(station.id)
+      return
+    }
+    const cat = this.deps.selectShelf && shelfAt(this.deps.world.mapKey ?? '', to.x, to.y)
+    if (cat) {
+      this.lastClick = null
+      this.deps.selectShelf!(cat)
+      return
+    }
+    const last = this.lastClick
+    this.lastClick = { time: p.downTime, x: p.x, y: p.y }
+    if (!last || p.downTime - last.time > DOUBLE_CLICK_MS ||
+      Math.hypot(p.x - last.x, p.y - last.y) > DOUBLE_CLICK_PX) return
+    this.lastClick = null
+    this.path = findPath(this.deps.map, self, to, this.tablePenalty(self, to))
   }
 
   update(time: number, delta: number) {
     const { world, map } = this.deps
     if (this.movementRevision !== world.movementRevision) {
       this.movementRevision = world.movementRevision
+      this.lastClick = null
       this.path = []
       this.input.keyboard?.resetKeys()
       this.lastSentPos = null

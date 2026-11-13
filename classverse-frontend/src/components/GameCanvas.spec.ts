@@ -43,6 +43,19 @@ vi.mock('@/game/CampusScene', () => ({ CampusScene: class {} }))
 const { default: GameCanvas } = await import('./GameCanvas.vue')
 
 describe('GameCanvas', () => {
+  it('focuses the map on entry without taking keyboard input back from chat', async () => {
+    const w = mount(GameCanvas, { attachTo: document.body, props: { deps: {} as never, label: 'Peta' } })
+    expect(document.activeElement).toBe(w.element)
+    const chat = document.createElement('textarea')
+    document.body.append(chat)
+    chat.focus()
+    await w.vm.$nextTick()
+    expect(document.activeElement).toBe(chat)
+    w.unmount()
+    chat.remove()
+    created.length = 0
+    lose.mockClear()
+  })
   it('releases the WebGL context when unmounted (travel remounts it)', () => {
     for (let i = 0; i < 3; i++) {
       const w = mount(GameCanvas, { props: { deps: {} as never, label: 'Peta' } })

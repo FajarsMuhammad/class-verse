@@ -398,7 +398,7 @@ onBeforeUnmount(() => {
                 station: () => station,
                 shelf: () => shelf,
               }"
-              :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik tujuan untuk mencari jalan.`"
+              :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik dua kali tujuan untuk mencari jalan.`"
             />
           </div>
           <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>

@@ -159,7 +159,9 @@ status terpilih memakai radio/border selain warna. Phaser memakai aset yang sama
 - Kontras teks minimal 4.5:1, termasuk label abu-abu kecil (`--color-ink-muted` sudah lolos di atas putih dan Kabut).
 - Pakai elemen asli (`<button>`, `<a>`, `<input>` + `<label>`), bukan `div` yang diberi click handler.
 - Warna yang harus dibedakan juga berbeda terang-gelapnya, bukan hanya hue.
-- Gerak di peta bisa dengan keyboard (WASD/panah) dan klik; mode HP tidak butuh gerak sama sekali.
+- Gerak di peta memakai keyboard (WASD/panah) atau klik dua kali lantai (maksimal 400 ms, jarak 24 px layar).
+  Gedung/rak/stasiun tetap sekali klik. Peta menerima fokus keyboard saat masuk; fokus chat/form tidak direbut kembali.
+  Mode HP tidak butuh gerak sama sekali.
 
 ## Di luar MVP
 
