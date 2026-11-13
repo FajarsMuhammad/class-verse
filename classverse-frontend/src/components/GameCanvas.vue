@@ -25,7 +25,9 @@ onMounted(() => {
     scene: [],
   })
   game.scene.add('campus', CampusScene, true, props.deps)
-  host.value.focus({ preventScroll: true })
+  // Do not steal focus from chat or forms when a room change remounts the map.
+  const active = document.activeElement
+  if (!active || active === document.body || !active.isConnected) host.value.focus({ preventScroll: true })
 })
 
 // releaseContext frees the GPU context. Phaser's destroy drops its references

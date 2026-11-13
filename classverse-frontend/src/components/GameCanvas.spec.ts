@@ -52,6 +52,10 @@ describe('GameCanvas', () => {
     await w.vm.$nextTick()
     expect(document.activeElement).toBe(chat)
     w.unmount()
+    // A forced remount (kick, reconnect) must not interrupt typing.
+    const again = mount(GameCanvas, { attachTo: document.body, props: { deps: {} as never, label: 'Peta' } })
+    expect(document.activeElement).toBe(chat)
+    again.unmount()
     chat.remove()
     created.length = 0
     lose.mockClear()
