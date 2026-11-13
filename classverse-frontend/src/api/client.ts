@@ -157,6 +157,9 @@ export function errorMessage(err: unknown): string {
     case 'forbidden':
       return err.message || 'Kamu tidak punya akses untuk ini.'
     case 'room_busy':
+    case 'no_copies':
+    case 'loan_limit':
+    case 'not_loanable':
     case 'conflict':
     case 'invite_expired':
       return err.message

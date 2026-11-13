@@ -23,9 +23,12 @@ WHERE org_id = $1 AND id = $2 AND archived_at IS NULL;
 
 -- name: ListBooks :many
 -- Catalog page ordered by title, with the caller's reader position. Staff may include drafts.
-SELECT sqlc.embed(b), COALESCE(p.position, 0)::integer AS position
+SELECT sqlc.embed(b), COALESCE(p.position, 0)::integer AS position,
+  (SELECT count(*) FROM library_loans l WHERE l.book_id = b.id AND l.returned_at IS NULL)::integer AS on_loan,
+  m.id AS my_loan_id, m.due_at AS my_due_at
 FROM library_books b
 LEFT JOIN reader_positions p ON p.file_id = b.file_id AND p.user_id = sqlc.arg(user_id)
+LEFT JOIN library_loans m ON m.book_id = b.id AND m.user_id = sqlc.arg(user_id) AND m.returned_at IS NULL
 WHERE b.org_id = sqlc.arg(org_id)
   AND b.archived_at IS NULL
   AND (sqlc.arg(include_drafts)::boolean OR b.published_at IS NOT NULL)
@@ -46,3 +49,34 @@ SELECT EXISTS (SELECT 1 FROM library_books
 
 -- name: FileInUse :one
 SELECT EXISTS (SELECT 1 FROM library_books WHERE org_id = $1 AND file_id = $2 AND archived_at IS NULL);
+
+-- name: LockMembership :one
+-- Serializes one member's borrows so the per-member limit holds under concurrency.
+SELECT role FROM memberships WHERE org_id = $1 AND user_id = $2 FOR UPDATE;
+
+-- name: ActiveLoan :one
+SELECT * FROM library_loans WHERE book_id = $1 AND user_id = $2 AND returned_at IS NULL;
+
+-- name: CountMemberLoans :one
+SELECT count(*)::integer FROM library_loans WHERE org_id = $1 AND user_id = $2 AND returned_at IS NULL;
+
+-- name: CountBookLoans :one
+SELECT count(*)::integer FROM library_loans WHERE book_id = $1 AND returned_at IS NULL;
+
+-- name: CreateLoan :one
+INSERT INTO library_loans (id, org_id, book_id, user_id, borrowed_at, due_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *;
+
+-- name: ReturnLoan :one
+-- Idempotent: a retried return keeps the first return time.
+UPDATE library_loans SET returned_at = COALESCE(returned_at, sqlc.arg(now))
+WHERE org_id = sqlc.arg(org_id) AND id = sqlc.arg(id) AND user_id = sqlc.arg(user_id)
+RETURNING *;
+
+-- name: ListMemberLoans :many
+-- "Pinjamanku": active loans, soonest due first. Archived books stay listed so they can be returned.
+SELECT sqlc.embed(l), b.title, b.author, b.cover
+FROM library_loans l JOIN library_books b ON b.org_id = l.org_id AND b.id = l.book_id
+WHERE l.org_id = $1 AND l.user_id = $2 AND l.returned_at IS NULL
+ORDER BY l.due_at, l.id;

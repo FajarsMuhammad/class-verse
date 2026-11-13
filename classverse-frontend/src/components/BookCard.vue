@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatLabel } from '@/api/library'
+import { dueLabel, formatLabel } from '@/api/library'
 import type { Book } from '@/api/types'
 
-const props = defineProps<{ book: Book }>()
-defineEmits<{ open: [book: Book] }>()
+// loanable: show Pinjam/Kembalikan (catalog for members; the staff manager leaves it off).
+const props = defineProps<{ book: Book; loanable?: boolean; busy?: boolean }>()
+defineEmits<{ open: [book: Book]; borrow: [book: Book]; giveBack: [book: Book] }>()
 
 const digital = computed(() => props.book.format !== 'buku')
 const action = computed(() => {
@@ -12,10 +13,13 @@ const action = computed(() => {
   if (resume) return 'Lanjutkan'
   return props.book.format === 'audio' ? 'Dengarkan' : 'Baca sekarang'
 })
-// shortcut: physical books show copy count only; borrowing and "on loan" status come with L2 loans.
-const status = computed(() =>
-  digital.value ? 'Selalu tersedia' : props.book.copies > 0 ? `${props.book.copies} eksemplar di rak` : 'Belum ada eksemplar',
-)
+const status = computed(() => {
+  const b = props.book
+  if (digital.value) return 'Selalu tersedia'
+  if (b.my_loan) return `Kamu pinjam · kembali ${dueLabel(b.my_loan.due_at)}`
+  if (b.copies === 0) return 'Belum ada eksemplar'
+  return b.available > 0 ? `${b.available} dari ${b.copies} tersedia` : 'Sedang dipinjam'
+})
 </script>
 
 <template>
@@ -31,10 +35,16 @@ const status = computed(() =>
         <span v-if="!book.published" class="chip draft">Draf</span>
       </p>
       <div class="foot">
-        <span class="status" :class="{ ok: digital || book.copies > 0 }">{{ status }}</span>
+        <span class="status" :class="{ ok: digital || book.available > 0 || book.my_loan }">{{ status }}</span>
         <button v-if="digital && book.file_id" type="button" class="btn-primary act" @click="$emit('open', book)">
           {{ action }}<span class="sr"> {{ book.title }}</span>
         </button>
+        <template v-else-if="loanable && !digital">
+          <button v-if="book.my_loan" type="button" class="btn-secondary act" :disabled="busy"
+            @click="$emit('giveBack', book)">Kembalikan<span class="sr"> {{ book.title }}</span></button>
+          <button v-else-if="book.available > 0" type="button" class="btn-primary act" :disabled="busy"
+            @click="$emit('borrow', book)">Pinjam<span class="sr"> {{ book.title }}</span></button>
+        </template>
       </div>
       <slot />
     </div>

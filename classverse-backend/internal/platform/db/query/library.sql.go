@@ -12,6 +12,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activeLoan = `-- name: ActiveLoan :one
+SELECT id, org_id, book_id, user_id, borrowed_at, due_at, returned_at FROM library_loans WHERE book_id = $1 AND user_id = $2 AND returned_at IS NULL
+`
+
+type ActiveLoanParams struct {
+	BookID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) ActiveLoan(ctx context.Context, arg ActiveLoanParams) (LibraryLoan, error) {
+	row := q.db.QueryRow(ctx, activeLoan, arg.BookID, arg.UserID)
+	var i LibraryLoan
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.BookID,
+		&i.UserID,
+		&i.BorrowedAt,
+		&i.DueAt,
+		&i.ReturnedAt,
+	)
+	return i, err
+}
+
 const archiveBook = `-- name: ArchiveBook :execrows
 UPDATE library_books SET archived_at = $3, updated_at = $3
 WHERE org_id = $1 AND id = $2 AND archived_at IS NULL
@@ -29,6 +53,33 @@ func (q *Queries) ArchiveBook(ctx context.Context, arg ArchiveBookParams) (int64
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const countBookLoans = `-- name: CountBookLoans :one
+SELECT count(*)::integer FROM library_loans WHERE book_id = $1 AND returned_at IS NULL
+`
+
+func (q *Queries) CountBookLoans(ctx context.Context, bookID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countBookLoans, bookID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countMemberLoans = `-- name: CountMemberLoans :one
+SELECT count(*)::integer FROM library_loans WHERE org_id = $1 AND user_id = $2 AND returned_at IS NULL
+`
+
+type CountMemberLoansParams struct {
+	OrgID  uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) CountMemberLoans(ctx context.Context, arg CountMemberLoansParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countMemberLoans, arg.OrgID, arg.UserID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const createBook = `-- name: CreateBook :one
@@ -91,6 +142,43 @@ func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (Library
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const createLoan = `-- name: CreateLoan :one
+INSERT INTO library_loans (id, org_id, book_id, user_id, borrowed_at, due_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, org_id, book_id, user_id, borrowed_at, due_at, returned_at
+`
+
+type CreateLoanParams struct {
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	BookID     uuid.UUID
+	UserID     uuid.UUID
+	BorrowedAt pgtype.Timestamptz
+	DueAt      pgtype.Timestamptz
+}
+
+func (q *Queries) CreateLoan(ctx context.Context, arg CreateLoanParams) (LibraryLoan, error) {
+	row := q.db.QueryRow(ctx, createLoan,
+		arg.ID,
+		arg.OrgID,
+		arg.BookID,
+		arg.UserID,
+		arg.BorrowedAt,
+		arg.DueAt,
+	)
+	var i LibraryLoan
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.BookID,
+		&i.UserID,
+		&i.BorrowedAt,
+		&i.DueAt,
+		&i.ReturnedAt,
 	)
 	return i, err
 }
@@ -163,9 +251,12 @@ func (q *Queries) GetBook(ctx context.Context, arg GetBookParams) (LibraryBook, 
 }
 
 const listBooks = `-- name: ListBooks :many
-SELECT b.id, b.org_id, b.title, b.author, b.shelf, b.level, b.format, b.copies, b.file_id, b.cover, b.sample, b.created_by, b.created_at, b.updated_at, b.published_at, b.archived_at, COALESCE(p.position, 0)::integer AS position
+SELECT b.id, b.org_id, b.title, b.author, b.shelf, b.level, b.format, b.copies, b.file_id, b.cover, b.sample, b.created_by, b.created_at, b.updated_at, b.published_at, b.archived_at, COALESCE(p.position, 0)::integer AS position,
+  (SELECT count(*) FROM library_loans l WHERE l.book_id = b.id AND l.returned_at IS NULL)::integer AS on_loan,
+  m.id AS my_loan_id, m.due_at AS my_due_at
 FROM library_books b
 LEFT JOIN reader_positions p ON p.file_id = b.file_id AND p.user_id = $1
+LEFT JOIN library_loans m ON m.book_id = b.id AND m.user_id = $1 AND m.returned_at IS NULL
 WHERE b.org_id = $2
   AND b.archived_at IS NULL
   AND ($3::boolean OR b.published_at IS NOT NULL)
@@ -191,6 +282,9 @@ type ListBooksParams struct {
 type ListBooksRow struct {
 	LibraryBook LibraryBook
 	Position    int32
+	OnLoan      int32
+	MyLoanID    uuid.NullUUID
+	MyDueAt     pgtype.Timestamptz
 }
 
 // Catalog page ordered by title, with the caller's reader position. Staff may include drafts.
@@ -230,6 +324,60 @@ func (q *Queries) ListBooks(ctx context.Context, arg ListBooksParams) ([]ListBoo
 			&i.LibraryBook.PublishedAt,
 			&i.LibraryBook.ArchivedAt,
 			&i.Position,
+			&i.OnLoan,
+			&i.MyLoanID,
+			&i.MyDueAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMemberLoans = `-- name: ListMemberLoans :many
+SELECT l.id, l.org_id, l.book_id, l.user_id, l.borrowed_at, l.due_at, l.returned_at, b.title, b.author, b.cover
+FROM library_loans l JOIN library_books b ON b.org_id = l.org_id AND b.id = l.book_id
+WHERE l.org_id = $1 AND l.user_id = $2 AND l.returned_at IS NULL
+ORDER BY l.due_at, l.id
+`
+
+type ListMemberLoansParams struct {
+	OrgID  uuid.UUID
+	UserID uuid.UUID
+}
+
+type ListMemberLoansRow struct {
+	LibraryLoan LibraryLoan
+	Title       string
+	Author      string
+	Cover       string
+}
+
+// "Pinjamanku": active loans, soonest due first. Archived books stay listed so they can be returned.
+func (q *Queries) ListMemberLoans(ctx context.Context, arg ListMemberLoansParams) ([]ListMemberLoansRow, error) {
+	rows, err := q.db.Query(ctx, listMemberLoans, arg.OrgID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMemberLoansRow{}
+	for rows.Next() {
+		var i ListMemberLoansRow
+		if err := rows.Scan(
+			&i.LibraryLoan.ID,
+			&i.LibraryLoan.OrgID,
+			&i.LibraryLoan.BookID,
+			&i.LibraryLoan.UserID,
+			&i.LibraryLoan.BorrowedAt,
+			&i.LibraryLoan.DueAt,
+			&i.LibraryLoan.ReturnedAt,
+			&i.Title,
+			&i.Author,
+			&i.Cover,
 		); err != nil {
 			return nil, err
 		}
@@ -274,6 +422,23 @@ func (q *Queries) LockBook(ctx context.Context, arg LockBookParams) (LibraryBook
 	return i, err
 }
 
+const lockMembership = `-- name: LockMembership :one
+SELECT role FROM memberships WHERE org_id = $1 AND user_id = $2 FOR UPDATE
+`
+
+type LockMembershipParams struct {
+	OrgID  uuid.UUID
+	UserID uuid.UUID
+}
+
+// Serializes one member's borrows so the per-member limit holds under concurrency.
+func (q *Queries) LockMembership(ctx context.Context, arg LockMembershipParams) (OrgRole, error) {
+	row := q.db.QueryRow(ctx, lockMembership, arg.OrgID, arg.UserID)
+	var role OrgRole
+	err := row.Scan(&role)
+	return role, err
+}
+
 const orgAdmin = `-- name: OrgAdmin :one
 SELECT user_id FROM memberships WHERE org_id = $1 AND role = 'admin' ORDER BY joined_at, user_id LIMIT 1
 `
@@ -283,6 +448,40 @@ func (q *Queries) OrgAdmin(ctx context.Context, orgID uuid.UUID) (uuid.UUID, err
 	var user_id uuid.UUID
 	err := row.Scan(&user_id)
 	return user_id, err
+}
+
+const returnLoan = `-- name: ReturnLoan :one
+UPDATE library_loans SET returned_at = COALESCE(returned_at, $1)
+WHERE org_id = $2 AND id = $3 AND user_id = $4
+RETURNING id, org_id, book_id, user_id, borrowed_at, due_at, returned_at
+`
+
+type ReturnLoanParams struct {
+	Now    pgtype.Timestamptz
+	OrgID  uuid.UUID
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+// Idempotent: a retried return keeps the first return time.
+func (q *Queries) ReturnLoan(ctx context.Context, arg ReturnLoanParams) (LibraryLoan, error) {
+	row := q.db.QueryRow(ctx, returnLoan,
+		arg.Now,
+		arg.OrgID,
+		arg.ID,
+		arg.UserID,
+	)
+	var i LibraryLoan
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.BookID,
+		&i.UserID,
+		&i.BorrowedAt,
+		&i.DueAt,
+		&i.ReturnedAt,
+	)
+	return i, err
 }
 
 const updateBook = `-- name: UpdateBook :one

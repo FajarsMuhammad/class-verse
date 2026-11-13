@@ -621,6 +621,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/library/books/{book_id}/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Anggota meminjam satu eksemplar buku fisik terbit selama 14 hari. Maksimal 5 pinjaman aktif.
+         *     Diulang saat pinjaman masih aktif mengembalikan pinjaman yang sama (tidak membuat duplikat).
+         */
+        post: operations["borrowBook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pinjamanku — pinjaman aktif pemanggil, jatuh tempo terdekat dulu. */
+        get: operations["listMyLoans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/loans/{loan_id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Peminjam mengembalikan pinjamannya sendiri. Diulang aman. */
+        post: operations["returnLoan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -651,6 +713,34 @@ export interface components {
             position: number;
             /** Format: date-time */
             updated_at: string;
+            /** @description Buku fisik: eksemplar yang tidak sedang dipinjam */
+            available: number;
+            my_loan: components["schemas"]["MyLoan"] | null;
+        };
+        MyLoan: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            due_at: string;
+        };
+        Loan: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            book_id: string;
+            title: string;
+            author: string;
+            cover: string;
+            /** Format: date-time */
+            borrowed_at: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            returned_at: string | null;
+        };
+        LoanList: {
+            items: components["schemas"]["Loan"][];
+            max_active: number;
         };
         BookList: {
             items: components["schemas"]["Book"][];
@@ -2119,6 +2209,89 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    borrowBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pinjaman aktif */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyLoan"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `no_copies`, `loan_limit`, atau `not_loanable` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listMyLoans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pinjaman aktif */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    returnLoan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dikembalikan */
             204: {
                 headers: {
                     [name: string]: unknown;

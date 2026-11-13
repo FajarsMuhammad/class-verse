@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Book, BookInput, BookList, Shelf } from './types'
+import type { Book, BookInput, BookList, LoanList, MyLoan, Shelf } from './types'
 
 const base = (orgID: string) => `/api/orgs/${encodeURIComponent(orgID)}/library/books`
 
@@ -25,7 +25,16 @@ export const libraryApi = {
     api<Book>(`${base(orgID)}/${encodeURIComponent(id)}`, { method: 'PUT', body }),
   archive: (orgID: string, id: string) =>
     api<void>(`${base(orgID)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  borrow: (orgID: string, bookID: string) =>
+    api<MyLoan>(`${base(orgID)}/${encodeURIComponent(bookID)}/loans`, { method: 'POST' }),
+  loans: (orgID: string) => api<LoanList>(`/api/orgs/${encodeURIComponent(orgID)}/library/loans`),
+  giveBack: (orgID: string, loanID: string) =>
+    api<void>(`/api/orgs/${encodeURIComponent(orgID)}/library/loans/${encodeURIComponent(loanID)}/return`, { method: 'POST' }),
 }
+
+// Due dates are shown in WIB regardless of the device time zone (school rule, docs/tasks L2).
+export const dueLabel = (iso: string) =>
+  new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'Asia/Jakarta' }).format(new Date(iso))
 
 // Labels follow the library shelves in assets/world/rooms.json (same keys as the backend enum).
 export const shelves: { key: Shelf; label: string }[] = [

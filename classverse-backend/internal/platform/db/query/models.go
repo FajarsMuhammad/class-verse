@@ -270,6 +270,16 @@ type LibraryBook struct {
 	ArchivedAt  pgtype.Timestamptz
 }
 
+type LibraryLoan struct {
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	BookID     uuid.UUID
+	UserID     uuid.UUID
+	BorrowedAt pgtype.Timestamptz
+	DueAt      pgtype.Timestamptz
+	ReturnedAt pgtype.Timestamptz
+}
+
 type Membership struct {
 	OrgID    uuid.UUID
 	UserID   uuid.UUID

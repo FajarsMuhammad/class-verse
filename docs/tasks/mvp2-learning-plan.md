@@ -230,7 +230,7 @@ memilih kategori. Pengajar/admin menambah, mengubah, menghapus buku dari halaman
 - [x] Verifikasi: integration Postgres+AIStor (peran, lintas org, draf, escape, paginasi, akses file, seed dua
   kali), komponen, browser Chrome (guru membuat draf → peserta tidak melihat dan file 404 → terbit → klik rak
   Sains → cari → baca di overlay; hapus file terpakai 409).
-- [ ] Belum: status "Sedang dipinjam"/Pinjam (L2), Safari/iOS, ruang `perpus` lama (map `baca`) tidak mendapat
+- [x] Status "Sedang dipinjam"/Pinjam selesai di L2. Belum: Safari/iOS, ruang `perpus` lama (map `baca`) tidak mendapat
   katalog sampai dimigrasi ke `library`.
 
 ### L2 — Pinjam dan kembalikan
@@ -243,6 +243,24 @@ memilih kategori. Pengajar/admin menambah, mengubah, menghapus buku dari halaman
   membuat duplikat. Mengurangi `copies` di bawah jumlah pinjaman aktif ditolak. Jatuh tempo ditampilkan WIB.
 - **UI:** tombol Pinjam / Kembalikan / "Sedang dipinjam"; bagian **Pinjamanku** (maks 5) dengan jatuh tempo.
 - **Ditunda (diputuskan):** antre (reservasi) dan denda.
+
+#### Progres L2
+
+- [x] Aturan 5 pinjaman aktif / 14 hari disetujui 2026-11-13 (konstanta `MaxActiveLoans`, `LoanDuration`).
+- [x] Migration `00009_library_loans.sql`: FK komposit `(org_id, book_id)` ke buku sekolah yang sama, unik parsial
+  satu pinjaman aktif per anggota+buku. Hanya buku fisik terbit; peminjam bisa siapa pun anggota sekolah.
+- [x] `Borrow` mengunci membership lalu buku (`FOR UPDATE`); retry mengembalikan pinjaman yang sama. `Return`
+  hanya oleh peminjam, idempoten (waktu kembali pertama dipertahankan). Ubah `copies` di bawah pinjaman aktif
+  ditolak (400 `copies`). Buku diarsip tetap muncul di Pinjamanku agar bisa dikembalikan.
+- [x] API `POST .../books/{id}/loans`, `GET .../library/loans`, `POST .../loans/{id}/return`; error 409
+  `no_copies`/`loan_limit`/`not_loanable` dengan pesan Indonesia; katalog menambah `available` dan `my_loan`.
+- [x] UI: Pinjam / Kembalikan / "Sedang dipinjam" / "x dari y tersedia" di kartu; Pinjamanku (n/5) dengan jatuh
+  tempo WIB (`Asia/Jakarta`), alasan penolakan tetap tampil setelah daftar dimuat ulang.
+- [x] Verifikasi: integration race eksemplar terakhir (7 anggota, 1 menang) dan batas lima paralel (15 run
+  stabil), HTTP status/shape, unit UI, Chrome (pinjam → anggota lain 409 → guru tak bisa turunkan stok →
+  kembalikan → tersedia lagi).
+- [ ] Belum: pengingat jatuh tempo/terlambat, staf melihat/menutup pinjaman anggota lain (mis. buku hilang),
+  Safari/iOS.
 
 ### M1 — Modul
 
@@ -407,7 +425,7 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | F1-03 | [ ] Kelola unggah/hapus file, baca PDF/audio, lanjut halaman terakhir; error/retry jelas dan kontrol keyboard/tap bekerja | F1-02 | OpenAPI, API client, Kelola, `Reader.vue`, reader positions | Component + E2E upload/baca/restore posisi/lintas org |
 | L1-01 | [x] Pengajar CRUD katalog draf/terbit/arsip; peserta hanya konten terbit, file wajib sesuai format dan org | F1 | migration/books queries, `internal/library/`, Kelola | Unit role, integration FK/org, UI authoring |
 | L1-02 | [x] Cari/paginasi/filter kategori dan klik rak membuka katalog; Chat tetap tersedia; contoh hanya dari seed eksplisit | L1-01 | library UI, `CampusScene.ts`, game events, seed | Component + browser klik rak/baca desktop dan HP |
-| L2-01 | [ ] Pinjam/kembali dan Pinjamanku; transaksi menahan pinjaman ke-6 dan dua peminjam eksemplar terakhir; retry aman | L1, aturan pinjam disetujui | migration/loans queries, `internal/library/`, library UI | Integration concurrent, UI stok/jatuh tempo/empty |
+| L2-01 | [x] Pinjam/kembali dan Pinjamanku; transaksi menahan pinjaman ke-6 dan dua peminjam eksemplar terakhir; retry aman | L1, aturan pinjam disetujui | migration/loans queries, `internal/library/`, library UI | Integration concurrent, UI stok/jatuh tempo/empty |
 | M1-01 | [ ] Pengajar membuat draf modul/urutan langkah dan menerbitkan; peserta tidak bisa membaca draf atau file yang hanya terikat draf | F1, aturan revisi disetujui | migration/modules queries, `internal/module/`, Kelola | Unit validasi + role/org/draft integration + UI authoring |
 | M1-02 | [ ] Lihat modul per gedung/level dan buka materi di aplikasi tanpa meninggalkan ruang; kosong/error/focus tertangani | M1-01 | PlaceCard, module UI, Reader, tokens | Component + browser materi PDF/audio/teks |
 | M2-01 | [ ] Selesai langkah idempotent dan urut di server; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit urutan, integration duplikat/org, E2E reload |

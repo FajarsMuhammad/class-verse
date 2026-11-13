@@ -429,6 +429,9 @@ type AccessTokenResponse struct {
 type Book struct {
 	Author string `json:"author"`
 
+	// Available Buku fisik: eksemplar yang tidak sedang dipinjam
+	Available int `json:"available"`
+
 	// Copies Eksemplar fisik; selalu 0 untuk ebook/audio
 	Copies    int                 `json:"copies"`
 	Cover     BookCover           `json:"cover"`
@@ -436,6 +439,7 @@ type Book struct {
 	Format    BookFormat          `json:"format"`
 	Id        openapi_types.UUID  `json:"id"`
 	Level     BookLevel           `json:"level"`
+	MyLoan    *MyLoan             `json:"my_loan"`
 	Position  int                 `json:"position"`
 	Published bool                `json:"published"`
 
@@ -584,6 +588,24 @@ type InvitePreview struct {
 // InviteRole defines model for InviteRole.
 type InviteRole string
 
+// Loan defines model for Loan.
+type Loan struct {
+	Author     string             `json:"author"`
+	BookId     openapi_types.UUID `json:"book_id"`
+	BorrowedAt time.Time          `json:"borrowed_at"`
+	Cover      string             `json:"cover"`
+	DueAt      time.Time          `json:"due_at"`
+	Id         openapi_types.UUID `json:"id"`
+	ReturnedAt *time.Time         `json:"returned_at"`
+	Title      string             `json:"title"`
+}
+
+// LoanList defines model for LoanList.
+type LoanList struct {
+	Items     []Loan `json:"items"`
+	MaxActive int    `json:"max_active"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -627,6 +649,12 @@ type ModerationActionAction string
 type ModerationLog struct {
 	Items      []ModerationAction `json:"items"`
 	NextCursor *string            `json:"next_cursor"`
+}
+
+// MyLoan defines model for MyLoan.
+type MyLoan struct {
+	DueAt time.Time          `json:"due_at"`
+	Id    openapi_types.UUID `json:"id"`
 }
 
 // OrgSummary defines model for OrgSummary.

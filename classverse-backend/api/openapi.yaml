@@ -656,6 +656,55 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/library/books/{book_id}/loans:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: book_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: borrowBook
+      description: |
+        Anggota meminjam satu eksemplar buku fisik terbit selama 14 hari. Maksimal 5 pinjaman aktif.
+        Diulang saat pinjaman masih aktif mengembalikan pinjaman yang sama (tidak membuat duplikat).
+      responses:
+        "200":
+          description: Pinjaman aktif
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MyLoan" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`no_copies`, `loan_limit`, atau `not_loanable`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /api/orgs/{org_id}/library/loans:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listMyLoans
+      description: Pinjamanku — pinjaman aktif pemanggil, jatuh tempo terdekat dulu.
+      responses:
+        "200":
+          description: Pinjaman aktif
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoanList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/orgs/{org_id}/library/loans/{loan_id}/return:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: loan_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: returnLoan
+      description: Peminjam mengembalikan pinjamannya sendiri. Diulang aman.
+      responses:
+        "204": { description: Dikembalikan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
 components:
   securitySchemes:
@@ -755,12 +804,40 @@ components:
       allOf:
         - $ref: "#/components/schemas/BookInput"
         - type: object
-          required: [id, sample, position, updated_at]
+          required: [id, sample, position, updated_at, available, my_loan]
           properties:
             id: { type: string, format: uuid }
             sample: { type: boolean, description: "Buku contoh dari seed, boleh dihapus" }
             position: { type: integer }
             updated_at: { type: string, format: date-time }
+            available: { type: integer, description: "Buku fisik: eksemplar yang tidak sedang dipinjam" }
+            my_loan:
+              nullable: true
+              allOf: [{ $ref: "#/components/schemas/MyLoan" }]
+    MyLoan:
+      type: object
+      required: [id, due_at]
+      properties:
+        id: { type: string, format: uuid }
+        due_at: { type: string, format: date-time }
+    Loan:
+      type: object
+      required: [id, book_id, title, author, cover, borrowed_at, due_at, returned_at]
+      properties:
+        id: { type: string, format: uuid }
+        book_id: { type: string, format: uuid }
+        title: { type: string }
+        author: { type: string }
+        cover: { type: string }
+        borrowed_at: { type: string, format: date-time }
+        due_at: { type: string, format: date-time }
+        returned_at: { type: string, format: date-time, nullable: true }
+    LoanList:
+      type: object
+      required: [items, max_active]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Loan" } }
+        max_active: { type: integer }
     BookList:
       type: object
       required: [items, next_cursor]

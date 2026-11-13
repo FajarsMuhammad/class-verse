@@ -71,10 +71,12 @@ type Input struct {
 	Published bool
 }
 
-// Book is a catalog entry plus the caller's last reader position for its file.
+// Book is a catalog entry plus the caller's reader position and loan state.
 type Book struct {
 	query.LibraryBook
 	Position int32
+	OnLoan   int32
+	MyLoan   *query.LibraryLoan
 }
 
 // Page is one catalog page.
@@ -255,6 +257,9 @@ func (s *Service) Update(ctx context.Context, userID, orgID, id uuid.UUID, in In
 		if err := checkFile(ctx, q, orgID, in); err != nil {
 			return err
 		}
+		if err := checkCopies(ctx, q, id, in.Copies); err != nil {
+			return err
+		}
 		published := pgtype.Timestamptz{}
 		if in.Published {
 			published = cur.PublishedAt
@@ -327,7 +332,11 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	}
 	page := Page{Items: make([]Book, 0, min(len(rows), limit))}
 	for _, r := range rows[:min(len(rows), limit)] {
-		page.Items = append(page.Items, Book{LibraryBook: r.LibraryBook, Position: r.Position})
+		b := Book{LibraryBook: r.LibraryBook, Position: r.Position, OnLoan: r.OnLoan}
+		if r.MyLoanID.Valid {
+			b.MyLoan = &query.LibraryLoan{ID: r.MyLoanID.UUID, BookID: r.LibraryBook.ID, DueAt: r.MyDueAt}
+		}
+		page.Items = append(page.Items, b)
 	}
 	if len(rows) > limit {
 		last := page.Items[limit-1]

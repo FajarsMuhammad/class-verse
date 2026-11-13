@@ -9,6 +9,7 @@ import type { Book } from '@/api/types'
 const draft: Book = {
   id: 'b1', title: 'Atlas', author: 'Rina', shelf: 'referensi', level: 'SMP', format: 'buku', copies: 2,
   file_id: null, cover: 'sejarah', published: false, sample: false, position: 0, updated_at: '2026-01-01T00:00:00Z',
+  available: 2, my_loan: null,
 }
 
 afterEach(() => vi.restoreAllMocks())
