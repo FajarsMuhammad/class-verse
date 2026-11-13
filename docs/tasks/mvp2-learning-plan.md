@@ -298,7 +298,8 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 - [x] Verifikasi: unit validasi/YouTube, integration Postgres (peran, lintas org, draf, file, urutan, arsip, HTTP),
   komponen, Chrome desktop + 390 px (guru membuat draf → peserta tidak melihat → urut → terbit → buka video,
   teks, PDF).
-- [ ] Belum: progres/kunci langkah (M2), langkah kuis (Q1), CSP global untuk `frame-src`, Safari/iOS.
+- [ ] Belum: langkah kuis (Q1), CSP global untuk `frame-src`, Safari/iOS. Progres menyusul M2;
+  kunci langkah tidak berlaku pada katalog bebas.
 
 ### M2 — Progres modul
 
@@ -307,7 +308,28 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 - **Aturan (disetujui 2026-11-13):** semua langkah **bebas dibuka**; langkah materi/video/berkas selesai saat
   siswa menekan "Selesai"; langkah kuis selesai saat lulus (nilai ≥ ambang, usul default 60), baru dihubungkan
   setelah Q1. Langkah arsip tidak dihitung dalam total progres.
-- **UI:** "Lanjutkan belajar" di panel belajar kiri memakai progres nyata.
+- **UI:** "Lanjutkan belajar" di panel belajar kiri dan mode HP memakai progres nyata.
+
+#### Progres M2
+
+- [x] Migration `00011_module_progress.sql`, FK komposit organisasi/membership/langkah, PK mencegah duplikat;
+  selesai mempertahankan timestamp pertama, batal selesai menghapus tanda. Arsip langkah/modul menjaga riwayat;
+  langkah arsip tidak dihitung dalam total. Hapus membership menghapus progres lewat FK.
+- [x] `PUT/DELETE .../modules/{module_id}/steps/{step_id}/done`: hanya progres pemanggil, akses diperiksa dalam
+  transaksi dengan lock modul agar tidak berlomba dengan arsip/unpublish. Draf hanya staf; sekolah lain 404.
+- [x] `GET .../modules/resume`: modul terbit dengan tanda selesai terbaru yang masih punya langkah aktif belum
+  selesai; tidak ada aktivitas atau semua selesai menghasilkan `resume: null`, bukan progres contoh.
+  Membuka materi saja belum dihitung aktivitas. Semua respons modul `no-store`; limit per pengguna
+  600 baca/menit dan 120 tulis/menit.
+- [x] UI Selesai/Batal selesai per langkah, jumlah selesai per modul, semua langkah tetap bebas dibuka.
+  Lanjutkan membuka gedung/jenjang terkait, memfokuskan modul terpilih; tutup dialog memperbarui kartu.
+- [x] Test integrasi mencakup urutan bebas, duplikat serentak/timestamp pertama, akun/sekolah/draf/arsip,
+  undo/resume/HTTP/rate limit; rollback/reapply migration di DB disposable. Komponen menguji save/error/retry,
+  progres server dan pilihan jenjang; Chrome desktop/390 px menguji reload, undo, akun berbeda, semua selesai.
+- [x] Verifikasi akhir: seluruh test backend `-race` lulus (coverage `module` 86,0%); frontend 42 file/156 test,
+  lint backend/frontend, build/type-check dan world check lulus. Chrome progres desktop/390 px serta regresi
+  pinjam/kembali dan reader lulus. Migration 00011 sudah diterapkan ke DB dev.
+- [ ] Belum: bukti konsumsi video/teks otomatis (tanda selesai adalah pengakuan pengguna), kuis Q1, Safari/iOS.
 
 ### A1 — Tugaskan modul ke kelas dan sematkan di ruang (setelah C1)
 
@@ -461,7 +483,7 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | L2-01 | [x] Pinjam/kembali dan Pinjamanku; transaksi menahan pinjaman ke-6 dan dua peminjam eksemplar terakhir; retry aman | L1, aturan pinjam disetujui | migration/loans queries, `internal/library/`, library UI | Integration concurrent, UI stok/jatuh tempo/empty |
 | M1-01 | [x] Pengajar membuat draf modul/urutan langkah dan menerbitkan; peserta tidak bisa membaca draf atau file yang hanya terikat draf | F1, aturan revisi disetujui | migration/modules queries, `internal/module/`, Kelola | Unit validasi + role/org/draft integration + UI authoring |
 | M1-02 | [x] Lihat modul per gedung/level dan buka materi di aplikasi tanpa meninggalkan ruang; kosong/error/focus tertangani | M1-01 | PlaceCard, module UI, Reader, tokens | Component + browser materi PDF/audio/teks |
-| M2-01 | [ ] Selesai langkah idempotent, langkah bebas dibuka; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit urutan, integration duplikat/org, E2E reload |
+| M2-01 | [x] Selesai langkah idempotent, langkah bebas dibuka; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit/komponen progres, integration duplikat/org/arsip, E2E reload |
 | Q1-01 | [ ] Bank soal draf/terbit tepat 4 opsi; kunci hanya tersedia pengajar, snapshot tidak berubah setelah edit | M1/M2 | migration/quizzes queries, `internal/quiz/`, Kelola | Unit soal invalid + integration version/role + component |
 | Q1-02 | [ ] Kuis mandiri menilai di server, submit ulang aman, nilai 0–100 tersimpan; langkah kuis lulus membuka langkah lanjut | Q1-01, aturan nilai disetujui | `internal/quiz/`, module linkage migration, quiz UI | Unit skor, integration submit/crash, E2E nilai/progres |
 | C1-01 | [ ] Pengajar/admin membuat kelas pada tahun ajaran; hanya admin memilih tahun aktif; sekolah lain tidak terpengaruh | Q1 dalam urutan, auth/org existing | migrations/year/class queries, fitur kelas, Kelola | Unit role, integration org/tahun aktif serentak, component Kelola |

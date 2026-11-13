@@ -789,6 +789,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/modules/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Modul terbit terakhir yang dikerjakan dan masih punya langkah aktif belum selesai; null jika tidak ada. */
+        get: operations["resumeModule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/steps/{step_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Tandai langkah selesai untuk pemanggil; idempoten. Langkah bebas diselesaikan tanpa urutan wajib. */
+        put: operations["completeModuleStep"];
+        post?: never;
+        /** @description Batalkan tanda selesai milik pemanggil; idempoten. */
+        delete: operations["uncompleteModuleStep"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -847,6 +888,18 @@ export interface components {
             minutes: number;
             /** @description Posisi baca pemanggil untuk file langkah `berkas` */
             reader_position: number;
+            /** @description Langkah sudah ditandai selesai oleh pemanggil */
+            done: boolean;
+        };
+        ModuleResume: {
+            /** Format: uuid */
+            module_id: string;
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            done: number;
+            total: number;
+            next_title: string;
         };
         /** @enum {string} */
         Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
@@ -2693,6 +2746,80 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resumeModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lanjutkan belajar */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        resume: components["schemas"]["ModuleResume"] | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    completeModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Selesai */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uncompleteModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tanda selesai dibatalkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
         };
     };

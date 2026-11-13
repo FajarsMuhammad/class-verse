@@ -26,10 +26,12 @@ LIMIT 100;
 
 -- name: ListModuleSteps :many
 -- Active steps of the given modules, in path order, with the caller's reader position for file steps.
-SELECT sqlc.embed(s), COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind
+SELECT sqlc.embed(s), COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind,
+  (d.step_id IS NOT NULL)::boolean AS done
 FROM module_steps s
 LEFT JOIN files f ON f.org_id = s.org_id AND f.id = s.file_id
 LEFT JOIN reader_positions p ON p.file_id = s.file_id AND p.user_id = sqlc.arg(user_id)
+LEFT JOIN module_progress d ON d.org_id = s.org_id AND d.step_id = s.id AND d.user_id = sqlc.arg(user_id)
 WHERE s.org_id = sqlc.arg(org_id) AND s.module_id = ANY(sqlc.arg(module_ids)::uuid[]) AND s.archived_at IS NULL
 ORDER BY s.module_id, s.position, s.id;
 
@@ -55,3 +57,37 @@ SELECT id FROM module_steps WHERE org_id = $1 AND module_id = $2 AND archived_at
 
 -- name: SetStepPosition :exec
 UPDATE module_steps SET position = $3 WHERE module_id = $1 AND id = $2;
+
+-- name: ReadableStep :one
+-- A participant can complete only an active step of a published, non-archived module.
+SELECT s.id FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+WHERE s.org_id = $1 AND s.module_id = $2 AND s.id = $3 AND s.archived_at IS NULL AND m.archived_at IS NULL
+  AND (sqlc.arg(staff)::boolean OR m.published_at IS NOT NULL);
+
+-- name: CompleteStep :exec
+-- Idempotent: completing again keeps the first completion time.
+INSERT INTO module_progress (org_id, user_id, step_id, completed_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING;
+
+-- name: UncompleteStep :exec
+DELETE FROM module_progress WHERE org_id = $1 AND user_id = $2 AND step_id = $3;
+
+-- name: ResumeModule :one
+-- "Lanjutkan belajar": the published module the member touched last that still has an unfinished active step.
+SELECT m.id, m.building_key, m.title,
+  (SELECT count(*) FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS total,
+  (SELECT count(*) FROM module_steps x JOIN module_progress y ON y.org_id = x.org_id AND y.step_id = x.id
+     AND y.user_id = sqlc.arg(user_id) WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS done,
+  (SELECT x.title FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
+     AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = sqlc.arg(user_id))
+     ORDER BY x.position, x.id LIMIT 1)::text AS next_title,
+  m.level
+FROM modules m
+JOIN module_steps s ON s.org_id = m.org_id AND s.module_id = m.id
+JOIN module_progress p ON p.org_id = s.org_id AND p.step_id = s.id AND p.user_id = sqlc.arg(user_id)
+WHERE m.org_id = sqlc.arg(org_id) AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+  AND EXISTS (SELECT 1 FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
+    AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = sqlc.arg(user_id)))
+GROUP BY m.id
+ORDER BY max(p.completed_at) DESC, m.id
+LIMIT 1;

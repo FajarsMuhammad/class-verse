@@ -745,9 +745,23 @@ type ModuleList struct {
 	Items []Module `json:"items"`
 }
 
+// ModuleResume defines model for ModuleResume.
+type ModuleResume struct {
+	BuildingKey string             `json:"building_key"`
+	Done        int                `json:"done"`
+	Level       Level              `json:"level"`
+	ModuleId    openapi_types.UUID `json:"module_id"`
+	NextTitle   string             `json:"next_title"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+}
+
 // ModuleStep defines model for ModuleStep.
 type ModuleStep struct {
-	Body   string              `json:"body"`
+	Body string `json:"body"`
+
+	// Done Langkah sudah ditandai selesai oleh pemanggil
+	Done   bool                `json:"done"`
 	FileId *openapi_types.UUID `json:"file_id"`
 
 	// FileKind Jenis file langkah `berkas` (hanya di daftar modul)

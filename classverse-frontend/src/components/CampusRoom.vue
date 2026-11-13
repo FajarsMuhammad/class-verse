@@ -93,6 +93,7 @@ const closeButton = ref<HTMLButtonElement | null>(null)
 const directoryOpen = ref(false)
 const roomsOpen = ref(false)
 const modulesOf = ref<Building | null>(null)
+const progressKey = ref(0)
 const mobilePanel = ref<'map' | 'chat'>('map')
 function toggleDirectory() {
   directoryOpen.value = !directoryOpen.value
@@ -285,7 +286,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed, library }]">
-      <LearningPanel v-model:closed="learningClosed" class="learning-panel" :name="auth.me?.display_name ?? ''"
+      <LearningPanel v-model:closed="learningClosed" class="learning-panel" :org-id="org.active?.id" :progress-key="progressKey" :name="auth.me?.display_name ?? ''"
         :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
         :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
         :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
@@ -397,7 +398,7 @@ onBeforeUnmount(() => {
             :occupancy="buildings.find((item) => item.building_key === panelBuilding?.key)"
             @walk="walkToPlace" @rooms="showPlaceRooms" @close="closePlace" @modules="modulesOf = panelBuilding ?? null" />
           <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
-            :building-name="modulesOf.name" @close="modulesOf = null" />
+            :building-name="modulesOf.name" @close="modulesOf = null; progressKey++" />
           <div v-if="kicked" class="connection-overlay" role="alert">
             <p>
               Kamu dikeluarkan dari sesi ini oleh pengajar. Minta izin pengajar untuk masuk lagi.

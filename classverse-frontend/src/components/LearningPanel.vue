@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import SeatPicker from '@/components/SeatPicker.vue'
+import ResumeLearning from '@/components/ResumeLearning.vue'
 import { avatarURL } from '@/game/avatars'
 import type { Seat } from '@/realtime/mapdata'
 
 // Left sidebar (docs/tasks/mvp2-revamp.md): profile and the current place.
-// Progress and missions join here once a persisted service exists.
+// Persisted module progress is independent of the avatar's room.
 defineProps<{
+  orgId?: string
+  progressKey?: number
   name: string
   avatar: string
   teacher: boolean
@@ -33,6 +36,7 @@ const emit = defineEmits<{ walk: [seat: Seat] }>()
         <img :src="avatarURL(avatar)" alt="" width="42" height="57" />
         <div><strong>{{ name }}</strong><p>{{ teacher ? 'Pengajar' : 'Peserta' }}</p></div>
       </div>
+      <ResumeLearning v-if="orgId" :org-id="orgId" :refresh-key="progressKey" />
       <h3>{{ campus ? 'Jelajahi kampus' : 'Ruang belajar' }}</h3>
       <p class="panel-note">{{ campus ? 'Klik gedung di peta atau buka Daftar gedung, lalu berjalan ke pintunya.' : roomName }}</p>
       <template v-if="!campus">

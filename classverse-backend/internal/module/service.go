@@ -95,6 +95,7 @@ type Step struct {
 	query.ModuleStep
 	FileKind       string
 	ReaderPosition int32
+	Done           bool
 }
 
 // Module is a module with its active steps in order.
@@ -492,7 +493,7 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	}
 	for _, st := range steps {
 		i := byID[st.ModuleStep.ModuleID]
-		out[i].Steps = append(out[i].Steps, Step{ModuleStep: st.ModuleStep, FileKind: st.FileKind, ReaderPosition: st.ReaderPosition})
+		out[i].Steps = append(out[i].Steps, Step{ModuleStep: st.ModuleStep, FileKind: st.FileKind, ReaderPosition: st.ReaderPosition, Done: st.Done})
 	}
 	return out, nil
 }

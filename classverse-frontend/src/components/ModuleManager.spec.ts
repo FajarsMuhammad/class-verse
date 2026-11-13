@@ -14,7 +14,7 @@ vi.mock('@/realtime/mapdata', () => ({
 }))
 
 const step = (id: string): ModuleStep => ({
-  id, kind: 'materi', title: `Langkah ${id}`, body: 'x', file_id: null, file_kind: null, video_id: null, minutes: 5, reader_position: 0,
+  id, kind: 'materi', title: `Langkah ${id}`, body: 'x', file_id: null, file_kind: null, video_id: null, minutes: 5, reader_position: 0, done: false,
 })
 const draft: Module = {
   id: 'm1', building_key: 'sains', level: 'SD', title: 'Tata Surya', description: '', published: false,

@@ -849,6 +849,46 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/orgs/{org_id}/modules/resume:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: resumeModule
+      description: Modul terbit terakhir yang dikerjakan dan masih punya langkah aktif belum selesai; null jika tidak ada.
+      responses:
+        "200":
+          description: Lanjutkan belajar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [resume]
+                properties:
+                  resume:
+                    nullable: true
+                    allOf: [{ $ref: "#/components/schemas/ModuleResume" }]
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/modules/{module_id}/steps/{step_id}/done:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: module_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: step_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: completeModuleStep
+      description: Tandai langkah selesai untuk pemanggil; idempoten. Langkah bebas diselesaikan tanpa urutan wajib.
+      responses:
+        "204": { description: Selesai }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: uncompleteModuleStep
+      description: Batalkan tanda selesai milik pemanggil; idempoten.
+      responses:
+        "204": { description: Tanda selesai dibatalkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     bearer:
@@ -968,7 +1008,7 @@ components:
         minutes: { type: integer, minimum: 1, maximum: 240 }
     ModuleStep:
       type: object
-      required: [id, kind, title, body, file_id, file_kind, video_id, minutes, reader_position]
+      required: [id, kind, title, body, file_id, file_kind, video_id, minutes, reader_position, done]
       properties:
         id: { type: string, format: uuid }
         kind: { $ref: "#/components/schemas/StepKind" }
@@ -979,6 +1019,18 @@ components:
         video_id: { type: string, nullable: true, description: "ID video YouTube 11 karakter" }
         minutes: { type: integer }
         reader_position: { type: integer, description: "Posisi baca pemanggil untuk file langkah `berkas`" }
+        done: { type: boolean, description: "Langkah sudah ditandai selesai oleh pemanggil" }
+    ModuleResume:
+      type: object
+      required: [module_id, building_key, level, title, done, total, next_title]
+      properties:
+        module_id: { type: string, format: uuid }
+        building_key: { type: string }
+        level: { $ref: "#/components/schemas/Level" }
+        title: { type: string }
+        done: { type: integer }
+        total: { type: integer }
+        next_title: { type: string }
     Shelf:
       type: string
       enum: [dongeng, novel, komik, sains, matematika, sejarah, inggris, referensi]

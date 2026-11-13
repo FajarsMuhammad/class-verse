@@ -13,16 +13,21 @@ import (
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/httpx"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/ratelimit"
 )
 
 // Handler serves module endpoints; mount inside RequireUser.
 type Handler struct {
-	svc *Service
-	log *slog.Logger
+	svc    *Service
+	log    *slog.Logger
+	reads  *ratelimit.Limiter
+	writes *ratelimit.Limiter
 }
 
 // NewHandler wires the HTTP layer.
-func NewHandler(svc *Service, log *slog.Logger) *Handler { return &Handler{svc: svc, log: log} }
+func NewHandler(svc *Service, log *slog.Logger) *Handler {
+	return &Handler{svc: svc, log: log, reads: ratelimit.New(600, time.Minute, svc.now), writes: ratelimit.New(120, time.Minute, svc.now)}
+}
 
 // Routes mounts module endpoints.
 func (h *Handler) Routes(r chi.Router) {
@@ -34,10 +39,25 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Put("/orgs/{org_id}/modules/{module_id}/steps/{step_id}", h.handle(h.updateStep))
 	r.Delete("/orgs/{org_id}/modules/{module_id}/steps/{step_id}", h.handle(h.archiveStep))
 	r.Put("/orgs/{org_id}/modules/{module_id}/order", h.handle(h.reorder))
+	r.Put("/orgs/{org_id}/modules/{module_id}/steps/{step_id}/done", h.handle(h.done(true)))
+	r.Delete("/orgs/{org_id}/modules/{module_id}/steps/{step_id}/done", h.handle(h.done(false)))
+	r.Get("/orgs/{org_id}/modules/resume", h.handle(h.resume))
 }
 
 func (h *Handler) handle(fn func(http.ResponseWriter, *http.Request) error) http.HandlerFunc {
 	return httpx.Handle(h.log, func(w http.ResponseWriter, r *http.Request) error {
+		w.Header().Set("Cache-Control", "no-store")
+		user, ok := auth.UserID(r.Context())
+		if !ok {
+			return &httpx.Error{Status: 401, Code: "unauthenticated", Message: "Silakan masuk"}
+		}
+		limit := h.writes
+		if r.Method == http.MethodGet {
+			limit = h.reads
+		}
+		if err := httpx.RateLimit(w, limit, user.String()); err != nil {
+			return err
+		}
 		err := fn(w, r)
 		var verr *ValidationError
 		switch {
@@ -71,6 +91,7 @@ type StepResponse struct {
 	VideoID        *string    `json:"video_id"`
 	Minutes        int32      `json:"minutes"`
 	ReaderPosition int32      `json:"reader_position"`
+	Done           bool       `json:"done"`
 }
 
 // Response is the public view of a module with its steps in order.
@@ -86,7 +107,7 @@ type Response struct {
 }
 
 func toStep(s Step) StepResponse {
-	out := StepResponse{ID: s.ID, Kind: s.Kind, Title: s.Title, Body: s.Body, Minutes: s.Minutes, ReaderPosition: s.ReaderPosition}
+	out := StepResponse{ID: s.ID, Kind: s.Kind, Title: s.Title, Body: s.Body, Minutes: s.Minutes, ReaderPosition: s.ReaderPosition, Done: s.Done}
 	if s.FileID.Valid {
 		out.FileID = &s.FileID.UUID
 	}
@@ -266,5 +287,48 @@ func (h *Handler) reorder(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func (h *Handler) done(done bool) func(http.ResponseWriter, *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		user, p, err := ids(r, "org_id", "module_id", "step_id")
+		if err != nil {
+			return err
+		}
+		if err := h.svc.SetDone(r.Context(), user, p[0], p[1], p[2], done); err != nil {
+			return err
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return nil
+	}
+}
+
+// ResumeResponse is the "Lanjutkan belajar" card; null when there is nothing to continue.
+type ResumeResponse struct {
+	ModuleID    uuid.UUID `json:"module_id"`
+	BuildingKey string    `json:"building_key"`
+	Level       string    `json:"level"`
+	Title       string    `json:"title"`
+	Done        int32     `json:"done"`
+	Total       int32     `json:"total"`
+	NextTitle   string    `json:"next_title"`
+}
+
+func (h *Handler) resume(w http.ResponseWriter, r *http.Request) error {
+	user, p, err := ids(r, "org_id")
+	if err != nil {
+		return err
+	}
+	res, err := h.svc.ResumeFor(r.Context(), user, p[0])
+	if err != nil {
+		return err
+	}
+	var out *ResumeResponse
+	if res != nil {
+		out = &ResumeResponse{ModuleID: res.ModuleID, BuildingKey: res.BuildingKey, Level: res.Level, Title: res.Title,
+			Done: res.Done, Total: res.Total, NextTitle: res.NextTitle}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"resume": out})
 	return nil
 }

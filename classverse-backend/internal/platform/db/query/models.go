@@ -311,6 +311,13 @@ type Module struct {
 	ArchivedAt  pgtype.Timestamptz
 }
 
+type ModuleProgress struct {
+	OrgID       uuid.UUID
+	UserID      uuid.UUID
+	StepID      uuid.UUID
+	CompletedAt pgtype.Timestamptz
+}
+
 type ModuleStep struct {
 	ID         uuid.UUID
 	OrgID      uuid.UUID

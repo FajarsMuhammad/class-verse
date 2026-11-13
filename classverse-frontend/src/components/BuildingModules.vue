@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, useTemplateRef } from 'vue'
 import ModulePath from './ModulePath.vue'
+import type { Level } from '@/api/types'
 
 // Modal wrapper so a participant browses a building's modules without leaving the map.
-defineProps<{ orgId: string; buildingKey: string; buildingName: string }>()
+defineProps<{ orgId: string; buildingKey: string; buildingName: string; initialLevel?: Level; moduleId?: string }>()
 const emit = defineEmits<{ close: [] }>()
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 onMounted(() => dialog.value?.showModal())
@@ -15,7 +16,8 @@ onMounted(() => dialog.value?.showModal())
       <h2 id="modules-title">Modul {{ buildingName }}</h2>
       <button type="button" class="btn-secondary close" aria-label="Tutup modul" @click="dialog?.close()">×</button>
     </header>
-    <ModulePath :org-id="orgId" :building-key="buildingKey" :building-name="buildingName" />
+    <ModulePath :org-id="orgId" :building-key="buildingKey" :building-name="buildingName"
+      :initial-level="initialLevel" :module-id="moduleId" />
   </dialog>
 </template>
 

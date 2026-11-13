@@ -84,6 +84,29 @@ func (q *Queries) ArchiveStep(ctx context.Context, arg ArchiveStepParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const completeStep = `-- name: CompleteStep :exec
+INSERT INTO module_progress (org_id, user_id, step_id, completed_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+`
+
+type CompleteStepParams struct {
+	OrgID       uuid.UUID
+	UserID      uuid.UUID
+	StepID      uuid.UUID
+	CompletedAt pgtype.Timestamptz
+}
+
+// Idempotent: completing again keeps the first completion time.
+func (q *Queries) CompleteStep(ctx context.Context, arg CompleteStepParams) error {
+	_, err := q.db.Exec(ctx, completeStep,
+		arg.OrgID,
+		arg.UserID,
+		arg.StepID,
+		arg.CompletedAt,
+	)
+	return err
+}
+
 const createModule = `-- name: CreateModule :one
 INSERT INTO modules (id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)
@@ -185,10 +208,12 @@ func (q *Queries) CreateStep(ctx context.Context, arg CreateStepParams) (ModuleS
 }
 
 const listModuleSteps = `-- name: ListModuleSteps :many
-SELECT s.id, s.org_id, s.module_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.minutes, s.created_at, s.updated_at, s.archived_at, COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind
+SELECT s.id, s.org_id, s.module_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.minutes, s.created_at, s.updated_at, s.archived_at, COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind,
+  (d.step_id IS NOT NULL)::boolean AS done
 FROM module_steps s
 LEFT JOIN files f ON f.org_id = s.org_id AND f.id = s.file_id
 LEFT JOIN reader_positions p ON p.file_id = s.file_id AND p.user_id = $1
+LEFT JOIN module_progress d ON d.org_id = s.org_id AND d.step_id = s.id AND d.user_id = $1
 WHERE s.org_id = $2 AND s.module_id = ANY($3::uuid[]) AND s.archived_at IS NULL
 ORDER BY s.module_id, s.position, s.id
 `
@@ -203,6 +228,7 @@ type ListModuleStepsRow struct {
 	ModuleStep     ModuleStep
 	ReaderPosition int32
 	FileKind       string
+	Done           bool
 }
 
 // Active steps of the given modules, in path order, with the caller's reader position for file steps.
@@ -231,6 +257,7 @@ func (q *Queries) ListModuleSteps(ctx context.Context, arg ListModuleStepsParams
 			&i.ModuleStep.ArchivedAt,
 			&i.ReaderPosition,
 			&i.FileKind,
+			&i.Done,
 		); err != nil {
 			return nil, err
 		}
@@ -336,6 +363,83 @@ func (q *Queries) NextStepPosition(ctx context.Context, moduleID uuid.UUID) (int
 	return column_1, err
 }
 
+const readableStep = `-- name: ReadableStep :one
+SELECT s.id FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+WHERE s.org_id = $1 AND s.module_id = $2 AND s.id = $3 AND s.archived_at IS NULL AND m.archived_at IS NULL
+  AND ($4::boolean OR m.published_at IS NOT NULL)
+`
+
+type ReadableStepParams struct {
+	OrgID    uuid.UUID
+	ModuleID uuid.UUID
+	ID       uuid.UUID
+	Staff    bool
+}
+
+// A participant can complete only an active step of a published, non-archived module.
+func (q *Queries) ReadableStep(ctx context.Context, arg ReadableStepParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, readableStep,
+		arg.OrgID,
+		arg.ModuleID,
+		arg.ID,
+		arg.Staff,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const resumeModule = `-- name: ResumeModule :one
+SELECT m.id, m.building_key, m.title,
+  (SELECT count(*) FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS total,
+  (SELECT count(*) FROM module_steps x JOIN module_progress y ON y.org_id = x.org_id AND y.step_id = x.id
+     AND y.user_id = $1 WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS done,
+  (SELECT x.title FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
+     AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = $1)
+     ORDER BY x.position, x.id LIMIT 1)::text AS next_title,
+  m.level
+FROM modules m
+JOIN module_steps s ON s.org_id = m.org_id AND s.module_id = m.id
+JOIN module_progress p ON p.org_id = s.org_id AND p.step_id = s.id AND p.user_id = $1
+WHERE m.org_id = $2 AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+  AND EXISTS (SELECT 1 FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
+    AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = $1))
+GROUP BY m.id
+ORDER BY max(p.completed_at) DESC, m.id
+LIMIT 1
+`
+
+type ResumeModuleParams struct {
+	UserID uuid.UUID
+	OrgID  uuid.UUID
+}
+
+type ResumeModuleRow struct {
+	ID          uuid.UUID
+	BuildingKey string
+	Title       string
+	Total       int32
+	Done        int32
+	NextTitle   string
+	Level       string
+}
+
+// "Lanjutkan belajar": the published module the member touched last that still has an unfinished active step.
+func (q *Queries) ResumeModule(ctx context.Context, arg ResumeModuleParams) (ResumeModuleRow, error) {
+	row := q.db.QueryRow(ctx, resumeModule, arg.UserID, arg.OrgID)
+	var i ResumeModuleRow
+	err := row.Scan(
+		&i.ID,
+		&i.BuildingKey,
+		&i.Title,
+		&i.Total,
+		&i.Done,
+		&i.NextTitle,
+		&i.Level,
+	)
+	return i, err
+}
+
 const setStepPosition = `-- name: SetStepPosition :exec
 UPDATE module_steps SET position = $3 WHERE module_id = $1 AND id = $2
 `
@@ -348,6 +452,21 @@ type SetStepPositionParams struct {
 
 func (q *Queries) SetStepPosition(ctx context.Context, arg SetStepPositionParams) error {
 	_, err := q.db.Exec(ctx, setStepPosition, arg.ModuleID, arg.ID, arg.Position)
+	return err
+}
+
+const uncompleteStep = `-- name: UncompleteStep :exec
+DELETE FROM module_progress WHERE org_id = $1 AND user_id = $2 AND step_id = $3
+`
+
+type UncompleteStepParams struct {
+	OrgID  uuid.UUID
+	UserID uuid.UUID
+	StepID uuid.UUID
+}
+
+func (q *Queries) UncompleteStep(ctx context.Context, arg UncompleteStepParams) error {
+	_, err := q.db.Exec(ctx, uncompleteStep, arg.OrgID, arg.UserID, arg.StepID)
 	return err
 }
 

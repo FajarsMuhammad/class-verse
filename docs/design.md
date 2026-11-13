@@ -245,7 +245,7 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 
 ## MVP 2 fitur belajar — keputusan dan batas perencanaan
 
-Status: cakupan/urutan disetujui, kode belum dibuat. Rencana dan checklist tunggal:
+Status: F1, L1, L2, M1 selesai; M2 progres modul diimplementasikan. Rencana dan checklist tunggal:
 [`docs/tasks/mvp2-learning-plan.md`](tasks/mvp2-learning-plan.md). Keputusan ini tidak mengubah ADR-002:
 state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
 
@@ -254,7 +254,7 @@ state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
   di profile Compose `storage`. PDF + audio dibaca di aplikasi, EPUB ditunda, tanpa RAG. Metadata dan kuota di
   Postgres, objek privat di MinIO. Kuota **5.000.000.000 byte/org**, batas **50.000.000 byte/file**; reservasi
   upload ikut dihitung. Batas kapasitas VPS tetap perlu dipantau di luar kuota per sekolah.
-- **Urutan:** F1 → L1 → L2 → M1 → M2 → Q1 → C1 → R1 → Q2 → B1 → B2. Langkah kuis ditambahkan setelah Q1, riwayat
+- **Urutan:** F1 → L1 → L2 → M1 → M2 → Q1 → C1 → A1 → R1 → Q2 → B1 → B2. Langkah kuis ditambahkan setelah Q1, riwayat
   Arena di Rapor setelah Q2; migration tidak boleh bergantung tabel dari slice mendatang.
 - **Leaderboard:** klasemen live per sesi kuis; ranking mingguan sekolah dengan filter gedung/mapel di Redis.
   Progres per modul di Rapor, ranking rombel ditunda. UTC untuk penyimpanan; minggu ditentukan `Asia/Jakarta`.
@@ -267,6 +267,17 @@ state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
   pengajar/admin mengelola roster, admin memilih satu tahun ajaran aktif per sekolah (disetujui). Tahun lama
   tetap bisa dipilih di Rapor, tanpa kenaikan otomatis. Schema detail masih perlu ditinjau sebelum migration C1.
   Tidak mengubah izin masuk ruang atau membuat leaderboard per kelas secara otomatis.
+- **Modul (M1/M2):** katalog terbit per gedung/jenjang terbuka bagi anggota sekolah dari mana saja;
+  bukan dibatasi rombel atau lokasi avatar (disetujui 2026-11-13). Modul terbit diedit langsung; langkah hanya
+  diarsip, tanpa revisi immutable. `module_progress(org_id,user_id,step_id,completed_at)` menyimpan tanda selesai
+  pemanggil; FK komposit ke membership dan langkah satu organisasi. Selesai idempotent mempertahankan waktu pertama,
+  batal selesai menghapus tanda; server memeriksa akses dan mengunci modul dalam transaksi yang sama.
+  Semua langkah bebas dibuka, termasuk yang belum selesai. Total menghitung langkah aktif saja. Lanjutkan belajar
+  memilih modul terbit dengan tanda selesai terbaru dan langkah aktif belum selesai; tanpa aktivitas selesai
+  tidak ada rekomendasi. Arsip tidak menghapus riwayat progres; keluar membership menghapus progres sesuai FK.
+- **A1 setelah C1:** tugaskan modul ke rombel (tenggat opsional) dan sematkan modul/langkah saat sesi ruang;
+  tidak menutup katalog bagi anggota lain. Urutan wajib berlaku untuk modul yang ditugaskan; detail skema
+  dan aturan penugasan dirinci saat C1 selesai.
 - **Antre buku:** ditunda; tidak ada reservasi/denda dalam L2.
 
 Rincian teknis **masih usulan**, tidak menimpa ADR lama: transport baca autentikasi/range (proxy vs presigned)

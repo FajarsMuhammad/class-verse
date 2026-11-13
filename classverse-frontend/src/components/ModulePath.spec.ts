@@ -6,7 +6,7 @@ import type { Module, ModuleStep } from '@/api/types'
 
 const step = (title: string, extra: Partial<ModuleStep> = {}): ModuleStep => ({
   id: title, kind: 'materi', title, body: 'Isi <b>tidak</b> dirender', file_id: null, file_kind: null, video_id: null,
-  minutes: 5, reader_position: 0, ...extra,
+  minutes: 5, reader_position: 0, done: false, ...extra,
 })
 const mod = (steps: ModuleStep[]): Module => ({
   id: 'm1', building_key: 'sains', level: 'SD', title: 'Tata Surya', description: 'Planet', published: true,
@@ -46,6 +46,27 @@ it('opens files in the reader with their kind and position, and text/video in th
   expect(w.get('.reader').text()).toBe('Dengar:audio:42')
   await buttons[1]!.trigger('click')
   expect(w.get('.viewer').text()).toBe('Tonton')
+})
+
+it('saves completion out of order and retains local state on a refused write', async () => {
+  const { ApiError } = await import('@/api/client')
+  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [mod([step('A'), step('B')])] })
+  const done = vi.spyOn(moduleApi, 'setDone').mockResolvedValueOnce().mockRejectedValueOnce(
+    new ApiError(500, { code: 'internal_error', message: 'x' }))
+  const w = mount(ModulePath, { props: { orgId: 'o', buildingKey: 'sains', buildingName: 'Menara Sains' }, global: { stubs } })
+  await flushPromises()
+  const buttons = w.findAll('.complete')
+  await buttons[1]!.trigger('click')
+  await flushPromises()
+  expect(done).toHaveBeenLastCalledWith('o', 'm1', 'B', true)
+  expect(w.text()).toContain('1 dari 2 selesai')
+  expect(buttons[1]!.attributes('aria-pressed')).toBe('true')
+  expect(w.emitted('changed')).toHaveLength(1)
+  await buttons[1]!.trigger('click')
+  await flushPromises()
+  expect(done).toHaveBeenLastCalledWith('o', 'm1', 'B', false)
+  expect(buttons[1]!.attributes('aria-pressed')).toBe('true')
+  expect(w.get('[role=alert]').text()).toContain('Terjadi kesalahan')
 })
 
 it('shows a retry when loading fails', async () => {

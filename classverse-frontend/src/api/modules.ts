@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Level, Module, ModuleInput, ModuleStep, StepInput } from './types'
+import type { Level, Module, ModuleInput, ModuleResume, ModuleStep, StepInput } from './types'
 
 const base = (orgID: string) => `/api/orgs/${encodeURIComponent(orgID)}/modules`
 const one = (orgID: string, id: string) => `${base(orgID)}/${encodeURIComponent(id)}`
@@ -28,6 +28,9 @@ export const moduleApi = {
     api<ModuleStep>(`${one(orgID, id)}/steps/${encodeURIComponent(stepID)}`, { method: 'PUT', body }),
   archiveStep: (orgID: string, id: string, stepID: string) =>
     api<void>(`${one(orgID, id)}/steps/${encodeURIComponent(stepID)}`, { method: 'DELETE' }),
+  setDone: (orgID: string, id: string, stepID: string, done: boolean) =>
+    api<void>(`${one(orgID, id)}/steps/${encodeURIComponent(stepID)}/done`, { method: done ? 'PUT' : 'DELETE' }),
+  resume: (orgID: string) => api<{ resume: ModuleResume | null }>(`${base(orgID)}/resume`),
   reorder: (orgID: string, id: string, stepIDs: string[]) =>
     api<void>(`${one(orgID, id)}/order`, { method: 'PUT', body: { step_ids: stepIDs } }),
 }
