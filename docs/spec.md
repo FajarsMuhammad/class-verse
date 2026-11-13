@@ -50,9 +50,9 @@ MVP awal; perluasan ini disetujui pengguna melalui rencana `docs/tasks/mvp2-lear
 | Urutan | Hasil peserta/pengajar | Batas disetujui |
 | --- | --- | --- |
 | F1 | Unggah materi dan baca di aplikasi | MinIO privat; PDF + audio dulu, EPUB menyusul; kuota 5 GB per sekolah dan maks 50 MB/file; tanpa RAG |
-| L1 → L2 | Katalog, klik rak, baca digital, pinjam/kembali fisik | Satu contoh berlabel untuk pengujian; tanpa antre/denda; aturan durasi/jumlah pinjaman masih usulan |
-| M1 → M2 | Modul per gedung dan progres nyata | Pengajar/admin mengisi, peserta membaca dan melanjutkan belajar |
-| Q1 → C1 → R1 | Kuis mandiri, kelas/rombel dan rapor | Penilaian server; pengajar/admin mengelola kelas/siswa, admin memilih tahun ajaran aktif; peserta hanya rapor sendiri |
+| L1 → L2 | Katalog, klik rak, baca digital, pinjam/kembali fisik | Satu contoh berlabel untuk pengujian; tanpa antre/denda; maks 5 pinjaman aktif, 14 hari |
+| M1 → M2 | Modul per gedung dan progres nyata | Pengajar/admin mengisi; katalog terbuka bagi semua anggota sekolah, dibuka dari mana saja; langkah bebas dibuka, progres dicatat per siswa |
+| Q1 → C1 → A1 → R1 | Kuis mandiri, kelas/rombel, tugaskan modul ke kelas dan sematkan di ruang, rapor | Penilaian server; pengajar/admin mengelola kelas/siswa, admin memilih tahun ajaran aktif; peserta hanya rapor sendiri |
 | Q2 | Arena Kuis live dan klasemen sesi | Batas ruang 40 sampai kapasitas baru terbukti; nilai tersimpan, bukan angka prototipe |
 | B1 → B2 | Leaderboard dan gamifikasi bertahap | Redis untuk ranking mingguan sekolah + filter gedung/mapel; progres modul di Rapor, bukan ranking modul |
 

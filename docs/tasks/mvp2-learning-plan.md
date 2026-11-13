@@ -21,6 +21,8 @@ memakai konvensi repo `docs/tasks/`, bukan direktori task kedua.
 | Persetujuan lanjutan | **Inisial; hover menampilkan nama lengkap dan kelas** | Sediakan juga focus keyboard dan tap; kelas dari rombel, bukan ruang virtual |
 | Persetujuan kelas | **Satu kelas aktif per siswa per sekolah per tahun ajaran** | Kelas/rombel menjadi data tersendiri; bukan label bebas profil atau kelas mata kuliah jamak |
 | Persetujuan C1 | **Pengajar/admin mengelola kelas dan siswa; admin memilih tahun ajaran aktif** | C1 setelah Q1 sebelum R1; perpindahan menyimpan riwayat, tidak ada kenaikan kelas otomatis |
+| 2026-11-13 | **Modul = katalog terbuka per gedung/jenjang**, bisa dibuka dari mana saja, bukan khusus kelas atau hanya di dalam ruang | Kelas mengarahkan, bukan mengunci: "Tugaskan ke kelas" dan "Sematkan modul di ruang" menjadi slice A1 setelah C1 |
+| 2026-11-13 | **Langkah modul bebas dibuka**; progres tetap dicatat per siswa | Urutan wajib (kunci langkah) hanya untuk modul yang ditugaskan, di A1 |
 
 Sumber: `kelasverse-assets/README.md`, `reference/Main.dc.html` (header, panel belajar, leaderboard), `Room.dc.html`
 (modul berjenjang di gedung), `Quiz.dc.html` (Arena Kuis live), `Library.dc.html` + gambar
@@ -40,7 +42,8 @@ Sumber: `kelasverse-assets/README.md`, `reference/Main.dc.html` (header, panel b
 
 ## Urutan dan ketergantungan
 
-Urutan kerja **disetujui: F1 → L1 → L2 → M1 → M2 → Q1 → C1 → R1 → Q2 → B1 → B2**.
+Urutan kerja **disetujui: F1 → L1 → L2 → M1 → M2 → Q1 → C1 → A1 → R1 → Q2 → B1 → B2** (A1 ditambahkan
+2026-11-13).
 
 | Slice | Dependensi | Batas agar urutan tetap bisa dikerjakan |
 | --- | --- | --- |
@@ -300,10 +303,20 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 ### M2 — Progres modul
 
 - **DB:** `module_progress(org_id, user_id, step_id, completed_at)` PK `(org_id, user_id, step_id)`;
-  progres terikat revisi langkah. Endpoint selesai idempotent, urutan divalidasi server.
-- **Aturan usulan:** langkah dibuka berurutan; langkah materi/video selesai saat siswa menekan "Selesai";
-  langkah kuis selesai saat lulus (nilai ≥ ambang, usul default 60), baru dihubungkan setelah Q1.
+  progres terikat ID langkah (modul diedit langsung, langkah hanya diarsip). Endpoint selesai idempotent.
+- **Aturan (disetujui 2026-11-13):** semua langkah **bebas dibuka**; langkah materi/video/berkas selesai saat
+  siswa menekan "Selesai"; langkah kuis selesai saat lulus (nilai ≥ ambang, usul default 60), baru dihubungkan
+  setelah Q1. Langkah arsip tidak dihitung dalam total progres.
 - **UI:** "Lanjutkan belajar" di panel belajar kiri memakai progres nyata.
+
+### A1 — Tugaskan modul ke kelas dan sematkan di ruang (setelah C1)
+
+- **Tugaskan:** pengajar memilih modul + kelas (C1) + tenggat opsional; modul muncul sebagai "Tugas" di panel
+  belajar siswa kelas itu, dengan urutan langkah wajib; pengajar melihat progres per siswa (dipakai Rapor).
+  Modul tetap terbuka sebagai katalog untuk siswa lain.
+- **Sematkan:** saat sesi live, pengajar menyematkan modul/langkah di ruang; peserta di ruang melihat tombol
+  "Buka bersama". Tidak membatasi akses dari luar ruang.
+- Skema dan aturan detail diusulkan saat C1 selesai.
 
 ### Q1 — Bank soal dan kuis mandiri
 
@@ -448,7 +461,7 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | L2-01 | [x] Pinjam/kembali dan Pinjamanku; transaksi menahan pinjaman ke-6 dan dua peminjam eksemplar terakhir; retry aman | L1, aturan pinjam disetujui | migration/loans queries, `internal/library/`, library UI | Integration concurrent, UI stok/jatuh tempo/empty |
 | M1-01 | [x] Pengajar membuat draf modul/urutan langkah dan menerbitkan; peserta tidak bisa membaca draf atau file yang hanya terikat draf | F1, aturan revisi disetujui | migration/modules queries, `internal/module/`, Kelola | Unit validasi + role/org/draft integration + UI authoring |
 | M1-02 | [x] Lihat modul per gedung/level dan buka materi di aplikasi tanpa meninggalkan ruang; kosong/error/focus tertangani | M1-01 | PlaceCard, module UI, Reader, tokens | Component + browser materi PDF/audio/teks |
-| M2-01 | [ ] Selesai langkah idempotent dan urut di server; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit urutan, integration duplikat/org, E2E reload |
+| M2-01 | [ ] Selesai langkah idempotent, langkah bebas dibuka; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit urutan, integration duplikat/org, E2E reload |
 | Q1-01 | [ ] Bank soal draf/terbit tepat 4 opsi; kunci hanya tersedia pengajar, snapshot tidak berubah setelah edit | M1/M2 | migration/quizzes queries, `internal/quiz/`, Kelola | Unit soal invalid + integration version/role + component |
 | Q1-02 | [ ] Kuis mandiri menilai di server, submit ulang aman, nilai 0–100 tersimpan; langkah kuis lulus membuka langkah lanjut | Q1-01, aturan nilai disetujui | `internal/quiz/`, module linkage migration, quiz UI | Unit skor, integration submit/crash, E2E nilai/progres |
 | C1-01 | [ ] Pengajar/admin membuat kelas pada tahun ajaran; hanya admin memilih tahun aktif; sekolah lain tidak terpengaruh | Q1 dalam urutan, auth/org existing | migrations/year/class queries, fitur kelas, Kelola | Unit role, integration org/tahun aktif serentak, component Kelola |
