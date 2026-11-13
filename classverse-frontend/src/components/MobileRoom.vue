@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import ChatPanel from '@/components/ChatPanel.vue'
 import LibraryCatalog from '@/components/LibraryCatalog.vue'
+import BuildingModules from '@/components/BuildingModules.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import DoorRooms from '@/components/DoorRooms.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -35,6 +36,7 @@ const {
   rejoin,
 } = props.room
 const org = useOrgStore()
+const modulesOf = ref<Building | null>(null)
 
 // Positions arrive in snapshots without a reactive signal; refresh lists twice a second.
 const tick = ref(0)
@@ -188,9 +190,14 @@ function reported() {
               list-mode
               @travel="travel"
             />
+            <button v-if="!b.staffOnly" type="button" class="btn-secondary modules-btn" @click="modulesOf = b">
+              Lihat modul<span class="sr"> {{ b.name }}</span>
+            </button>
           </div>
         </li>
       </ul>
+      <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
+        :building-name="modulesOf.name" @close="modulesOf = null" />
     </template>
 
     <template v-else>
@@ -443,5 +450,17 @@ h2 {
 .catalog-title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-lg);
+}
+.modules-btn {
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--space-2);
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 </style>

@@ -683,10 +683,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Modul (jalur belajar) beserta langkah aktif berurutan. Peserta hanya melihat modul terbit; `drafts=true`
+         *     menyertakan draf untuk pengajar/admin. Arsip tidak pernah tampil. Maksimal 100 modul.
+         */
+        get: operations["listModules"];
+        put?: never;
+        /** @description Pengajar/admin. Gedung khusus staf (Ruang Guru) ditolak. */
+        post: operations["createModule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Mengganti field modul; modul terbit diedit langsung. */
+        put: operations["updateModule"];
+        post?: never;
+        /** @description Pengajar/admin. Arsipkan modul beserta langkahnya; file tidak ikut terhapus. */
+        delete: operations["archiveModule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Pengajar/admin. Langkah baru ditaruh paling akhir; maksimal 50 langkah aktif. */
+        post: operations["addModuleStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/steps/{step_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Mengganti isi langkah. */
+        put: operations["updateModuleStep"];
+        post?: never;
+        /** @description Pengajar/admin. Langkah tidak pernah dihapus permanen agar progres (M2) tetap merujuk data nyata. */
+        delete: operations["archiveModuleStep"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. `step_ids` wajib memuat semua langkah aktif tepat sekali. */
+        put: operations["reorderModuleSteps"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        Level: "SD" | "SMP" | "SMA" | "Umum";
+        ModuleInput: {
+            /** @description Kunci gedung di peta kampus */
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            description: string;
+            published: boolean;
+        };
+        Module: components["schemas"]["ModuleInput"] & {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            updated_at: string;
+            steps: components["schemas"]["ModuleStep"][];
+        };
+        ModuleList: {
+            items: components["schemas"]["Module"][];
+        };
+        /** @enum {string} */
+        StepKind: "materi" | "berkas" | "video";
+        StepInput: {
+            kind: components["schemas"]["StepKind"];
+            title: string;
+            /** @description Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa. */
+            body?: string;
+            /**
+             * Format: uuid
+             * @description Wajib untuk `berkas`: PDF/audio siap milik sekolah
+             */
+            file_id?: string | null;
+            /** @description Wajib untuk `video`: ID atau tautan YouTube (https) */
+            video_id?: string;
+            minutes: number;
+        };
+        ModuleStep: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["StepKind"];
+            title: string;
+            body: string;
+            /** Format: uuid */
+            file_id: string | null;
+            /**
+             * @description Jenis file langkah `berkas` (hanya di daftar modul)
+             * @enum {string|null}
+             */
+            file_kind: "pdf" | "audio" | null;
+            /** @description ID video YouTube 11 karakter */
+            video_id: string | null;
+            minutes: number;
+            /** @description Posisi baca pemanggil untuk file langkah `berkas` */
+            reader_position: number;
+        };
         /** @enum {string} */
         Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
         BookInput: {
@@ -2298,6 +2459,238 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listModules: {
+        parameters: {
+            query?: {
+                building_key?: string;
+                level?: components["schemas"]["Level"];
+                drafts?: boolean;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar modul */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleInput"];
+            };
+        };
+        responses: {
+            /** @description Modul dibuat (tanpa langkah) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Module"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleInput"];
+            };
+        };
+        responses: {
+            /** @description Modul diperbarui (tanpa langkah) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Module"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepInput"];
+            };
+        };
+        responses: {
+            /** @description Langkah dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleStep"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepInput"];
+            };
+        };
+        responses: {
+            /** @description Langkah diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleStep"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    reorderModuleSteps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    step_ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Urutan disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

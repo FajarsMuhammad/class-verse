@@ -184,7 +184,10 @@ func (q *Queries) CreateLoan(ctx context.Context, arg CreateLoanParams) (Library
 }
 
 const fileInUse = `-- name: FileInUse :one
-SELECT EXISTS (SELECT 1 FROM library_books WHERE org_id = $1 AND file_id = $2 AND archived_at IS NULL)
+SELECT (EXISTS (SELECT 1 FROM library_books b
+    WHERE b.org_id = $1 AND b.file_id = $2 AND b.archived_at IS NULL)
+  OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+    WHERE s.org_id = $1 AND s.file_id = $2 AND s.archived_at IS NULL AND m.archived_at IS NULL))::boolean
 `
 
 type FileInUseParams struct {
@@ -192,16 +195,20 @@ type FileInUseParams struct {
 	FileID uuid.NullUUID
 }
 
+// Books and module steps that are not archived keep their file from being deleted.
 func (q *Queries) FileInUse(ctx context.Context, arg FileInUseParams) (bool, error) {
 	row := q.db.QueryRow(ctx, fileInUse, arg.OrgID, arg.FileID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const filePublished = `-- name: FilePublished :one
-SELECT EXISTS (SELECT 1 FROM library_books
-  WHERE org_id = $1 AND file_id = $2 AND archived_at IS NULL AND published_at IS NOT NULL)
+SELECT (EXISTS (SELECT 1 FROM library_books b
+    WHERE b.org_id = $1 AND b.file_id = $2 AND b.archived_at IS NULL AND b.published_at IS NOT NULL)
+  OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+    WHERE s.org_id = $1 AND s.file_id = $2 AND s.archived_at IS NULL
+      AND m.archived_at IS NULL AND m.published_at IS NOT NULL))::boolean
 `
 
 type FilePublishedParams struct {
@@ -209,12 +216,12 @@ type FilePublishedParams struct {
 	FileID uuid.NullUUID
 }
 
-// A participant may read a file only through a published, non-archived book.
+// A participant may read a file only through a published, non-archived book or module step.
 func (q *Queries) FilePublished(ctx context.Context, arg FilePublishedParams) (bool, error) {
 	row := q.db.QueryRow(ctx, filePublished, arg.OrgID, arg.FileID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getBook = `-- name: GetBook :one

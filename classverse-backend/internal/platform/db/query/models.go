@@ -297,6 +297,36 @@ type ModerationAction struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type Module struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	BuildingKey string
+	Level       string
+	Title       string
+	Description string
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	PublishedAt pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+}
+
+type ModuleStep struct {
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	ModuleID   uuid.UUID
+	Position   int32
+	Kind       string
+	Title      string
+	Body       string
+	FileID     uuid.NullUUID
+	VideoID    pgtype.Text
+	Minutes    int32
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+	ArchivedAt pgtype.Timestamptz
+}
+
 type Organization struct {
 	ID        uuid.UUID
 	Name      string

@@ -25,3 +25,12 @@ it('walks to the door then offers room selection when nearby', async () => {
   await w.get('[aria-label="Tutup detail tempat"]').trigger('click')
   expect(w.emitted('close')).toHaveLength(1)
 })
+
+it('offers modules for learning buildings but not for staff-only ones', async () => {
+  const w = mount(PlaceCard, { props: { building: { ...building, key: 'sains', staffOnly: false }, atDoor: false, teacher: false, disabled: true } })
+  // Reading modules does not need the room connection, so it stays enabled while travel is disabled.
+  await w.get('[data-testid="place-modules"]').trigger('click')
+  expect(w.emitted('modules')).toHaveLength(1)
+  await w.setProps({ building })
+  expect(w.find('[data-testid="place-modules"]').exists()).toBe(false)
+})

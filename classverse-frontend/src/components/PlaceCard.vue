@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { Building } from '@/realtime/mapdata'
 import type { BuildingCount } from '@/realtime/messages'
 const props = defineProps<{ building: Building; occupancy?: BuildingCount; atDoor: boolean; teacher: boolean; disabled: boolean }>()
-const emit = defineEmits<{ close: []; walk: []; rooms: [] }>()
+const emit = defineEmits<{ close: []; walk: []; rooms: []; modules: [] }>()
 const restricted = computed(() => props.building.staffOnly && !props.teacher)
 </script>
 
@@ -18,6 +18,10 @@ const restricted = computed(() => props.building.staffOnly && !props.teacher)
     <p v-else class="occupancy">Jumlah peserta belum tersedia.</p>
     <button class="btn-primary action" data-testid="place-action" :disabled="disabled || restricted"
       @click="atDoor ? emit('rooms') : emit('walk')">{{ atDoor ? 'Pilih ruang' : 'Menuju pintu' }}</button>
+    <!-- Modules are readable from anywhere on the map; staff-only buildings have none. -->
+    <button v-if="!building.staffOnly" class="btn-secondary action" data-testid="place-modules" @click="emit('modules')">
+      Lihat modul
+    </button>
   </section>
 </template>
 

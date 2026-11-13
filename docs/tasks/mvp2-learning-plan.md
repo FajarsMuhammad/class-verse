@@ -277,6 +277,26 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 - **UI peserta:** detail gedung (PlaceCard → "Lihat modul") menampilkan jalur seperti `Room.dc.html`.
 - **UI pengajar:** halaman Kelola → Modul (buat, urutkan langkah, terbitkan).
 
+#### Progres M1
+
+- [x] Keputusan 2026-11-13: modul terbit **diedit langsung** (tanpa revisi immutable); langkah tidak pernah dihapus,
+  hanya diarsip, agar progres M2 tetap merujuk baris nyata. Video = YouTube via `youtube-nocookie.com`.
+  Jenis langkah `materi`/`berkas`/`video`; `kuis` menyusul Q1.
+- [x] Migration `00010_modules.sql`: `modules`, `module_steps` (FK komposit ke modul dan `files` sekolah sama, CHECK
+  per jenis, `video_id` hanya ID 11 karakter). Kolom `description`, `body` (teks biasa, bukan HTML/markdown).
+- [x] `internal/module`: CRUD modul/langkah, urutan (`PUT .../order` wajib semua langkah aktif tepat sekali), arsip,
+  daftar per gedung/jenjang dengan `file_kind` dan posisi baca. Gedung khusus staf ditolak. Tautan YouTube
+  (watch/youtu.be/embed/shorts, https saja) dinormalisasi ke ID di server.
+- [x] Akses file: peserta membaca file dari buku **atau** langkah modul terbit non-arsip; draf → 404. File yang
+  dipakai langkah aktif tidak bisa dihapus (409 `file_in_use`).
+- [x] UI: Kelola → "Modul belajar" (buat/ubah/terbit/arsip, tambah/ubah/arsip langkah, naik/turun). Peserta:
+  PlaceCard → **Lihat modul** (desktop) dan tombol di daftar gedung (HP) membuka dialog jalur per jenjang;
+  materi teks/video di `StepViewer` (iframe sandbox), berkas di `FileReader`.
+- [x] Verifikasi: unit validasi/YouTube, integration Postgres (peran, lintas org, draf, file, urutan, arsip, HTTP),
+  komponen, Chrome desktop + 390 px (guru membuat draf → peserta tidak melihat → urut → terbit → buka video,
+  teks, PDF).
+- [ ] Belum: progres/kunci langkah (M2), langkah kuis (Q1), CSP global untuk `frame-src`, Safari/iOS.
+
 ### M2 — Progres modul
 
 - **DB:** `module_progress(org_id, user_id, step_id, completed_at)` PK `(org_id, user_id, step_id)`;
@@ -426,8 +446,8 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | L1-01 | [x] Pengajar CRUD katalog draf/terbit/arsip; peserta hanya konten terbit, file wajib sesuai format dan org | F1 | migration/books queries, `internal/library/`, Kelola | Unit role, integration FK/org, UI authoring |
 | L1-02 | [x] Cari/paginasi/filter kategori dan klik rak membuka katalog; Chat tetap tersedia; contoh hanya dari seed eksplisit | L1-01 | library UI, `CampusScene.ts`, game events, seed | Component + browser klik rak/baca desktop dan HP |
 | L2-01 | [x] Pinjam/kembali dan Pinjamanku; transaksi menahan pinjaman ke-6 dan dua peminjam eksemplar terakhir; retry aman | L1, aturan pinjam disetujui | migration/loans queries, `internal/library/`, library UI | Integration concurrent, UI stok/jatuh tempo/empty |
-| M1-01 | [ ] Pengajar membuat draf modul/urutan langkah dan menerbitkan; peserta tidak bisa membaca draf atau file yang hanya terikat draf | F1, aturan revisi disetujui | migration/modules queries, `internal/module/`, Kelola | Unit validasi + role/org/draft integration + UI authoring |
-| M1-02 | [ ] Lihat modul per gedung/level dan buka materi di aplikasi tanpa meninggalkan ruang; kosong/error/focus tertangani | M1-01 | PlaceCard, module UI, Reader, tokens | Component + browser materi PDF/audio/teks |
+| M1-01 | [x] Pengajar membuat draf modul/urutan langkah dan menerbitkan; peserta tidak bisa membaca draf atau file yang hanya terikat draf | F1, aturan revisi disetujui | migration/modules queries, `internal/module/`, Kelola | Unit validasi + role/org/draft integration + UI authoring |
+| M1-02 | [x] Lihat modul per gedung/level dan buka materi di aplikasi tanpa meninggalkan ruang; kosong/error/focus tertangani | M1-01 | PlaceCard, module UI, Reader, tokens | Component + browser materi PDF/audio/teks |
 | M2-01 | [ ] Selesai langkah idempotent dan urut di server; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit urutan, integration duplikat/org, E2E reload |
 | Q1-01 | [ ] Bank soal draf/terbit tepat 4 opsi; kunci hanya tersedia pengajar, snapshot tidak berubah setelah edit | M1/M2 | migration/quizzes queries, `internal/quiz/`, Kelola | Unit soal invalid + integration version/role + component |
 | Q1-02 | [ ] Kuis mandiri menilai di server, submit ulang aman, nilai 0–100 tersimpan; langkah kuis lulus membuka langkah lanjut | Q1-01, aturan nilai disetujui | `internal/quiz/`, module linkage migration, quiz UI | Unit skor, integration submit/crash, E2E nilai/progres |

@@ -228,6 +228,30 @@ func (e InviteRole) Valid() bool {
 	}
 }
 
+// Defines values for Level.
+const (
+	LevelSD   Level = "SD"
+	LevelSMA  Level = "SMA"
+	LevelSMP  Level = "SMP"
+	LevelUmum Level = "Umum"
+)
+
+// Valid indicates whether the value is a known member of the Level enum.
+func (e Level) Valid() bool {
+	switch e {
+	case LevelSD:
+		return true
+	case LevelSMA:
+		return true
+	case LevelSMP:
+		return true
+	case LevelUmum:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ModerationActionAction.
 const (
 	Allow  ModerationActionAction = "allow"
@@ -252,6 +276,24 @@ func (e ModerationActionAction) Valid() bool {
 	case Unlock:
 		return true
 	case Unmute:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleStepFileKind.
+const (
+	ModuleStepFileKindAudio ModuleStepFileKind = "audio"
+	ModuleStepFileKindPdf   ModuleStepFileKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the ModuleStepFileKind enum.
+func (e ModuleStepFileKind) Valid() bool {
+	switch e {
+	case ModuleStepFileKindAudio:
+		return true
+	case ModuleStepFileKindPdf:
 		return true
 	default:
 		return false
@@ -393,6 +435,27 @@ func (e StartUploadRequestKind) Valid() bool {
 	case StartUploadRequestKindAudio:
 		return true
 	case StartUploadRequestKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StepKind.
+const (
+	Berkas StepKind = "berkas"
+	Materi StepKind = "materi"
+	Video  StepKind = "video"
+)
+
+// Valid indicates whether the value is a known member of the StepKind enum.
+func (e StepKind) Valid() bool {
+	switch e {
+	case Berkas:
+		return true
+	case Materi:
+		return true
+	case Video:
 		return true
 	default:
 		return false
@@ -588,6 +651,9 @@ type InvitePreview struct {
 // InviteRole defines model for InviteRole.
 type InviteRole string
 
+// Level defines model for Level.
+type Level string
+
 // Loan defines model for Loan.
 type Loan struct {
 	Author     string             `json:"author"`
@@ -650,6 +716,56 @@ type ModerationLog struct {
 	Items      []ModerationAction `json:"items"`
 	NextCursor *string            `json:"next_cursor"`
 }
+
+// Module defines model for Module.
+type Module struct {
+	// BuildingKey Kunci gedung di peta kampus
+	BuildingKey string             `json:"building_key"`
+	Description string             `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
+	Level       Level              `json:"level"`
+	Published   bool               `json:"published"`
+	Steps       []ModuleStep       `json:"steps"`
+	Title       string             `json:"title"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
+// ModuleInput defines model for ModuleInput.
+type ModuleInput struct {
+	// BuildingKey Kunci gedung di peta kampus
+	BuildingKey string `json:"building_key"`
+	Description string `json:"description"`
+	Level       Level  `json:"level"`
+	Published   bool   `json:"published"`
+	Title       string `json:"title"`
+}
+
+// ModuleList defines model for ModuleList.
+type ModuleList struct {
+	Items []Module `json:"items"`
+}
+
+// ModuleStep defines model for ModuleStep.
+type ModuleStep struct {
+	Body   string              `json:"body"`
+	FileId *openapi_types.UUID `json:"file_id"`
+
+	// FileKind Jenis file langkah `berkas` (hanya di daftar modul)
+	FileKind *ModuleStepFileKind `json:"file_kind"`
+	Id       openapi_types.UUID  `json:"id"`
+	Kind     StepKind            `json:"kind"`
+	Minutes  int                 `json:"minutes"`
+
+	// ReaderPosition Posisi baca pemanggil untuk file langkah `berkas`
+	ReaderPosition int    `json:"reader_position"`
+	Title          string `json:"title"`
+
+	// VideoId ID video YouTube 11 karakter
+	VideoId *string `json:"video_id"`
+}
+
+// ModuleStepFileKind Jenis file langkah `berkas` (hanya di daftar modul)
+type ModuleStepFileKind string
 
 // MyLoan defines model for MyLoan.
 type MyLoan struct {
@@ -766,6 +882,24 @@ type StartUploadRequest struct {
 
 // StartUploadRequestKind defines model for StartUploadRequest.Kind.
 type StartUploadRequestKind string
+
+// StepInput defines model for StepInput.
+type StepInput struct {
+	// Body Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa.
+	Body *string `json:"body,omitempty"`
+
+	// FileId Wajib untuk `berkas`: PDF/audio siap milik sekolah
+	FileId  *openapi_types.UUID `json:"file_id,omitempty"`
+	Kind    StepKind            `json:"kind"`
+	Minutes int                 `json:"minutes"`
+	Title   string              `json:"title"`
+
+	// VideoId Wajib untuk `video`: ID atau tautan YouTube (https)
+	VideoId *string `json:"video_id,omitempty"`
+}
+
+// StepKind defines model for StepKind.
+type StepKind string
 
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
@@ -894,6 +1028,18 @@ type ListModerationLogParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ListModulesParams defines parameters for ListModules.
+type ListModulesParams struct {
+	BuildingKey *string `form:"building_key,omitempty" json:"building_key,omitempty"`
+	Level       *Level  `form:"level,omitempty" json:"level,omitempty"`
+	Drafts      *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+}
+
+// ReorderModuleStepsJSONBody defines parameters for ReorderModuleSteps.
+type ReorderModuleStepsJSONBody struct {
+	StepIds []openapi_types.UUID `json:"step_ids"`
+}
+
 // ListReportsParams defines parameters for ListReports.
 type ListReportsParams struct {
 	Status *ReportStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -937,6 +1083,21 @@ type CreateBookJSONRequestBody = BookInput
 
 // UpdateBookJSONRequestBody defines body for UpdateBook for application/json ContentType.
 type UpdateBookJSONRequestBody = BookInput
+
+// CreateModuleJSONRequestBody defines body for CreateModule for application/json ContentType.
+type CreateModuleJSONRequestBody = ModuleInput
+
+// UpdateModuleJSONRequestBody defines body for UpdateModule for application/json ContentType.
+type UpdateModuleJSONRequestBody = ModuleInput
+
+// ReorderModuleStepsJSONRequestBody defines body for ReorderModuleSteps for application/json ContentType.
+type ReorderModuleStepsJSONRequestBody ReorderModuleStepsJSONBody
+
+// AddModuleStepJSONRequestBody defines body for AddModuleStep for application/json ContentType.
+type AddModuleStepJSONRequestBody = StepInput
+
+// UpdateModuleStepJSONRequestBody defines body for UpdateModuleStep for application/json ContentType.
+type UpdateModuleStepJSONRequestBody = StepInput
 
 // CreateRoomJSONRequestBody defines body for CreateRoom for application/json ContentType.
 type CreateRoomJSONRequestBody = CreateRoomRequest

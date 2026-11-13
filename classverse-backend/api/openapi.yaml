@@ -705,6 +705,149 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/modules:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listModules
+      description: |
+        Modul (jalur belajar) beserta langkah aktif berurutan. Peserta hanya melihat modul terbit; `drafts=true`
+        menyertakan draf untuk pengajar/admin. Arsip tidak pernah tampil. Maksimal 100 modul.
+      parameters:
+        - { name: building_key, in: query, schema: { type: string } }
+        - { name: level, in: query, schema: { $ref: "#/components/schemas/Level" } }
+        - { name: drafts, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: Daftar modul
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleList" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createModule
+      description: Pengajar/admin. Gedung khusus staf (Ruang Guru) ditolak.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleInput" }
+      responses:
+        "201":
+          description: Modul dibuat (tanpa langkah)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Module" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/orgs/{org_id}/modules/{module_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: module_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: updateModule
+      description: Pengajar/admin. Mengganti field modul; modul terbit diedit langsung.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleInput" }
+      responses:
+        "200":
+          description: Modul diperbarui (tanpa langkah)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Module" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: archiveModule
+      description: Pengajar/admin. Arsipkan modul beserta langkahnya; file tidak ikut terhapus.
+      responses:
+        "204": { description: Diarsipkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/modules/{module_id}/steps:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: module_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: addModuleStep
+      description: Pengajar/admin. Langkah baru ditaruh paling akhir; maksimal 50 langkah aktif.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StepInput" }
+      responses:
+        "201":
+          description: Langkah dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleStep" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/modules/{module_id}/steps/{step_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: module_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: step_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: updateModuleStep
+      description: Pengajar/admin. Mengganti isi langkah.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StepInput" }
+      responses:
+        "200":
+          description: Langkah diperbarui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleStep" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: archiveModuleStep
+      description: Pengajar/admin. Langkah tidak pernah dihapus permanen agar progres (M2) tetap merujuk data nyata.
+      responses:
+        "204": { description: Diarsipkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/modules/{module_id}/order:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: module_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: reorderModuleSteps
+      description: Pengajar/admin. `step_ids` wajib memuat semua langkah aktif tepat sekali.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [step_ids]
+              properties:
+                step_ids: { type: array, items: { type: string, format: uuid } }
+      responses:
+        "204": { description: Urutan disimpan }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
 components:
   securitySchemes:
@@ -784,6 +927,58 @@ components:
           schema: { $ref: "#/components/schemas/AccessTokenResponse" }
 
   schemas:
+    Level:
+      type: string
+      enum: [SD, SMP, SMA, Umum]
+    ModuleInput:
+      type: object
+      required: [building_key, level, title, description, published]
+      properties:
+        building_key: { type: string, description: "Kunci gedung di peta kampus" }
+        level: { $ref: "#/components/schemas/Level" }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        published: { type: boolean }
+    Module:
+      allOf:
+        - $ref: "#/components/schemas/ModuleInput"
+        - type: object
+          required: [id, updated_at, steps]
+          properties:
+            id: { type: string, format: uuid }
+            updated_at: { type: string, format: date-time }
+            steps: { type: array, items: { $ref: "#/components/schemas/ModuleStep" } }
+    ModuleList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Module" } }
+    StepKind:
+      type: string
+      enum: [materi, berkas, video]
+    StepInput:
+      type: object
+      required: [kind, title, minutes]
+      properties:
+        kind: { $ref: "#/components/schemas/StepKind" }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        body: { type: string, maxLength: 5000, description: "Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa." }
+        file_id: { type: string, format: uuid, nullable: true, description: "Wajib untuk `berkas`: PDF/audio siap milik sekolah" }
+        video_id: { type: string, description: "Wajib untuk `video`: ID atau tautan YouTube (https)" }
+        minutes: { type: integer, minimum: 1, maximum: 240 }
+    ModuleStep:
+      type: object
+      required: [id, kind, title, body, file_id, file_kind, video_id, minutes, reader_position]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/StepKind" }
+        title: { type: string }
+        body: { type: string }
+        file_id: { type: string, format: uuid, nullable: true }
+        file_kind: { type: string, enum: [pdf, audio], nullable: true, description: "Jenis file langkah `berkas` (hanya di daftar modul)" }
+        video_id: { type: string, nullable: true, description: "ID video YouTube 11 karakter" }
+        minutes: { type: integer }
+        reader_position: { type: integer, description: "Posisi baca pemanggil untuk file langkah `berkas`" }
     Shelf:
       type: string
       enum: [dongeng, novel, komik, sains, matematika, sejarah, inggris, referensi]

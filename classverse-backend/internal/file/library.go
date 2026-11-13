@@ -96,7 +96,7 @@ func (u *Uploader) Open(ctx context.Context, f query.File, start, end int64) (Co
 	return Content{Body: body, Header: header, Partial: start != 0 || end != f.SizeBytes-1}, nil
 }
 
-// ErrInUse protects files still referenced by an active library book.
+// ErrInUse protects files still referenced by an active library book or module step.
 var ErrInUse = errors.New("file in use")
 
 // ErrRange maps to 416 so the browser can retry without Range.

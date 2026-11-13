@@ -76,7 +76,7 @@ func (h *Handler) limited(limit *ratelimit.Limiter, fn func(http.ResponseWriter,
 		case errors.Is(err, ErrInvalidUpload):
 			return httpx.ValidationFailed(map[string]string{"file": "File bukan PDF/MP3/M4A yang valid, atau ukuran/chunk/checksum tidak cocok"})
 		case errors.Is(err, ErrInUse):
-			return &httpx.Error{Status: 409, Code: "file_in_use", Message: "File masih dipakai buku di katalog. Arsipkan bukunya dulu."}
+			return &httpx.Error{Status: 409, Code: "file_in_use", Message: "File masih dipakai buku katalog atau langkah modul. Arsipkan dulu yang memakainya."}
 		case errors.Is(err, ErrState):
 			return &httpx.Error{Status: 409, Code: "conflict", Message: "Upload sedang diproses, belum lengkap, atau sudah kedaluwarsa"}
 		case errors.Is(err, ErrQuota):

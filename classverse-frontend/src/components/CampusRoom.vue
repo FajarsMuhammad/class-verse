@@ -13,6 +13,7 @@ import DoorRooms from '@/components/DoorRooms.vue'
 import MapZoom from '@/components/MapZoom.vue'
 import MapMinimap from '@/components/MapMinimap.vue'
 import PlaceCard from '@/components/PlaceCard.vue'
+import BuildingModules from '@/components/BuildingModules.vue'
 import LearningPanel from '@/components/LearningPanel.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import { useOrgStore } from '@/stores/org'
@@ -91,6 +92,7 @@ const directoryButton = ref<HTMLButtonElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
 const directoryOpen = ref(false)
 const roomsOpen = ref(false)
+const modulesOf = ref<Building | null>(null)
 const mobilePanel = ref<'map' | 'chat'>('map')
 function toggleDirectory() {
   directoryOpen.value = !directoryOpen.value
@@ -393,7 +395,9 @@ onBeforeUnmount(() => {
             class="place-detail" :building="panelBuilding" :teacher="org.isTeacher" :at-door="canEnter"
             :disabled="traveling || status !== 'open'"
             :occupancy="buildings.find((item) => item.building_key === panelBuilding?.key)"
-            @walk="walkToPlace" @rooms="showPlaceRooms" @close="closePlace" />
+            @walk="walkToPlace" @rooms="showPlaceRooms" @close="closePlace" @modules="modulesOf = panelBuilding ?? null" />
+          <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
+            :building-name="modulesOf.name" @close="modulesOf = null" />
           <div v-if="kicked" class="connection-overlay" role="alert">
             <p>
               Kamu dikeluarkan dari sesi ini oleh pengajar. Minta izin pengajar untuk masuk lagi.

@@ -22,6 +22,7 @@ import (
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/file"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/invite"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/library"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/module"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/config"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
@@ -197,6 +198,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	roomSvc := room.NewService(room.NewStore(pool), orgSvc, campusBuildings{mapData["campus"]}, roomOccupancy{hub}, now, log)
 	roomHandler := room.NewHandler(roomSvc, log)
 	libraryHandler := library.NewHandler(library.NewService(pool, orgSvc, now), log)
+	moduleHandler := module.NewHandler(module.NewService(pool, orgSvc, campusBuildings{mapData["campus"]}, now), log)
 	reportHandler := report.NewHandler(report.NewService(report.NewStore(pool), orgSvc, now), log)
 	lk, err := voice.NewLiveKit(cfg.LiveKit.URL, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, now)
 	if err != nil {
@@ -233,6 +235,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				reportHandler.Routes(r)
 				voiceHandler.Routes(r)
 				libraryHandler.Routes(r)
+				moduleHandler.Routes(r)
 				if uploads != nil {
 					uploads.Routes(r)
 				}

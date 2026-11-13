@@ -43,12 +43,19 @@ LIMIT sqlc.arg(row_limit);
 SELECT user_id FROM memberships WHERE org_id = $1 AND role = 'admin' ORDER BY joined_at, user_id LIMIT 1;
 
 -- name: FilePublished :one
--- A participant may read a file only through a published, non-archived book.
-SELECT EXISTS (SELECT 1 FROM library_books
-  WHERE org_id = $1 AND file_id = $2 AND archived_at IS NULL AND published_at IS NOT NULL);
+-- A participant may read a file only through a published, non-archived book or module step.
+SELECT (EXISTS (SELECT 1 FROM library_books b
+    WHERE b.org_id = sqlc.arg(org_id) AND b.file_id = sqlc.arg(file_id) AND b.archived_at IS NULL AND b.published_at IS NOT NULL)
+  OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+    WHERE s.org_id = sqlc.arg(org_id) AND s.file_id = sqlc.arg(file_id) AND s.archived_at IS NULL
+      AND m.archived_at IS NULL AND m.published_at IS NOT NULL))::boolean;
 
 -- name: FileInUse :one
-SELECT EXISTS (SELECT 1 FROM library_books WHERE org_id = $1 AND file_id = $2 AND archived_at IS NULL);
+-- Books and module steps that are not archived keep their file from being deleted.
+SELECT (EXISTS (SELECT 1 FROM library_books b
+    WHERE b.org_id = sqlc.arg(org_id) AND b.file_id = sqlc.arg(file_id) AND b.archived_at IS NULL)
+  OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+    WHERE s.org_id = sqlc.arg(org_id) AND s.file_id = sqlc.arg(file_id) AND s.archived_at IS NULL AND m.archived_at IS NULL))::boolean;
 
 -- name: LockMembership :one
 -- Serializes one member's borrows so the per-member limit holds under concurrency.
