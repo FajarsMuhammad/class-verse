@@ -331,14 +331,26 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
   pinjam/kembali dan reader lulus. Migration 00011 sudah diterapkan ke DB dev.
 - [ ] Belum: bukti konsumsi video/teks otomatis (tanda selesai adalah pengakuan pengguna), kuis Q1, Safari/iOS.
 
-### A1 — Tugaskan modul ke kelas dan sematkan di ruang (setelah C1)
+### A1 — Tugaskan modul ke kelas dan sematkan di ruang (selesai)
 
 - **Tugaskan:** pengajar memilih modul + kelas (C1) + tenggat opsional; modul muncul sebagai "Tugas" di panel
   belajar siswa kelas itu, dengan urutan langkah wajib; pengajar melihat progres per siswa (dipakai Rapor).
   Modul tetap terbuka sebagai katalog untuk siswa lain.
 - **Sematkan:** saat sesi live, pengajar menyematkan modul/langkah di ruang; peserta di ruang melihat tombol
   "Buka bersama". Tidak membatasi akses dari luar ruang.
-- Skema dan aturan detail diusulkan saat C1 selesai.
+- **Disetujui:** penerima dibekukan saat tugas dibuat; pindah kelas mempertahankan tugas, siswa baru tidak otomatis
+  menerima tugas lama. Isi/urutan langkah disalin saat penerbitan. Progres tugas mulai nol, terpisah dari katalog,
+  monotonic tanpa undo; kuis wajib melalui percobaan konteks tugas. Soal tetap snapshot saat percobaan dimulai.
+- **Implementasi:** migration 00015 untuk tugas/penerima/langkah/progres dan konteks quiz attempt; 00016 untuk
+  sematan per sesi ruang. API `assignments`, Kelola `AssignmentManager`, siswa `AssignmentPanel` desktop/HP.
+  Deadline WIB disimpan UTC dan tidak mengunci. ID penerbitan dari client dipertahankan untuk retry;
+  pembatalan soft tetap menyimpan riwayat. File snapshot dilindungi dari delete dan akses tugas dicek per penerima/urutan.
+- **Sematan:** `learning_pin`/`learning_unpin` melalui actor dan worker sesi existing, staff dalam interior saja;
+  validasi organisasi/publikasi/pasangan modul-langkah; state dikirim ke late join/reconnect dan dipulihkan dari sesi
+  setelah restart. Sesi baru tidak mewarisi sematan lama. Buka bersama tidak memaksa navigasi atau sinkron playback.
+- **Bukti:** full backend race/lint (assignment 82%, realtime 83,5%), 187 frontend tests/lint/build, disposable
+  migration DownTo14/Up, Postgres snapshot/urutan/idempotensi/kuis/file/sematan, Chrome tugas desktop/390px,
+  WS sematan/late join; regresi modul/progres/kuis/perpustakaan/input peta. Detail: `a1-assignments.md`.
 
 ### Q1 — Bank soal dan kuis mandiri
 

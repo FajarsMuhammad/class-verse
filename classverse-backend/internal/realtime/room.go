@@ -34,6 +34,7 @@ type Admission struct {
 	BuildingKey string
 	ScheduledAt *time.Time
 	AllChat     bool
+	Pin         *LearningPin
 	UserID      uuid.UUID
 	Name        string
 	Avatar      string
@@ -167,6 +168,7 @@ type room struct {
 	spawnN      int
 	emptySince  time.Time
 	sessionOpen bool
+	pin         *LearningPin
 	allChat     bool
 	// Session moderation state; lives as long as the room actor (see design).
 	locked       bool
@@ -181,7 +183,7 @@ type room struct {
 func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *slog.Logger) *room {
 	return &room{
 		id: adm.RoomID, orgID: adm.OrgID, name: adm.RoomName, buildingKey: adm.BuildingKey,
-		mapd: mapd, campus: mapd.Key == campusKey, capacity: adm.Capacity, now: now, log: log, hub: hub,
+		mapd: mapd, campus: mapd.Key == campusKey, capacity: adm.Capacity, now: now, log: log, hub: hub, pin: adm.Pin,
 		allChat: adm.AllChat || mapd.Key == campusKey,
 		inbox:   make(chan any, inboxSize), done: make(chan struct{}),
 		members: make(map[uuid.UUID]*member), reserved: make(map[uuid.UUID]bool),
@@ -265,6 +267,8 @@ func (r *room) handle(cmd any) {
 			r.broadcast(newOut(TypeProfileUpdated, c.p), uuid.Nil)
 		}
 		close(c.done)
+	case learningPinResult:
+		r.applyLearningPin(c)
 	case commandCmd:
 		r.command(c)
 	case moderatedCmd:
@@ -385,6 +389,7 @@ func (r *room) sendWelcome(m *member, typ string) {
 		}
 	}
 	m.conn.send(newOut(typ, w))
+	m.conn.send(newOut(TypeRoomState, r.state(m.p.ID)))
 	// A (re)connected client starts without a zone; tell it the current one.
 	if m.zone.Key != "" {
 		m.conn.send(newOut(TypeZone, ZoneMsg{Key: m.zone.Key, Name: m.zone.Name}))

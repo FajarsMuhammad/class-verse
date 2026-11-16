@@ -6,7 +6,7 @@ import type { QuizAttempt } from '@/api/types'
 
 // Q1 self-paced quiz. The server grades; the key and explanations arrive only after finishing
 // (approved rule 3). Questions are plain text, never HTML.
-const props = defineProps<{ orgId: string; quizId: string; title: string }>()
+const props = defineProps<{ orgId: string; quizId: string; title: string; assignmentStepId?: string }>()
 const emit = defineEmits<{ close: []; finished: [attempt: QuizAttempt] }>()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
@@ -22,7 +22,9 @@ async function start() {
   busy.value = true
   error.value = ''
   try {
-    attempt.value = await quizApi.start(props.orgId, props.quizId)
+    attempt.value = props.assignmentStepId
+      ? await quizApi.start(props.orgId, props.quizId, props.assignmentStepId)
+      : await quizApi.start(props.orgId, props.quizId)
     current.value = Math.max(0, attempt.value.answers.findIndex((a) => a < 0))
   } catch (err) {
     error.value = errorMessage(err)

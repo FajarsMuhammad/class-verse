@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/db/seed"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/assignment"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/class"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/file"
@@ -203,6 +204,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	moduleHandler := module.NewHandler(module.NewService(pool, orgSvc, campusBuildings{mapData["campus"]}, now), log)
 	quizHandler := quiz.NewHandler(quiz.NewService(pool, orgSvc, campusBuildings{mapData["campus"]}, now), log)
 	classHandler := class.NewHandler(class.NewService(pool, orgSvc, now), log)
+	assignmentHandler := assignment.NewHandler(assignment.NewService(pool, orgSvc, now), log)
 	reportHandler := report.NewHandler(report.NewService(report.NewStore(pool), orgSvc, now), log)
 	lk, err := voice.NewLiveKit(cfg.LiveKit.URL, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, now)
 	if err != nil {
@@ -242,6 +244,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				moduleHandler.Routes(r)
 				quizHandler.Routes(r)
 				classHandler.Routes(r)
+				assignmentHandler.Routes(r)
 				if uploads != nil {
 					uploads.Routes(r)
 				}

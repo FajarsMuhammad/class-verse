@@ -330,7 +330,16 @@ func (h *Handler) start(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	a, err := h.svc.Start(r.Context(), user, p[0], p[1])
+	var a Attempt
+	if raw := r.URL.Query().Get("assignment_step_id"); raw != "" {
+		stepID, parseErr := uuid.Parse(raw)
+		if parseErr != nil {
+			return ErrNotFound
+		}
+		a, err = h.svc.StartAssignment(r.Context(), user, p[0], p[1], stepID)
+	} else {
+		a, err = h.svc.Start(r.Context(), user, p[0], p[1])
+	}
 	if err != nil {
 		return err
 	}

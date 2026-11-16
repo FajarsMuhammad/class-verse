@@ -31,7 +31,7 @@ export const quizApi = {
     api<void>(`${one(orgID, id)}/questions/${encodeURIComponent(questionID)}`, { method: 'DELETE' }),
   reorder: (orgID: string, id: string, questionIDs: string[]) =>
     api<void>(`${one(orgID, id)}/order`, { method: 'PUT', body: { question_ids: questionIDs } }),
-  start: (orgID: string, id: string) => api<QuizAttempt>(`${one(orgID, id)}/attempts`, { method: 'POST' }),
+  start: (orgID: string, id: string, assignmentStepID?: string) => api<QuizAttempt>(`${one(orgID, id)}/attempts${assignmentStepID ? `?assignment_step_id=${encodeURIComponent(assignmentStepID)}` : ''}`, { method: 'POST' }),
   answer: (orgID: string, id: string, attemptID: string, index: number, choice: number) =>
     api<void>(`${attempt(orgID, id, attemptID)}/answers/${index}`, { method: 'PUT', body: { choice } }),
   finish: (orgID: string, id: string, attemptID: string) =>

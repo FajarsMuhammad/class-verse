@@ -196,6 +196,50 @@ type AcademicYear struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type Assignment struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	ClassID     uuid.UUID
+	ModuleID    uuid.UUID
+	Title       string
+	ClassName   string
+	YearLabel   string
+	BuildingKey string
+	Level       string
+	DueAt       pgtype.Timestamptz
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	CancelledAt pgtype.Timestamptz
+}
+
+type AssignmentProgress struct {
+	OrgID        uuid.UUID
+	AssignmentID uuid.UUID
+	UserID       uuid.UUID
+	StepID       uuid.UUID
+	CompletedAt  pgtype.Timestamptz
+}
+
+type AssignmentRecipient struct {
+	OrgID        uuid.UUID
+	AssignmentID uuid.UUID
+	UserID       uuid.UUID
+}
+
+type AssignmentStep struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	AssignmentID uuid.UUID
+	Position     int32
+	Kind         string
+	Title        string
+	Body         string
+	FileID       uuid.NullUUID
+	VideoID      pgtype.Text
+	QuizID       uuid.NullUUID
+	Minutes      int32
+}
+
 type ChatMessage struct {
 	ID        int64
 	SessionID uuid.UUID
@@ -389,17 +433,19 @@ type Quiz struct {
 }
 
 type QuizAttempt struct {
-	ID         uuid.UUID
-	OrgID      uuid.UUID
-	QuizID     uuid.UUID
-	UserID     uuid.UUID
-	Questions  []byte
-	Answers    []int16
-	PassScore  int16
-	StartedAt  pgtype.Timestamptz
-	FinishedAt pgtype.Timestamptz
-	Correct    pgtype.Int2
-	Score      pgtype.Int2
+	ID               uuid.UUID
+	OrgID            uuid.UUID
+	QuizID           uuid.UUID
+	UserID           uuid.UUID
+	Questions        []byte
+	Answers          []int16
+	PassScore        int16
+	StartedAt        pgtype.Timestamptz
+	FinishedAt       pgtype.Timestamptz
+	Correct          pgtype.Int2
+	Score            pgtype.Int2
+	AssignmentID     uuid.NullUUID
+	AssignmentStepID uuid.NullUUID
 }
 
 type QuizQuestion struct {
@@ -469,10 +515,12 @@ type RoomLocationHistory struct {
 }
 
 type RoomSession struct {
-	ID        uuid.UUID
-	RoomID    uuid.UUID
-	StartedAt pgtype.Timestamptz
-	EndedAt   pgtype.Timestamptz
+	ID          uuid.UUID
+	RoomID      uuid.UUID
+	StartedAt   pgtype.Timestamptz
+	EndedAt     pgtype.Timestamptz
+	PinModuleID uuid.NullUUID
+	PinStepID   uuid.NullUUID
 }
 
 type SessionAttendance struct {

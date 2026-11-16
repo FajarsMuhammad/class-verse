@@ -15,6 +15,7 @@ import MapMinimap from '@/components/MapMinimap.vue'
 import PlaceCard from '@/components/PlaceCard.vue'
 import BuildingModules from '@/components/BuildingModules.vue'
 import LearningPanel from '@/components/LearningPanel.vue'
+import RoomLearningPin from '@/components/RoomLearningPin.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import { useOrgStore } from '@/stores/org'
 import { useAuthStore } from '@/stores/auth'
@@ -301,6 +302,7 @@ onBeforeUnmount(() => {
         :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
         :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
       <div class="map-column">
+        <RoomLearningPin v-if="org.active && !campus && !kicked" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" />
         <div class="map-frame">
           <header ref="mapTop" class="map-top">
             <button

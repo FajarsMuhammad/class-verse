@@ -9,6 +9,24 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AssignmentStepFileKind.
+const (
+	AssignmentStepFileKindAudio AssignmentStepFileKind = "audio"
+	AssignmentStepFileKindPdf   AssignmentStepFileKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the AssignmentStepFileKind enum.
+func (e AssignmentStepFileKind) Valid() bool {
+	switch e {
+	case AssignmentStepFileKindAudio:
+		return true
+	case AssignmentStepFileKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BookCover.
 const (
 	BookCoverArena      BookCover = "arena"
@@ -505,6 +523,56 @@ type AcademicYear struct {
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
+
+// Assignment defines model for Assignment.
+type Assignment struct {
+	BuildingKey string             `json:"building_key"`
+	Cancelled   bool               `json:"cancelled"`
+	ClassName   string             `json:"class_name"`
+	Done        int                `json:"done"`
+	DueAt       *time.Time         `json:"due_at"`
+	Id          openapi_types.UUID `json:"id"`
+	Level       Level              `json:"level"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+	YearLabel   string             `json:"year_label"`
+}
+
+// AssignmentInput defines model for AssignmentInput.
+type AssignmentInput struct {
+	ClassId openapi_types.UUID `json:"class_id"`
+	DueAt   *time.Time         `json:"due_at,omitempty"`
+
+	// Id Client-generated retry-safe ID
+	Id       openapi_types.UUID `json:"id"`
+	ModuleId openapi_types.UUID `json:"module_id"`
+}
+
+// AssignmentRecipient defines model for AssignmentRecipient.
+type AssignmentRecipient struct {
+	DisplayName string             `json:"display_name"`
+	Done        int                `json:"done"`
+	Total       int                `json:"total"`
+	UserId      openapi_types.UUID `json:"user_id"`
+}
+
+// AssignmentStep defines model for AssignmentStep.
+type AssignmentStep struct {
+	Body     string                  `json:"body"`
+	Done     bool                    `json:"done"`
+	FileId   *openapi_types.UUID     `json:"file_id"`
+	FileKind *AssignmentStepFileKind `json:"file_kind"`
+	Id       openapi_types.UUID      `json:"id"`
+	Kind     StepKind                `json:"kind"`
+	Minutes  int                     `json:"minutes"`
+	QuizId   *openapi_types.UUID     `json:"quiz_id"`
+	Title    string                  `json:"title"`
+	Unlocked bool                    `json:"unlocked"`
+	VideoId  *string                 `json:"video_id"`
+}
+
+// AssignmentStepFileKind defines model for AssignmentStep.FileKind.
+type AssignmentStepFileKind string
 
 // AttemptQuestion defines model for AttemptQuestion.
 type AttemptQuestion struct {
@@ -1111,6 +1179,9 @@ type VoiceToken struct {
 	Url string `json:"url"`
 }
 
+// AssignmentID defines model for AssignmentID.
+type AssignmentID = openapi_types.UUID
+
 // AttemptID defines model for AttemptID.
 type AttemptID = openapi_types.UUID
 
@@ -1222,6 +1293,12 @@ type ListQuizzesParams struct {
 	Drafts      *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
 }
 
+// StartQuizAttemptParams defines parameters for StartQuizAttempt.
+type StartQuizAttemptParams struct {
+	// AssignmentStepId Own unlocked assignment quiz step; creates/resumes separate task-context attempt
+	AssignmentStepId *openapi_types.UUID `form:"assignment_step_id,omitempty" json:"assignment_step_id,omitempty"`
+}
+
 // AnswerQuizQuestionJSONBody defines parameters for AnswerQuizQuestion.
 type AnswerQuizQuestionJSONBody struct {
 	Choice int `json:"choice"`
@@ -1272,6 +1349,9 @@ type CreateClassJSONRequestBody = ClassInput
 
 // PlaceStudentJSONRequestBody defines body for PlaceStudent for application/json ContentType.
 type PlaceStudentJSONRequestBody PlaceStudentJSONBody
+
+// IssueAssignmentJSONRequestBody defines body for IssueAssignment for application/json ContentType.
+type IssueAssignmentJSONRequestBody = AssignmentInput
 
 // RenameClassJSONRequestBody defines body for RenameClass for application/json ContentType.
 type RenameClassJSONRequestBody = ClassInput

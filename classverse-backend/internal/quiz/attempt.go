@@ -75,21 +75,51 @@ func toAttempt(row query.QuizAttempt) (Attempt, error) {
 // Start returns the caller's unfinished attempt for a published quiz, or starts a new one with a snapshot
 // of the current questions. Staff may also try drafts to check their own quiz.
 func (s *Service) Start(ctx context.Context, userID, orgID, quizID uuid.UUID) (Attempt, error) {
+	return s.start(ctx, userID, orgID, quizID, uuid.Nil)
+}
+
+// StartAssignment starts a fresh task-context attempt, never reusing catalog work.
+func (s *Service) StartAssignment(ctx context.Context, userID, orgID, quizID, stepID uuid.UUID) (Attempt, error) {
+	if stepID == uuid.Nil {
+		return Attempt{}, ErrNotFound
+	}
+	return s.start(ctx, userID, orgID, quizID, stepID)
+}
+
+func (s *Service) start(ctx context.Context, userID, orgID, quizID, stepID uuid.UUID) (Attempt, error) {
 	role, err := s.auth.Authorize(ctx, userID, orgID, org.RoleParticipant)
 	if err != nil {
 		return Attempt{}, err
 	}
 	var row query.QuizAttempt
 	err = s.inTx(ctx, func(q *query.Queries) error {
+		assignmentID := uuid.NullUUID{}
+		contextID := uuid.NullUUID{UUID: stepID, Valid: stepID != uuid.Nil}
+		if contextID.Valid {
+			step, err := q.AssignmentQuizContext(ctx, query.AssignmentQuizContextParams{OrgID: orgID, UserID: userID, StepID: stepID})
+			if errors.Is(err, pgx.ErrNoRows) || err == nil && step.QuizID.UUID != quizID {
+				return ErrNotFound
+			}
+			if err != nil {
+				return fmt.Errorf("assignment quiz context: %w", err)
+			}
+			assignmentID = uuid.NullUUID{UUID: step.AssignmentID, Valid: true}
+			if _, err := q.LockAssignment(ctx, query.LockAssignmentParams{OrgID: orgID, ID: step.AssignmentID}); err != nil {
+				return err
+			}
+			if _, err := q.AssignmentQuizContext(ctx, query.AssignmentQuizContextParams{OrgID: orgID, UserID: userID, StepID: stepID}); err != nil {
+				return ErrNotFound
+			}
+		}
 		// The quiz lock serializes concurrent starts, so the open-attempt index never races.
 		z, err := s.lock(ctx, q, orgID, quizID)
 		if err != nil {
 			return err
 		}
-		if !z.PublishedAt.Valid && !role.AtLeast(org.RoleTeacher) {
+		if !z.PublishedAt.Valid && (contextID.Valid || !role.AtLeast(org.RoleTeacher)) {
 			return ErrNotFound
 		}
-		row, err = q.OpenAttempt(ctx, query.OpenAttemptParams{QuizID: quizID, UserID: userID})
+		row, err = q.OpenAttempt(ctx, query.OpenAttemptParams{QuizID: quizID, UserID: userID, AssignmentStepID: contextID})
 		if err == nil {
 			return nil
 		}
@@ -115,7 +145,7 @@ func (s *Service) Start(ctx context.Context, userID, orgID, quizID uuid.UUID) (A
 		}
 		row, err = q.CreateAttempt(ctx, query.CreateAttemptParams{
 			ID: uuid.New(), OrgID: orgID, QuizID: quizID, UserID: userID, Questions: raw, Answers: answers,
-			PassScore: z.PassScore, StartedAt: pgTime(s.now()),
+			PassScore: z.PassScore, StartedAt: pgTime(s.now()), AssignmentID: assignmentID, AssignmentStepID: contextID,
 		})
 		if err != nil {
 			return fmt.Errorf("create attempt: %w", err)
@@ -153,6 +183,14 @@ func (s *Service) Answer(ctx context.Context, userID, orgID, quizID, attemptID u
 		if row.FinishedAt.Valid {
 			return ErrFinished
 		}
+		if row.AssignmentID.Valid {
+			if _, err := q.LockAssignment(ctx, query.LockAssignmentParams{OrgID: orgID, ID: row.AssignmentID.UUID}); err != nil {
+				return err
+			}
+			if _, err := q.AssignmentQuizContext(ctx, query.AssignmentQuizContextParams{OrgID: orgID, UserID: userID, StepID: row.AssignmentStepID.UUID}); err != nil {
+				return ErrNotFound
+			}
+		}
 		if index < 0 || index >= len(row.Answers) {
 			return &ValidationError{Fields: map[string]string{"index": "Soal tidak ada"}}
 		}
@@ -182,6 +220,14 @@ func (s *Service) Finish(ctx context.Context, userID, orgID, quizID, attemptID u
 		if row.FinishedAt.Valid {
 			return nil
 		}
+		if row.AssignmentID.Valid {
+			if _, err := q.LockAssignment(ctx, query.LockAssignmentParams{OrgID: orgID, ID: row.AssignmentID.UUID}); err != nil {
+				return err
+			}
+			if _, err := q.AssignmentQuizContext(ctx, query.AssignmentQuizContextParams{OrgID: orgID, UserID: userID, StepID: row.AssignmentStepID.UUID}); err != nil {
+				return ErrNotFound
+			}
+		}
 		var qs []Snapshot
 		if err := json.Unmarshal(row.Questions, &qs); err != nil {
 			return fmt.Errorf("decode attempt questions: %w", err)
@@ -195,7 +241,13 @@ func (s *Service) Finish(ctx context.Context, userID, orgID, quizID, attemptID u
 			return fmt.Errorf("finish attempt: %w", err)
 		}
 		// Same transaction: a pass and its module progress are saved together or not at all.
-		if score >= int(row.PassScore) {
+		if score >= int(row.PassScore) && row.AssignmentID.Valid {
+			err = q.CompleteAssignmentStep(ctx, query.CompleteAssignmentStepParams{OrgID: orgID, AssignmentID: row.AssignmentID.UUID, UserID: userID, StepID: row.AssignmentStepID.UUID, CompletedAt: row.FinishedAt})
+			if err != nil {
+				return fmt.Errorf("complete assignment quiz: %w", err)
+			}
+		}
+		if score >= int(row.PassScore) && !row.AssignmentID.Valid {
 			err = q.CompleteQuizSteps(ctx, query.CompleteQuizStepsParams{OrgID: orgID, UserID: userID, QuizID: uuid.NullUUID{UUID: quizID, Valid: true}, CompletedAt: row.FinishedAt})
 			if err != nil {
 				return fmt.Errorf("complete quiz steps: %w", err)

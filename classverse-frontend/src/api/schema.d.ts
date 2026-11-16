@@ -1009,6 +1009,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        get: operations["listAssignments"];
+        put?: never;
+        post: operations["issueAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["cancelAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        get: operations["listAssignmentSteps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        get: operations["listAssignmentRoster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}/steps/{step_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Ordered monotonic completion; quiz steps require passing contextual attempt, never manual completion */
+        put: operations["completeAssignmentStep"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/academic-years": {
         parameters: {
             query?: never;
@@ -1305,6 +1401,57 @@ export interface components {
             /** @description 0–100, dibulatkan ke bawah */
             score: number | null;
             passed: boolean | null;
+        };
+        AssignmentInput: {
+            /**
+             * Format: uuid
+             * @description Client-generated retry-safe ID
+             */
+            id: string;
+            /** Format: uuid */
+            class_id: string;
+            /** Format: uuid */
+            module_id: string;
+            /** Format: date-time */
+            due_at?: string | null;
+        };
+        Assignment: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            class_name: string;
+            year_label: string;
+            building_key: string;
+            level: components["schemas"]["Level"];
+            /** Format: date-time */
+            due_at: string | null;
+            cancelled: boolean;
+            done: number;
+            total: number;
+        };
+        AssignmentStep: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["StepKind"];
+            title: string;
+            body: string;
+            /** Format: uuid */
+            file_id: string | null;
+            /** @enum {string|null} */
+            file_kind: "pdf" | "audio" | null;
+            video_id: string | null;
+            /** Format: uuid */
+            quiz_id: string | null;
+            minutes: number;
+            done: boolean;
+            unlocked: boolean;
+        };
+        AssignmentRecipient: {
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            done: number;
+            total: number;
         };
         AcademicYear: {
             /** Format: uuid */
@@ -1781,6 +1928,7 @@ export interface components {
     };
     parameters: {
         OrgID: string;
+        AssignmentID: string;
         YearID: string;
         QuizID: string;
         AttemptID: string;
@@ -3508,7 +3656,10 @@ export interface operations {
     };
     startQuizAttempt: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Own unlocked assignment quiz step; creates/resumes separate task-context attempt */
+                assignment_step_id?: string;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -3589,6 +3740,153 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own tasks for participants, all school tasks for staff */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Assignment"][];
+                    };
+                };
+            };
+        };
+    };
+    issueAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentInput"];
+            };
+        };
+        responses: {
+            /** @description Issued or identical retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                    };
+                };
+            };
+        };
+    };
+    cancelAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled; history retained */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAssignmentSteps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own ordered steps; locked body and content references omitted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AssignmentStep"][];
+                    };
+                };
+            };
+        };
+    };
+    listAssignmentRoster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff only; frozen recipient progress */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AssignmentRecipient"][];
+                    };
+                };
+            };
+        };
+    };
+    completeAssignmentStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done or identical retry */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: components["responses"]["Conflict"];
         };
     };
     listAcademicYears: {

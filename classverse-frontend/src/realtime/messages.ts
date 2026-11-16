@@ -44,6 +44,8 @@ export interface ClientMessages {
 export type CommandMsg =
   | { name: 'gather' | 'lock' | 'unlock' | 'voice_broadcast' | 'voice_broadcast_off' }
   | { name: 'kick' | 'allow' | 'mute' | 'unmute'; target: string }
+  | { name: 'learning_pin'; target: string; step?: string }
+  | { name: 'learning_unpin' }
 export interface BannedUser {
   id: string
   name: string
@@ -153,7 +155,15 @@ export interface ZoneMsg {
   key: string
   name: string
 }
+export interface LearningPin {
+  module_id: string
+  step_id: string
+  title: string
+  building_key: string
+  level: string
+}
 export interface RoomStateMsg {
+  pin?: LearningPin | null
   all_chat_enabled: boolean
   locked?: boolean
   muted?: boolean

@@ -44,6 +44,12 @@ func (s *Store) Admit(ctx context.Context, roomID, userID uuid.UUID) (Admission,
 		t := row.ScheduledAt.Time.UTC()
 		adm.ScheduledAt = &t
 	}
+	if adm.MapKey != campusKey {
+		adm.Pin, err = s.learningPin(ctx, roomID)
+		if err != nil {
+			return Admission{}, fmt.Errorf("load learning pin: %w", err)
+		}
+	}
 	return adm, nil
 }
 

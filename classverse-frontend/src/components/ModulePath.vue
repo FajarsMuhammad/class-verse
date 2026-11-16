@@ -9,7 +9,7 @@ import QuizPlayer from './QuizPlayer.vue'
 import StepViewer from './StepViewer.vue'
 
 // Open catalog: every step remains accessible, regardless of completion order.
-const props = defineProps<{ orgId: string; buildingKey: string; buildingName: string; initialLevel?: Level; moduleId?: string }>()
+const props = defineProps<{ orgId: string; buildingKey: string; buildingName: string; initialLevel?: Level; moduleId?: string; stepId?: string }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const ids = { level: useId(), list: useId() }
@@ -39,6 +39,8 @@ async function load() {
       if (props.moduleId) {
         await nextTick()
         document.getElementById(`module-${props.moduleId}`)?.focus()
+        const step = page.items.find(m => m.id === props.moduleId)?.steps.find(s => s.id === props.stepId)
+        if (step) open(step)
       }
     }
   } catch (err) {

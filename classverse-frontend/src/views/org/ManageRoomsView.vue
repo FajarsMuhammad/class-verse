@@ -7,6 +7,7 @@ import LibraryManager from '@/components/LibraryManager.vue'
 import ModuleManager from '@/components/ModuleManager.vue'
 import QuizManager from '@/components/QuizManager.vue'
 import ClassManager from '@/components/ClassManager.vue'
+import AssignmentManager from '@/components/AssignmentManager.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
@@ -36,6 +37,7 @@ const org = useOrgStore()
       :org-id="org.active.id" />
     <ClassManager v-if="org.active && org.active.role !== 'participant'" :key="`classes-${org.active.id}`"
       :org-id="org.active.id" :is-admin="org.active.role === 'admin'" />
+    <AssignmentManager v-if="org.active && org.active.role !== 'participant'" :key="`assignments-${org.active.id}`" :org-id="org.active.id" />
     <InvitePanel
       v-if="org.active && auth.me"
       :key="org.active.id"

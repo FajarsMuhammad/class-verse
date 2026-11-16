@@ -59,6 +59,7 @@ type EmoteOut struct {
 type CommandMsg struct {
 	Name   string    `json:"name"`
 	Target uuid.UUID `json:"target,omitempty"`
+	Step   uuid.UUID `json:"step,omitempty"`
 }
 
 // ModerationEvent tells staff the result of kick/allow and the open-session
@@ -205,9 +206,19 @@ type ZoneMsg struct {
 	Name string `json:"name"`
 }
 
+// LearningPin is a current-catalog link, not an assignment or synchronized playback.
+type LearningPin struct {
+	ModuleID    uuid.UUID `json:"module_id"`
+	StepID      uuid.UUID `json:"step_id"`
+	Title       string    `json:"title"`
+	BuildingKey string    `json:"building_key"`
+	Level       string    `json:"level"`
+}
+
 // RoomStateMsg carries room settings that can change during a session.
 type RoomStateMsg struct {
-	AllChatEnabled bool `json:"all_chat_enabled"`
+	Pin            *LearningPin `json:"pin"`
+	AllChatEnabled bool         `json:"all_chat_enabled"`
 	// Locked rooms reject new participants (slice 7).
 	Locked bool `json:"locked"`
 	// Muted is personal: true when this receiver may not chat or speak.

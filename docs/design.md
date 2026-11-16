@@ -284,9 +284,15 @@ state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
   Semua langkah bebas dibuka, termasuk yang belum selesai. Total menghitung langkah aktif saja. Lanjutkan belajar
   memilih modul terbit dengan tanda selesai terbaru dan langkah aktif belum selesai; tanpa aktivitas selesai
   tidak ada rekomendasi. Arsip tidak menghapus riwayat progres; keluar membership menghapus progres sesuai FK.
-- **A1 setelah C1:** tugaskan modul ke rombel (tenggat opsional) dan sematkan modul/langkah saat sesi ruang;
+- **A1 (migration 00015–00016):** tugaskan modul ke rombel (tenggat opsional) dan sematkan modul/langkah saat sesi ruang;
   tidak menutup katalog bagi anggota lain. Urutan wajib berlaku untuk modul yang ditugaskan; detail skema
-  dan aturan penugasan dirinci saat C1 selesai.
+  dan aturan penugasan ada di `docs/tasks/a1-assignments.md`. Tugas menyimpan snapshot penerima/isi/order, progres
+  terpisah monotonic dengan check urutan server; issuance retry-safe memakai UUID client. Lock roster school/year
+  menyerialkan issuance terhadap perpindahan. Quiz attempt memiliki konteks tugas/step nullable; unique open attempt
+  per quiz/user/context (`NULLS NOT DISTINCT`) menjaga katalog dan tugas terpisah. Pass konteks hanya menandai
+  tugas, pass katalog tetap mengisi M2. Snapshot file tetap menjadi referensi delete dan aksesnya memeriksa penerima
+  serta predecessor. Sematan disimpan di sesi, disebar `room_state.pin`; worker sesi existing melakukan DB I/O,
+  bukan actor. `learning_pin` target module + optional step; `learning_unpin` menghapus. New session tanpa sematan.
 - **Antre buku:** ditunda; tidak ada reservasi/denda dalam L2.
 
 Rincian teknis **masih usulan**, tidak menimpa ADR lama: transport baca autentikasi/range (proxy vs presigned)

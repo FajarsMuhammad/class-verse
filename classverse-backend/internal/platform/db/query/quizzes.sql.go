@@ -58,20 +58,22 @@ func (q *Queries) CompleteQuizSteps(ctx context.Context, arg CompleteQuizStepsPa
 }
 
 const createAttempt = `-- name: CreateAttempt :one
-INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score
+INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, assignment_id, assignment_step_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid, $10::uuid)
+RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id
 `
 
 type CreateAttemptParams struct {
-	ID        uuid.UUID
-	OrgID     uuid.UUID
-	QuizID    uuid.UUID
-	UserID    uuid.UUID
-	Questions []byte
-	Answers   []int16
-	PassScore int16
-	StartedAt pgtype.Timestamptz
+	ID               uuid.UUID
+	OrgID            uuid.UUID
+	QuizID           uuid.UUID
+	UserID           uuid.UUID
+	Questions        []byte
+	Answers          []int16
+	PassScore        int16
+	StartedAt        pgtype.Timestamptz
+	AssignmentID     uuid.NullUUID
+	AssignmentStepID uuid.NullUUID
 }
 
 func (q *Queries) CreateAttempt(ctx context.Context, arg CreateAttemptParams) (QuizAttempt, error) {
@@ -84,6 +86,8 @@ func (q *Queries) CreateAttempt(ctx context.Context, arg CreateAttemptParams) (Q
 		arg.Answers,
 		arg.PassScore,
 		arg.StartedAt,
+		arg.AssignmentID,
+		arg.AssignmentStepID,
 	)
 	var i QuizAttempt
 	err := row.Scan(
@@ -98,6 +102,8 @@ func (q *Queries) CreateAttempt(ctx context.Context, arg CreateAttemptParams) (Q
 		&i.FinishedAt,
 		&i.Correct,
 		&i.Score,
+		&i.AssignmentID,
+		&i.AssignmentStepID,
 	)
 	return i, err
 }
@@ -218,7 +224,7 @@ func (q *Queries) DeleteQuestion(ctx context.Context, arg DeleteQuestionParams) 
 
 const finishAttempt = `-- name: FinishAttempt :one
 UPDATE quiz_attempts SET finished_at = $2, correct = $3, score = $4 WHERE id = $1 AND finished_at IS NULL
-RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score
+RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id
 `
 
 type FinishAttemptParams struct {
@@ -248,6 +254,8 @@ func (q *Queries) FinishAttempt(ctx context.Context, arg FinishAttemptParams) (Q
 		&i.FinishedAt,
 		&i.Correct,
 		&i.Score,
+		&i.AssignmentID,
+		&i.AssignmentStepID,
 	)
 	return i, err
 }
@@ -361,7 +369,7 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Lis
 }
 
 const lockAttempt = `-- name: LockAttempt :one
-SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score FROM quiz_attempts WHERE org_id = $1 AND quiz_id = $2 AND id = $3 AND user_id = $4 FOR UPDATE
+SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id FROM quiz_attempts WHERE org_id = $1 AND quiz_id = $2 AND id = $3 AND user_id = $4 FOR UPDATE
 `
 
 type LockAttemptParams struct {
@@ -392,6 +400,8 @@ func (q *Queries) LockAttempt(ctx context.Context, arg LockAttemptParams) (QuizA
 		&i.FinishedAt,
 		&i.Correct,
 		&i.Score,
+		&i.AssignmentID,
+		&i.AssignmentStepID,
 	)
 	return i, err
 }
@@ -437,16 +447,18 @@ func (q *Queries) NextQuestionPosition(ctx context.Context, quizID uuid.UUID) (i
 }
 
 const openAttempt = `-- name: OpenAttempt :one
-SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 AND finished_at IS NULL
+SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 AND finished_at IS NULL
+ AND assignment_step_id IS NOT DISTINCT FROM $3::uuid
 `
 
 type OpenAttemptParams struct {
-	QuizID uuid.UUID
-	UserID uuid.UUID
+	QuizID           uuid.UUID
+	UserID           uuid.UUID
+	AssignmentStepID uuid.NullUUID
 }
 
 func (q *Queries) OpenAttempt(ctx context.Context, arg OpenAttemptParams) (QuizAttempt, error) {
-	row := q.db.QueryRow(ctx, openAttempt, arg.QuizID, arg.UserID)
+	row := q.db.QueryRow(ctx, openAttempt, arg.QuizID, arg.UserID, arg.AssignmentStepID)
 	var i QuizAttempt
 	err := row.Scan(
 		&i.ID,
@@ -460,6 +472,8 @@ func (q *Queries) OpenAttempt(ctx context.Context, arg OpenAttemptParams) (QuizA
 		&i.FinishedAt,
 		&i.Correct,
 		&i.Score,
+		&i.AssignmentID,
+		&i.AssignmentStepID,
 	)
 	return i, err
 }

@@ -5,6 +5,8 @@ import ChatPanel from '@/components/ChatPanel.vue'
 import LibraryCatalog from '@/components/LibraryCatalog.vue'
 import BuildingModules from '@/components/BuildingModules.vue'
 import ResumeLearning from '@/components/ResumeLearning.vue'
+import AssignmentPanel from '@/components/AssignmentPanel.vue'
+import RoomLearningPin from '@/components/RoomLearningPin.vue'
 import RoomStations from '@/components/RoomStations.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import DoorRooms from '@/components/DoorRooms.vue'
@@ -245,6 +247,8 @@ function reported() {
     <RoomStations v-if="!kicked && org.active && ['science', 'staff'].includes(current?.map_key ?? '')"
       :key="current?.room_id" class="card" :org-id="org.active.id" :map-key="current!.map_key" :station="station"
       :teacher="org.isTeacher" @select="station = $event" />
+    <RoomLearningPin v-if="!kicked && org.active" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" />
+    <AssignmentPanel v-if="!kicked && org.active" :key="`tasks-${org.active.id}`" :org-id="org.active.id" />
     <ResumeLearning v-if="!kicked && org.active" class="card" :org-id="org.active.id" :refresh-key="progressKey" />
     <section v-if="!kicked && current?.map_key === 'library' && org.active" class="card" aria-labelledby="catalog-title">
       <h2 id="catalog-title" class="catalog-title">Katalog</h2>

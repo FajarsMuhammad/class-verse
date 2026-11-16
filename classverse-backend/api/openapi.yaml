@@ -1043,6 +1043,12 @@ paths:
       - $ref: "#/components/parameters/QuizID"
     post:
       operationId: startQuizAttempt
+      parameters:
+        - name: assignment_step_id
+          in: query
+          required: false
+          description: Own unlocked assignment quiz step; creates/resumes separate task-context attempt
+          schema: { type: string, format: uuid }
       description: |
         Melanjutkan percobaan yang belum selesai, atau memulai percobaan baru dengan snapshot soal saat ini.
         Percobaan tidak dibatasi. Kunci dan penjelasan bernilai null sampai percobaan selesai.
@@ -1098,6 +1104,89 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/orgs/{org_id}/assignments:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listAssignments
+      responses:
+        "200":
+          description: Own tasks for participants, all school tasks for staff
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
+    post:
+      operationId: issueAssignment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignmentInput" }
+      responses:
+        "200":
+          description: Issued or identical retry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id: { type: string, format: uuid }
+  /api/orgs/{org_id}/assignments/{assignment_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/AssignmentID"
+    delete:
+      operationId: cancelAssignment
+      responses:
+        "204": { description: Cancelled; history retained }
+  /api/orgs/{org_id}/assignments/{assignment_id}/steps:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/AssignmentID"
+    get:
+      operationId: listAssignmentSteps
+      responses:
+        "200":
+          description: Own ordered steps; locked body and content references omitted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/AssignmentStep" } }
+  /api/orgs/{org_id}/assignments/{assignment_id}/roster:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/AssignmentID"
+    get:
+      operationId: listAssignmentRoster
+      responses:
+        "200":
+          description: Staff only; frozen recipient progress
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/AssignmentRecipient" } }
+  /api/orgs/{org_id}/assignments/{assignment_id}/steps/{step_id}/done:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/AssignmentID"
+      - { name: step_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: completeAssignmentStep
+      description: Ordered monotonic completion; quiz steps require passing contextual attempt, never manual completion
+      responses:
+        "204": { description: Done or identical retry }
+        "409": { $ref: "#/components/responses/Conflict" }
   /api/orgs/{org_id}/academic-years:
     parameters:
       - $ref: "#/components/parameters/OrgID"
@@ -1295,6 +1384,11 @@ components:
   parameters:
     OrgID:
       name: org_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AssignmentID:
+      name: assignment_id
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1513,6 +1607,51 @@ components:
         correct: { type: integer, nullable: true }
         score: { type: integer, nullable: true, description: "0–100, dibulatkan ke bawah" }
         passed: { type: boolean, nullable: true }
+    AssignmentInput:
+      type: object
+      required: [id, class_id, module_id]
+      properties:
+        id: { type: string, format: uuid, description: Client-generated retry-safe ID }
+        class_id: { type: string, format: uuid }
+        module_id: { type: string, format: uuid }
+        due_at: { type: string, format: date-time, nullable: true }
+    Assignment:
+      type: object
+      required: [id, title, class_name, year_label, building_key, level, due_at, cancelled, done, total]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        class_name: { type: string }
+        year_label: { type: string }
+        building_key: { type: string }
+        level: { $ref: "#/components/schemas/Level" }
+        due_at: { type: string, format: date-time, nullable: true }
+        cancelled: { type: boolean }
+        done: { type: integer }
+        total: { type: integer }
+    AssignmentStep:
+      type: object
+      required: [id, kind, title, body, file_id, file_kind, video_id, quiz_id, minutes, done, unlocked]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/StepKind" }
+        title: { type: string }
+        body: { type: string }
+        file_id: { type: string, format: uuid, nullable: true }
+        file_kind: { type: string, enum: [pdf, audio], nullable: true }
+        video_id: { type: string, nullable: true }
+        quiz_id: { type: string, format: uuid, nullable: true }
+        minutes: { type: integer }
+        done: { type: boolean }
+        unlocked: { type: boolean }
+    AssignmentRecipient:
+      type: object
+      required: [user_id, display_name, done, total]
+      properties:
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+        done: { type: integer }
+        total: { type: integer }
     AcademicYear:
       type: object
       required: [id, label, active]

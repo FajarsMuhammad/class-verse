@@ -337,6 +337,10 @@ func (s *Service) Place(ctx context.Context, userID, orgID, yearID, studentID uu
 		return err
 	}
 	return s.inTx(ctx, func(q *query.Queries) error {
+		// Issuance freezes a consistent roster; all transfers of this school/year share its lock.
+		if err := q.LockAssignmentRoster(ctx, query.LockAssignmentRosterParams{OrgID: orgID, YearID: yearID}); err != nil {
+			return fmt.Errorf("lock class roster: %w", err)
+		}
 		// Membership row lock serializes placements of one student; the unique index is the final guard.
 		role, err := q.GetMemberRoleForUpdate(ctx, query.GetMemberRoleForUpdateParams{OrgID: orgID, UserID: studentID})
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && role != query.OrgRoleParticipant) {

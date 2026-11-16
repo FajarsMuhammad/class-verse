@@ -278,7 +278,7 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur
 				c.sendError(ErrorMsg{Code: CodeBadMessage, Message: "Perintah tidak valid", Seq: env.Seq})
 				continue
 			}
-			if !cur.Load().post(commandCmd{c: c, seq: env.Seq, name: m.Name, target: m.Target}) {
+			if !cur.Load().post(commandCmd{c: c, seq: env.Seq, name: m.Name, target: m.Target, step: m.Step}) {
 				return
 			}
 		case TypeChat:

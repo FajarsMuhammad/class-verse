@@ -55,11 +55,12 @@ SELECT id FROM quiz_questions WHERE org_id = $1 AND quiz_id = $2 ORDER BY positi
 UPDATE quiz_questions SET position = $3 WHERE quiz_id = $1 AND id = $2;
 
 -- name: OpenAttempt :one
-SELECT * FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 AND finished_at IS NULL;
+SELECT * FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 AND finished_at IS NULL
+ AND assignment_step_id IS NOT DISTINCT FROM sqlc.narg(assignment_step_id)::uuid;
 
 -- name: CreateAttempt :one
-INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, assignment_id, assignment_step_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, sqlc.narg(assignment_id)::uuid, sqlc.narg(assignment_step_id)::uuid)
 RETURNING *;
 
 -- name: LockAttempt :one

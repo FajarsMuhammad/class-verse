@@ -6,6 +6,7 @@ import { fetchMap, type MapData } from './mapdata'
 import { ChatState } from './chat'
 import type {
   BannedUser,
+  LearningPin,
   BuildingCount,
   ChatScope,
   ConnectionMode,
@@ -16,6 +17,8 @@ import type {
 import { World } from './world'
 
 export interface RoomHandle {
+  pin?: Ref<LearningPin | null>
+  pinLearning?: (moduleID: string, stepID?: string) => void
   status: Ref<ConnectionStatus>
   map: Ref<MapData | null>
   world: World
@@ -56,6 +59,7 @@ export interface RoomHandle {
 // useRoom connects to one room over WebSocket and keeps a World in sync.
 // The connection closes when the component unmounts.
 export function useRoom(): RoomHandle {
+  const pin = ref<LearningPin | null>(null)
   const status = ref<ConnectionStatus>('connecting')
   const map = shallowRef<MapData | null>(null)
   const online = ref(0)
@@ -114,6 +118,7 @@ export function useRoom(): RoomHandle {
           kicked.value = false
           banned.value = []
           mutedIds.value = []
+          pin.value = null
           current.value = msg.d!
           traveling.value = false
           error.value = ''
@@ -128,7 +133,8 @@ export function useRoom(): RoomHandle {
               if (!abort.signal.aborted && version === mapVersion)
                 error.value = 'Peta gagal dimuat. Muat ulang halaman.'
             })
-        } else if (msg.t === 'buildings') buildings.value = msg.d!.items
+        } else if (msg.t === 'room_state') pin.value = msg.d!.pin ?? null
+        else if (msg.t === 'buildings') buildings.value = msg.d!.items
         else if (msg.t === 'error' && emoteSeqs.delete(msg.d!.seq ?? -1)) {
           // The bar already cools down and is disabled while muted.
         } else if (
@@ -160,6 +166,12 @@ export function useRoom(): RoomHandle {
   })
 
   return {
+    pin,
+    pinLearning: (moduleID, stepID) => {
+      if (status.value !== 'open' || traveling.value) return
+      if (moduleID) client?.send('cmd', { name: 'learning_pin', target: moduleID, step: stepID })
+      else client?.send('cmd', { name: 'learning_unpin' })
+    },
     status,
     map,
     world,

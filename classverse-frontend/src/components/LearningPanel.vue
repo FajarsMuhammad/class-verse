@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SeatPicker from '@/components/SeatPicker.vue'
 import ResumeLearning from '@/components/ResumeLearning.vue'
+import AssignmentPanel from '@/components/AssignmentPanel.vue'
 import { avatarURL } from '@/game/avatars'
 import type { Seat } from '@/realtime/mapdata'
 
@@ -36,7 +37,8 @@ const emit = defineEmits<{ walk: [seat: Seat] }>()
         <img :src="avatarURL(avatar)" alt="" width="42" height="57" />
         <div><strong>{{ name }}</strong><p>{{ teacher ? 'Pengajar' : 'Peserta' }}</p></div>
       </div>
-      <ResumeLearning v-if="orgId" :org-id="orgId" :refresh-key="progressKey" />
+      <AssignmentPanel v-if="orgId" :key="orgId" :org-id="orgId" />
+    <ResumeLearning v-if="orgId" :org-id="orgId" :refresh-key="progressKey" />
       <h3>{{ campus ? 'Jelajahi kampus' : 'Ruang belajar' }}</h3>
       <p class="panel-note">{{ campus ? 'Klik gedung di peta atau buka Daftar gedung, lalu berjalan ke pintunya.' : roomName }}</p>
       <template v-if="!campus">
