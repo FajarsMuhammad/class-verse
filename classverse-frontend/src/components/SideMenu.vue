@@ -10,12 +10,15 @@ export interface SideItem {
   label: string
   icon: string
   keep?: boolean
+  companion?: boolean
   wide?: boolean
   dot?: boolean
 }
-const props = defineProps<{ items: SideItem[]; label: string; link?: { to: string; label: string; icon: string } }>()
+const props = defineProps<{ items: SideItem[]; label: string; fullPage?: boolean; link?: { to: string; label: string; icon: string } }>()
 const active = defineModel<string | null>('active', { default: null })
 const current = computed(() => props.items.find((i) => i.key === active.value) ?? null)
+const pageOpen = computed(() => props.fullPage && !current.value?.companion)
+const hasMapPanel = computed(() => props.items.some(item => item.key === 'map'))
 
 const id = useId()
 const heading = useTemplateRef<HTMLElement>('heading')
@@ -28,7 +31,7 @@ function toggle(key: string) {
 }
 function close() {
   userAction = true
-  active.value = null
+  active.value = pageOpen.value && current.value && hasMapPanel.value ? 'map' : null
 }
 // Escape inside a native dialog (reader, quiz) belongs to that dialog, not to the panel.
 function onEscape(e: KeyboardEvent) {
@@ -41,13 +44,18 @@ watch(active, async (now, before) => {
   userAction = false
   await nextTick()
   if (now && before !== now) heading.value?.focus()
-  else if (!now && before) rail.value?.querySelector<HTMLElement>(`[data-item="${before}"]`)?.focus()
+  else if (!now && before) rail.value?.querySelector<HTMLElement>(`[data-item="${props.fullPage ? 'map' : before}"]`)?.focus()
 })
 </script>
 
 <template>
-  <div class="side-menu" :class="{ open: !!current, wide: current?.wide }" @keydown.esc="onEscape">
+  <div class="side-menu" :class="{ open: !!current, wide: current?.wide, 'full-page': pageOpen }" @keydown.esc="onEscape">
     <nav ref="rail" class="rail" :aria-label="label">
+      <div v-if="$slots.identity" class="rail-identity"><slot name="identity" /></div>
+      <button v-if="fullPage && !hasMapPanel" type="button" class="rail-button" data-item="map" :aria-pressed="!current" @click="close">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16" /></svg>
+        <span>Peta</span>
+      </button>
       <button v-for="item in items" :key="item.key" type="button" class="rail-button" :data-item="item.key"
         :aria-pressed="active === item.key" :aria-controls="`${id}-panel`"
         :aria-label="item.dot ? `${item.label} (ada pesan baru)` : undefined" @click="toggle(item.key)">
@@ -59,11 +67,12 @@ watch(active, async (now, before) => {
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path :d="link.icon" /></svg>
         <span>{{ link.label }}</span>
       </RouterLink>
+      <div v-if="$slots.account" class="rail-account"><slot name="account" /></div>
     </nav>
     <section v-show="current" :id="`${id}-panel`" class="panel" :aria-labelledby="`${id}-title`">
       <header class="panel-head">
         <h2 :id="`${id}-title`" ref="heading" tabindex="-1">{{ current?.label }}</h2>
-        <button type="button" class="btn-secondary collapse" aria-label="Ciutkan menu samping" @click="close">‹</button>
+        <button type="button" class="btn-secondary collapse" :aria-label="pageOpen ? 'Kembali ke peta' : 'Ciutkan menu samping'" @click="close">{{ pageOpen ? 'Kembali ke peta' : '‹' }}</button>
       </header>
       <div v-for="item in items" v-show="active === item.key" :key="item.key" class="panel-body" :data-panel="item.key">
         <slot v-if="item.keep || active === item.key" :name="item.key" />
@@ -75,22 +84,24 @@ watch(active, async (now, before) => {
 <style scoped>
 .side-menu {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-1);
   min-height: 0;
 }
 .rail {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  width: 64px;
+  gap: var(--space-1);
+  width: 60px;
   box-sizing: border-box;
   padding: var(--space-2) var(--space-1);
   background: var(--color-surface);
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-lg);
   overflow-y: auto;
   scrollbar-width: none;
 }
+.rail-identity { display: flex; justify-content: center; padding-bottom: var(--space-2); }
+.rail-account { margin-top: auto; display: flex; justify-content: center; padding-top: var(--space-2); }
 .rail-button {
   position: relative;
   display: flex;
@@ -122,7 +133,10 @@ watch(active, async (now, before) => {
   background: var(--color-surface);
   border-radius: var(--radius-2xl);
 }
-.wide .panel { width: min(640px, 46vw); }
+.wide .panel { width: min(580px, 43vw); }
+.full-page.open { flex: 1; min-width: 0; }
+.full-page .panel { flex: 1; width: auto; min-width: 0; padding: var(--space-6); }
+.full-page .collapse { padding: 0 var(--space-4); }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
 .panel-head h2 { margin: 0; font: var(--weight-semibold) var(--text-lg) / var(--line-tight) var(--font-display); }
 .collapse { flex: none; min-width: var(--touch-min, 44px); padding: 0; }
@@ -131,6 +145,7 @@ watch(active, async (now, before) => {
   .side-menu { flex-direction: column; }
   .rail { flex-direction: row; width: auto; overflow-x: auto; }
   .rail-button { flex: none; min-width: 64px; }
+  .rail-account { margin-top: 0; margin-left: auto; padding-top: 0; }
   .panel, .wide .panel { width: auto; flex: 1; }
 }
 </style>

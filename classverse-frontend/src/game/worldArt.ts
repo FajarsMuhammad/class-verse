@@ -44,10 +44,9 @@ function drawRoom(scene: Phaser.Scene, key: string) {
   const ink = color(cssToken('--kv-ink'))
   const accent = cssToken(key === 'science' ? '--kv-subject-ipa' : key === 'staff' ? '--kv-text-muted' : '--kv-subject-bahasa')
   const g = scene.add.graphics().setDepth(-10)
-  // Shell: rounded wall with an ink outline (reference rooms), pink in the library.
-  g.fillStyle(color(layout.quiet ? cssToken('--kv-library-wall') : rooms.wall.color))
+  // Blend the outer wall into the viewport; collision geometry stays unchanged.
+  g.fillStyle(color(cssToken('--kv-map-ground')))
   g.fillRoundedRect(0, 0, width, height, 30)
-  g.lineStyle(3, ink).strokeRoundedRect(1.5, 1.5, width - 3, height - 3, 30)
   const desc = rooms.floors[layout.floorKind as keyof typeof rooms.floors]
   const floorColor = color(desc.split(' ')[0]!)
   g.fillStyle(floorColor)

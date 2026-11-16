@@ -8,7 +8,9 @@ import {
   ref,
   watch,
 } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import ProfileDialog from './ProfileDialog.vue'
+import logoUrl from '@/assets/avatars/round.svg'
 import DoorRooms from '@/components/DoorRooms.vue'
 import MapZoom from '@/components/MapZoom.vue'
 import MapMinimap from '@/components/MapMinimap.vue'
@@ -33,6 +35,7 @@ import MobileRoom from '@/components/MobileRoom.vue'
 import TeacherPanel from '@/components/TeacherPanel.vue'
 import VoiceBar from '@/components/VoiceBar.vue'
 import { useRoom } from '@/realtime/useRoom'
+import { doorExit } from '@/realtime/doorExit'
 import { useVoice } from '@/realtime/useVoice'
 
 // Phaser is loaded only when the map is shown (never in mode HP).
@@ -70,6 +73,21 @@ const org = useOrgStore()
 const auth = useAuthStore()
 const shelf = ref<Shelf | ''>('')
 const route = useRoute()
+const router = useRouter()
+const accountOpen = ref(false)
+const profileOpen = ref(false)
+const profileStatus = ref('')
+const profileTrigger = ref<HTMLButtonElement | null>(null)
+async function closeProfile() {
+  profileOpen.value = false
+  await nextTick()
+  profileTrigger.value?.focus()
+}
+async function logout() {
+  await auth.logout()
+  await router.push({ name: 'login' })
+}
+const selectedTool = ref('quizzes')
 const nearDoor = ref<Building | null>(null)
 const zoom = ref(0.5)
 const position = ref<{ x: number; y: number } | null>(null)
@@ -99,24 +117,11 @@ const icons = {
 const toolPlace = computed(() => !org.isTeacher || kicked.value ? null : current.value?.map_key === 'staff' ? 'staff' : library.value ? 'library' : null)
 // Staff "Modul" holds the live-session pin in every interior; Ruang Guru/Perpustakaan add their managers there.
 const pinPlace = computed(() => org.isTeacher && !kicked.value && !campus.value)
-const toolItems = computed<SideItem[]>(() => [
-  ...(pinPlace.value ? [{ key: 'modules', label: 'Modul', icon: icons.modules, wide: toolPlace.value !== null }] : []),
-  ...(toolPlace.value === 'staff'
-    ? [
-        { key: 'quizzes', label: 'Kuis', icon: icons.quizzes, wide: true },
-        { key: 'classes', label: 'Kelas', icon: icons.classes, wide: true },
-        { key: 'assignments', label: 'Tugas', icon: icons.assignments, wide: true },
-        { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
-        { key: 'rooms', label: 'Ruang', icon: icons.rooms, wide: true },
-        { key: 'files', label: 'Berkas', icon: icons.files, wide: true },
-      ]
-    : toolPlace.value === 'library'
-      ? [
-          { key: 'books', label: 'Kelola buku', icon: icons.catalog, wide: true },
-          { key: 'files', label: 'Berkas', icon: icons.files, wide: true },
-        ]
-      : []),
-])
+const toolItems = computed<SideItem[]>(() => org.isTeacher && !kicked.value ? [
+  { key: 'modules', label: 'Modul', icon: icons.modules, wide: true },
+  { key: 'tools', label: 'Kelola', icon: icons.classes, wide: true },
+  { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
+] : [])
 // Unread dot on Chat while its panel is closed (ChatState is not reactive; chatVersion tracks it).
 const seenChat = ref(0)
 const chatCount = computed(() => {
@@ -126,15 +131,20 @@ const chatCount = computed(() => {
 // Participants find the pin at the top of Belajar; a dot marks a pin they have not opened the panel for yet.
 const pinKey = computed(() => room.pin?.value ? `${room.pin.value.module_id}:${room.pin.value.step_id}` : '')
 const seenPin = ref('')
+const mapPanelKey = computed(() => org.isTeacher ? 'map' : 'learn')
 const sideItems = computed<SideItem[]>(() => [
-  { key: 'learn', label: 'Belajar', icon: icons.learn, dot: !org.isTeacher && !!pinKey.value && pinKey.value !== seenPin.value && sideItem.value !== 'learn' },
-  { key: 'chat', label: 'Chat', icon: icons.chat, keep: true, dot: sideItem.value !== 'chat' && chatCount.value > seenChat.value },
-  ...(contentRoom.value ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value }] : []),
+  { key: org.isTeacher ? 'map' : 'learn', label: org.isTeacher ? 'Peta' : 'Belajar',
+    icon: org.isTeacher ? 'M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16' : icons.learn,
+    companion: true, dot: !org.isTeacher && !!pinKey.value && pinKey.value !== seenPin.value && sideItem.value !== 'learn' },
+  { key: 'chat', label: 'Chat', icon: icons.chat, keep: true, companion: true, dot: sideItem.value !== 'chat' && chatCount.value > seenChat.value },
+  ...(contentRoom.value && (!org.isTeacher || library.value) ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value }] : []),
   ...toolItems.value,
 ])
 // The panel remembers being collapsed so the map stays wide; when open, content rooms start on their catalog.
 const SIDE_KEY = 'kv-side-collapsed'
-const sideItem = ref<string | null>(localStorage.getItem(SIDE_KEY) === '1' ? null : 'learn')
+const sideItem = ref<string | null>(localStorage.getItem(SIDE_KEY) === '1' ? null : org.isTeacher ? 'map' : 'learn')
+const pageOpen = computed(() => org.isTeacher && !!sideItem.value &&
+  !sideItems.value.find(item => item.key === sideItem.value)?.companion)
 watch(sideItem, (key) => {
   localStorage.setItem(SIDE_KEY, key ? '0' : '1')
   if (key === 'chat') seenChat.value = chatCount.value
@@ -144,12 +154,12 @@ watch(pinKey, (k) => { if (sideItem.value === 'learn') seenPin.value = k })
 watch(chatCount, (n) => { if (sideItem.value === 'chat') seenChat.value = n })
 watch(() => current.value?.room_id, () => {
   if (!sideItem.value) return
-  if (!sideItems.value.some((i) => i.key === sideItem.value)) sideItem.value = 'learn'
-  if (contentRoom.value) sideItem.value = 'catalog'
+  if (!sideItems.value.some((i) => i.key === sideItem.value)) sideItem.value = org.isTeacher ? 'map' : 'learn'
+  if (contentRoom.value && (!org.isTeacher || library.value)) sideItem.value = 'catalog'
 })
 function selectStation(id: string) {
   station.value = id
-  sideItem.value = 'catalog'
+  if (!org.isTeacher) sideItem.value = 'catalog'
 }
 function selectShelf(cat: string) {
   shelf.value = cat as Shelf
@@ -260,6 +270,8 @@ const EXIT_RADIUS = 40 // inside the server's 48 px doorRadius
 const LEAVE_TIMEOUT_MS = 15000 // a 30-tile room crosses in under 6 s
 let walkTarget: { x: number; y: number; id: number } | null = null
 let leaveStarted = 0
+let exitArmed = false
+watch(() => current.value?.room_id, () => { exitArmed = false })
 const leaving = ref(false)
 const leaveError = ref('')
 function atExit() {
@@ -306,7 +318,12 @@ onMounted(() => {
   void start(props.roomId, 'campus', listMode ? 'list' : 'map')
   if (listMode) return
   timer = setInterval(() => {
-    if (leaving.value && atExit()) {
+    const exit = map.value?.exit
+    const selfAtDoor = world.self
+    const automatic = doorExit(exitArmed, exit && selfAtDoor ? Math.hypot(selfAtDoor.x - exit.x, selfAtDoor.y - exit.y) : Infinity,
+      !campus.value && status.value === 'open' && !traveling.value && !kicked.value)
+    exitArmed = automatic.armed
+    if ((leaving.value && atExit()) || automatic.exit) {
       leaving.value = false
       void travel(props.roomId)
     } else if (leaving.value && Date.now() - leaveStarted > LEAVE_TIMEOUT_MS) {
@@ -342,19 +359,30 @@ onBeforeUnmount(() => {
     :status-text="statusText"
   />
   <section v-else class="workspace" aria-labelledby="map-title">
-    <div class="layout" :class="{ 'menu-open': !!sideItem }">
-      <SideMenu v-model:active="sideItem" class="side" :items="sideItems" :label="org.isTeacher ? 'Menu ruang dan alat guru' : 'Menu ruang'"
-        :link="toolPlace === 'staff' ? { to: '/moderasi', label: 'Moderasi', icon: icons.moderation } : undefined">
-        <template #learn>
+    <div class="layout" :class="{ 'menu-open': !!sideItem, 'page-open': pageOpen }">
+      <SideMenu v-model:active="sideItem" class="side" :full-page="org.isTeacher" :items="sideItems" :label="org.isTeacher ? 'Menu ruang dan alat guru' : 'Menu ruang'">
+        <template v-if="org.isTeacher" #identity>
+          <RouterLink class="workspace-logo" :to="{ name: 'home' }" aria-label="Kelasverse — peta sekolah"><img :src="logoUrl" alt="" width="32" height="32" /></RouterLink>
+        </template>
+        <template v-if="org.isTeacher" #account>
+          <button ref="profileTrigger" class="account-button" type="button" aria-label="Akun dan navigasi" :aria-expanded="accountOpen" @click="accountOpen = !accountOpen">{{ auth.me?.display_name?.slice(0, 1) }}</button>
+        </template>
+        <template #[mapPanelKey]>
           <RoomLearningPin v-if="!org.isTeacher && !campus && !kicked && org.active && room.pin?.value" :key="current?.room_id"
             :room="room" :org-id="org.active.id" :staff="false" />
+          <button v-if="org.isTeacher && campus" class="btn-secondary" @click="toggleDirectory">Daftar gedung</button>
+          <details v-if="org.isTeacher" class="people-list">
+            <summary>Orang di ruang ini ({{ online }})</summary>
+            <p>{{ auth.me?.display_name }} (kamu)</p>
+            <p v-for="person in [...world.avatars.values()].filter(p => !p.hidden)" :key="person.id">{{ person.name }}</p>
+          </details>
           <LearningPanel embedded :org-id="org.active?.id" :progress-key="progressKey" :name="auth.me?.display_name ?? ''"
             :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
             :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
             :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
         </template>
         <template #chat>
-          <p class="panel-note">Ngobrol dengan orang di sekitarmu</p>
+          <p class="panel-note">{{ campus ? schoolName : current?.room_name }} · {{ chat.zone.name || 'Area umum' }}</p>
           <ChatPanel class="side-chat" :chat="chat" :version="chatVersion" :error="chatError" :disabled="status !== 'open'"
             :campus="campus" :teacher="org.isTeacher" @send="sendChat" @report="reporting = $event" />
           <p v-if="reportNotice" role="status" class="room-meta">{{ reportNotice }}</p>
@@ -366,18 +394,27 @@ onBeforeUnmount(() => {
             @manage="sideItem = 'modules'" />
         </template>
         <template #modules>
-          <RoomLearningPin v-if="org.active" :key="current?.room_id" :room="room" :org-id="org.active.id" staff />
-          <RoomTools v-if="toolPlace && org.active && auth.me" :tool="toolPlace === 'library' ? 'library-modules' : 'modules'"
+          <RoomLearningPin v-if="pinPlace && org.active" :key="current?.room_id" :room="room" :org-id="org.active.id" staff />
+          <RoomTools v-if="org.active && auth.me" :tool="toolPlace === 'library' ? 'library-modules' : 'modules'"
             :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" />
         </template>
-        <template v-for="t in toolItems.filter((i) => i.key !== 'modules')" :key="t.key" #[t.key]>
-          <RoomTools v-if="org.active && auth.me" :tool="t.key" :org-id="org.active.id" :user-id="auth.me.id"
-            :is-admin="org.active.role === 'admin'" />
+        <template #tools>
+          <TeacherPanel v-if="!campus && !kicked" :room="room" />
+          <label class="tool-picker">Alat pengajar
+            <select v-model="selectedTool">
+              <option value="quizzes">Kuis</option><option value="classes">Kelas</option>
+              <option value="assignments">Tugas</option><option value="rooms">Ruang</option>
+              <option value="books">Buku perpustakaan</option><option value="files">Berkas</option>
+            </select>
+          </label>
+          <RoomTools v-if="org.active && auth.me" :key="selectedTool" :tool="selectedTool" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" />
         </template>
+        <template #gradebook><RoomTools v-if="org.active && auth.me" tool="gradebook" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" /></template>
       </SideMenu>
-      <div class="map-column">
+      <div class="map-column" :class="{ 'map-hidden': pageOpen }" :inert="pageOpen">
       <div class="map-frame">
-        <header ref="mapTop" class="map-top">
+        <h1 v-if="org.isTeacher" id="map-title" class="sr-only">{{ campus ? schoolName : current?.room_name }}</h1>
+        <header v-if="!org.isTeacher" ref="mapTop" class="map-top">
           <button
             v-if="!campus && !kicked"
             type="button"
@@ -412,7 +449,7 @@ onBeforeUnmount(() => {
           >
             Daftar gedung
           </button>
-          <TeacherPanel v-else-if="org.isTeacher && !kicked" :room="room" floating />
+
         </header>
         <aside
           v-if="campus && (directoryOpen || roomsOpen)"
@@ -515,6 +552,17 @@ onBeforeUnmount(() => {
         </footer>
         </div>
       </div>
+      <aside v-if="accountOpen" class="account-menu" aria-label="Akun dan navigasi" @keydown.esc.stop="accountOpen = false; profileTrigger?.focus()">
+        <strong>{{ auth.me?.display_name }}</strong>
+        <span>{{ schoolName }}</span>
+        <button type="button" @click="accountOpen = false; profileOpen = true">Profil</button>
+        <RouterLink :to="{ name: 'select-org' }">Ganti sekolah</RouterLink>
+        <RouterLink :to="{ name: 'moderation' }">Moderasi</RouterLink>
+        <button type="button" @click="logout">Keluar akun</button>
+        <button type="button" @click="accountOpen = false; profileTrigger?.focus()">Tutup</button>
+      </aside>
+      <ProfileDialog v-if="profileOpen" @close="closeProfile" @saved="profileStatus = 'Profil berhasil disimpan.'" />
+      <p v-if="profileStatus" class="float-note" role="status">{{ profileStatus }}</p>
       <ReportDialog
         v-if="reporting && current"
         :target-id="reporting.fromId"
@@ -716,15 +764,28 @@ h1 {
   border-radius: var(--radius-pill);
   font-weight: var(--weight-bold);
 }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.people-list { margin-bottom: var(--space-3); }
+.people-list summary { min-height: var(--touch-min); cursor: pointer; }
+.people-list p { margin: var(--space-2) 0; }
+.workspace-logo, .account-button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--touch-min); min-height: var(--touch-min); border-radius: var(--radius-pill); }
+.account-button { border: 1px solid var(--color-border); background: var(--color-primary-soft); color: var(--color-primary-strong); font: inherit; font-weight: var(--weight-bold); cursor: pointer; }
+.account-menu { position: absolute; z-index: 5; left: 64px; bottom: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); width: min(280px, 75vw); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-raise); }
+.account-menu a, .account-menu button { display: flex; align-items: center; min-height: var(--touch-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: var(--color-surface-alt); color: var(--color-ink); font: inherit; text-decoration: none; cursor: pointer; }
+.account-menu span { color: var(--color-ink-muted); overflow-wrap: anywhere; }
+.tool-picker { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); font-weight: var(--weight-semibold); }
+.tool-picker select { min-height: var(--touch-min); padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); font: inherit; }
 .layout {
   flex: 1;
   min-height: 0;
   position: relative;
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-1);
 }
 .side { flex: none; }
 .map-column { flex: 1; min-width: 0; }
+/* Keep canvas dimensions while a page is open; display:none makes Phaser resize to 0. */
+.map-column.map-hidden { position: absolute; inset: 0 0 0 64px; visibility: hidden; pointer-events: none; }
 .panel-note { color: var(--kv-text-muted); font-size: var(--text-sm); }
 /* HUD floats over the camera-follow viewport. */
 .stage {
@@ -737,7 +798,7 @@ h1 {
   width: 100%;
   position: relative;
   background: var(--kv-map-ground);
-  border-radius: var(--kv-radius-map);
+  border-radius: var(--radius-lg);
   overflow: clip;
 }
 .loading {
@@ -826,5 +887,6 @@ li span {
   /* Narrow screens: rail across the top, the open panel above the map. */
   .layout { flex-direction: column; min-height: 400px; }
   .layout.menu-open .side { max-height: 55%; }
+  .layout.page-open .side { max-height: none; flex: 1; }
 }
 </style>

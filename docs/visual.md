@@ -167,18 +167,37 @@ status terpilih memakai radio/border selain warna. Phaser memakai aset yang sama
 
 Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung detail dibuat saat implementasi peta di Fase 4.
 
-## Menu samping ruang (2026-11, referensi `docs/screens/sidemenu.png`)
+## Menu samping ruang (2026-11, referensi `docs/screens/sidemenu.png` dan `reff-design-1..3.png`)
 
-- Desktop/tablet: rel ikon tipis (72 px) selalu tampil di kiri peta + satu panel yang bisa diciutkan. Kolom
+- Desktop/tablet: rel ikon tipis (60 px) selalu tampil di kiri peta + satu panel yang bisa diciutkan. Kolom
   kiri "Panel belajar" dan kolom kanan chat/katalog dihapus; peta mengisi sisa lebar. Menciutkan panel menambah
   lebar peta, posisi/koneksi ruang tidak berubah.
 - Item untuk semua: **Belajar** (profil, tugas, lanjutkan belajar, kursi), **Chat** (tetap ter-mount saat
   disembunyikan agar draf tidak hilang; titik merah bila ada pesan baru), **Katalog** di Perpustakaan atau
   **Stasiun** di Menara Sains/Ruang Guru.
-- Guru/admin di setiap interior punya item **Modul** berisi kartu **Sematkan di ruang ini** (pilih modul terbit dan
-  langkah awal opsional, ganti, lepas). Bilah sematan di atas peta dihapus agar peta lebih tinggi.
-  Di **Ruang Guru** panel Modul juga memuat pengelola modul, lalu Kuis, Kelas, Tugas, Rapor, Ruang, Berkas dan
-  tautan Moderasi. Di **Perpustakaan**: Modul (pengelola dibatasi gedung `perpus`), Kelola buku, Berkas.
+- Guru/admin desktop: **Peta, Chat, Modul, Kelola, Rapor**; Katalog tambahan hanya di Perpustakaan.
+  Tidak ada item Belajar terpisah untuk guru, termasuk di Ruang Guru: isi pendamping berada pada menu **Peta**
+  sesuai `reff-design-3.png`. Peta membuka panel ruang 320 px di kiri dan peta aktif di kanan; dapat diciutkan.
+  **Peta dan Chat** bergantian memakai panel pendamping, bukan dua kolom. Chat menampilkan konteks ruang/zona, pesan bergulir dan input tetap
+  di bawah; draf serta indikator pesan baru tetap terjaga.
+  **Modul, Kelola, Rapor** dan katalog guru terbuka sebagai halaman penuh di samping rel.
+  Tombol **Kembali ke peta** di atas halaman kembali ke Peta beserta panel ruang; item **Peta** pada rel
+  membuka/menutup panel itu. Panel pendamping memakai tombol ciut. Escape dari halaman juga kembali ke Peta.
+  Peta tetap ter-mount, berdimensi nonzero, tersembunyi dan inert saat halaman dibuka: koneksi/posisi tidak
+  direset dan tidak ada fokus keyboard pada peta tersembunyi. Draf chat tetap terjaga.
+  **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola memakai satu pemilih alat:
+  Kuis, Kelas, Tugas, Ruang (termasuk undangan), Buku perpustakaan, Berkas. Kontrol sesi juga di Kelola.
+  Modul berisi pengelola modul (dibatasi `perpus` di Perpustakaan), dan kartu **Sematkan di ruang ini**
+  pada interior. Tidak ada bilah sematan di atas peta.
+- Header aplikasi dan header peta guru desktop dihapus. Peta memenuhi tinggi viewport dengan sela 4 px;
+  menu awal ciut jika belum ada preferensi. Akun di bawah rel menyimpan Profil, Ganti sekolah, Moderasi,
+  Keluar akun. Identitas Kelasverse di atas rel kembali ke peta. Daftar gedung dan daftar orang ada di Belajar.
+  Header halaman non-peta, peserta dan mode HP tetap.
+- Bingkai hitam luar interior dihapus; warna dinding luar memakai `--kv-map-ground` agar menyatu dengan
+  viewport. Lantai, furnitur, pintu dan collision tidak berubah.
+- Avatar keluar otomatis saat kembali ke pintu interior: setelah berjarak >56 px dari pintu, masuk radius
+  40 px memicu travel sekali; spawn di pintu tidak langsung keluar. Server tetap memeriksa radius 48 px.
+  Disconnect, travel dan pergantian ruang mereset pemicu. Tombol keluar mode HP tetap tersedia.
 - Peserta melihat sematan sebagai kartu "Dari pengajar" di atas panel Belajar; titik pada ikon Belajar bila ada
   sematan baru saat panel tertutup. Satu elemen tegas: kartu nila bergaya catatan yang ditempel (pushpin),
   sisanya tenang.

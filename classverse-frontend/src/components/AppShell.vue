@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { RouterLink, useRouter } from 'vue-router'
-import { nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import ProfileDialog from './ProfileDialog.vue'
 
 import logoUrl from '@/assets/avatars/round.svg'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
-defineProps<{ immersive?: boolean }>()
+const props = defineProps<{ immersive?: boolean }>()
 
 const auth = useAuthStore()
 const org = useOrgStore()
 const router = useRouter()
+const mapWorkspace = computed(() => props.immersive && org.isTeacher &&
+  !(typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse) and (max-width: 767px)').matches))
 const profileButton = useTemplateRef<HTMLButtonElement>('profileButton')
 const profileOpen = ref(false)
 async function closeProfile() {
@@ -28,8 +30,8 @@ async function logout() {
 </script>
 
 <template>
-  <div class="shell" :class="{ immersive }">
-    <header class="top">
+  <div class="shell" :class="{ immersive, 'map-workspace': mapWorkspace }">
+    <header v-if="!mapWorkspace" class="top">
       <div class="brand">
         <img :src="logoUrl" alt="" width="40" height="40" />
         <span class="wordmark">Kelasverse</span>
@@ -219,6 +221,7 @@ async function logout() {
   flex-direction: column;
   padding: var(--space-3);
 }
+.map-workspace .content { padding: var(--space-1); }
 .content {
   flex: 1;
   width: 100%;
