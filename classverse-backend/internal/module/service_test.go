@@ -56,7 +56,8 @@ func TestValidateStep(t *testing.T) {
 		{"materi needs body", StepInput{Kind: "materi", Title: "A", Minutes: 5}, "body"},
 		{"berkas needs file", StepInput{Kind: "berkas", Title: "A", Minutes: 5}, "file_id"},
 		{"video needs link", StepInput{Kind: "video", Title: "A", Minutes: 5, VideoID: "https://vimeo.com/1"}, "video_id"},
-		{"bad kind", StepInput{Kind: "kuis", Title: "A", Minutes: 5}, "kind"},
+		{"bad kind", StepInput{Kind: "game", Title: "A", Minutes: 5}, "kind"},
+		{"kuis needs quiz", StepInput{Kind: "kuis", Title: "A", Minutes: 5}, "quiz_id"},
 		{"zero minutes", StepInput{Kind: "materi", Title: "A", Body: "x", Minutes: 0}, "minutes"},
 		{"long body", StepInput{Kind: "materi", Title: "A", Body: strings.Repeat("a", 5001), Minutes: 1}, "body"},
 	} {
@@ -76,6 +77,14 @@ func TestValidateStep(t *testing.T) {
 	got, err = validateStep(StepInput{Kind: "berkas", Title: "A", Minutes: 3, FileID: &file, VideoID: "dQw4w9WgXcQ"})
 	if err != nil || got.VideoID != "" || got.FileID == nil {
 		t.Fatalf("berkas cleanup: %+v %v", got, err)
+	}
+	quiz := uuid.New()
+	got, err = validateStep(StepInput{Kind: "kuis", Title: "A", Minutes: 3, FileID: &file, VideoID: "dQw4w9WgXcQ", QuizID: &quiz})
+	if err != nil || got.FileID != nil || got.VideoID != "" || got.QuizID == nil {
+		t.Fatalf("kuis cleanup: %+v %v", got, err)
+	}
+	if got, _ := validateStep(StepInput{Kind: "video", Title: "A", Minutes: 3, VideoID: "dQw4w9WgXcQ", QuizID: &quiz}); got.QuizID != nil {
+		t.Fatalf("video kept quiz id: %+v", got)
 	}
 }
 

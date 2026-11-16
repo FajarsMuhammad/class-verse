@@ -352,6 +352,24 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
   empat opsi dan satu jawaban; attempt menyimpan snapshot versi soal. Satu jawaban per soal, pengiriman ulang
   idempotent, hasil selesai immutable. Pembukaan kunci jawaban saat retry/live perlu aturan eksplisit.
 - **UI:** tampilan soal 4 pilihan bentuk-warna (lingkaran/segitiga/kotak/belah ketupat, tidak bergantung warna saja).
+- **Keputusan Q1 (disetujui 2026-11-13):**
+  1. Nilai lulus default **60**, bisa diubah pengajar per kuis (1–100).
+  2. Percobaan **tidak dibatasi**; semua tercatat. Rapor memakai **nilai tertinggi**.
+  3. Kunci jawaban dan penjelasan dibuka **setelah seluruh kuis selesai**, tidak per soal.
+  4. Kuis bisa menjadi langkah modul (`kuis`) dan otomatis selesai saat lulus; tidak bisa ditandai manual.
+     Langkah lain tetap bebas dibuka (katalog terbuka).
+- **Schema final (menggantikan usulan di atas):** `quizzes`, `quiz_questions` (dihapus permanen boleh, karena
+  attempt menyimpan snapshot), `quiz_attempts(questions jsonb, answers smallint[], …)` dengan jawaban `-1` =
+  belum dijawab; tidak ada tabel `quiz_answers`. Satu attempt terbuka per anggota/kuis; mulai lagi melanjutkannya.
+  Jawaban boleh diganti sampai kuis diselesaikan; selesai idempotent dan hasilnya immutable. Nilai = `floor(benar
+  × 100 / jumlah soal)`, soal tak dijawab dihitung salah.
+- **Hasil Q1 (branch `q1-quiz`):** migration `00012_quizzes.sql`, `00013_module_quiz_steps.sql` (Up/Down/Up DB
+  disposable lulus, diterapkan di DB dev). Paket `internal/quiz/`; endpoint `/api/orgs/{org_id}/quizzes…` (OpenAPI).
+  Kelola → Kuis untuk soal/terbit/arsip/urutan; langkah modul `kuis` memilih kuis terbit, lulus menyelesaikan
+  langkah di transaksi yang sama (PUT done untuk langkah kuis 409 `quiz_step`). Peserta main dari dialog modul gedung
+  (daftar Kuis + langkah kuis) dengan opsi bentuk/warna, ringkasan kunci/penjelasan setelah selesai, Coba lagi.
+  Verifikasi: test Go `-race` (kuis 85,5%), Vitest, lint/build, Chrome desktop + 390 px (`/tmp/kv-e2e/quiz.mjs`).
+  Belum: halaman Rapor (R1), batas waktu per soal, acak urutan soal/opsi, impor soal.
 
 ### Q2 — Arena Kuis live
 
@@ -484,8 +502,8 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | M1-01 | [x] Pengajar membuat draf modul/urutan langkah dan menerbitkan; peserta tidak bisa membaca draf atau file yang hanya terikat draf | F1, aturan revisi disetujui | migration/modules queries, `internal/module/`, Kelola | Unit validasi + role/org/draft integration + UI authoring |
 | M1-02 | [x] Lihat modul per gedung/level dan buka materi di aplikasi tanpa meninggalkan ruang; kosong/error/focus tertangani | M1-01 | PlaceCard, module UI, Reader, tokens | Component + browser materi PDF/audio/teks |
 | M2-01 | [x] Selesai langkah idempotent, langkah bebas dibuka; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit/komponen progres, integration duplikat/org/arsip, E2E reload |
-| Q1-01 | [ ] Bank soal draf/terbit tepat 4 opsi; kunci hanya tersedia pengajar, snapshot tidak berubah setelah edit | M1/M2 | migration/quizzes queries, `internal/quiz/`, Kelola | Unit soal invalid + integration version/role + component |
-| Q1-02 | [ ] Kuis mandiri menilai di server, submit ulang aman, nilai 0–100 tersimpan; langkah kuis lulus membuka langkah lanjut | Q1-01, aturan nilai disetujui | `internal/quiz/`, module linkage migration, quiz UI | Unit skor, integration submit/crash, E2E nilai/progres |
+| Q1-01 | [x] Bank soal draf/terbit tepat 4 opsi; kunci hanya tersedia pengajar, snapshot tidak berubah setelah edit | M1/M2 | migration/quizzes queries, `internal/quiz/`, Kelola | Unit soal invalid + integration version/role + component |
+| Q1-02 | [x] Kuis mandiri menilai di server, submit ulang aman, nilai 0–100 tersimpan; langkah kuis lulus membuka langkah lanjut | Q1-01, aturan nilai disetujui | `internal/quiz/`, module linkage migration, quiz UI | Unit skor, integration submit/crash, E2E nilai/progres |
 | C1-01 | [ ] Pengajar/admin membuat kelas pada tahun ajaran; hanya admin memilih tahun aktif; sekolah lain tidak terpengaruh | Q1 dalam urutan, auth/org existing | migrations/year/class queries, fitur kelas, Kelola | Unit role, integration org/tahun aktif serentak, component Kelola |
 | C1-02 | [ ] Penempatan/pindah siswa atomik; maksimal satu aktif per sekolah/tahun meski request serentak; riwayat tetap, tahun/sekolah lain boleh berbeda | C1-01 | enrollment queries/service, roster UI | Integration concurrency/transfer/role/org, E2E pindah dan ganti tahun |
 | R1-01 | [ ] Peserta melihat rapor sendiri; pengajar memfilter kelas/tahun serta konten dengan CSV aman; hasil lama tidak ditimpa saat pindah kelas | M2/Q1/C1 | report queries, fitur rapor baru, Rapor UI | Integration own/other/org/class/year, CSV injection + browser |

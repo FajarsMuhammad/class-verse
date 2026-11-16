@@ -1,11 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import ModulePath from './ModulePath.vue'
 import { moduleApi } from '@/api/modules'
+import { quizApi } from '@/api/quizzes'
 import type { Module, ModuleStep } from '@/api/types'
 
 const step = (title: string, extra: Partial<ModuleStep> = {}): ModuleStep => ({
-  id: title, kind: 'materi', title, body: 'Isi <b>tidak</b> dirender', file_id: null, file_kind: null, video_id: null,
+  id: title, kind: 'materi', title, body: 'Isi <b>tidak</b> dirender', file_id: null, file_kind: null, video_id: null, quiz_id: null,
   minutes: 5, reader_position: 0, done: false, ...extra,
 })
 const mod = (steps: ModuleStep[]): Module => ({
@@ -13,11 +14,14 @@ const mod = (steps: ModuleStep[]): Module => ({
   updated_at: '2026-01-01T00:00:00Z', steps,
 })
 
+// Quizzes load next to modules; default to none so module-only tests stay focused.
+beforeEach(() => { vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [] }) })
 afterEach(() => vi.restoreAllMocks())
 
 const stubs = {
   FileReader: { props: ['file'], template: '<div class="reader">{{ file.name }}:{{ file.kind }}:{{ file.position }}</div>' },
   StepViewer: { props: ['step'], template: '<div class="viewer">{{ step.title }}</div>' },
+  QuizPlayer: { props: ['quizId', 'title'], emits: ['finished', 'close'], template: '<div class="player">{{ quizId }}:{{ title }}</div>' },
 }
 
 it('lists a building path per level, sums minutes, and refetches when the level changes', async () => {
@@ -79,4 +83,40 @@ it('shows a retry when loading fails', async () => {
   await flushPromises()
   expect(list).toHaveBeenCalledTimes(2)
   expect(w.find('[role=alert]').exists()).toBe(false)
+})
+
+it('opens a quiz step in the player, has no manual completion, and marks it done after a pass', async () => {
+  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [mod([step('Kuis kecil', { kind: 'kuis', quiz_id: 'q1' })])] })
+  const done = vi.spyOn(moduleApi, 'setDone')
+  const w = mount(ModulePath, { props: { orgId: 'o', buildingKey: 'sains', buildingName: 'Menara Sains' }, global: { stubs } })
+  await flushPromises()
+  expect(w.find('.complete').exists()).toBe(false)
+  expect(w.text()).toContain('Selesai otomatis saat lulus')
+  await w.find('.open').trigger('click')
+  expect(w.find('.player').text()).toBe('q1:Kuis kecil')
+  w.findComponent(stubs.QuizPlayer).vm.$emit('finished', { passed: false })
+  await flushPromises()
+  expect(w.find('.step.done').exists()).toBe(false)
+  w.findComponent(stubs.QuizPlayer).vm.$emit('finished', { passed: true })
+  await flushPromises()
+  expect(w.find('.step.done').exists()).toBe(true)
+  expect(done).not.toHaveBeenCalled()
+})
+
+it('lists building quizzes with best score and opens them', async () => {
+  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [] })
+  const quizzes = vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [
+    { id: 'q1', building_key: 'sains', level: 'SD', title: 'Kuis Planet', description: '', pass_score: 60, published: true,
+      updated_at: '2026-01-01T00:00:00Z', question_count: 10, best_score: 80, attempts: 2 },
+    { id: 'q2', building_key: 'sains', level: 'SD', title: 'Kuis Bintang', description: '', pass_score: 70, published: true,
+      updated_at: '2026-01-01T00:00:00Z', question_count: 5, best_score: null, attempts: 0 },
+  ] })
+  const w = mount(ModulePath, { props: { orgId: 'o', buildingKey: 'sains', buildingName: 'Menara Sains' }, global: { stubs } })
+  await flushPromises()
+  expect(quizzes).toHaveBeenLastCalledWith('o', { building_key: 'sains', level: 'SD' })
+  const cards = w.findAll('.quiz-card')
+  expect(cards[0]!.text()).toContain('10 soal · nilai terbaik 80')
+  expect(cards[1]!.text()).toContain('5 soal · belum dicoba')
+  await cards[1]!.find('button').trigger('click')
+  expect(w.find('.player').text()).toBe('q2:Kuis Bintang')
 })

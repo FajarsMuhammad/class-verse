@@ -450,6 +450,7 @@ func (e StartUploadRequestKind) Valid() bool {
 // Defines values for StepKind.
 const (
 	Berkas StepKind = "berkas"
+	Kuis   StepKind = "kuis"
 	Materi StepKind = "materi"
 	Video  StepKind = "video"
 )
@@ -458,6 +459,8 @@ const (
 func (e StepKind) Valid() bool {
 	switch e {
 	case Berkas:
+		return true
+	case Kuis:
 		return true
 	case Materi:
 		return true
@@ -492,6 +495,17 @@ func (e UploadProgressState) Valid() bool {
 // AccessTokenResponse defines model for AccessTokenResponse.
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
+}
+
+// AttemptQuestion defines model for AttemptQuestion.
+type AttemptQuestion struct {
+	// Answer Null sampai percobaan selesai
+	Answer *int `json:"answer"`
+
+	// Explanation Null sampai percobaan selesai
+	Explanation *string  `json:"explanation"`
+	Options     []string `json:"options"`
+	Prompt      string   `json:"prompt"`
 }
 
 // Book defines model for Book.
@@ -776,6 +790,9 @@ type ModuleStep struct {
 	Kind     StepKind            `json:"kind"`
 	Minutes  int                 `json:"minutes"`
 
+	// QuizId Kuis langkah `kuis`; selesai otomatis saat lulus
+	QuizId *openapi_types.UUID `json:"quiz_id"`
+
 	// ReaderPosition Posisi baca pemanggil untuk file langkah `berkas`
 	ReaderPosition int    `json:"reader_position"`
 	Title          string `json:"title"`
@@ -811,6 +828,77 @@ type Organization struct {
 	Name         string             `json:"name"`
 	Role         Role               `json:"role"`
 	Slug         string             `json:"slug"`
+}
+
+// QuestionInput defines model for QuestionInput.
+type QuestionInput struct {
+	// Answer Indeks pilihan benar
+	Answer      int      `json:"answer"`
+	Explanation *string  `json:"explanation,omitempty"`
+	Options     []string `json:"options"`
+	Prompt      string   `json:"prompt"`
+}
+
+// Quiz defines model for Quiz.
+type Quiz struct {
+	// Attempts Jumlah percobaan selesai milik pemanggil
+	Attempts int `json:"attempts"`
+
+	// BestScore Nilai tertinggi pemanggil; null jika belum pernah selesai
+	BestScore     *int               `json:"best_score"`
+	BuildingKey   string             `json:"building_key"`
+	Description   string             `json:"description"`
+	Id            openapi_types.UUID `json:"id"`
+	Level         Level              `json:"level"`
+	PassScore     int                `json:"pass_score"`
+	Published     bool               `json:"published"`
+	QuestionCount int                `json:"question_count"`
+
+	// Questions Hanya untuk pengajar/admin dengan drafts=true
+	Questions *[]QuizQuestion `json:"questions,omitempty"`
+	Title     string          `json:"title"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// QuizAttempt defines model for QuizAttempt.
+type QuizAttempt struct {
+	// Answers Pilihan pemanggil; -1 = belum dijawab
+	Answers   []int              `json:"answers"`
+	Correct   *int               `json:"correct"`
+	Finished  bool               `json:"finished"`
+	Id        openapi_types.UUID `json:"id"`
+	PassScore int                `json:"pass_score"`
+	Passed    *bool              `json:"passed"`
+	Questions []AttemptQuestion  `json:"questions"`
+	QuizId    openapi_types.UUID `json:"quiz_id"`
+
+	// Score 0–100, dibulatkan ke bawah
+	Score *int `json:"score"`
+}
+
+// QuizInput defines model for QuizInput.
+type QuizInput struct {
+	// BuildingKey Kunci gedung di peta kampus
+	BuildingKey string `json:"building_key"`
+	Description string `json:"description"`
+	Level       Level  `json:"level"`
+	PassScore   *int   `json:"pass_score,omitempty"`
+	Published   bool   `json:"published"`
+	Title       string `json:"title"`
+}
+
+// QuizList defines model for QuizList.
+type QuizList struct {
+	Items []Quiz `json:"items"`
+}
+
+// QuizQuestion defines model for QuizQuestion.
+type QuizQuestion struct {
+	Answer      int                `json:"answer"`
+	Explanation string             `json:"explanation"`
+	Id          openapi_types.UUID `json:"id"`
+	Options     []string           `json:"options"`
+	Prompt      string             `json:"prompt"`
 }
 
 // RegisterRequest defines model for RegisterRequest.
@@ -912,7 +1000,10 @@ type StepInput struct {
 	FileId  *openapi_types.UUID `json:"file_id,omitempty"`
 	Kind    StepKind            `json:"kind"`
 	Minutes int                 `json:"minutes"`
-	Title   string              `json:"title"`
+
+	// QuizId Wajib untuk `kuis`: kuis terbit milik sekolah
+	QuizId *openapi_types.UUID `json:"quiz_id,omitempty"`
+	Title  string              `json:"title"`
 
 	// VideoId Wajib untuk `video`: ID atau tautan YouTube (https)
 	VideoId *string `json:"video_id,omitempty"`
@@ -976,6 +1067,9 @@ type VoiceToken struct {
 	Url string `json:"url"`
 }
 
+// AttemptID defines model for AttemptID.
+type AttemptID = openapi_types.UUID
+
 // FileID defines model for FileID.
 type FileID = openapi_types.UUID
 
@@ -984,6 +1078,9 @@ type InviteCode = string
 
 // OrgID defines model for OrgID.
 type OrgID = openapi_types.UUID
+
+// QuizID defines model for QuizID.
+type QuizID = openapi_types.UUID
 
 // AccessToken defines model for AccessToken.
 type AccessToken = AccessTokenResponse
@@ -1060,6 +1157,23 @@ type ReorderModuleStepsJSONBody struct {
 	StepIds []openapi_types.UUID `json:"step_ids"`
 }
 
+// ListQuizzesParams defines parameters for ListQuizzes.
+type ListQuizzesParams struct {
+	BuildingKey *string `form:"building_key,omitempty" json:"building_key,omitempty"`
+	Level       *Level  `form:"level,omitempty" json:"level,omitempty"`
+	Drafts      *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+}
+
+// AnswerQuizQuestionJSONBody defines parameters for AnswerQuizQuestion.
+type AnswerQuizQuestionJSONBody struct {
+	Choice int `json:"choice"`
+}
+
+// ReorderQuizQuestionsJSONBody defines parameters for ReorderQuizQuestions.
+type ReorderQuizQuestionsJSONBody struct {
+	QuestionIds []openapi_types.UUID `json:"question_ids"`
+}
+
 // ListReportsParams defines parameters for ListReports.
 type ListReportsParams struct {
 	Status *ReportStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -1118,6 +1232,24 @@ type AddModuleStepJSONRequestBody = StepInput
 
 // UpdateModuleStepJSONRequestBody defines body for UpdateModuleStep for application/json ContentType.
 type UpdateModuleStepJSONRequestBody = StepInput
+
+// CreateQuizJSONRequestBody defines body for CreateQuiz for application/json ContentType.
+type CreateQuizJSONRequestBody = QuizInput
+
+// UpdateQuizJSONRequestBody defines body for UpdateQuiz for application/json ContentType.
+type UpdateQuizJSONRequestBody = QuizInput
+
+// AnswerQuizQuestionJSONRequestBody defines body for AnswerQuizQuestion for application/json ContentType.
+type AnswerQuizQuestionJSONRequestBody AnswerQuizQuestionJSONBody
+
+// ReorderQuizQuestionsJSONRequestBody defines body for ReorderQuizQuestions for application/json ContentType.
+type ReorderQuizQuestionsJSONRequestBody ReorderQuizQuestionsJSONBody
+
+// AddQuizQuestionJSONRequestBody defines body for AddQuizQuestion for application/json ContentType.
+type AddQuizQuestionJSONRequestBody = QuestionInput
+
+// UpdateQuizQuestionJSONRequestBody defines body for UpdateQuizQuestion for application/json ContentType.
+type UpdateQuizQuestionJSONRequestBody = QuestionInput
 
 // CreateRoomJSONRequestBody defines body for CreateRoom for application/json ContentType.
 type CreateRoomJSONRequestBody = CreateRoomRequest

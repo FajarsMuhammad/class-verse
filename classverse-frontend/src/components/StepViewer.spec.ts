@@ -8,7 +8,7 @@ beforeAll(() => {
   HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.open = false; this.dispatchEvent(new Event('close')) }
 })
 
-const base = { id: 's', title: 'Bab', file_id: null, file_kind: null, minutes: 3, reader_position: 0, done: false }
+const base = { id: 's', title: 'Bab', file_id: null, file_kind: null, quiz_id: null, minutes: 3, reader_position: 0, done: false }
 
 it('renders text as plain text, never as HTML', () => {
   const w = mount(StepViewer, { props: { step: { ...base, kind: 'materi', body: '<img src=x onerror=alert(1)>Halo', video_id: null } } })

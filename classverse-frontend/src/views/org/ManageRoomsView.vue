@@ -5,6 +5,7 @@ import RoomPanel from '@/components/RoomPanel.vue'
 import FileUploadPanel from '@/components/FileUploadPanel.vue'
 import LibraryManager from '@/components/LibraryManager.vue'
 import ModuleManager from '@/components/ModuleManager.vue'
+import QuizManager from '@/components/QuizManager.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
@@ -29,6 +30,8 @@ const org = useOrgStore()
     <LibraryManager v-if="org.active && org.active.role !== 'participant'" :key="`library-${org.active.id}`"
       :org-id="org.active.id" />
     <ModuleManager v-if="org.active && org.active.role !== 'participant'" :key="`modules-${org.active.id}`"
+      :org-id="org.active.id" />
+    <QuizManager v-if="org.active && org.active.role !== 'participant'" :key="`quizzes-${org.active.id}`"
       :org-id="org.active.id" />
     <InvitePanel
       v-if="org.active && auth.me"

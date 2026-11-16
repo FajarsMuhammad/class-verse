@@ -4,6 +4,7 @@ import ModuleManager from './ModuleManager.vue'
 import { ApiError } from '@/api/client'
 import { fileApi } from '@/api/files'
 import { moduleApi } from '@/api/modules'
+import { quizApi } from '@/api/quizzes'
 import type { Module, ModuleStep } from '@/api/types'
 
 vi.mock('@/realtime/mapdata', () => ({
@@ -14,7 +15,7 @@ vi.mock('@/realtime/mapdata', () => ({
 }))
 
 const step = (id: string): ModuleStep => ({
-  id, kind: 'materi', title: `Langkah ${id}`, body: 'x', file_id: null, file_kind: null, video_id: null, minutes: 5, reader_position: 0, done: false,
+  id, kind: 'materi', title: `Langkah ${id}`, body: 'x', file_id: null, file_kind: null, video_id: null, quiz_id: null, minutes: 5, reader_position: 0, done: false,
 })
 const draft: Module = {
   id: 'm1', building_key: 'sains', level: 'SD', title: 'Tata Surya', description: '', published: false,
@@ -68,4 +69,23 @@ it('adds a video step and shows server field errors next to the field', async ()
   expect(addStep).toHaveBeenCalledWith('o', 'm1', expect.objectContaining({ kind: 'video', video_id: 'https://vimeo.com/1', file_id: null }))
   expect(w.text()).toContain('Tempel tautan YouTube yang valid')
   expect(w.get('form input[inputmode=url]').attributes('aria-invalid')).toBe('true')
+})
+
+it('adds a quiz step pointing at a published quiz of the same building', async () => {
+  const quizzes = vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [
+    { id: 'q1', building_key: 'sains', level: 'SD', title: 'Kuis Planet', description: '', pass_score: 60, published: true,
+      updated_at: '2026-01-01T00:00:00Z', question_count: 3, best_score: null, attempts: 0 },
+  ] })
+  const addStep = vi.spyOn(moduleApi, 'addStep').mockResolvedValue({ ...step('k'), kind: 'kuis', quiz_id: 'q1' })
+  const w = mount(ModuleManager, { props: { orgId: 'o' } })
+  await flushPromises()
+  await w.get('.add').trigger('click')
+  await w.get('form select').setValue('kuis')
+  await flushPromises()
+  expect(quizzes).toHaveBeenCalledWith('o', { building_key: 'sains' })
+  await w.findAll('form input')[0]!.setValue('Kuis kecil')
+  await w.get('form select[aria-label="Kuis"]').setValue('q1')
+  await w.get('form').trigger('submit')
+  await flushPromises()
+  expect(addStep).toHaveBeenCalledWith('o', 'm1', expect.objectContaining({ kind: 'kuis', quiz_id: 'q1', file_id: null }))
 })

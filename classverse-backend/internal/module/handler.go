@@ -69,6 +69,8 @@ func (h *Handler) handle(fn func(http.ResponseWriter, *http.Request) error) http
 			return &httpx.Error{Status: http.StatusNotFound, Code: "not_found", Message: "Modul atau langkah tidak ditemukan"}
 		case errors.Is(err, ErrStepLimit):
 			return httpx.ValidationFailed(map[string]string{"steps": fmt.Sprintf("Maksimal %d langkah per modul", maxSteps)})
+		case errors.Is(err, ErrQuizStep):
+			return &httpx.Error{Status: http.StatusConflict, Code: "quiz_step", Message: "Langkah kuis selesai otomatis saat kamu lulus kuisnya"}
 		case errors.Is(err, ErrBadOrdering):
 			return httpx.ValidationFailed(map[string]string{"step_ids": "Urutan harus memuat semua langkah tepat sekali"})
 		}
@@ -89,6 +91,7 @@ type StepResponse struct {
 	FileID         *uuid.UUID `json:"file_id"`
 	FileKind       *string    `json:"file_kind"`
 	VideoID        *string    `json:"video_id"`
+	QuizID         *uuid.UUID `json:"quiz_id"`
 	Minutes        int32      `json:"minutes"`
 	ReaderPosition int32      `json:"reader_position"`
 	Done           bool       `json:"done"`
@@ -116,6 +119,9 @@ func toStep(s Step) StepResponse {
 	}
 	if s.VideoID.Valid {
 		out.VideoID = &s.VideoID.String
+	}
+	if s.QuizID.Valid {
+		out.QuizID = &s.QuizID.UUID
 	}
 	return out
 }
@@ -145,6 +151,7 @@ type stepRequest struct {
 	Body    string     `json:"body"`
 	FileID  *uuid.UUID `json:"file_id"`
 	VideoID string     `json:"video_id"`
+	QuizID  *uuid.UUID `json:"quiz_id"`
 	Minutes int        `json:"minutes"`
 }
 

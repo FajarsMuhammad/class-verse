@@ -876,16 +876,225 @@ paths:
       - { name: step_id, in: path, required: true, schema: { type: string, format: uuid } }
     put:
       operationId: completeModuleStep
-      description: Tandai langkah selesai untuk pemanggil; idempoten. Langkah bebas diselesaikan tanpa urutan wajib.
+      description: |
+        Tandai langkah selesai untuk pemanggil; idempoten. Langkah bebas diselesaikan tanpa urutan wajib.
+        Langkah `kuis` ditolak 409 `quiz_step`: selesai otomatis saat lulus kuisnya.
       responses:
         "204": { description: Selesai }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
     delete:
       operationId: uncompleteModuleStep
       description: Batalkan tanda selesai milik pemanggil; idempoten.
       responses:
         "204": { description: Tanda selesai dibatalkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/orgs/{org_id}/quizzes:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listQuizzes
+      description: |
+        Kuis beserta nilai terbaik dan jumlah percobaan selesai milik pemanggil. Peserta hanya melihat kuis terbit dan
+        tidak pernah menerima soal/kunci di sini. `drafts=true` untuk pengajar/admin menyertakan draf serta soal
+        lengkap dengan kunci (untuk Kelola). Maksimal 100 kuis.
+      parameters:
+        - { name: building_key, in: query, schema: { type: string } }
+        - { name: level, in: query, schema: { $ref: "#/components/schemas/Level" } }
+        - { name: drafts, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: Daftar kuis
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuizList" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createQuiz
+      description: Pengajar/admin. Dibuat sebagai draf; terbitkan setelah ada minimal 1 soal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuizInput" }
+      responses:
+        "201":
+          description: Kuis dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quiz" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/QuizID"
+    put:
+      operationId: updateQuiz
+      description: Pengajar/admin. Percobaan yang sudah dimulai tetap memakai nilai lulus dan soal saat dimulai.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuizInput" }
+      responses:
+        "200":
+          description: Kuis diperbarui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quiz" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: archiveQuiz
+      description: Pengajar/admin. Arsipkan kuis; riwayat nilai tetap tersimpan.
+      responses:
+        "204": { description: Diarsipkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/questions:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/QuizID"
+    post:
+      operationId: addQuizQuestion
+      description: Pengajar/admin. Soal ditaruh paling akhir; maksimal 50 soal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuestionInput" }
+      responses:
+        "201":
+          description: Soal dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuizQuestion" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/questions/{question_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/QuizID"
+      - { name: question_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: updateQuizQuestion
+      description: Pengajar/admin. Percobaan yang sudah dimulai tidak berubah (snapshot).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QuestionInput" }
+      responses:
+        "200":
+          description: Soal diperbarui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuizQuestion" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteQuizQuestion
+      description: Pengajar/admin. Kuis terbit wajib menyisakan minimal 1 soal.
+      responses:
+        "204": { description: Dihapus }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/order:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/QuizID"
+    put:
+      operationId: reorderQuizQuestions
+      description: Pengajar/admin. `question_ids` wajib memuat semua soal tepat sekali.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question_ids]
+              properties:
+                question_ids: { type: array, items: { type: string, format: uuid } }
+      responses:
+        "204": { description: Urutan disimpan }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/attempts:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/QuizID"
+    post:
+      operationId: startQuizAttempt
+      description: |
+        Melanjutkan percobaan yang belum selesai, atau memulai percobaan baru dengan snapshot soal saat ini.
+        Percobaan tidak dibatasi. Kunci dan penjelasan bernilai null sampai percobaan selesai.
+      responses:
+        "200":
+          description: Percobaan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuizAttempt" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/attempts/{attempt_id}/answers/{index}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/QuizID"
+      - $ref: "#/components/parameters/AttemptID"
+      - { name: index, in: path, required: true, schema: { type: integer, minimum: 0 } }
+    put:
+      operationId: answerQuizQuestion
+      description: Menyimpan atau mengganti pilihan untuk soal ke-`index` (0-based). Diulang aman. Ditolak setelah selesai.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [choice]
+              properties:
+                choice: { type: integer, minimum: 0, maximum: 3 }
+      responses:
+        "204": { description: Jawaban disimpan }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/attempts/{attempt_id}/finish:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/QuizID"
+      - $ref: "#/components/parameters/AttemptID"
+    post:
+      operationId: finishQuizAttempt
+      description: |
+        Server menilai sekali (soal kosong dihitung salah; nilai dibulatkan ke bawah). Diulang mengembalikan hasil
+        yang sama. Lulus otomatis menyelesaikan langkah modul `kuis` yang menunjuk kuis ini.
+      responses:
+        "200":
+          description: Hasil beserta kunci dan penjelasan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuizAttempt" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -899,6 +1108,16 @@ components:
   parameters:
     OrgID:
       name: org_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    QuizID:
+      name: quiz_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AttemptID:
+      name: attempt_id
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -995,7 +1214,7 @@ components:
         items: { type: array, items: { $ref: "#/components/schemas/Module" } }
     StepKind:
       type: string
-      enum: [materi, berkas, video]
+      enum: [materi, berkas, video, kuis]
     StepInput:
       type: object
       required: [kind, title, minutes]
@@ -1005,10 +1224,11 @@ components:
         body: { type: string, maxLength: 5000, description: "Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa." }
         file_id: { type: string, format: uuid, nullable: true, description: "Wajib untuk `berkas`: PDF/audio siap milik sekolah" }
         video_id: { type: string, description: "Wajib untuk `video`: ID atau tautan YouTube (https)" }
+        quiz_id: { type: string, format: uuid, nullable: true, description: "Wajib untuk `kuis`: kuis terbit milik sekolah" }
         minutes: { type: integer, minimum: 1, maximum: 240 }
     ModuleStep:
       type: object
-      required: [id, kind, title, body, file_id, file_kind, video_id, minutes, reader_position, done]
+      required: [id, kind, title, body, file_id, file_kind, video_id, quiz_id, minutes, reader_position, done]
       properties:
         id: { type: string, format: uuid }
         kind: { $ref: "#/components/schemas/StepKind" }
@@ -1017,6 +1237,7 @@ components:
         file_id: { type: string, format: uuid, nullable: true }
         file_kind: { type: string, enum: [pdf, audio], nullable: true, description: "Jenis file langkah `berkas` (hanya di daftar modul)" }
         video_id: { type: string, nullable: true, description: "ID video YouTube 11 karakter" }
+        quiz_id: { type: string, format: uuid, nullable: true, description: "Kuis langkah `kuis`; selesai otomatis saat lulus" }
         minutes: { type: integer }
         reader_position: { type: integer, description: "Posisi baca pemanggil untuk file langkah `berkas`" }
         done: { type: boolean, description: "Langkah sudah ditandai selesai oleh pemanggil" }
@@ -1031,6 +1252,75 @@ components:
         done: { type: integer }
         total: { type: integer }
         next_title: { type: string }
+    QuizInput:
+      type: object
+      required: [building_key, level, title, description, published]
+      properties:
+        building_key: { type: string, description: "Kunci gedung di peta kampus" }
+        level: { $ref: "#/components/schemas/Level" }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        pass_score: { type: integer, minimum: 1, maximum: 100, default: 60 }
+        published: { type: boolean }
+    Quiz:
+      type: object
+      required: [id, building_key, level, title, description, pass_score, published, updated_at, question_count, best_score, attempts]
+      properties:
+        id: { type: string, format: uuid }
+        building_key: { type: string }
+        level: { $ref: "#/components/schemas/Level" }
+        title: { type: string }
+        description: { type: string }
+        pass_score: { type: integer }
+        published: { type: boolean }
+        updated_at: { type: string, format: date-time }
+        question_count: { type: integer }
+        best_score: { type: integer, nullable: true, description: "Nilai tertinggi pemanggil; null jika belum pernah selesai" }
+        attempts: { type: integer, description: "Jumlah percobaan selesai milik pemanggil" }
+        questions: { type: array, items: { $ref: "#/components/schemas/QuizQuestion" }, description: "Hanya untuk pengajar/admin dengan drafts=true" }
+    QuizList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Quiz" } }
+    QuestionInput:
+      type: object
+      required: [prompt, options, answer]
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 500 }
+        options: { type: array, minItems: 4, maxItems: 4, items: { type: string, minLength: 1, maxLength: 200 } }
+        answer: { type: integer, minimum: 0, maximum: 3, description: "Indeks pilihan benar" }
+        explanation: { type: string, maxLength: 500 }
+    QuizQuestion:
+      type: object
+      required: [id, prompt, options, answer, explanation]
+      properties:
+        id: { type: string, format: uuid }
+        prompt: { type: string }
+        options: { type: array, items: { type: string } }
+        answer: { type: integer }
+        explanation: { type: string }
+    AttemptQuestion:
+      type: object
+      required: [prompt, options, answer, explanation]
+      properties:
+        prompt: { type: string }
+        options: { type: array, items: { type: string } }
+        answer: { type: integer, nullable: true, description: "Null sampai percobaan selesai" }
+        explanation: { type: string, nullable: true, description: "Null sampai percobaan selesai" }
+    QuizAttempt:
+      type: object
+      required: [id, quiz_id, questions, answers, pass_score, finished, correct, score, passed]
+      properties:
+        id: { type: string, format: uuid }
+        quiz_id: { type: string, format: uuid }
+        questions: { type: array, items: { $ref: "#/components/schemas/AttemptQuestion" } }
+        answers: { type: array, items: { type: integer }, description: "Pilihan pemanggil; -1 = belum dijawab" }
+        pass_score: { type: integer }
+        finished: { type: boolean }
+        correct: { type: integer, nullable: true }
+        score: { type: integer, nullable: true, description: "0–100, dibulatkan ke bawah" }
+        passed: { type: boolean, nullable: true }
     Shelf:
       type: string
       enum: [dongeng, novel, komik, sains, matematika, sejarah, inggris, referensi]

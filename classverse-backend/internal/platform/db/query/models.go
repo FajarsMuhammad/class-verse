@@ -332,6 +332,7 @@ type ModuleStep struct {
 	CreatedAt  pgtype.Timestamptz
 	UpdatedAt  pgtype.Timestamptz
 	ArchivedAt pgtype.Timestamptz
+	QuizID     uuid.NullUUID
 }
 
 type Organization struct {
@@ -341,6 +342,48 @@ type Organization struct {
 	LogoUrl   pgtype.Text
 	CreatedBy uuid.UUID
 	CreatedAt pgtype.Timestamptz
+}
+
+type Quiz struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	BuildingKey string
+	Level       string
+	Title       string
+	Description string
+	PassScore   int16
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	PublishedAt pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+}
+
+type QuizAttempt struct {
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	QuizID     uuid.UUID
+	UserID     uuid.UUID
+	Questions  []byte
+	Answers    []int16
+	PassScore  int16
+	StartedAt  pgtype.Timestamptz
+	FinishedAt pgtype.Timestamptz
+	Correct    pgtype.Int2
+	Score      pgtype.Int2
+}
+
+type QuizQuestion struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	QuizID      uuid.UUID
+	Position    int32
+	Prompt      string
+	Options     []string
+	Answer      int16
+	Explanation string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
 }
 
 type ReaderPosition struct {

@@ -3,7 +3,8 @@ import { computed, onMounted, ref, useId } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
 import { kindLabel, levels, moduleApi } from '@/api/modules'
-import type { FileItem, Module, ModuleInput, ModuleStep, StepInput } from '@/api/types'
+import { quizApi } from '@/api/quizzes'
+import type { FileItem, Module, ModuleInput, ModuleStep, Quiz, StepInput } from '@/api/types'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Modul (M1-01): staff author paths per building and level. Steps are archived, never deleted.
@@ -13,6 +14,7 @@ const id = useId()
 const modules = ref<Module[]>([])
 const buildings = ref<Building[]>([])
 const files = ref<FileItem[]>([])
+const quizzes = ref<Quiz[]>([]) // published quizzes of the building whose step form is open
 const editing = ref<string | null>(null) // module id or 'new'
 const form = ref<ModuleInput>(blank())
 const stepFor = ref<string | null>(null) // module id whose step form is open
@@ -27,7 +29,7 @@ function blank(): ModuleInput {
   return { building_key: '', level: 'SD', title: '', description: '', published: false }
 }
 function blankStep(): StepInput {
-  return { kind: 'materi', title: '', body: '', file_id: null, video_id: '', minutes: 5 }
+  return { kind: 'materi', title: '', body: '', file_id: null, video_id: '', quiz_id: null, minutes: 5 }
 }
 // Ruang Guru is staff-only and has no learning paths (the server rejects it too).
 const choices = computed(() => buildings.value.filter((b) => !b.staffOnly))
@@ -87,15 +89,21 @@ function editStep(m: Module, s?: ModuleStep) {
   stepEditing.value = s?.id ?? 'new'
   fields.value = {}
   step.value = s
-    ? { kind: s.kind, title: s.title, body: s.body, file_id: s.file_id, video_id: s.video_id ?? '', minutes: s.minutes }
+    ? { kind: s.kind, title: s.title, body: s.body, file_id: s.file_id, video_id: s.video_id ?? '', quiz_id: s.quiz_id, minutes: s.minutes }
     : blankStep()
   if (!files.value.length) {
     fileApi.list(props.orgId).then((r) => (files.value = r.items)).catch(() => (files.value = []))
   }
+  // Only published quizzes of this building can be linked (the server checks too).
+  quizApi.list(props.orgId, { building_key: m.building_key }).then((r) => (quizzes.value = r.items)).catch(() => (quizzes.value = []))
 }
 async function saveStep() {
   const mid = stepFor.value!
-  const body = { ...step.value, file_id: step.value.kind === 'berkas' ? step.value.file_id : null }
+  const body = {
+    ...step.value,
+    file_id: step.value.kind === 'berkas' ? step.value.file_id : null,
+    quiz_id: step.value.kind === 'kuis' ? step.value.quiz_id : null,
+  }
   const ok = await run(
     () => (stepEditing.value === 'new'
       ? moduleApi.addStep(props.orgId, mid, body)
@@ -203,6 +211,16 @@ onMounted(async () => {
             </select>
             <p :class="fields.file_id ? 'field-error' : 'hint'">
               {{ fields.file_id || (files.length ? 'PDF atau audio dari File belajar.' : 'Belum ada file. Unggah dulu di File belajar.') }}
+            </p>
+          </template>
+          <template v-if="step.kind === 'kuis'">
+            <label :for="`${id}-sq`">Kuis</label>
+            <select :id="`${id}-sq`" v-model="step.quiz_id" aria-label="Kuis" :aria-invalid="!!fields.quiz_id">
+              <option :value="null" disabled>Pilih kuis</option>
+              <option v-for="z in quizzes" :key="z.id" :value="z.id">{{ z.title }} ({{ z.level }}, {{ z.question_count }} soal)</option>
+            </select>
+            <p :class="fields.quiz_id ? 'field-error' : 'hint'">
+              {{ fields.quiz_id || (quizzes.length ? 'Selesai otomatis saat peserta lulus kuis.' : 'Belum ada kuis terbit di gedung ini. Buat di bagian Kuis.') }}
             </p>
           </template>
           <template v-if="step.kind === 'video'">

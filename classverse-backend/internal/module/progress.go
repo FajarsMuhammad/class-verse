@@ -35,12 +35,16 @@ func (s *Service) SetDone(ctx context.Context, userID, orgID, moduleID, stepID u
 		if _, err := s.lock(ctx, q, orgID, moduleID); err != nil {
 			return err
 		}
-		_, err := q.ReadableStep(ctx, query.ReadableStepParams{OrgID: orgID, ModuleID: moduleID, ID: stepID, Staff: role.AtLeast(org.RoleTeacher)})
+		kind, err := q.ReadableStep(ctx, query.ReadableStepParams{OrgID: orgID, ModuleID: moduleID, ID: stepID, Staff: role.AtLeast(org.RoleTeacher)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
 		if err != nil {
 			return fmt.Errorf("get step: %w", err)
+		}
+		// A quiz step is completed only by passing the quiz (approved rule 4), never by hand.
+		if kind == "kuis" {
+			return ErrQuizStep
 		}
 		if done {
 			err = q.CompleteStep(ctx, query.CompleteStepParams{OrgID: orgID, UserID: userID, StepID: stepID, CompletedAt: pgTime(s.now())})

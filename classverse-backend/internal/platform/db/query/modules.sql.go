@@ -155,9 +155,9 @@ func (q *Queries) CreateModule(ctx context.Context, arg CreateModuleParams) (Mod
 }
 
 const createStep = `-- name: CreateStep :one
-INSERT INTO module_steps (id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
-RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at
+INSERT INTO module_steps (id, org_id, module_id, position, kind, title, body, file_id, video_id, quiz_id, minutes, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at, quiz_id
 `
 
 type CreateStepParams struct {
@@ -170,6 +170,7 @@ type CreateStepParams struct {
 	Body      string
 	FileID    uuid.NullUUID
 	VideoID   pgtype.Text
+	QuizID    uuid.NullUUID
 	Minutes   int32
 	CreatedAt pgtype.Timestamptz
 }
@@ -185,6 +186,7 @@ func (q *Queries) CreateStep(ctx context.Context, arg CreateStepParams) (ModuleS
 		arg.Body,
 		arg.FileID,
 		arg.VideoID,
+		arg.QuizID,
 		arg.Minutes,
 		arg.CreatedAt,
 	)
@@ -203,12 +205,30 @@ func (q *Queries) CreateStep(ctx context.Context, arg CreateStepParams) (ModuleS
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.QuizID,
 	)
 	return i, err
 }
 
+const getLinkableQuiz = `-- name: GetLinkableQuiz :one
+SELECT id FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL AND published_at IS NOT NULL
+`
+
+type GetLinkableQuizParams struct {
+	OrgID uuid.UUID
+	ID    uuid.UUID
+}
+
+// A quiz step may point only at a published, non-archived quiz of the same school.
+func (q *Queries) GetLinkableQuiz(ctx context.Context, arg GetLinkableQuizParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getLinkableQuiz, arg.OrgID, arg.ID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const listModuleSteps = `-- name: ListModuleSteps :many
-SELECT s.id, s.org_id, s.module_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.minutes, s.created_at, s.updated_at, s.archived_at, COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind,
+SELECT s.id, s.org_id, s.module_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.minutes, s.created_at, s.updated_at, s.archived_at, s.quiz_id, COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind,
   (d.step_id IS NOT NULL)::boolean AS done
 FROM module_steps s
 LEFT JOIN files f ON f.org_id = s.org_id AND f.id = s.file_id
@@ -255,6 +275,7 @@ func (q *Queries) ListModuleSteps(ctx context.Context, arg ListModuleStepsParams
 			&i.ModuleStep.CreatedAt,
 			&i.ModuleStep.UpdatedAt,
 			&i.ModuleStep.ArchivedAt,
+			&i.ModuleStep.QuizID,
 			&i.ReaderPosition,
 			&i.FileKind,
 			&i.Done,
@@ -364,7 +385,7 @@ func (q *Queries) NextStepPosition(ctx context.Context, moduleID uuid.UUID) (int
 }
 
 const readableStep = `-- name: ReadableStep :one
-SELECT s.id FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+SELECT s.kind FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
 WHERE s.org_id = $1 AND s.module_id = $2 AND s.id = $3 AND s.archived_at IS NULL AND m.archived_at IS NULL
   AND ($4::boolean OR m.published_at IS NOT NULL)
 `
@@ -377,16 +398,16 @@ type ReadableStepParams struct {
 }
 
 // A participant can complete only an active step of a published, non-archived module.
-func (q *Queries) ReadableStep(ctx context.Context, arg ReadableStepParams) (uuid.UUID, error) {
+func (q *Queries) ReadableStep(ctx context.Context, arg ReadableStepParams) (string, error) {
 	row := q.db.QueryRow(ctx, readableStep,
 		arg.OrgID,
 		arg.ModuleID,
 		arg.ID,
 		arg.Staff,
 	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	var kind string
+	err := row.Scan(&kind)
+	return kind, err
 }
 
 const resumeModule = `-- name: ResumeModule :one
@@ -516,9 +537,9 @@ func (q *Queries) UpdateModule(ctx context.Context, arg UpdateModuleParams) (Mod
 }
 
 const updateStep = `-- name: UpdateStep :one
-UPDATE module_steps SET kind = $4, title = $5, body = $6, file_id = $7, video_id = $8, minutes = $9, updated_at = $10
+UPDATE module_steps SET kind = $4, title = $5, body = $6, file_id = $7, video_id = $8, quiz_id = $9, minutes = $10, updated_at = $11
 WHERE org_id = $1 AND module_id = $2 AND id = $3 AND archived_at IS NULL
-RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at
+RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at, quiz_id
 `
 
 type UpdateStepParams struct {
@@ -530,6 +551,7 @@ type UpdateStepParams struct {
 	Body      string
 	FileID    uuid.NullUUID
 	VideoID   pgtype.Text
+	QuizID    uuid.NullUUID
 	Minutes   int32
 	UpdatedAt pgtype.Timestamptz
 }
@@ -544,6 +566,7 @@ func (q *Queries) UpdateStep(ctx context.Context, arg UpdateStepParams) (ModuleS
 		arg.Body,
 		arg.FileID,
 		arg.VideoID,
+		arg.QuizID,
 		arg.Minutes,
 		arg.UpdatedAt,
 	)
@@ -562,6 +585,7 @@ func (q *Queries) UpdateStep(ctx context.Context, arg UpdateStepParams) (ModuleS
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.QuizID,
 	)
 	return i, err
 }

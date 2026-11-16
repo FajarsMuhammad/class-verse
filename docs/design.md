@@ -705,3 +705,13 @@ The user approved server-enforced zone audio without distance attenuation, confi
 - *UI.* Mic 52×52 round Tinta (`aria-pressed`, off on entry and after travel), status line naming the heard channel,
   teacher switch "Bicara ke semua ruang", "Aktifkan suara" when autoplay is blocked, `--color-speaking` ring on
   active speakers (LiveKit active speakers).
+
+## Q1 — Kuis mandiri
+
+- Tabel `quizzes`, `quiz_questions` (tepat 4 opsi, `answer` 0–3, boleh dihapus), `quiz_attempts` (snapshot soal di
+  `questions jsonb`, `answers smallint[]` dengan -1 = kosong, `score`/`correct` ditulis sekali saat selesai). Satu
+  attempt terbuka per anggota/kuis (unique index parsial); `Start` mengunci kuis lalu melanjutkan attempt terbuka.
+- Kunci dan penjelasan tidak dikirim ke peserta sampai attempt selesai; daftar kuis peserta tidak memuat soal.
+  Nilai `floor(benar × 100 / jumlah)`; lulus jika ≥ `pass_score` snapshot attempt. Nilai terbaik untuk Rapor.
+- Langkah modul `kuis` (`module_steps.quiz_id`, FK org-scoped) hanya menunjuk kuis terbit; lulus menulis
+  `module_progress` pada transaksi `Finish` yang sama. Penandaan manual ditolak 409 `quiz_step`.

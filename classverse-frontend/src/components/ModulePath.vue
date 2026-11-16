@@ -2,8 +2,10 @@
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { errorMessage } from '@/api/client'
 import { kindLabel, levels, moduleApi } from '@/api/modules'
-import type { Level, Module, ModuleStep } from '@/api/types'
+import { quizApi } from '@/api/quizzes'
+import type { Level, Module, ModuleStep, Quiz, QuizAttempt } from '@/api/types'
 import FileReader, { type ReadableFile } from './FileReader.vue'
+import QuizPlayer from './QuizPlayer.vue'
 import StepViewer from './StepViewer.vue'
 
 // Open catalog: every step remains accessible, regardless of completion order.
@@ -13,6 +15,9 @@ const emit = defineEmits<{ changed: [] }>()
 const ids = { level: useId(), list: useId() }
 const level = ref<Level>(props.initialLevel ?? 'SD')
 const modules = ref<Module[]>([])
+const quizzes = ref<Quiz[]>([])
+// The quiz being played; stepID is set when it was opened from a module quiz step.
+const playing = ref<{ id: string; title: string; stepID?: string } | null>(null)
 const loading = ref(false)
 const error = ref('')
 const viewing = ref<ModuleStep | null>(null)
@@ -26,9 +31,11 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const page = await moduleApi.list(props.orgId, { building_key: props.buildingKey, level: level.value })
+    const query = { building_key: props.buildingKey, level: level.value }
+    const [page, quizPage] = await Promise.all([moduleApi.list(props.orgId, query), quizApi.list(props.orgId, query)])
     if (mine === generation) {
       modules.value = page.items
+      quizzes.value = quizPage.items
       if (props.moduleId) {
         await nextTick()
         document.getElementById(`module-${props.moduleId}`)?.focus()
@@ -43,7 +50,7 @@ async function load() {
 watch([() => props.orgId, () => props.buildingKey, level], load, { immediate: true })
 
 const minutes = (m: Module) => m.steps.reduce((sum, s) => sum + s.minutes, 0)
-const empty = computed(() => !loading.value && !error.value && !modules.value.length)
+const empty = computed(() => !loading.value && !error.value && !modules.value.length && !quizzes.value.length)
 
 async function setDone(m: Module, step: ModuleStep) {
   if (saving.value) return
@@ -66,10 +73,24 @@ async function setDone(m: Module, step: ModuleStep) {
 }
 
 function open(step: ModuleStep) {
-  if (step.kind === 'berkas' && step.file_id) {
+  if (step.kind === 'kuis' && step.quiz_id) {
+    viewing.value = null
+    playing.value = { id: step.quiz_id, title: step.title, stepID: step.id }
+  } else if (step.kind === 'berkas' && step.file_id) {
     viewing.value = null
     reading.value = { id: step.file_id, name: step.title, kind: step.file_kind ?? 'pdf', position: step.reader_position }
   } else viewing.value = step
+}
+// The server already completed the step on a pass (same transaction); mirror it and refresh best scores.
+function quizFinished(a: QuizAttempt) {
+  const stepID = playing.value?.stepID
+  if (a.passed && stepID) {
+    modules.value = modules.value.map((m) => ({ ...m, steps: m.steps.map((s) => (s.id === stepID ? { ...s, done: true } : s)) }))
+    emit('changed')
+  }
+  quizzes.value = quizzes.value.map((z) => z.id === a.quiz_id
+    ? { ...z, attempts: z.attempts + 1, best_score: Math.max(z.best_score ?? 0, a.score ?? 0) }
+    : z)
 }
 function closed(position: number) {
   const id = reading.value?.id
@@ -100,13 +121,14 @@ function closed(position: number) {
         <p class="muted small" role="status">{{ m.steps.filter((s) => s.done).length }} dari {{ m.steps.length }} selesai</p>
         <ol class="steps">
           <li v-for="(s, i) in m.steps" :key="s.id" :class="['step', s.kind, { done: s.done }]">
-            <span class="dot" aria-hidden="true">{{ s.done ? '✓' : s.kind === 'video' ? '▷' : s.kind === 'berkas' ? '▤' : '▱' }}<small>{{ i + 1 }}</small></span>
+            <span class="dot" aria-hidden="true">{{ s.done ? '✓' : s.kind === 'video' ? '▷' : s.kind === 'berkas' ? '▤' : s.kind === 'kuis' ? '?' : '▱' }}<small>{{ i + 1 }}</small></span>
             <span class="text"><strong>{{ s.title }}</strong><small>{{ kindLabel[s.kind] }} · {{ s.minutes }} mnt</small></span>
             <div class="actions">
               <button type="button" class="btn-secondary open" @click="open(s)">
-                {{ s.kind === 'video' ? 'Tonton' : s.file_kind === 'audio' ? 'Dengarkan' : 'Buka' }}<span class="sr"> {{ s.title }}</span>
+                {{ s.kind === 'video' ? 'Tonton' : s.kind === 'kuis' ? 'Kerjakan' : s.file_kind === 'audio' ? 'Dengarkan' : 'Buka' }}<span class="sr"> {{ s.title }}</span>
               </button>
-              <button type="button" class="btn-secondary complete" :aria-pressed="s.done" :disabled="saving" @click="setDone(m, s)">
+              <p v-if="s.kind === 'kuis'" class="muted small auto">Selesai otomatis saat lulus</p>
+              <button v-else type="button" class="btn-secondary complete" :aria-pressed="s.done" :disabled="saving" @click="setDone(m, s)">
                 {{ s.done ? 'Batal selesai' : 'Selesai' }}<span class="sr"> {{ s.title }}</span>
               </button>
             </div>
@@ -115,6 +137,21 @@ function closed(position: number) {
         <p v-if="!m.steps.length" class="muted small">Modul ini belum punya langkah.</p>
       </article>
     </div>
+    <section v-if="quizzes.length" class="quizzes" aria-label="Kuis">
+      <h3>Kuis</h3>
+      <article v-for="z in quizzes" :key="z.id" class="quiz-card">
+        <span class="quiz-icon" aria-hidden="true">?</span>
+        <div class="text">
+          <strong>{{ z.title }}</strong>
+          <small>{{ z.question_count }} soal · {{ z.best_score === null ? 'belum dicoba' : `nilai terbaik ${z.best_score}` }}</small>
+        </div>
+        <button type="button" class="btn-primary" @click="playing = { id: z.id, title: z.title }">
+          {{ z.attempts ? 'Main lagi' : 'Main' }}<span class="sr"> {{ z.title }}</span>
+        </button>
+      </article>
+    </section>
+    <QuizPlayer v-if="playing" :key="playing.id" :org-id="orgId" :quiz-id="playing.id" :title="playing.title"
+      @finished="quizFinished" @close="playing = null" />
     <StepViewer v-if="viewing" :step="viewing" :steps="viewingModule?.steps" :module-title="viewingModule?.title"
       :saving="saving" @select="open" @done="viewingModule && setDone(viewingModule, $event)" @close="viewing = null" />
     <FileReader v-if="reading" :key="reading.id" :org-id="orgId" :file="reading" @close="closed" />
@@ -248,6 +285,42 @@ function closed(position: number) {
   flex: none;
   min-height: 44px;
 }
+.auto {
+  margin: 0;
+  align-self: center;
+}
+.quizzes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 3px solid var(--kv-ink);
+  border-radius: var(--kv-radius-card);
+  background: var(--kv-learning-surface);
+  box-shadow: 0 7px 0 var(--kv-ink);
+}
+.quizzes h3 { margin: 0; font-family: var(--font-display); }
+.quiz-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 3px solid var(--kv-ink);
+  border-radius: var(--radius-lg);
+}
+.quiz-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--kv-ink);
+  border-radius: var(--radius-md);
+  background: var(--kv-subject-arena);
+  color: var(--kv-surface);
+  font-weight: var(--weight-bold);
+}
+.quiz-card .btn-primary { flex: none; min-height: 44px; }
 .sr {
   position: absolute;
   width: 1px;

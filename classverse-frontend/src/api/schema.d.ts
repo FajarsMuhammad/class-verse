@@ -820,11 +820,190 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Tandai langkah selesai untuk pemanggil; idempoten. Langkah bebas diselesaikan tanpa urutan wajib. */
+        /**
+         * @description Tandai langkah selesai untuk pemanggil; idempoten. Langkah bebas diselesaikan tanpa urutan wajib.
+         *     Langkah `kuis` ditolak 409 `quiz_step`: selesai otomatis saat lulus kuisnya.
+         */
         put: operations["completeModuleStep"];
         post?: never;
         /** @description Batalkan tanda selesai milik pemanggil; idempoten. */
         delete: operations["uncompleteModuleStep"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Kuis beserta nilai terbaik dan jumlah percobaan selesai milik pemanggil. Peserta hanya melihat kuis terbit dan
+         *     tidak pernah menerima soal/kunci di sini. `drafts=true` untuk pengajar/admin menyertakan draf serta soal
+         *     lengkap dengan kunci (untuk Kelola). Maksimal 100 kuis.
+         */
+        get: operations["listQuizzes"];
+        put?: never;
+        /** @description Pengajar/admin. Dibuat sebagai draf; terbitkan setelah ada minimal 1 soal. */
+        post: operations["createQuiz"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Percobaan yang sudah dimulai tetap memakai nilai lulus dan soal saat dimulai. */
+        put: operations["updateQuiz"];
+        post?: never;
+        /** @description Pengajar/admin. Arsipkan kuis; riwayat nilai tetap tersimpan. */
+        delete: operations["archiveQuiz"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Pengajar/admin. Soal ditaruh paling akhir; maksimal 50 soal. */
+        post: operations["addQuizQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Percobaan yang sudah dimulai tidak berubah (snapshot). */
+        put: operations["updateQuizQuestion"];
+        post?: never;
+        /** @description Pengajar/admin. Kuis terbit wajib menyisakan minimal 1 soal. */
+        delete: operations["deleteQuizQuestion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. `question_ids` wajib memuat semua soal tepat sekali. */
+        put: operations["reorderQuizQuestions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Melanjutkan percobaan yang belum selesai, atau memulai percobaan baru dengan snapshot soal saat ini.
+         *     Percobaan tidak dibatasi. Kunci dan penjelasan bernilai null sampai percobaan selesai.
+         */
+        post: operations["startQuizAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/attempts/{attempt_id}/answers/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+                index: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Menyimpan atau mengganti pilihan untuk soal ke-`index` (0-based). Diulang aman. Ditolak setelah selesai. */
+        put: operations["answerQuizQuestion"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/attempts/{attempt_id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Server menilai sekali (soal kosong dihitung salah; nilai dibulatkan ke bawah). Diulang mengembalikan hasil
+         *     yang sama. Lulus otomatis menyelesaikan langkah modul `kuis` yang menunjuk kuis ini.
+         */
+        post: operations["finishQuizAttempt"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -855,7 +1034,7 @@ export interface components {
             items: components["schemas"]["Module"][];
         };
         /** @enum {string} */
-        StepKind: "materi" | "berkas" | "video";
+        StepKind: "materi" | "berkas" | "video" | "kuis";
         StepInput: {
             kind: components["schemas"]["StepKind"];
             title: string;
@@ -868,6 +1047,11 @@ export interface components {
             file_id?: string | null;
             /** @description Wajib untuk `video`: ID atau tautan YouTube (https) */
             video_id?: string;
+            /**
+             * Format: uuid
+             * @description Wajib untuk `kuis`: kuis terbit milik sekolah
+             */
+            quiz_id?: string | null;
             minutes: number;
         };
         ModuleStep: {
@@ -885,6 +1069,11 @@ export interface components {
             file_kind: "pdf" | "audio" | null;
             /** @description ID video YouTube 11 karakter */
             video_id: string | null;
+            /**
+             * Format: uuid
+             * @description Kuis langkah `kuis`; selesai otomatis saat lulus
+             */
+            quiz_id: string | null;
             minutes: number;
             /** @description Posisi baca pemanggil untuk file langkah `berkas` */
             reader_position: number;
@@ -900,6 +1089,76 @@ export interface components {
             done: number;
             total: number;
             next_title: string;
+        };
+        QuizInput: {
+            /** @description Kunci gedung di peta kampus */
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            description: string;
+            /** @default 60 */
+            pass_score: number;
+            published: boolean;
+        };
+        Quiz: {
+            /** Format: uuid */
+            id: string;
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            description: string;
+            pass_score: number;
+            published: boolean;
+            /** Format: date-time */
+            updated_at: string;
+            question_count: number;
+            /** @description Nilai tertinggi pemanggil; null jika belum pernah selesai */
+            best_score: number | null;
+            /** @description Jumlah percobaan selesai milik pemanggil */
+            attempts: number;
+            /** @description Hanya untuk pengajar/admin dengan drafts=true */
+            questions?: components["schemas"]["QuizQuestion"][];
+        };
+        QuizList: {
+            items: components["schemas"]["Quiz"][];
+        };
+        QuestionInput: {
+            prompt: string;
+            options: string[];
+            /** @description Indeks pilihan benar */
+            answer: number;
+            explanation?: string;
+        };
+        QuizQuestion: {
+            /** Format: uuid */
+            id: string;
+            prompt: string;
+            options: string[];
+            answer: number;
+            explanation: string;
+        };
+        AttemptQuestion: {
+            prompt: string;
+            options: string[];
+            /** @description Null sampai percobaan selesai */
+            answer: number | null;
+            /** @description Null sampai percobaan selesai */
+            explanation: string | null;
+        };
+        QuizAttempt: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            quiz_id: string;
+            questions: components["schemas"]["AttemptQuestion"][];
+            /** @description Pilihan pemanggil; -1 = belum dijawab */
+            answers: number[];
+            pass_score: number;
+            finished: boolean;
+            correct: number | null;
+            /** @description 0–100, dibulatkan ke bawah */
+            score: number | null;
+            passed: boolean | null;
         };
         /** @enum {string} */
         Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
@@ -1335,6 +1594,8 @@ export interface components {
     };
     parameters: {
         OrgID: string;
+        QuizID: string;
+        AttemptID: string;
         FileID: string;
         /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
         InviteCode: string;
@@ -2797,6 +3058,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     uncompleteModuleStep: {
@@ -2818,6 +3080,324 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listQuizzes: {
+        parameters: {
+            query?: {
+                building_key?: string;
+                level?: components["schemas"]["Level"];
+                drafts?: boolean;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar kuis */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createQuiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizInput"];
+            };
+        };
+        responses: {
+            /** @description Kuis dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quiz"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateQuiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizInput"];
+            };
+        };
+        responses: {
+            /** @description Kuis diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quiz"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveQuiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionInput"];
+            };
+        };
+        responses: {
+            /** @description Soal dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizQuestion"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionInput"];
+            };
+        };
+        responses: {
+            /** @description Soal diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizQuestion"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dihapus */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    reorderQuizQuestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    question_ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Urutan disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startQuizAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Percobaan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizAttempt"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    answerQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    choice: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Jawaban disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    finishQuizAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hasil beserta kunci dan penjelasan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizAttempt"];
+                };
             };
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];

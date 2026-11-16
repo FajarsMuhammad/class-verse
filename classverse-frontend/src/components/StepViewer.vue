@@ -43,7 +43,7 @@ onMounted(() => dialog.value?.showModal())
     <p v-if="step.body" class="body">{{ step.body }}</p>
     <footer v-if="steps?.length" class="controls">
       <button type="button" class="btn-secondary" :disabled="index <= 0" @click="select(-1)">Sebelumnya</button>
-      <button type="button" class="btn-secondary" :disabled="saving" :aria-pressed="step.done" @click="emit('done', step)">{{ step.done ? 'Batal selesai' : 'Selesai' }}</button>
+      <button v-if="step.kind !== 'kuis'" type="button" class="btn-secondary" :disabled="saving" :aria-pressed="step.done" @click="emit('done', step)">{{ step.done ? 'Batal selesai' : 'Selesai' }}</button>
       <button type="button" class="btn-primary" :disabled="index >= steps.length - 1" @click="select(1)">Lanjut</button>
     </footer>
       </main>

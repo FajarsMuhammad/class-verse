@@ -28,7 +28,7 @@ import (
 // Allowed values mirror the CHECK constraints in 00010_modules.sql.
 var (
 	Levels = []string{"SD", "SMP", "SMA", "Umum"}
-	Kinds  = []string{"materi", "berkas", "video"}
+	Kinds  = []string{"materi", "berkas", "video", "kuis"}
 )
 
 const maxSteps = 50
@@ -40,6 +40,7 @@ var (
 	ErrNotFound    = errors.New("module not found")
 	ErrStepLimit   = errors.New("too many steps")
 	ErrBadOrdering = errors.New("order must list every active step once")
+	ErrQuizStep    = errors.New("quiz steps complete by passing the quiz")
 )
 
 // ValidationError lists invalid input fields.
@@ -87,6 +88,7 @@ type StepInput struct {
 	Body    string
 	FileID  *uuid.UUID
 	VideoID string
+	QuizID  *uuid.UUID
 	Minutes int
 }
 
@@ -168,6 +170,10 @@ func validateStep(in StepInput) (StepInput, error) {
 	if in.Body, ok = text(in.Body, minBody, 5000, true); !ok {
 		v.add("body", "Isi materi 1–5000 karakter")
 	}
+	// Fields that do not belong to the kind are dropped, so the DB CHECKs always hold.
+	if in.Kind != "kuis" {
+		in.QuizID = nil
+	}
 	switch in.Kind {
 	case "materi":
 		in.FileID, in.VideoID = nil, ""
@@ -180,6 +186,11 @@ func validateStep(in StepInput) (StepInput, error) {
 		in.FileID = nil
 		if in.VideoID = youTubeID(in.VideoID); in.VideoID == "" {
 			v.add("video_id", "Tempel tautan YouTube yang valid")
+		}
+	case "kuis":
+		in.FileID, in.VideoID = nil, ""
+		if in.QuizID == nil {
+			v.add("quiz_id", "Pilih kuis")
 		}
 	default:
 		v.add("kind", "Pilih jenis langkah")
@@ -207,6 +218,19 @@ func youTubeID(raw string) string {
 		}
 	}
 	return ""
+}
+
+// checkQuiz requires a published quiz of this school for a quiz step.
+func checkQuiz(ctx context.Context, q *query.Queries, orgID uuid.UUID, id *uuid.UUID) error {
+	if id == nil {
+		return nil
+	}
+	if _, err := q.GetLinkableQuiz(ctx, query.GetLinkableQuizParams{OrgID: orgID, ID: *id}); errors.Is(err, pgx.ErrNoRows) {
+		return &ValidationError{Fields: map[string]string{"quiz_id": "Kuis tidak ditemukan atau belum terbit"}}
+	} else if err != nil {
+		return fmt.Errorf("get step quiz: %w", err)
+	}
+	return nil
 }
 
 // checkFile requires a ready file of this school.
@@ -355,6 +379,9 @@ func (s *Service) AddStep(ctx context.Context, userID, orgID, moduleID uuid.UUID
 		if err := checkFile(ctx, q, orgID, in.FileID); err != nil {
 			return err
 		}
+		if err := checkQuiz(ctx, q, orgID, in.QuizID); err != nil {
+			return err
+		}
 		pos, err := q.NextStepPosition(ctx, moduleID)
 		if err != nil {
 			return fmt.Errorf("next step position: %w", err)
@@ -364,8 +391,8 @@ func (s *Service) AddStep(ctx context.Context, userID, orgID, moduleID uuid.UUID
 		}
 		step, err = q.CreateStep(ctx, query.CreateStepParams{
 			ID: uuid.New(), OrgID: orgID, ModuleID: moduleID, Position: pos, Kind: in.Kind, Title: in.Title,
-			Body: in.Body, FileID: nullID(in.FileID), VideoID: nullText(in.VideoID), Minutes: int32(in.Minutes),
-			CreatedAt: pgTime(s.now()),
+			Body: in.Body, FileID: nullID(in.FileID), VideoID: nullText(in.VideoID), QuizID: nullID(in.QuizID),
+			Minutes: int32(in.Minutes), CreatedAt: pgTime(s.now()),
 		})
 		if err != nil {
 			return fmt.Errorf("create step: %w", err)
@@ -392,9 +419,12 @@ func (s *Service) UpdateStep(ctx context.Context, userID, orgID, moduleID, stepI
 		if err := checkFile(ctx, q, orgID, in.FileID); err != nil {
 			return err
 		}
+		if err := checkQuiz(ctx, q, orgID, in.QuizID); err != nil {
+			return err
+		}
 		step, err = q.UpdateStep(ctx, query.UpdateStepParams{
 			OrgID: orgID, ModuleID: moduleID, ID: stepID, Kind: in.Kind, Title: in.Title, Body: in.Body,
-			FileID: nullID(in.FileID), VideoID: nullText(in.VideoID), Minutes: int32(in.Minutes), UpdatedAt: pgTime(s.now()),
+			FileID: nullID(in.FileID), VideoID: nullText(in.VideoID), QuizID: nullID(in.QuizID), Minutes: int32(in.Minutes), UpdatedAt: pgTime(s.now()),
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound

@@ -37,7 +37,7 @@ export const moduleApi = {
 
 export const levels: Level[] = ['SD', 'SMP', 'SMA', 'Umum']
 
-export const kindLabel: Record<ModuleStep['kind'], string> = { materi: 'Materi', berkas: 'Bacaan', video: 'Video' }
+export const kindLabel: Record<ModuleStep['kind'], string> = { materi: 'Materi', berkas: 'Bacaan', video: 'Video', kuis: 'Kuis' }
 
 // Privacy-enhanced embed; the server stores only the 11-character ID.
 export const embedURL = (videoID: string) => `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoID)}?rel=0`
