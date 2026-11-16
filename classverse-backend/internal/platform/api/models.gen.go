@@ -492,6 +492,15 @@ func (e UploadProgressState) Valid() bool {
 	}
 }
 
+// AcademicYear defines model for AcademicYear.
+type AcademicYear struct {
+	Active bool               `json:"active"`
+	Id     openapi_types.UUID `json:"id"`
+
+	// Label Example: 2026/2027
+	Label string `json:"label"`
+}
+
 // AccessTokenResponse defines model for AccessTokenResponse.
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -570,6 +579,11 @@ type BookInputLevel string
 type BookList struct {
 	Items      []Book  `json:"items"`
 	NextCursor *string `json:"next_cursor"`
+}
+
+// ClassInput defines model for ClassInput.
+type ClassInput struct {
+	Name string `json:"name"`
 }
 
 // CreateInviteRequest defines model for CreateInviteRequest.
@@ -830,6 +844,16 @@ type Organization struct {
 	Slug         string             `json:"slug"`
 }
 
+// Placement defines model for Placement.
+type Placement struct {
+	ClassName string `json:"class_name"`
+
+	// EndedAt Null = masih di kelas ini
+	EndedAt   *time.Time `json:"ended_at"`
+	StartedAt time.Time  `json:"started_at"`
+	YearLabel string     `json:"year_label"`
+}
+
 // QuestionInput defines model for QuestionInput.
 type QuestionInput struct {
 	// Answer Indeks pilihan benar
@@ -976,6 +1000,26 @@ type RoomList struct {
 // RoomMap defines model for RoomMap.
 type RoomMap string
 
+// RosterEntry defines model for RosterEntry.
+type RosterEntry struct {
+	AvatarKey string `json:"avatar_key"`
+
+	// ClassId Null = belum ditempatkan
+	ClassId     *openapi_types.UUID `json:"class_id"`
+	DisplayName string              `json:"display_name"`
+	UserId      openapi_types.UUID  `json:"user_id"`
+}
+
+// SchoolClass defines model for SchoolClass.
+type SchoolClass struct {
+	AcademicYearId openapi_types.UUID `json:"academic_year_id"`
+	Id             openapi_types.UUID `json:"id"`
+	Name           string             `json:"name"`
+
+	// Students Jumlah siswa aktif
+	Students int `json:"students"`
+}
+
 // Shelf defines model for Shelf.
 type Shelf string
 
@@ -1082,6 +1126,9 @@ type OrgID = openapi_types.UUID
 // QuizID defines model for QuizID.
 type QuizID = openapi_types.UUID
 
+// YearID defines model for YearID.
+type YearID = openapi_types.UUID
+
 // AccessToken defines model for AccessToken.
 type AccessToken = AccessTokenResponse
 
@@ -1111,6 +1158,17 @@ type ValidationFailed = ErrorResponse
 
 // VoiceUnavailable defines model for VoiceUnavailable.
 type VoiceUnavailable = ErrorResponse
+
+// CreateAcademicYearJSONBody defines parameters for CreateAcademicYear.
+type CreateAcademicYearJSONBody struct {
+	// Label Example: 2026/2027
+	Label string `json:"label"`
+}
+
+// PlaceStudentJSONBody defines parameters for PlaceStudent.
+type PlaceStudentJSONBody struct {
+	ClassId *openapi_types.UUID `json:"class_id"`
+}
 
 // GetFileContentParams defines parameters for GetFileContent.
 type GetFileContentParams struct {
@@ -1205,6 +1263,18 @@ type UpdateMeJSONRequestBody = UpdateMeRequest
 
 // CreateOrgJSONRequestBody defines body for CreateOrg for application/json ContentType.
 type CreateOrgJSONRequestBody = CreateOrgRequest
+
+// CreateAcademicYearJSONRequestBody defines body for CreateAcademicYear for application/json ContentType.
+type CreateAcademicYearJSONRequestBody CreateAcademicYearJSONBody
+
+// CreateClassJSONRequestBody defines body for CreateClass for application/json ContentType.
+type CreateClassJSONRequestBody = ClassInput
+
+// PlaceStudentJSONRequestBody defines body for PlaceStudent for application/json ContentType.
+type PlaceStudentJSONRequestBody PlaceStudentJSONBody
+
+// RenameClassJSONRequestBody defines body for RenameClass for application/json ContentType.
+type RenameClassJSONRequestBody = ClassInput
 
 // SaveFilePositionJSONRequestBody defines body for SaveFilePosition for application/json ContentType.
 type SaveFilePositionJSONRequestBody SaveFilePositionJSONBody

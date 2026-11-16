@@ -385,7 +385,7 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
 - Hasil disimpan sebagai `quiz_attempts` dengan mode/sesi Arena, jadi masuk Rapor dan leaderboard.
   Identitas sesi masuk kunci idempotensi; leaderboard live per sesi terpisah dari agregat mingguan Redis.
 
-### C1 — Kelas/rombel (cakupan dan pengelolaan disetujui; schema usulan)
+### C1 — Kelas/rombel (selesai)
 
 **Tujuan:** daftar siswa kelas menjadi sumber kelas pada tooltip dan filter Rapor, bukan mengikuti lokasi avatar.
 
@@ -395,7 +395,7 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
   menempatkan/memindahkan peserta dari anggota sekolah. **Admin** memilih satu tahun ajaran aktif per sekolah;
   tahun lama tetap bisa dipilih di Rapor. Siswa tidak mengubah kelas sendiri. Anggota lama tidak
   diberi kelas otomatis; statusnya "Belum ditempatkan" sampai pengajar/admin menempatkan.
-- **Usulan model:** `academic_years` milik organisasi, `classes` terikat organisasi/tahun ajaran, dan
+- **Model C1:** `academic_years` milik organisasi, `classes` terikat organisasi/tahun ajaran, dan
   `class_enrollments` berisi siswa, kelas, waktu masuk/keluar. Constraint unik parsial pada
   `(org_id, academic_year_id, user_id) WHERE ended_at IS NULL` menjamin maksimal satu penempatan aktif, termasuk
   dua permintaan bersamaan. FK komposit memastikan tahun/kelas/anggota berasal dari organisasi yang sama.
@@ -407,6 +407,23 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
   ulang nilai lama sebagai nilai yang diperoleh dalam kelas baru. Ranking per kelas tetap di luar scope B1.
 - **Uji wajib:** penempatan ganda serentak ditolak; siswa yang sama di tahun/sekolah berbeda diizinkan; pindah
   kelas atomik dan riwayat tetap; akses lintas organisasi ditolak; peserta tidak bisa mengubah roster sendiri.
+- **Detail implementasi C1:**
+  - Tahun ajaran berlabel `YYYY/YYYY+1` (mis. `2026/2027`), unik per sekolah, tanpa tanggal mulai/akhir. Tahun
+    pertama yang dibuat otomatis aktif; selanjutnya admin memilih. Tepat satu tahun aktif dijaga unique parsial.
+  - Roster hanya untuk anggota berperan **peserta**; pengajar/admin tidak ditempatkan. Nama dari `display_name`.
+  - Kelas tidak pernah dihapus permanen: arsip hanya jika tanpa siswa aktif. Nama kelas 1–40 karakter, unik
+    (tanpa beda huruf besar) per tahun ajaran di antara kelas aktif.
+  - "Pindah" = satu `PUT` penempatan: menutup penempatan aktif tahun itu dan membuka yang baru dalam satu
+    transaksi; ke kelas yang sama tidak melakukan apa-apa. "Keluarkan" menutup penempatan (status Belum ditempatkan).
+
+- **Bukti C1:** migration `00014_classes.sql`, query sqlc dan service/HTTP `internal/class`, OpenAPI + tipe
+  generated, panel `ClassManager` pada Kelola. Semua endpoint roster staff-only; tanpa email/tanggal lahir.
+  Request penempatan wajib memuat `class_id` (UUID atau `null` eksplisit); `{}` ditolak agar tidak mengeluarkan
+  siswa tanpa sengaja. Lock membership menyerialkan perpindahan; lock kelas mencegah masuk saat pengarsipan.
+- **Verifikasi:** Postgres asli `-race`, role/org/year isolation, 24 penempatan serentak, pembuatan tahun pertama
+  serentak, constraint langsung, Up/DownTo13/Up database disposable; component UI dan Chrome desktop/390px
+  (tahun/kelas/pindah/riwayat/keluarkan/ganti tahun), regresi modul/progres/kuis. Tooltip dan Rapor memakai data
+  ini pada slice pemakainya; belum ada assignment A1 atau pembatasan akses katalog berdasarkan kelas.
 
 ### R1 — Rapor
 
@@ -504,8 +521,8 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | M2-01 | [x] Selesai langkah idempotent, langkah bebas dibuka; reload melanjutkan langkah benar; tombol Lanjutkan memakai data nyata | M1 | migration/progress queries, `internal/module/`, LearningPanel | Unit/komponen progres, integration duplikat/org/arsip, E2E reload |
 | Q1-01 | [x] Bank soal draf/terbit tepat 4 opsi; kunci hanya tersedia pengajar, snapshot tidak berubah setelah edit | M1/M2 | migration/quizzes queries, `internal/quiz/`, Kelola | Unit soal invalid + integration version/role + component |
 | Q1-02 | [x] Kuis mandiri menilai di server, submit ulang aman, nilai 0–100 tersimpan; langkah kuis lulus membuka langkah lanjut | Q1-01, aturan nilai disetujui | `internal/quiz/`, module linkage migration, quiz UI | Unit skor, integration submit/crash, E2E nilai/progres |
-| C1-01 | [ ] Pengajar/admin membuat kelas pada tahun ajaran; hanya admin memilih tahun aktif; sekolah lain tidak terpengaruh | Q1 dalam urutan, auth/org existing | migrations/year/class queries, fitur kelas, Kelola | Unit role, integration org/tahun aktif serentak, component Kelola |
-| C1-02 | [ ] Penempatan/pindah siswa atomik; maksimal satu aktif per sekolah/tahun meski request serentak; riwayat tetap, tahun/sekolah lain boleh berbeda | C1-01 | enrollment queries/service, roster UI | Integration concurrency/transfer/role/org, E2E pindah dan ganti tahun |
+| C1-01 | [x] Pengajar/admin membuat kelas pada tahun ajaran; hanya admin memilih tahun aktif; sekolah lain tidak terpengaruh | Q1 dalam urutan, auth/org existing | migrations/year/class queries, fitur kelas, Kelola | Unit role, integration org/tahun aktif serentak, component Kelola |
+| C1-02 | [x] Penempatan/pindah siswa atomik; maksimal satu aktif per sekolah/tahun meski request serentak; riwayat tetap, tahun/sekolah lain boleh berbeda | C1-01 | enrollment queries/service, roster UI | Integration concurrency/transfer/role/org, E2E pindah dan ganti tahun |
 | R1-01 | [ ] Peserta melihat rapor sendiri; pengajar memfilter kelas/tahun serta konten dengan CSV aman; hasil lama tidak ditimpa saat pindah kelas | M2/Q1/C1 | report queries, fitur rapor baru, Rapor UI | Integration own/other/org/class/year, CSV injection + browser |
 | Q2-01 | [ ] Pengajar menjalankan sesi; deadline/jawaban/reveal authoritative, tanpa DB blocking ticker; state dan recovery tercatat | Q1/R1 | `internal/quiz/`, `internal/realtime/`, protocol mirrors | State-machine + fake clock, reconnect/restart, `go test -race` |
 | Q2-02 | [ ] Dua browser ikut kuis sampai hasil; travel/kick/reconnect tidak menggandakan nilai; Arena history muncul di Rapor | Q2-01 | Arena UI, WS client, Rapor query/UI | E2E teacher + 2 peserta, beban 40 dengan target NFR lama |

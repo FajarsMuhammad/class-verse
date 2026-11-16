@@ -1098,6 +1098,193 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/orgs/{org_id}/academic-years:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listAcademicYears
+      description: Pengajar/admin. Tahun ajaran sekolah, terbaru dulu; tepat satu aktif bila ada.
+      responses:
+        "200":
+          description: Daftar tahun ajaran
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/AcademicYear" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createAcademicYear
+      description: Admin. Label `YYYY/YYYY+1`, unik per sekolah. Tahun pertama sekolah otomatis aktif.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string, example: "2026/2027" }
+      responses:
+        "201":
+          description: Tahun ajaran dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AcademicYear" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/active:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    put:
+      operationId: activateAcademicYear
+      description: Admin. Menjadikan tahun ini satu-satunya tahun aktif; tahun lain tetap tersedia.
+      responses:
+        "204": { description: Diaktifkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/classes:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    get:
+      operationId: listClasses
+      description: Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa.
+      responses:
+        "200":
+          description: Daftar kelas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/SchoolClass" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createClass
+      description: Pengajar/admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClassInput" }
+      responses:
+        "201":
+          description: Kelas dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SchoolClass" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/roster:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    get:
+      operationId: listRoster
+      description: Pengajar/admin. Semua anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan).
+      responses:
+        "200":
+          description: Roster
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/RosterEntry" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/roster/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+      - { name: user_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: placeStudent
+      description: |
+        Pengajar/admin. Menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
+        ditutup, riwayat tetap). `class_id: null` mengeluarkan dari kelas. Hanya anggota berperan peserta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [class_id]
+              properties:
+                class_id: { type: string, format: uuid, nullable: true }
+      responses:
+        "204": { description: Disimpan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/classes/{class_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: class_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: renameClass
+      description: Pengajar/admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClassInput" }
+      responses:
+        "200":
+          description: Kelas diperbarui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SchoolClass" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: archiveClass
+      description: Pengajar/admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); riwayat tetap.
+      responses:
+        "204": { description: Diarsipkan }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/members/{user_id}/placements:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: user_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listPlacements
+      description: Pengajar/admin. Riwayat kelas peserta di sekolah ini, semua tahun, terbaru dulu.
+      responses:
+        "200":
+          description: Riwayat
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Placement" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
 components:
   securitySchemes:
     bearer:
@@ -1108,6 +1295,11 @@ components:
   parameters:
     OrgID:
       name: org_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    YearID:
+      name: year_id
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1321,6 +1513,42 @@ components:
         correct: { type: integer, nullable: true }
         score: { type: integer, nullable: true, description: "0–100, dibulatkan ke bawah" }
         passed: { type: boolean, nullable: true }
+    AcademicYear:
+      type: object
+      required: [id, label, active]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string, example: "2026/2027" }
+        active: { type: boolean }
+    ClassInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 40 }
+    SchoolClass:
+      type: object
+      required: [id, academic_year_id, name, students]
+      properties:
+        id: { type: string, format: uuid }
+        academic_year_id: { type: string, format: uuid }
+        name: { type: string }
+        students: { type: integer, description: "Jumlah siswa aktif" }
+    RosterEntry:
+      type: object
+      required: [user_id, display_name, avatar_key, class_id]
+      properties:
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+        avatar_key: { type: string }
+        class_id: { type: string, format: uuid, nullable: true, description: "Null = belum ditempatkan" }
+    Placement:
+      type: object
+      required: [class_name, year_label, started_at, ended_at]
+      properties:
+        class_name: { type: string }
+        year_label: { type: string }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time, nullable: true, description: "Null = masih di kelas ini" }
     Shelf:
       type: string
       enum: [dongeng, novel, komik, sains, matematika, sejarah, inggris, referensi]

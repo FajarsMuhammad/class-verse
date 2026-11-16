@@ -261,11 +261,20 @@ state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
 - **Identitas leaderboard:** inisial, detail hover/focus/tap nama lengkap + kelas; hanya anggota organisasi.
   `users.display_name` bukan jaminan nama legal; sumber nama tooltip masih perlu konfirmasi. Kelas berasal dari
   C1, bukan label bebas membership dan bukan room aktif.
-- **Kelas/rombel (C1):** satu kelas aktif per siswa per organisasi per tahun ajaran, disetujui. Usul tabel
+- **Kelas/rombel (C1):** satu kelas aktif per siswa per organisasi per tahun ajaran. Migration `00014` memakai
   `academic_years`, `classes`, `class_enrollments` dengan FK komposit organisasi dan unique parsial penempatan
   aktif `(org_id, academic_year_id, user_id) WHERE ended_at IS NULL`. Pindah kelas atomik, riwayat tetap;
   pengajar/admin mengelola roster, admin memilih satu tahun ajaran aktif per sekolah (disetujui). Tahun lama
-  tetap bisa dipilih di Rapor, tanpa kenaikan otomatis. Schema detail masih perlu ditinjau sebelum migration C1.
+  tetap tersedia untuk Rapor, tanpa kenaikan otomatis. `internal/class` mengelola tahun, kelas, roster peserta,
+  dan riwayat; panel Kelola memakai endpoint staff-only. Admin membuat tahun berlabel `YYYY/YYYY+1` dan
+  mengaktifkan satu tahun; tahun pertama otomatis aktif. Pengajar/admin membuat/mengganti nama kelas dan
+  mengarsipkan kelas kosong saja. Perpindahan mengunci membership peserta lalu kelas tujuan; arsip mengunci
+  kelas sebelum menghitung roster. Unique parsial menjadi pengaman terakhir terhadap penempatan ganda.
+  `PUT .../academic-years/{year_id}/roster/{user_id}` wajib `class_id` UUID atau `null` eksplisit untuk keluar;
+  penempatan sama idempotent, penempatan lama ditutup dalam transaksi. Hasil belajar tidak diubah.
+  Nama kelas unik tanpa beda huruf besar per tahun di antara kelas nonarsip. Riwayat menyimpan ID kelas
+  (nama mengikuti perubahan nama), waktu masuk/keluar dan pembuat penempatan; membership deletion CASCADE.
+  Belum ada tooltip kelas, assignment, auto-promosi, atau pembatasan room/katalog berdasarkan kelas.
   Tidak mengubah izin masuk ruang atau membuat leaderboard per kelas secara otomatis.
 - **Modul (M1/M2):** katalog terbit per gedung/jenjang terbuka bagi anggota sekolah dari mana saja;
   bukan dibatasi rombel atau lokasi avatar (disetujui 2026-11-13). Modul terbit diedit langsung; langkah hanya

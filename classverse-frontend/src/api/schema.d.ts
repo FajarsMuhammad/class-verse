@@ -1009,6 +1009,152 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/academic-years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Tahun ajaran sekolah, terbaru dulu; tepat satu aktif bila ada. */
+        get: operations["listAcademicYears"];
+        put?: never;
+        /** @description Admin. Label `YYYY/YYYY+1`, unik per sekolah. Tahun pertama sekolah otomatis aktif. */
+        post: operations["createAcademicYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Admin. Menjadikan tahun ini satu-satunya tahun aktif; tahun lain tetap tersedia. */
+        put: operations["activateAcademicYear"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/classes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa. */
+        get: operations["listClasses"];
+        put?: never;
+        /** @description Pengajar/admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu. */
+        post: operations["createClass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Semua anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan). */
+        get: operations["listRoster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/roster/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description Pengajar/admin. Menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
+         *     ditutup, riwayat tetap). `class_id: null` mengeluarkan dari kelas. Hanya anggota berperan peserta.
+         */
+        put: operations["placeStudent"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/classes/{class_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. */
+        put: operations["renameClass"];
+        post?: never;
+        /** @description Pengajar/admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); riwayat tetap. */
+        delete: operations["archiveClass"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/members/{user_id}/placements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Riwayat kelas peserta di sekolah ini, semua tahun, terbaru dulu. */
+        get: operations["listPlacements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1159,6 +1305,47 @@ export interface components {
             /** @description 0–100, dibulatkan ke bawah */
             score: number | null;
             passed: boolean | null;
+        };
+        AcademicYear: {
+            /** Format: uuid */
+            id: string;
+            /** @example 2026/2027 */
+            label: string;
+            active: boolean;
+        };
+        ClassInput: {
+            name: string;
+        };
+        SchoolClass: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            academic_year_id: string;
+            name: string;
+            /** @description Jumlah siswa aktif */
+            students: number;
+        };
+        RosterEntry: {
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            avatar_key: string;
+            /**
+             * Format: uuid
+             * @description Null = belum ditempatkan
+             */
+            class_id: string | null;
+        };
+        Placement: {
+            class_name: string;
+            year_label: string;
+            /** Format: date-time */
+            started_at: string;
+            /**
+             * Format: date-time
+             * @description Null = masih di kelas ini
+             */
+            ended_at: string | null;
         };
         /** @enum {string} */
         Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
@@ -1594,6 +1781,7 @@ export interface components {
     };
     parameters: {
         OrgID: string;
+        YearID: string;
         QuizID: string;
         AttemptID: string;
         FileID: string;
@@ -3400,6 +3588,293 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAcademicYears: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar tahun ajaran */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AcademicYear"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createAcademicYear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026/2027 */
+                    label: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Tahun ajaran dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcademicYear"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    activateAcademicYear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diaktifkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listClasses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar kelas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SchoolClass"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createClass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassInput"];
+            };
+        };
+        responses: {
+            /** @description Kelas dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolClass"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listRoster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Roster */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RosterEntry"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    placeStudent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    class_id: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    renameClass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassInput"];
+            };
+        };
+        responses: {
+            /** @description Kelas diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolClass"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveClass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listPlacements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Riwayat */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Placement"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };

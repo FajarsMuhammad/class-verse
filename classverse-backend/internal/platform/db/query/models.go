@@ -188,6 +188,14 @@ func (ns NullReportStatus) Value() (driver.Value, error) {
 	return string(ns.ReportStatus), nil
 }
 
+type AcademicYear struct {
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	Label     string
+	Active    bool
+	CreatedAt pgtype.Timestamptz
+}
+
 type ChatMessage struct {
 	ID        int64
 	SessionID uuid.UUID
@@ -196,6 +204,27 @@ type ChatMessage struct {
 	ZoneKey   pgtype.Text
 	Body      string
 	CreatedAt pgtype.Timestamptz
+}
+
+type Class struct {
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AcademicYearID uuid.UUID
+	Name           string
+	CreatedBy      uuid.UUID
+	CreatedAt      pgtype.Timestamptz
+	ArchivedAt     pgtype.Timestamptz
+}
+
+type ClassEnrollment struct {
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AcademicYearID uuid.UUID
+	ClassID        uuid.UUID
+	UserID         uuid.UUID
+	StartedAt      pgtype.Timestamptz
+	EndedAt        pgtype.Timestamptz
+	CreatedBy      uuid.UUID
 }
 
 type EmailOtp struct {
