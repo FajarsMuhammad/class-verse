@@ -83,9 +83,9 @@ watch(active, async (now, before) => {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  width: 72px;
+  width: 64px;
   box-sizing: border-box;
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-1);
   background: var(--color-surface);
   border-radius: var(--radius-2xl);
   overflow-y: auto;
@@ -97,7 +97,7 @@ watch(active, async (now, before) => {
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
-  min-height: 56px;
+  min-height: 52px;
   padding: var(--space-2) 0;
   border: 0;
   border-radius: var(--radius-lg);
@@ -115,14 +115,14 @@ watch(active, async (now, before) => {
 .panel {
   display: flex;
   flex-direction: column;
-  width: 340px;
+  width: 320px;
   min-height: 0;
   box-sizing: border-box;
   padding: var(--space-4);
   background: var(--color-surface);
   border-radius: var(--radius-2xl);
 }
-.wide .panel { width: min(680px, 52vw); }
+.wide .panel { width: min(640px, 46vw); }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
 .panel-head h2 { margin: 0; font: var(--weight-semibold) var(--text-lg) / var(--line-tight) var(--font-display); }
 .collapse { flex: none; min-width: var(--touch-min, 44px); padding: 0; }

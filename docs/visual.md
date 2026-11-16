@@ -175,8 +175,14 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
 - Item untuk semua: **Belajar** (profil, tugas, lanjutkan belajar, kursi), **Chat** (tetap ter-mount saat
   disembunyikan agar draf tidak hilang; titik merah bila ada pesan baru), **Katalog** di Perpustakaan atau
   **Stasiun** di Menara Sains/Ruang Guru.
-- Guru/admin di **Ruang Guru**: Modul, Kuis, Kelas, Tugas, Rapor, Ruang, Berkas, lalu tautan Moderasi.
-  Guru/admin di **Perpustakaan**: Kelola buku, Modul perpus (pengelola modul dibatasi gedung `perpus`), Berkas.
+- Guru/admin di setiap interior punya item **Modul** berisi kartu **Sematkan di ruang ini** (pilih modul terbit dan
+  langkah awal opsional, ganti, lepas). Bilah sematan di atas peta dihapus agar peta lebih tinggi.
+  Di **Ruang Guru** panel Modul juga memuat pengelola modul, lalu Kuis, Kelas, Tugas, Rapor, Ruang, Berkas dan
+  tautan Moderasi. Di **Perpustakaan**: Modul (pengelola dibatasi gedung `perpus`), Kelola buku, Berkas.
+- Peserta melihat sematan sebagai kartu "Dari pengajar" di atas panel Belajar; titik pada ikon Belajar bila ada
+  sematan baru saat panel tertutup. Satu elemen tegas: kartu nila bergaya catatan yang ditempel (pushpin),
+  sisanya tenang.
+- Status ciut menu disimpan di `localStorage` (`kv-side-collapsed`) sehingga peta tetap lebar setelah muat ulang.
   Penempatan menu saja; server tetap memeriksa peran, bukan lokasi avatar.
 - Fokus: membuka item memindah fokus ke judul panel; menciutkan/Escape mengembalikan fokus ke tombol rel.
   Escape di dalam `<dialog>` (pembaca, kuis) tidak menutup panel. Pembukaan otomatis saat masuk ruang tidak

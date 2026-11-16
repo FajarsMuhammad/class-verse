@@ -247,7 +247,7 @@ function reported() {
     <RoomStations v-if="!kicked && org.active && ['science', 'staff'].includes(current?.map_key ?? '')"
       :key="current?.room_id" class="card" :org-id="org.active.id" :map-key="current!.map_key" :station="station"
       :teacher="org.isTeacher" @select="station = $event" />
-    <RoomLearningPin v-if="!kicked && org.active" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" />
+    <RoomLearningPin v-if="!kicked && org.active && current?.map_key !== 'campus' && (org.isTeacher || room.pin?.value)" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" />
     <AssignmentPanel v-if="!kicked && org.active" :key="`tasks-${org.active.id}`" :org-id="org.active.id" />
     <ResumeLearning v-if="!kicked && org.active" class="card" :org-id="org.active.id" :refresh-key="progressKey" />
     <section v-if="!kicked && current?.map_key === 'library' && org.active" class="card" aria-labelledby="catalog-title">

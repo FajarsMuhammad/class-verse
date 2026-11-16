@@ -217,7 +217,7 @@ async function logout() {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: var(--space-4);
+  padding: var(--space-3);
 }
 .content {
   flex: 1;

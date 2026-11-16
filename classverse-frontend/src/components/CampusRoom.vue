@@ -97,41 +97,54 @@ const icons = {
   moderation: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',
 } as const
 const toolPlace = computed(() => !org.isTeacher || kicked.value ? null : current.value?.map_key === 'staff' ? 'staff' : library.value ? 'library' : null)
-const toolItems = computed<SideItem[]>(() => toolPlace.value === 'staff'
-  ? [
-      { key: 'modules', label: 'Modul', icon: icons.modules, wide: true },
-      { key: 'quizzes', label: 'Kuis', icon: icons.quizzes, wide: true },
-      { key: 'classes', label: 'Kelas', icon: icons.classes, wide: true },
-      { key: 'assignments', label: 'Tugas', icon: icons.assignments, wide: true },
-      { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
-      { key: 'rooms', label: 'Ruang', icon: icons.rooms, wide: true },
-      { key: 'files', label: 'Berkas', icon: icons.files, wide: true },
-    ]
-  : toolPlace.value === 'library'
+// Staff "Modul" holds the live-session pin in every interior; Ruang Guru/Perpustakaan add their managers there.
+const pinPlace = computed(() => org.isTeacher && !kicked.value && !campus.value)
+const toolItems = computed<SideItem[]>(() => [
+  ...(pinPlace.value ? [{ key: 'modules', label: 'Modul', icon: icons.modules, wide: toolPlace.value !== null }] : []),
+  ...(toolPlace.value === 'staff'
     ? [
-        { key: 'books', label: 'Kelola buku', icon: icons.catalog, wide: true },
-        { key: 'library-modules', label: 'Modul perpus', icon: icons.modules, wide: true },
+        { key: 'quizzes', label: 'Kuis', icon: icons.quizzes, wide: true },
+        { key: 'classes', label: 'Kelas', icon: icons.classes, wide: true },
+        { key: 'assignments', label: 'Tugas', icon: icons.assignments, wide: true },
+        { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
+        { key: 'rooms', label: 'Ruang', icon: icons.rooms, wide: true },
         { key: 'files', label: 'Berkas', icon: icons.files, wide: true },
       ]
-    : [])
+    : toolPlace.value === 'library'
+      ? [
+          { key: 'books', label: 'Kelola buku', icon: icons.catalog, wide: true },
+          { key: 'files', label: 'Berkas', icon: icons.files, wide: true },
+        ]
+      : []),
+])
 // Unread dot on Chat while its panel is closed (ChatState is not reactive; chatVersion tracks it).
 const seenChat = ref(0)
 const chatCount = computed(() => {
   void chatVersion.value
   return Object.values(chat.lines).reduce((n, l) => n + l.length, 0)
 })
+// Participants find the pin at the top of Belajar; a dot marks a pin they have not opened the panel for yet.
+const pinKey = computed(() => room.pin?.value ? `${room.pin.value.module_id}:${room.pin.value.step_id}` : '')
+const seenPin = ref('')
 const sideItems = computed<SideItem[]>(() => [
-  { key: 'learn', label: 'Belajar', icon: icons.learn },
+  { key: 'learn', label: 'Belajar', icon: icons.learn, dot: !org.isTeacher && !!pinKey.value && pinKey.value !== seenPin.value && sideItem.value !== 'learn' },
   { key: 'chat', label: 'Chat', icon: icons.chat, keep: true, dot: sideItem.value !== 'chat' && chatCount.value > seenChat.value },
   ...(contentRoom.value ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value }] : []),
   ...toolItems.value,
 ])
-// Content rooms open on their catalog/stations; elsewhere the panel starts on Belajar.
-const sideItem = ref<string | null>('learn')
-watch(sideItem, (key) => { if (key === 'chat') seenChat.value = chatCount.value })
+// The panel remembers being collapsed so the map stays wide; when open, content rooms start on their catalog.
+const SIDE_KEY = 'kv-side-collapsed'
+const sideItem = ref<string | null>(localStorage.getItem(SIDE_KEY) === '1' ? null : 'learn')
+watch(sideItem, (key) => {
+  localStorage.setItem(SIDE_KEY, key ? '0' : '1')
+  if (key === 'chat') seenChat.value = chatCount.value
+  if (key === 'learn') seenPin.value = pinKey.value
+})
+watch(pinKey, (k) => { if (sideItem.value === 'learn') seenPin.value = k })
 watch(chatCount, (n) => { if (sideItem.value === 'chat') seenChat.value = n })
 watch(() => current.value?.room_id, () => {
-  if (sideItem.value && !sideItems.value.some((i) => i.key === sideItem.value)) sideItem.value = 'learn'
+  if (!sideItem.value) return
+  if (!sideItems.value.some((i) => i.key === sideItem.value)) sideItem.value = 'learn'
   if (contentRoom.value) sideItem.value = 'catalog'
 })
 function selectStation(id: string) {
@@ -333,6 +346,8 @@ onBeforeUnmount(() => {
       <SideMenu v-model:active="sideItem" class="side" :items="sideItems" :label="org.isTeacher ? 'Menu ruang dan alat guru' : 'Menu ruang'"
         :link="toolPlace === 'staff' ? { to: '/moderasi', label: 'Moderasi', icon: icons.moderation } : undefined">
         <template #learn>
+          <RoomLearningPin v-if="!org.isTeacher && !campus && !kicked && org.active && room.pin?.value" :key="current?.room_id"
+            :room="room" :org-id="org.active.id" :staff="false" />
           <LearningPanel embedded :org-id="org.active?.id" :progress-key="progressKey" :name="auth.me?.display_name ?? ''"
             :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
             :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
@@ -350,13 +365,17 @@ onBeforeUnmount(() => {
             :map-key="current!.map_key" :station="station" :teacher="org.isTeacher" @select="selectStation"
             @manage="sideItem = 'modules'" />
         </template>
-        <template v-for="t in toolItems" :key="t.key" #[t.key]>
+        <template #modules>
+          <RoomLearningPin v-if="org.active" :key="current?.room_id" :room="room" :org-id="org.active.id" staff />
+          <RoomTools v-if="toolPlace && org.active && auth.me" :tool="toolPlace === 'library' ? 'library-modules' : 'modules'"
+            :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" />
+        </template>
+        <template v-for="t in toolItems.filter((i) => i.key !== 'modules')" :key="t.key" #[t.key]>
           <RoomTools v-if="org.active && auth.me" :tool="t.key" :org-id="org.active.id" :user-id="auth.me.id"
             :is-admin="org.active.role === 'admin'" />
         </template>
       </SideMenu>
       <div class="map-column">
-        <RoomLearningPin v-if="org.active && !campus && !kicked" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" />
       <div class="map-frame">
         <header ref="mapTop" class="map-top">
           <button
