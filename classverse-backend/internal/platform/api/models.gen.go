@@ -724,6 +724,59 @@ type FileList struct {
 	UsedBytes  int64      `json:"used_bytes"`
 }
 
+// GradebookModule defines model for GradebookModule.
+type GradebookModule struct {
+	Archived    bool               `json:"archived"`
+	BuildingKey string             `json:"building_key"`
+	Done        int                `json:"done"`
+	Id          openapi_types.UUID `json:"id"`
+	Level       string             `json:"level"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+}
+
+// GradebookPage defines model for GradebookPage.
+type GradebookPage struct {
+	Items []GradebookRow `json:"items"`
+	Total int            `json:"total"`
+}
+
+// GradebookQuiz defines model for GradebookQuiz.
+type GradebookQuiz struct {
+	Archived    bool               `json:"archived"`
+	Attempts    int                `json:"attempts"`
+	Best        *int               `json:"best"`
+	BuildingKey string             `json:"building_key"`
+	Id          openapi_types.UUID `json:"id"`
+	Last        *int               `json:"last"`
+	Title       string             `json:"title"`
+}
+
+// GradebookRow defines model for GradebookRow.
+type GradebookRow struct {
+	AverageBest      *float32           `json:"average_best"`
+	ClassName        string             `json:"class_name"`
+	ModulesDone      int                `json:"modules_done"`
+	ModulesTotal     int                `json:"modules_total"`
+	Name             string             `json:"name"`
+	QuizzesAttempted int                `json:"quizzes_attempted"`
+	QuizzesTotal     int                `json:"quizzes_total"`
+	UserId           openapi_types.UUID `json:"user_id"`
+}
+
+// GradebookTask defines model for GradebookTask.
+type GradebookTask struct {
+	BuildingKey string             `json:"building_key"`
+	Cancelled   bool               `json:"cancelled"`
+	ClassName   string             `json:"class_name"`
+	Done        int                `json:"done"`
+	DueAt       *time.Time         `json:"due_at"`
+	Id          openapi_types.UUID `json:"id"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+	YearLabel   string             `json:"year_label"`
+}
+
 // Invite defines model for Invite.
 type Invite struct {
 	// Code Bentuk tampilan ABCD-EFGH
@@ -1124,6 +1177,16 @@ type StepInput struct {
 // StepKind defines model for StepKind.
 type StepKind string
 
+// StudentGradebook defines model for StudentGradebook.
+type StudentGradebook struct {
+	Assignments []GradebookTask    `json:"assignments"`
+	AverageBest *float32           `json:"average_best"`
+	Modules     []GradebookModule  `json:"modules"`
+	Name        string             `json:"name"`
+	Quizzes     []GradebookQuiz    `json:"quizzes"`
+	UserId      openapi_types.UUID `json:"user_id"`
+}
+
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
 	// AvatarKey Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid.
@@ -1249,6 +1312,44 @@ type GetFileContentParams struct {
 // SaveFilePositionJSONBody defines parameters for SaveFilePosition.
 type SaveFilePositionJSONBody struct {
 	Position int `json:"position"`
+}
+
+// ListGradebookParams defines parameters for ListGradebook.
+type ListGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
+	Offset      *int                `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit       *int                `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ExportGradebookParams defines parameters for ExportGradebook.
+type ExportGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
+}
+
+// GetMyGradebookParams defines parameters for GetMyGradebook.
+type GetMyGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
+}
+
+// GetStudentGradebookParams defines parameters for GetStudentGradebook.
+type GetStudentGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
 }
 
 // ListInvitesParams defines parameters for ListInvites.

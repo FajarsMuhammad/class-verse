@@ -1104,6 +1104,93 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/orgs/{org_id}/gradebook:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: year_id, in: query, schema: { type: string, format: uuid } }
+      - { name: class_id, in: query, schema: { type: string, format: uuid } }
+      - { name: module_id, in: query, schema: { type: string, format: uuid } }
+      - { name: quiz_id, in: query, schema: { type: string, format: uuid } }
+      - { name: building_key, in: query, schema: { type: string } }
+      - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000 } }
+      - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+    get:
+      operationId: listGradebook
+      description: Staff participant summaries
+      responses:
+        "200":
+          description: Staff participant summaries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GradebookPage" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/gradebook/me:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: year_id, in: query, schema: { type: string, format: uuid } }
+      - { name: class_id, in: query, schema: { type: string, format: uuid } }
+      - { name: module_id, in: query, schema: { type: string, format: uuid } }
+      - { name: quiz_id, in: query, schema: { type: string, format: uuid } }
+      - { name: building_key, in: query, schema: { type: string } }
+    get:
+      operationId: getMyGradebook
+      description: Own academic report
+      responses:
+        "200":
+          description: Own academic report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudentGradebook" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/gradebook/students/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: user_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: year_id, in: query, schema: { type: string, format: uuid } }
+      - { name: class_id, in: query, schema: { type: string, format: uuid } }
+      - { name: module_id, in: query, schema: { type: string, format: uuid } }
+      - { name: quiz_id, in: query, schema: { type: string, format: uuid } }
+      - { name: building_key, in: query, schema: { type: string } }
+    get:
+      operationId: getStudentGradebook
+      description: Own report or school participant report for staff
+      responses:
+        "200":
+          description: Own report or school participant report for staff
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudentGradebook" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/gradebook/csv:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: year_id, in: query, schema: { type: string, format: uuid } }
+      - { name: class_id, in: query, schema: { type: string, format: uuid } }
+      - { name: module_id, in: query, schema: { type: string, format: uuid } }
+      - { name: quiz_id, in: query, schema: { type: string, format: uuid } }
+      - { name: building_key, in: query, schema: { type: string } }
+    get:
+      operationId: exportGradebook
+      description: Staff filtered CSV, maximum 10000 students; formula-safe
+      responses:
+        "200":
+          description: Staff filtered CSV, maximum 10000 students; formula-safe
+          content:
+            text/csv:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/orgs/{org_id}/assignments:
     parameters:
       - $ref: "#/components/parameters/OrgID"
@@ -1607,6 +1694,69 @@ components:
         correct: { type: integer, nullable: true }
         score: { type: integer, nullable: true, description: "0–100, dibulatkan ke bawah" }
         passed: { type: boolean, nullable: true }
+    GradebookModule:
+      type: object
+      required: [id, title, building_key, level, archived, done, total]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        building_key: { type: string }
+        level: { type: string }
+        archived: { type: boolean }
+        done: { type: integer }
+        total: { type: integer }
+    GradebookQuiz:
+      type: object
+      required: [id, title, building_key, archived, attempts, best, last]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        building_key: { type: string }
+        archived: { type: boolean }
+        attempts: { type: integer }
+        best: { type: integer, nullable: true }
+        last: { type: integer, nullable: true }
+    GradebookTask:
+      type: object
+      required: [id, title, class_name, year_label, building_key, cancelled, due_at, done, total]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        class_name: { type: string }
+        year_label: { type: string }
+        building_key: { type: string }
+        cancelled: { type: boolean }
+        due_at: { type: string, format: date-time, nullable: true }
+        done: { type: integer }
+        total: { type: integer }
+    GradebookRow:
+      type: object
+      required: [user_id, name, class_name, modules_done, modules_total, quizzes_attempted, quizzes_total, average_best]
+      properties:
+        user_id: { type: string, format: uuid }
+        name: { type: string }
+        class_name: { type: string }
+        modules_done: { type: integer }
+        modules_total: { type: integer }
+        quizzes_attempted: { type: integer }
+        quizzes_total: { type: integer }
+        average_best: { type: number, nullable: true }
+    GradebookPage:
+      type: object
+      required: [items, total]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/GradebookRow" } }
+        total: { type: integer }
+    StudentGradebook:
+      type: object
+      required: [user_id, name, modules, quizzes, assignments, average_best]
+      properties:
+        user_id: { type: string, format: uuid }
+        name: { type: string }
+        modules: { type: array, items: { $ref: "#/components/schemas/GradebookModule" } }
+        quizzes: { type: array, items: { $ref: "#/components/schemas/GradebookQuiz" } }
+        assignments: { type: array, items: { $ref: "#/components/schemas/GradebookTask" } }
+        average_best: { type: number, nullable: true }
     AssignmentInput:
       type: object
       required: [id, class_id, module_id]

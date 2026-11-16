@@ -299,7 +299,8 @@ Rincian teknis **masih usulan**, tidak menimpa ADR lama: transport baca autentik
 perlu spike; PDF.js/Redis belum dipin. SDK storage `minio-go/v7` v7.4.1 sudah diuji di AIStor lokal. Redis memakai proyeksi idempotent total absolut dari
 Postgres dengan pekerjaan durable, bukan increment buta setelah commit; detail worker/rebuild harus diuji.
 Nama package mengikuti domain (`file`, `library`, `module`, `quiz`, `leaderboard`). Package `report` yang sudah
-ada menangani laporan moderasi, bukan Rapor; gunakan package berbeda saat R1 agar izin tidak tercampur.
+ada menangani laporan moderasi, bukan Rapor. R1 memakai `internal/gradebook` read-only: `GET /api/orgs/{org_id}/gradebook`
+(staf, paging), `/gradebook/me`, `/gradebook/students/{user_id}`, `/gradebook/csv` (staf, CSV formula-safe).
 Tidak menambah service generik, ORM, atau akses langsung store fitur lain.
 
 ## Data model

@@ -1009,6 +1009,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/gradebook": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Staff participant summaries */
+        get: operations["listGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/gradebook/me": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Own academic report */
+        get: operations["getMyGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/gradebook/students/{user_id}": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Own report or school participant report for staff */
+        get: operations["getStudentGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/gradebook/csv": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Staff filtered CSV, maximum 10000 students; formula-safe */
+        get: operations["exportGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/assignments": {
         parameters: {
             query?: never;
@@ -1401,6 +1504,63 @@ export interface components {
             /** @description 0–100, dibulatkan ke bawah */
             score: number | null;
             passed: boolean | null;
+        };
+        GradebookModule: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            building_key: string;
+            level: string;
+            archived: boolean;
+            done: number;
+            total: number;
+        };
+        GradebookQuiz: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            building_key: string;
+            archived: boolean;
+            attempts: number;
+            best: number | null;
+            last: number | null;
+        };
+        GradebookTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            class_name: string;
+            year_label: string;
+            building_key: string;
+            cancelled: boolean;
+            /** Format: date-time */
+            due_at: string | null;
+            done: number;
+            total: number;
+        };
+        GradebookRow: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            class_name: string;
+            modules_done: number;
+            modules_total: number;
+            quizzes_attempted: number;
+            quizzes_total: number;
+            average_best: number | null;
+        };
+        GradebookPage: {
+            items: components["schemas"]["GradebookRow"][];
+            total: number;
+        };
+        StudentGradebook: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            modules: components["schemas"]["GradebookModule"][];
+            quizzes: components["schemas"]["GradebookQuiz"][];
+            assignments: components["schemas"]["GradebookTask"][];
+            average_best: number | null;
         };
         AssignmentInput: {
             /**
@@ -3739,6 +3899,137 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff participant summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradebookPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMyGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own academic report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentGradebook"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStudentGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own report or school participant report for staff */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentGradebook"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff filtered CSV, maximum 10000 students; formula-safe */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };

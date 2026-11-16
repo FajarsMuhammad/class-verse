@@ -88,6 +88,7 @@ interface RequestOptions {
   body?: unknown
   auth?: boolean
   signal?: AbortSignal
+  responseType?: 'json' | 'blob'
 }
 
 // api calls an /api endpoint and returns the parsed JSON (or undefined for
@@ -106,7 +107,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   }
   if (!res.ok) throw await toError(res)
   if (res.status === 202 || res.status === 204) return undefined as T
-  return (await res.json()) as T
+  return (opts.responseType === 'blob' ? await res.blob() : await res.json()) as T
 }
 
 function send(path: string, opts: RequestOptions, auth: boolean): Promise<Response> {

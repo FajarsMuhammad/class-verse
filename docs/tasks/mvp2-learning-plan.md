@@ -437,13 +437,19 @@ Modul = jalur belajar per gedung dan level (SD/SMP/SMA/Umum), berisi langkah ber
   (tahun/kelas/pindah/riwayat/keluarkan/ganti tahun), regresi modul/progres/kuis. Tooltip dan Rapor memakai data
   ini pada slice pemakainya; belum ada assignment A1 atau pembatasan akses katalog berdasarkan kelas.
 
-### R1 — Rapor
+### R1 — Rapor (selesai, tanpa Arena sampai Q2)
 
 - **Peserta:** ringkasan per gedung/mapel: modul selesai, nilai kuis terakhir dan terbaik, riwayat Arena.
 - **Pengajar/admin:** tabel anggota organisasi, filter kelas/tahun ajaran dari C1 serta gedung/modul/kuis;
   siapa sudah/belum menyelesaikan, rata-rata nilai dan ekspor CSV. Definisi filter historis mengikuti keputusan C1.
 - Query agregasi atas M2/Q1; nilai tidak dicampur poin kompetisi. Peserta hanya melihat rapor sendiri;
   pengajar/admin melihat anggota organisasinya. CSV di-escape terhadap formula injection, termasuk nama siswa.
+- **Implementasi:** `internal/gradebook` (bukan `internal/report` moderasi), tanpa migration. `/rapor` untuk semua
+  anggota; peserta melihat rapor sendiri, staf roster 20/halaman + detail + CSV maks 10.000 siswa. Filter kelas =
+  penempatan aktif pada tahun terpilih, bukan atribusi nilai lama. Nilai terbaik/terakhir per kuis, belum mencoba
+  null (bukan 0), rata-rata = rata-rata nilai terbaik kuis yang dikerjakan. Tugas memakai snapshot kelas/tahun A1.
+- **Bukti:** Postgres own/other/org/filter/pindah kelas/arsip/paging, HTTP 403/404/400/CSV formula, Vue rapor,
+  full backend race/lint, frontend lint/build, Chrome staf+CSV dan siswa 390px. Detail `docs/tasks/r1-reports.md`.
 
 ### B1 — Poin dan leaderboard mingguan (Redis)
 
@@ -535,7 +541,7 @@ dicoba, bukan menyerahkan backend kosong tanpa UI.
 | Q1-02 | [x] Kuis mandiri menilai di server, submit ulang aman, nilai 0–100 tersimpan; langkah kuis lulus membuka langkah lanjut | Q1-01, aturan nilai disetujui | `internal/quiz/`, module linkage migration, quiz UI | Unit skor, integration submit/crash, E2E nilai/progres |
 | C1-01 | [x] Pengajar/admin membuat kelas pada tahun ajaran; hanya admin memilih tahun aktif; sekolah lain tidak terpengaruh | Q1 dalam urutan, auth/org existing | migrations/year/class queries, fitur kelas, Kelola | Unit role, integration org/tahun aktif serentak, component Kelola |
 | C1-02 | [x] Penempatan/pindah siswa atomik; maksimal satu aktif per sekolah/tahun meski request serentak; riwayat tetap, tahun/sekolah lain boleh berbeda | C1-01 | enrollment queries/service, roster UI | Integration concurrency/transfer/role/org, E2E pindah dan ganti tahun |
-| R1-01 | [ ] Peserta melihat rapor sendiri; pengajar memfilter kelas/tahun serta konten dengan CSV aman; hasil lama tidak ditimpa saat pindah kelas | M2/Q1/C1 | report queries, fitur rapor baru, Rapor UI | Integration own/other/org/class/year, CSV injection + browser |
+| R1-01 | [x] Peserta melihat rapor sendiri; pengajar memfilter kelas/tahun serta konten dengan CSV aman; hasil lama tidak ditimpa saat pindah kelas | M2/Q1/C1 | report queries, fitur rapor baru, Rapor UI | Integration own/other/org/class/year, CSV injection + browser |
 | Q2-01 | [ ] Pengajar menjalankan sesi; deadline/jawaban/reveal authoritative, tanpa DB blocking ticker; state dan recovery tercatat | Q1/R1 | `internal/quiz/`, `internal/realtime/`, protocol mirrors | State-machine + fake clock, reconnect/restart, `go test -race` |
 | Q2-02 | [ ] Dua browser ikut kuis sampai hasil; travel/kick/reconnect tidak menggandakan nilai; Arena history muncul di Rapor | Q2-01 | Arena UI, WS client, Rapor query/UI | E2E teacher + 2 peserta, beban 40 dengan target NFR lama |
 | B1-01 | [ ] Event/outbox atomik, proyeksi Redis idempotent; retry/crash/rebuild serentak tidak mengubah total; minggu WIB/ISO benar | Q2, aturan poin disetujui | migrations, `internal/leaderboard/`, Redis compose/config | Integration PG+Redis: timeout, eviction, outage, pergantian tahun |
