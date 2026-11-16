@@ -13,6 +13,12 @@
       "skillPath": "skills/browser-testing-with-devtools/SKILL.md",
       "computedHash": "faada493db081854d597976b3b11421f1176d81caadadf53e8312745d29eb20a"
     },
+    "caveman": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "b51af74aacdadbc3c2d6bb79f05db58dc521854b87f7ffabd48faf286a81ed31"
+    },
     "debugging-and-error-recovery": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",
