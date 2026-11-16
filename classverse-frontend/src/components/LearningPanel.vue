@@ -5,7 +5,7 @@ import AssignmentPanel from '@/components/AssignmentPanel.vue'
 import { avatarURL } from '@/game/avatars'
 import type { Seat } from '@/realtime/mapdata'
 
-// Left sidebar (docs/tasks/mvp2-revamp.md): profile and the current place.
+// "Belajar" item of the side menu (docs/screens/sidemenu.png): profile, tasks, resume and the current place.
 // Persisted module progress is independent of the avatar's room.
 defineProps<{
   orgId?: string
@@ -21,47 +21,31 @@ defineProps<{
   others: { x: number; y: number }[]
   seatsDisabled: boolean
 }>()
-const closed = defineModel<boolean>('closed', { required: true })
 const emit = defineEmits<{ walk: [seat: Seat] }>()
 </script>
 
 <template>
-  <aside class="learning-panel" aria-label="Panel belajar">
-    <header class="panel-heading">
-      <h2 v-if="!closed">Panel belajar</h2>
-      <button class="btn-secondary" :aria-label="closed ? 'Buka panel belajar' : 'Ciutkan panel belajar'"
-        :aria-expanded="!closed" @click="closed = !closed">{{ closed ? '›' : '‹' }}</button>
-    </header>
-    <template v-if="!closed">
-      <div class="learner">
-        <img :src="avatarURL(avatar)" alt="" width="42" height="57" />
-        <div><strong>{{ name }}</strong><p>{{ teacher ? 'Pengajar' : 'Peserta' }}</p></div>
-      </div>
-      <AssignmentPanel v-if="orgId" :key="orgId" :org-id="orgId" />
+  <div class="learning-panel">
+    <div class="learner">
+      <img :src="avatarURL(avatar)" alt="" width="42" height="57" />
+      <div><strong>{{ name }}</strong><p>{{ teacher ? 'Pengajar' : 'Peserta' }}</p></div>
+    </div>
+    <AssignmentPanel v-if="orgId" :key="orgId" :org-id="orgId" />
     <ResumeLearning v-if="orgId" :org-id="orgId" :refresh-key="progressKey" />
-      <h3>{{ campus ? 'Jelajahi kampus' : 'Ruang belajar' }}</h3>
-      <p class="panel-note">{{ campus ? 'Klik gedung di peta atau buka Daftar gedung, lalu berjalan ke pintunya.' : roomName }}</p>
-      <template v-if="!campus">
-        <p class="panel-note">{{ zoneName || 'Area bersama' }}</p>
-        <SeatPicker :seats="seats" :self="self" :others="others" :disabled="seatsDisabled"
-          @walk="(seat) => emit('walk', seat)" />
-      </template>
+    <h3>{{ campus ? 'Jelajahi kampus' : 'Ruang belajar' }}</h3>
+    <p class="panel-note">{{ campus ? 'Klik gedung di peta atau buka Daftar gedung, lalu berjalan ke pintunya.' : roomName }}</p>
+    <template v-if="!campus">
+      <p class="panel-note">{{ zoneName || 'Area bersama' }}</p>
+      <SeatPicker :seats="seats" :self="self" :others="others" :disabled="seatsDisabled"
+        @walk="(seat) => emit('walk', seat)" />
     </template>
-  </aside>
+  </div>
 </template>
 
 <style scoped>
-.learning-panel {
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-4);
-  background: var(--kv-surface);
-  border-radius: var(--kv-radius-card);
-}
-.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.panel-heading h2 { margin: 0; font-size: var(--text-lg); }
-.panel-heading button { flex: none; padding: 0; min-width: var(--touch-min); }
-.panel-note { color: var(--kv-text-muted); font-size: var(--text-sm); }
-.learner { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
+.learning-panel { display: flex; flex-direction: column; gap: var(--space-3); }
+.panel-note { margin: 0; color: var(--kv-text-muted); font-size: var(--text-sm); }
+h3 { margin: var(--space-2) 0 0; }
+.learner { display: flex; align-items: center; gap: var(--space-3); }
 .learner p { color: var(--kv-text-muted); margin: var(--space-1) 0; }
 </style>

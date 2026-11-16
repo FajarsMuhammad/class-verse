@@ -24,6 +24,8 @@ import type { Building, Seat } from '@/realtime/mapdata'
 import ChatPanel from '@/components/ChatPanel.vue'
 import LibraryCatalog from '@/components/LibraryCatalog.vue'
 import RoomStations from '@/components/RoomStations.vue'
+import RoomTools from '@/components/RoomTools.vue'
+import SideMenu, { type SideItem } from '@/components/SideMenu.vue'
 import type { Shelf } from '@/api/types'
 import ReportDialog from '@/components/ReportDialog.vue'
 import type { ChatLine } from '@/realtime/chat'
@@ -66,10 +68,6 @@ const {
 } = room
 const org = useOrgStore()
 const auth = useAuthStore()
-const learningClosed = ref(false)
-const chatClosed = ref(false)
-// Library rooms open on the catalog; chat stays one tab away.
-const sideTab = ref<'catalog' | 'chat'>('catalog')
 const shelf = ref<Shelf | ''>('')
 const route = useRoute()
 const nearDoor = ref<Building | null>(null)
@@ -81,15 +79,68 @@ const library = computed(() => current.value?.map_key === 'library')
 const stationRoom = computed(() => ['science', 'staff'].includes(current.value?.map_key ?? ''))
 const contentRoom = computed(() => library.value || stationRoom.value)
 const station = ref('')
+// One side menu (docs/screens/sidemenu.png) replaces the old left/right columns so the map gets the width.
+// Staff tools appear only where they belong: teaching tools in Ruang Guru, collection tools in Perpustakaan.
+// Placement only; the server authorizes every call by role, never by the avatar's room.
+const icons = {
+  learn: 'M4 6l8-3 8 3-8 3zM6 8v6c0 2 3 4 6 4s6-2 6-4V8',
+  chat: 'M4 5h16v11H9l-5 4z',
+  catalog: 'M5 4h5v16H5zM12 4h3v16h-3zM17 5l3 1-3 14-3-1',
+  station: 'M12 3l2 5h5l-4 4 2 6-5-3-5 3 2-6-4-4h5z',
+  modules: 'M4 5h7v14H4zM13 5h7v14h-7',
+  quizzes: 'M12 3l9 5-9 5-9-5zM6 11v5l6 3 6-3v-5',
+  classes: 'M8 11a3 3 0 100-6 3 3 0 000 6zM16 11a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 8 1 8 5',
+  assignments: 'M9 4h6v3H9zM6 6h12v15H6zM9 12l2 2 4-4',
+  gradebook: 'M5 20V10M12 20V4M19 20v-7',
+  rooms: 'M4 20V8l8-5 8 5v12M9 20v-6h6v6',
+  files: 'M6 3h8l4 4v14H6zM14 3v4h4',
+  moderation: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',
+} as const
+const toolPlace = computed(() => !org.isTeacher || kicked.value ? null : current.value?.map_key === 'staff' ? 'staff' : library.value ? 'library' : null)
+const toolItems = computed<SideItem[]>(() => toolPlace.value === 'staff'
+  ? [
+      { key: 'modules', label: 'Modul', icon: icons.modules, wide: true },
+      { key: 'quizzes', label: 'Kuis', icon: icons.quizzes, wide: true },
+      { key: 'classes', label: 'Kelas', icon: icons.classes, wide: true },
+      { key: 'assignments', label: 'Tugas', icon: icons.assignments, wide: true },
+      { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
+      { key: 'rooms', label: 'Ruang', icon: icons.rooms, wide: true },
+      { key: 'files', label: 'Berkas', icon: icons.files, wide: true },
+    ]
+  : toolPlace.value === 'library'
+    ? [
+        { key: 'books', label: 'Kelola buku', icon: icons.catalog, wide: true },
+        { key: 'library-modules', label: 'Modul perpus', icon: icons.modules, wide: true },
+        { key: 'files', label: 'Berkas', icon: icons.files, wide: true },
+      ]
+    : [])
+// Unread dot on Chat while its panel is closed (ChatState is not reactive; chatVersion tracks it).
+const seenChat = ref(0)
+const chatCount = computed(() => {
+  void chatVersion.value
+  return Object.values(chat.lines).reduce((n, l) => n + l.length, 0)
+})
+const sideItems = computed<SideItem[]>(() => [
+  { key: 'learn', label: 'Belajar', icon: icons.learn },
+  { key: 'chat', label: 'Chat', icon: icons.chat, keep: true, dot: sideItem.value !== 'chat' && chatCount.value > seenChat.value },
+  ...(contentRoom.value ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value }] : []),
+  ...toolItems.value,
+])
+// Content rooms open on their catalog/stations; elsewhere the panel starts on Belajar.
+const sideItem = ref<string | null>('learn')
+watch(sideItem, (key) => { if (key === 'chat') seenChat.value = chatCount.value })
+watch(chatCount, (n) => { if (sideItem.value === 'chat') seenChat.value = n })
+watch(() => current.value?.room_id, () => {
+  if (sideItem.value && !sideItems.value.some((i) => i.key === sideItem.value)) sideItem.value = 'learn'
+  if (contentRoom.value) sideItem.value = 'catalog'
+})
 function selectStation(id: string) {
   station.value = id
-  sideTab.value = 'catalog'
-  chatClosed.value = false
+  sideItem.value = 'catalog'
 }
 function selectShelf(cat: string) {
   shelf.value = cat as Shelf
-  sideTab.value = 'catalog'
-  chatClosed.value = false
+  sideItem.value = 'catalog'
 }
 // ChatState is not reactive; chatVersion changes with it (room_state carries muted).
 const muted = computed(() => {
@@ -104,7 +155,6 @@ const directoryOpen = ref(false)
 const roomsOpen = ref(false)
 const modulesOf = ref<Building | null>(null)
 const progressKey = ref(0)
-const mobilePanel = ref<'map' | 'chat'>('map')
 function toggleDirectory() {
   directoryOpen.value = !directoryOpen.value
   roomsOpen.value = false
@@ -156,7 +206,6 @@ watch(campus, () => {
 watch(() => current.value?.room_id, () => {
   shelf.value = ''
   station.value = ''
-  sideTab.value = 'catalog'
 })
 watch(
   () => route.query.building,
@@ -280,207 +329,183 @@ onBeforeUnmount(() => {
     :status-text="statusText"
   />
   <section v-else class="workspace" aria-labelledby="map-title">
-    <div class="mobile-switch" aria-label="Tampilan ruang">
-      <button
-        class="btn-secondary"
-        :aria-pressed="mobilePanel === 'map'"
-        @click="mobilePanel = 'map'"
-      >
-        Peta
-      </button>
-      <button
-        class="btn-secondary"
-        :aria-pressed="mobilePanel === 'chat'"
-        @click="mobilePanel = 'chat'"
-      >
-        Chat
-      </button>
-    </div>
-    <div class="layout" :class="[`show-${mobilePanel}`, { 'learning-closed': learningClosed, 'chat-closed': chatClosed, library: contentRoom }]">
-      <LearningPanel v-model:closed="learningClosed" class="learning-panel" :org-id="org.active?.id" :progress-key="progressKey" :name="auth.me?.display_name ?? ''"
-        :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
-        :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
-        :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
+    <div class="layout" :class="{ 'menu-open': !!sideItem }">
+      <SideMenu v-model:active="sideItem" class="side" :items="sideItems" :label="org.isTeacher ? 'Menu ruang dan alat guru' : 'Menu ruang'"
+        :link="toolPlace === 'staff' ? { to: '/moderasi', label: 'Moderasi', icon: icons.moderation } : undefined">
+        <template #learn>
+          <LearningPanel embedded :org-id="org.active?.id" :progress-key="progressKey" :name="auth.me?.display_name ?? ''"
+            :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
+            :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
+            :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
+        </template>
+        <template #chat>
+          <p class="panel-note">Ngobrol dengan orang di sekitarmu</p>
+          <ChatPanel class="side-chat" :chat="chat" :version="chatVersion" :error="chatError" :disabled="status !== 'open'"
+            :campus="campus" :teacher="org.isTeacher" @send="sendChat" @report="reporting = $event" />
+          <p v-if="reportNotice" role="status" class="room-meta">{{ reportNotice }}</p>
+        </template>
+        <template #catalog>
+          <LibraryCatalog v-if="library && org.active" v-model:shelf="shelf" class="side-catalog" :org-id="org.active.id" />
+          <RoomStations v-else-if="stationRoom && org.active" :key="current?.room_id" class="side-catalog" :org-id="org.active.id"
+            :map-key="current!.map_key" :station="station" :teacher="org.isTeacher" @select="selectStation"
+            @manage="sideItem = 'modules'" />
+        </template>
+        <template v-for="t in toolItems" :key="t.key" #[t.key]>
+          <RoomTools v-if="org.active && auth.me" :tool="t.key" :org-id="org.active.id" :user-id="auth.me.id"
+            :is-admin="org.active.role === 'admin'" />
+        </template>
+      </SideMenu>
       <div class="map-column">
         <RoomLearningPin v-if="org.active && !campus && !kicked" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" />
-        <div class="map-frame">
-          <header ref="mapTop" class="map-top">
-            <button
-              v-if="!campus && !kicked"
-              type="button"
-              class="back"
-              :aria-busy="leaving"
-              :disabled="traveling || status !== 'open'"
-              @click="leaveRoom"
-            >
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                <path
-                  d="M15 5l-7 7 7 7"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
-            </button>
-            <div class="title">
-              <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
-              <p role="status" data-testid="connection-status">{{ statusText }}</p>
-            </div>
-            <button
-              v-if="campus"
-              ref="directoryButton"
-              class="btn-secondary"
-              :aria-expanded="directoryOpen"
-              aria-controls="building-directory"
-              @click="toggleDirectory"
-            >
-              Daftar gedung
-            </button>
-            <TeacherPanel v-else-if="org.isTeacher && !kicked" :room="room" floating />
-          </header>
-          <aside
-            v-if="campus && (directoryOpen || roomsOpen)"
-            id="building-directory"
-            class="buildings"
-            aria-label="Pilihan gedung dan ruang"
-            @keydown.esc="closeDirectory"
-          >
-            <header class="dropdown-head">
-              <h2 v-if="directoryOpen">Daftar gedung</h2>
-              <span v-else></span>
-              <button ref="closeButton" class="btn-secondary close" aria-label="Tutup pilihan" @click="closeDirectory">×</button>
-            </header>
-            <DoorRooms
-              v-if="roomsOpen && panelBuilding && org.active"
-              :org-id="org.active.id"
-              :building="panelBuilding"
-              :disabled="!canEnter || traveling || status !== 'open'"
-              :at-door="canEnter"
-              @travel="travel"
-            />
-            <p v-if="directoryOpen">
-              Pilih gedung untuk melihat ruang, lalu jalan ke pintunya untuk masuk.
-            </p>
-            <ul v-if="directoryOpen">
-              <li v-for="b in map?.buildings ?? []" :key="b.key" :class="b.key">
-                <button
-                  class="building-choice"
-                  :aria-pressed="panelBuilding?.key === b.key"
-                  @click="selectBuilding(b.key)"
-                >
-                  {{ b.name }}
-                </button>
-                <span>{{ b.staffOnly ? 'Khusus pengajar dan admin' : b.description }}</span>
-                <span v-if="buildings.find((item) => item.building_key === b.key)"
-                  >{{ buildings.find((item) => item.building_key === b.key)?.people }} orang ·
-                  {{ buildings.find((item) => item.building_key === b.key)?.live_rooms }} ruang
-                  live</span
-                >
-              </li>
-            </ul>
-          </aside>
-          <div v-if="map" class="stage">
-            <GameCanvas
-              :key="current?.room_id"
-              :deps="{
-                map,
-                world,
-                sendMove,
-                currentZone: () => chat.zone.key,
-                speaking: () => voice?.speaking.value ?? new Set(),
-                inset: () => inset,
-                walkTarget: () => walkTarget,
-                zoom: () => zoom,
-                selectBuilding,
-                selectShelf,
-                selectStation,
-                station: () => station,
-                shelf: () => shelf,
-              }"
-              :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik dua kali tujuan untuk mencari jalan.`"
-            />
-          </div>
-          <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
-          <MapZoom v-if="campus && map" v-model="zoom" class="map-zoom" />
-          <MapMinimap v-if="campus && map" :map="map" :position="position" class="map-minimap" />
-          <PlaceCard v-if="campus && panelBuilding && panelBuilding.key !== dismissedPlace && !directoryOpen && !roomsOpen"
-            class="place-detail" :building="panelBuilding" :teacher="org.isTeacher" :at-door="canEnter"
+      <div class="map-frame">
+        <header ref="mapTop" class="map-top">
+          <button
+            v-if="!campus && !kicked"
+            type="button"
+            class="back"
+            :aria-busy="leaving"
             :disabled="traveling || status !== 'open'"
-            :occupancy="buildings.find((item) => item.building_key === panelBuilding?.key)"
-            @walk="walkToPlace" @rooms="showPlaceRooms" @close="closePlace" @modules="modulesOf = panelBuilding ?? null" />
-          <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
-            :building-name="modulesOf.name" @close="modulesOf = null; progressKey++" />
-          <div v-if="kicked" class="connection-overlay" role="alert">
-            <p>
-              Kamu dikeluarkan dari sesi ini oleh pengajar. Minta izin pengajar untuk masuk lagi.
-            </p>
-            <button class="btn-primary" @click="rejoin">Buka peta sekolah</button>
+            @click="leaveRoom"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                d="M15 5l-7 7 7 7"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
+          </button>
+          <div class="title">
+            <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
+            <p role="status" data-testid="connection-status">{{ statusText }}</p>
           </div>
-          <div v-else-if="map && status !== 'open'" class="connection-overlay" role="status">
-            {{ statusText }}
-          </div>
-          <footer ref="mapBottom" class="map-bottom">
-            <EmoteBar :send="room.sendEmote"
-              :disabled="status !== 'open' || traveling || kicked || muted" />
-            <p v-if="map?.quiet && !campus" class="quiet-chip">Zona tenang — suara mati, chat tetap bisa</p>
-            <VoiceBar
-              v-else-if="voice && !campus && !kicked"
-              :voice="voice"
-              :chat="chat"
-              :version="chatVersion"
-              :self-id="world.selfId"
-              :teacher="org.isTeacher"
-              :disabled="status !== 'open'"
-              @broadcast="room.voiceBroadcast"
-            />
-            <p v-if="leaveError || error" class="float-note" role="alert">
-              {{ leaveError || error }}
-            </p>
-          </footer>
+          <button
+            v-if="campus"
+            ref="directoryButton"
+            class="btn-secondary"
+            :aria-expanded="directoryOpen"
+            aria-controls="building-directory"
+            @click="toggleDirectory"
+          >
+            Daftar gedung
+          </button>
+          <TeacherPanel v-else-if="org.isTeacher && !kicked" :room="room" floating />
+        </header>
+        <aside
+          v-if="campus && (directoryOpen || roomsOpen)"
+          id="building-directory"
+          class="buildings"
+          aria-label="Pilihan gedung dan ruang"
+          @keydown.esc="closeDirectory"
+        >
+          <header class="dropdown-head">
+            <h2 v-if="directoryOpen">Daftar gedung</h2>
+            <span v-else></span>
+            <button ref="closeButton" class="btn-secondary close" aria-label="Tutup pilihan" @click="closeDirectory">×</button>
+          </header>
+          <DoorRooms
+            v-if="roomsOpen && panelBuilding && org.active"
+            :org-id="org.active.id"
+            :building="panelBuilding"
+            :disabled="!canEnter || traveling || status !== 'open'"
+            :at-door="canEnter"
+            @travel="travel"
+          />
+          <p v-if="directoryOpen">
+            Pilih gedung untuk melihat ruang, lalu jalan ke pintunya untuk masuk.
+          </p>
+          <ul v-if="directoryOpen">
+            <li v-for="b in map?.buildings ?? []" :key="b.key" :class="b.key">
+              <button
+                class="building-choice"
+                :aria-pressed="panelBuilding?.key === b.key"
+                @click="selectBuilding(b.key)"
+              >
+                {{ b.name }}
+              </button>
+              <span>{{ b.staffOnly ? 'Khusus pengajar dan admin' : b.description }}</span>
+              <span v-if="buildings.find((item) => item.building_key === b.key)"
+                >{{ buildings.find((item) => item.building_key === b.key)?.people }} orang ·
+                {{ buildings.find((item) => item.building_key === b.key)?.live_rooms }} ruang
+                live</span
+              >
+            </li>
+          </ul>
+        </aside>
+        <div v-if="map" class="stage">
+          <GameCanvas
+            :key="current?.room_id"
+            :deps="{
+              map,
+              world,
+              sendMove,
+              currentZone: () => chat.zone.key,
+              speaking: () => voice?.speaking.value ?? new Set(),
+              inset: () => inset,
+              walkTarget: () => walkTarget,
+              zoom: () => zoom,
+              selectBuilding,
+              selectShelf,
+              selectStation,
+              station: () => station,
+              shelf: () => shelf,
+            }"
+            :label="`${campus ? 'Peta sekolah' : current?.room_name}. Fokus peta, gunakan WASD atau tombol panah untuk berjalan. Klik dua kali tujuan untuk mencari jalan.`"
+          />
+        </div>
+        <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
+        <MapZoom v-if="campus && map" v-model="zoom" class="map-zoom" />
+        <MapMinimap v-if="campus && map" :map="map" :position="position" class="map-minimap" />
+        <PlaceCard v-if="campus && panelBuilding && panelBuilding.key !== dismissedPlace && !directoryOpen && !roomsOpen"
+          class="place-detail" :building="panelBuilding" :teacher="org.isTeacher" :at-door="canEnter"
+          :disabled="traveling || status !== 'open'"
+          :occupancy="buildings.find((item) => item.building_key === panelBuilding?.key)"
+          @walk="walkToPlace" @rooms="showPlaceRooms" @close="closePlace" @modules="modulesOf = panelBuilding ?? null" />
+        <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
+          :building-name="modulesOf.name" @close="modulesOf = null; progressKey++" />
+        <div v-if="kicked" class="connection-overlay" role="alert">
+          <p>
+            Kamu dikeluarkan dari sesi ini oleh pengajar. Minta izin pengajar untuk masuk lagi.
+          </p>
+          <button class="btn-primary" @click="rejoin">Buka peta sekolah</button>
+        </div>
+        <div v-else-if="map && status !== 'open'" class="connection-overlay" role="status">
+          {{ statusText }}
+        </div>
+        <footer ref="mapBottom" class="map-bottom">
+          <EmoteBar :send="room.sendEmote"
+            :disabled="status !== 'open' || traveling || kicked || muted" />
+          <p v-if="map?.quiet && !campus" class="quiet-chip">Zona tenang — suara mati, chat tetap bisa</p>
+          <VoiceBar
+            v-else-if="voice && !campus && !kicked"
+            :voice="voice"
+            :chat="chat"
+            :version="chatVersion"
+            :self-id="world.selfId"
+            :teacher="org.isTeacher"
+            :disabled="status !== 'open'"
+            @broadcast="room.voiceBroadcast"
+          />
+          <p v-if="leaveError || error" class="float-note" role="alert">
+            {{ leaveError || error }}
+          </p>
+        </footer>
         </div>
       </div>
-      <aside class="chat-sidebar" :aria-label="contentRoom ? 'Belajar dan chat' : 'Chat ruang'">
-        <header class="panel-heading"><h2 v-if="!chatClosed">{{ library ? 'Perpustakaan' : stationRoom ? (current?.map_key === 'staff' ? 'Alat guru' : 'Menara Sains') : 'Chat' }}</h2>
-          <button class="btn-secondary" :aria-label="chatClosed ? 'Buka panel samping' : 'Ciutkan panel samping'"
-            :aria-expanded="!chatClosed" @click="chatClosed = !chatClosed">{{ chatClosed ? '‹' : '›' }}</button>
-        </header>
-        <div v-if="contentRoom && !chatClosed" class="side-tabs" role="group" aria-label="Isi panel">
-          <button type="button" :aria-pressed="sideTab === 'catalog'" @click="sideTab = 'catalog'">{{ library ? 'Katalog' : 'Stasiun' }}</button>
-          <button type="button" :aria-pressed="sideTab === 'chat'" @click="sideTab = 'chat'">Chat</button>
-        </div>
-        <LibraryCatalog v-if="library && org.active && sideTab === 'catalog'" v-show="!chatClosed"
-          v-model:shelf="shelf" class="side-catalog" :org-id="org.active.id" />
-        <RoomStations v-if="stationRoom && org.active && sideTab === 'catalog' && !chatClosed"
-          :key="current?.room_id" class="side-catalog" :org-id="org.active.id" :map-key="current!.map_key"
-          :station="station" :teacher="org.isTeacher" @select="selectStation" />
-        <p v-if="!chatClosed && (!contentRoom || sideTab === 'chat')" class="panel-note">Ngobrol dengan orang di sekitarmu</p>
-        <ChatPanel
-          v-show="!chatClosed && (!contentRoom || sideTab === 'chat')"
-          class="side-chat"
-          :chat="chat"
-          :version="chatVersion"
-          :error="chatError"
-          :disabled="status !== 'open'"
-          :campus="campus"
-          :teacher="org.isTeacher"
-          @send="sendChat"
-          @report="reporting = $event"
-        />
-        <p v-if="reportNotice" role="status" class="room-meta">{{ reportNotice }}</p>
-        <ReportDialog
-          v-if="reporting && current"
-          :target-id="reporting.fromId"
-          :target-name="reporting.fromName"
-          :room-id="current.room_id"
-          :message-id="reporting.messageId"
-          :message-text="reporting.text"
-          @close="reporting = null"
-          @reported="reported"
-        />
-      </aside>
+      <ReportDialog
+        v-if="reporting && current"
+        :target-id="reporting.fromId"
+        :target-name="reporting.fromName"
+        :room-id="current.room_id"
+        :message-id="reporting.messageId"
+        :message-text="reporting.text"
+        @close="reporting = null"
+        @reported="reported"
+      />
     </div>
   </section>
 </template>
@@ -496,21 +521,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
 }
-.mobile-switch {
-  display: none;
-}
 .map-column {
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-.chat-sidebar {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border-radius: var(--radius-2xl);
 }
 .side-chat {
   flex: 1;
@@ -520,32 +534,6 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   margin-top: var(--space-3);
-}
-.side-tabs {
-  display: flex;
-  gap: var(--space-1);
-  margin-top: var(--space-3);
-  padding: var(--space-1);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-alt);
-}
-.side-tabs button {
-  flex: 1;
-  min-height: 44px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-ink);
-  font: inherit;
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-}
-.side-tabs button[aria-pressed='true'] {
-  background: var(--color-surface);
-  box-shadow: var(--kv-shadow-card);
-}
-.side-tabs button:focus-visible {
-  outline: 3px solid var(--color-primary-strong);
 }
 /* Two rails float over the map. Each is one line with a fixed height, so a
    status change can never resize anything; the scene fits the floor between
@@ -713,18 +701,11 @@ h1 {
   flex: 1;
   min-height: 0;
   position: relative;
-  display: grid;
-  grid-template-columns: 264px minmax(0, 1fr) var(--side-width, 300px);
-  gap: var(--space-4);
+  display: flex;
+  gap: var(--space-3);
 }
-.layout.learning-closed { grid-template-columns: 76px minmax(0, 1fr) var(--side-width, 300px); }
-/* The catalog needs room for book cards. */
-.layout.library { --side-width: 360px; }
-.layout.chat-closed { grid-template-columns: 264px minmax(0, 1fr) 76px; }
-.layout.learning-closed.chat-closed { grid-template-columns: 76px minmax(0, 1fr) 76px; }
-.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.panel-heading h2 { margin: 0; font-size: var(--text-lg); }
-.panel-heading button { flex: none; padding: 0; min-width: var(--touch-min); }
+.side { flex: none; }
+.map-column { flex: 1; min-width: 0; }
 .panel-note { color: var(--kv-text-muted); font-size: var(--text-sm); }
 /* HUD floats over the camera-follow viewport. */
 .stage {
@@ -814,12 +795,6 @@ li span {
   border-color: var(--color-speaking);
 }
 @media (max-width: 900px) {
-  .mobile-switch {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
-  }
-  .learning-panel { display: none; }
   /* Teacher controls overflow narrow screens: scroll the rail, keep pills whole. */
   .map-top { overflow-x: auto; padding: var(--space-1) 0; scrollbar-width: none; }
   .map-top > * { flex: none; }
@@ -829,13 +804,8 @@ li span {
   .title p {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
   }
-  .layout, .layout.learning-closed, .layout.chat-closed, .layout.learning-closed.chat-closed {
-    grid-template-columns: minmax(0, 1fr);
-    min-height: 400px;
-  }
-  .show-map .chat-sidebar,
-  .show-chat .map-column {
-    display: none;
-  }
+  /* Narrow screens: rail across the top, the open panel above the map. */
+  .layout { flex-direction: column; min-height: 400px; }
+  .layout.menu-open .side { max-height: 55%; }
 }
 </style>

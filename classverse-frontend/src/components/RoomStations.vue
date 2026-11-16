@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, getCurrentInstance, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { roomLayout } from '@/game/roomLayout'
 import { moduleApi } from '@/api/modules'
@@ -8,7 +8,9 @@ import type { Module } from '@/api/types'
 import ModulePath from './ModulePath.vue'
 
 const props = defineProps<{ orgId: string; mapKey: string; station: string; teacher: boolean }>()
-const emit = defineEmits<{ select: [id: string] }>()
+// manage opens the Modul tool beside the map; without a listener (phone list mode) it links to Kelola.
+const emit = defineEmits<{ select: [id: string]; manage: [] }>()
+const inPlace = !!getCurrentInstance()?.vnode.props?.onManage
 const stations = computed(() => roomLayout(props.mapKey)?.stations ?? [])
 const selected = computed(() => stations.value.find((s) => s.id === props.station) ?? stations.value[0])
 const staff = computed(() => props.mapKey === 'staff')
@@ -54,7 +56,8 @@ const description = computed(() => {
       <p class="eyebrow">{{ staff ? 'Ruang Guru' : 'Jalur belajar IPA' }}</p>
       <h3>{{ selected?.label }}</h3>
       <p>{{ description }}</p>
-      <RouterLink v-if="staff && teacher" to="/kelola-ruang" class="btn-primary">Buat dan kelola modul</RouterLink>
+      <button v-if="staff && teacher && inPlace" type="button" class="btn-primary" @click="emit('manage')">Buat dan kelola modul</button>
+      <RouterLink v-else-if="staff && teacher" to="/kelola-ruang" class="btn-primary">Buat dan kelola modul</RouterLink>
       <button v-else-if="!staff" type="button" class="btn-primary" @click="showModules = !showModules"
         :aria-expanded="showModules">{{ showModules ? 'Tutup modul' : 'Lihat modul IPA' }}</button>
     </div>
@@ -63,13 +66,13 @@ const description = computed(() => {
       <p v-if="loading" role="status">Memuat modul…</p>
       <p v-else-if="error" class="alert" role="alert">{{ error }} <button type="button" class="link" @click="load">Coba lagi</button></p>
       <p v-else-if="!modules.length" class="note">Belum ada modul. Buat modul pertama melalui Kelola.</p>
-      <RouterLink v-for="m in modules" :key="m.id" to="/kelola-ruang" class="module-row">
+      <component :is="inPlace ? 'button' : RouterLink" v-for="m in modules" :key="m.id" v-bind="inPlace ? { type: 'button', onClick: () => emit('manage') } : { to: '/kelola-ruang' }" class="module-row">
         <strong>{{ m.title }}</strong><span>{{ m.published ? 'Terbit' : 'Draf' }}</span>
         <small>{{ m.level }} · {{ m.steps.length }} langkah</small>
-      </RouterLink>
+      </component>
     </section>
     <ModulePath v-if="!staff && showModules" :org-id="orgId" building-key="sains" building-name="Menara Sains" />
-    <p class="note">{{ staff ? 'Daftar modul sekolah tersedia di Kelola. Rekaman, tugas, dan statistik kelas menyusul.' : 'Modul tersedia untuk semua stasiun. Pengelompokan modul per stasiun belum tersedia.' }}</p>
+    <p class="note">{{ staff ? 'Modul, kuis, kelas, tugas, dan rapor ada di menu alat guru. Rekaman dan statistik kelas menyusul.' : 'Modul tersedia untuk semua stasiun. Pengelompokan modul per stasiun belum tersedia.' }}</p>
   </section>
 </template>
 
@@ -84,7 +87,7 @@ p { margin: 0; line-height: var(--line-normal); }
 .eyebrow { color: var(--kv-subject-ipa); font-weight: var(--weight-semibold); }
 .note { color: var(--color-ink-muted); font-size: var(--text-sm); }
 .school-modules { display: grid; gap: var(--space-3); border-top: 1px solid var(--color-border-soft); padding-top: var(--space-4); }
-.module-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); color: var(--color-ink); text-decoration: none; }
+.module-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); color: var(--color-ink); text-decoration: none; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .module-row span { font-size: var(--text-xs); color: var(--kv-subject-ipa); }
 .module-row small { grid-column: 1 / -1; color: var(--color-ink-muted); }
 .btn-primary { text-align: center; text-decoration: none; background: var(--kv-subject-ipa); }

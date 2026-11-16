@@ -166,3 +166,22 @@ status terpilih memakai radio/border selain warna. Phaser memakai aset yang sama
 ## Di luar MVP
 
 Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung detail dibuat saat implementasi peta di Fase 4.
+
+## Menu samping ruang (2026-11, referensi `docs/screens/sidemenu.png`)
+
+- Desktop/tablet: rel ikon tipis (72 px) selalu tampil di kiri peta + satu panel yang bisa diciutkan. Kolom
+  kiri "Panel belajar" dan kolom kanan chat/katalog dihapus; peta mengisi sisa lebar. Menciutkan panel menambah
+  lebar peta, posisi/koneksi ruang tidak berubah.
+- Item untuk semua: **Belajar** (profil, tugas, lanjutkan belajar, kursi), **Chat** (tetap ter-mount saat
+  disembunyikan agar draf tidak hilang; titik merah bila ada pesan baru), **Katalog** di Perpustakaan atau
+  **Stasiun** di Menara Sains/Ruang Guru.
+- Guru/admin di **Ruang Guru**: Modul, Kuis, Kelas, Tugas, Rapor, Ruang, Berkas, lalu tautan Moderasi.
+  Guru/admin di **Perpustakaan**: Kelola buku, Modul perpus (pengelola modul dibatasi gedung `perpus`), Berkas.
+  Penempatan menu saja; server tetap memeriksa peran, bukan lokasi avatar.
+- Fokus: membuka item memindah fokus ke judul panel; menciutkan/Escape mengembalikan fokus ke tombol rel.
+  Escape di dalam `<dialog>` (pembaca, kuis) tidak menutup panel. Pembukaan otomatis saat masuk ruang tidak
+  mencuri fokus dari peta.
+- Layar sempit (≤900 px): rel mendatar di atas, panel di atas peta. Mode HP (daftar) tidak berubah; alat guru di
+  HP lewat halaman **Kelola sekolah** (`/kelola-ruang?bagian=ruang|modul|kelas|perpustakaan`).
+- Pustakawan non-guru belum menjadi peran sendiri; tambahkan peran khusus katalog bila sekolah memakai petugas
+  perpustakaan yang tidak boleh melihat nilai.

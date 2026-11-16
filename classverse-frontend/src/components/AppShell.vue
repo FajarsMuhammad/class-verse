@@ -46,7 +46,7 @@ async function logout() {
         <RouterLink class="nav-link" :to="{ name: 'home' }">Peta sekolah</RouterLink>
         <RouterLink v-if="org.active" class="nav-link" :to="{ name: 'gradebook' }">Rapor</RouterLink>
         <RouterLink v-if="org.isTeacher" class="nav-link" :to="{ name: 'manage-rooms' }">
-          Kelola ruang
+          Kelola sekolah
         </RouterLink>
         <RouterLink v-if="org.isTeacher" class="nav-link" :to="{ name: 'moderation' }">
           Moderasi

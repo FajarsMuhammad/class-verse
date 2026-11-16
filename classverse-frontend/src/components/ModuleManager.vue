@@ -8,7 +8,8 @@ import type { FileItem, Module, ModuleInput, ModuleStep, Quiz, StepInput } from 
 import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Modul (M1-01): staff author paths per building and level. Steps are archived, never deleted.
-const props = defineProps<{ orgId: string }>()
+// buildingKey limits the manager to one building (Perpustakaan tools open it for `perpus` only).
+const props = defineProps<{ orgId: string; buildingKey?: string }>()
 
 const id = useId()
 const modules = ref<Module[]>([])
@@ -32,12 +33,12 @@ function blankStep(): StepInput {
   return { kind: 'materi', title: '', body: '', file_id: null, video_id: '', quiz_id: null, minutes: 5 }
 }
 // Ruang Guru is staff-only and has no learning paths (the server rejects it too).
-const choices = computed(() => buildings.value.filter((b) => !b.staffOnly))
+const choices = computed(() => buildings.value.filter((b) => !b.staffOnly && (!props.buildingKey || b.key === props.buildingKey)))
 const buildingName = (key: string) => buildings.value.find((b) => b.key === key)?.name ?? key
 
 async function load() {
   try {
-    modules.value = (await moduleApi.list(props.orgId, { drafts: true })).items
+    modules.value = (await moduleApi.list(props.orgId, { drafts: true, building_key: props.buildingKey })).items
   } catch (err) {
     error.value = errorMessage(err)
   }
