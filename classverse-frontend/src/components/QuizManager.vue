@@ -194,7 +194,7 @@ onMounted(async () => {
         <option value="">Semua jenjang</option>
         <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
       </select>
-      <p v-if="!visible.length" class="hint">Belum ada kuis untuk jenjang ini.</p>
+      <p v-if="!visible.length" class="hint">{{ quizzes.length ? 'Belum ada kuis untuk jenjang ini.' : 'Belum ada kuis. Buat kuis pertama.' }}</p>
       <ul class="catalog-list">
         <li v-for="item in visible" :key="item.id" class="catalog-row">
           <div><strong>{{ item.title }}</strong>
@@ -235,7 +235,6 @@ onMounted(async () => {
       </div>
     </form>
 
-    <p v-if="!selected && !editing && !quizzes.length" class="sub">Belum ada kuis. Buat kuis pertama.</p>
     <article v-for="z in active && !editing ? [active] : []" :key="z.id" class="quiz" :aria-labelledby="`${id}-${z.id}`">
       <div class="quiz-head">
         <div>

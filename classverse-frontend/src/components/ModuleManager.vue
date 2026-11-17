@@ -243,7 +243,7 @@ onMounted(async () => {
         <option value="">Semua jenjang</option>
         <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
       </select>
-      <p v-if="!visible.length" class="hint">Belum ada modul untuk jenjang ini.</p>
+      <p v-if="!visible.length" class="hint">{{ modules.length ? 'Belum ada modul untuk jenjang ini.' : 'Belum ada modul. Buat modul pertama.' }}</p>
       <ul class="catalog-list">
         <li v-for="item in visible" :key="item.id" class="catalog-row">
           <div><strong>{{ item.title }}</strong>
@@ -280,7 +280,6 @@ onMounted(async () => {
       </div>
     </form>
 
-    <p v-if="!selected && !editing && !modules.length" class="sub">Belum ada modul. Buat modul pertama.</p>
     <article v-for="m in active && !editing ? [active] : []" :key="m.id" class="module" :aria-labelledby="`${id}-${m.id}`">
       <div class="module-head">
         <div>

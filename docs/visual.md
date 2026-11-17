@@ -220,7 +220,7 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
 - Item untuk semua: **Belajar** (profil, tugas, lanjutkan belajar, kursi), **Chat** (tetap ter-mount saat
   disembunyikan agar draf tidak hilang; titik merah bila ada pesan baru), **Katalog** di Perpustakaan atau
   **Stasiun** di Menara Sains/Ruang Guru.
-- Guru/admin desktop: **Peta, Chat, Modul, Kelola, Rapor**; Katalog tambahan hanya di Perpustakaan.
+- Guru/admin desktop: **Peta, Chat, Kelola, Rapor**; Katalog tambahan hanya di Perpustakaan.
   Katalog guru adalah panel pendamping (peta tetap terlihat) dan tidak terbuka otomatis saat masuk; guru mulai di Peta.
   Peta sekolah: kamera tidak mengikuti avatar. Mulai di posisi avatar, lalu digeser dengan klik-tahan-geser
   (gerak >6 px = geser, bukan klik; dibatasi tepi peta, peta lebih kecil dari layar tetap di tengah). Zoom di
@@ -237,19 +237,21 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   sesuai `reff-design-3.png`. Peta membuka panel ruang 320 px di kiri dan peta aktif di kanan; dapat diciutkan.
   **Peta dan Chat** bergantian memakai panel pendamping, bukan dua kolom. Chat menampilkan konteks ruang/zona, pesan bergulir dan input tetap
   di bawah; draf serta indikator pesan baru tetap terjaga.
-  **Modul, Kelola, Rapor** dan katalog guru terbuka sebagai halaman penuh di samping rel.
+  **Kelola, Rapor** dan katalog guru terbuka sebagai halaman penuh di samping rel.
   Tombol **Kembali ke peta** di atas halaman kembali ke Peta beserta panel ruang; item **Peta** pada rel
   membuka/menutup panel itu. Panel pendamping memakai tombol ciut. Escape dari halaman juga kembali ke Peta.
   Peta tetap ter-mount, berdimensi nonzero, tersembunyi dan inert saat halaman dibuka: koneksi/posisi tidak
   direset dan tidak ada fokus keyboard pada peta tersembunyi. Draf chat tetap terjaga.
-  **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola memakai satu pemilih alat:
-  Kuis, Kelas, Tugas, Ruang (termasuk undangan), Buku perpustakaan, Berkas. Kontrol sesi juga di Kelola.
-  Modul berisi pengelola modul (dibatasi `perpus` di Perpustakaan). Aksi **Sematkan ke [nama ruang]**
+  **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola adalah menu induk dengan submenu kiri
+  ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Tugas, Ruang & undangan, Buku perpustakaan, Berkas,
+  dan Kontrol sesi saat berada di ruang. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
+  dimuat. Lebar ≤1000 px submenu berbaris di atas konten. Modul belajar dibatasi `perpus` di Perpustakaan.
+  Aksi **Sematkan ke [nama ruang]**
   berada pada detail modul terbit yang memiliki isi, bukan pemilih terpisah di atas daftar. Klik membuka
   pilihan Seluruh modul / Mulai dari materi. Di kampus, tampilkan petunjuk untuk masuk ruang terlebih dahulu.
   Saat disconnect/travel/dikeluarkan, sematkan tidak aktif; pergantian ruang menutup form sematan.
   Panel Peta guru memuat **Materi sesi ini**, judul modul/materi, **Buka materi**, **Ganti**, **Lepas**.
-  Ganti/Pilih modul membuka daftar Modul; sesudah mengirim sematan kembali ke Peta, status aktual mengikuti
+  Ganti/Pilih modul membuka **Kelola → Modul belajar**; sesudah mengirim sematan kembali ke Peta, status aktual mengikuti
   pesan server. Mode HP memakai pengelola modul yang sama dari Pilih/Ganti, tanpa pemilih modul kedua.
   Tidak ada bilah sematan di atas peta.
 - Header aplikasi dan header peta desktop dihapus **untuk guru dan peserta** (workspace sama). Peta memenuhi tinggi viewport dengan sela 4 px;

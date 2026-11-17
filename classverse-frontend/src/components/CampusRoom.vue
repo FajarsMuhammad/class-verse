@@ -33,7 +33,7 @@ import type { Shelf } from '@/api/types'
 import ReportDialog from '@/components/ReportDialog.vue'
 import type { ChatLine } from '@/realtime/chat'
 import MobileRoom from '@/components/MobileRoom.vue'
-import TeacherPanel from '@/components/TeacherPanel.vue'
+import TeacherTools from '@/components/TeacherTools.vue'
 import VoiceBar from '@/components/VoiceBar.vue'
 import { useRoom } from '@/realtime/useRoom'
 import { doorExit } from '@/realtime/doorExit'
@@ -100,7 +100,11 @@ async function logout() {
   await auth.logout()
   await router.push({ name: 'login' })
 }
-const selectedTool = ref('quizzes')
+const selectedTool = ref('modules')
+function openModules() {
+  selectedTool.value = 'modules'
+  sideItem.value = 'tools'
+}
 const nearDoor = ref<Building | null>(null)
 const zoom = ref(0.5)
 const position = ref<{ x: number; y: number } | null>(null)
@@ -127,9 +131,7 @@ const icons = {
   files: 'M6 3h8l4 4v14H6zM14 3v4h4',
   moderation: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',
 } as const
-const toolPlace = computed(() => !org.isTeacher || kicked.value ? null : current.value?.map_key === 'staff' ? 'staff' : library.value ? 'library' : null)
 const toolItems = computed<SideItem[]>(() => org.isTeacher && !kicked.value ? [
-  { key: 'modules', label: 'Modul', icon: icons.modules, wide: true },
   { key: 'tools', label: 'Kelola', icon: icons.classes, wide: true },
   { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
 ] : [])
@@ -374,7 +376,7 @@ onBeforeUnmount(() => {
         </template>
         <template #[mapPanelKey]>
           <RoomLearningPin v-if="!campus && !kicked && org.active && (org.isTeacher || room.pin?.value)" :key="current?.room_id"
-            :room="room" :org-id="org.active.id" :staff="org.isTeacher" @change="sideItem = 'modules'" />
+            :room="room" :org-id="org.active.id" :staff="org.isTeacher" @change="openModules" />
           <button v-if="!campus && !kicked" type="button" class="btn-secondary leave-link" :aria-busy="leaving"
             :disabled="traveling || status !== 'open'" @click="leaveRoom">
             {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
@@ -397,23 +399,11 @@ onBeforeUnmount(() => {
           <LibraryCatalog v-if="library && org.active" v-model:shelf="shelf" class="side-catalog" :org-id="org.active.id" />
           <RoomStations v-else-if="stationRoom && org.active" :key="current?.room_id" class="side-catalog" :org-id="org.active.id"
             :map-key="current!.map_key" :station="station" :teacher="org.isTeacher" @select="selectStation"
-            @manage="sideItem = 'modules'" />
-        </template>
-        <template #modules>
-          <RoomTools v-if="org.active && auth.me" :tool="toolPlace === 'library' ? 'library-modules' : 'modules'"
-            :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" :room="room"
-            @pinned="sideItem = 'map'" />
+            @manage="openModules" />
         </template>
         <template #tools>
-          <TeacherPanel v-if="!campus && !kicked" :room="room" />
-          <label class="tool-picker">Alat pengajar
-            <select v-model="selectedTool">
-              <option value="quizzes">Kuis</option><option value="classes">Kelas</option>
-              <option value="assignments">Tugas</option><option value="rooms">Ruang</option>
-              <option value="books">Buku perpustakaan</option><option value="files">Berkas</option>
-            </select>
-          </label>
-          <RoomTools v-if="org.active && auth.me" :key="selectedTool" :tool="selectedTool" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" />
+          <TeacherTools v-if="org.active && auth.me" v-model="selectedTool" :org-id="org.active.id" :user-id="auth.me.id"
+            :is-admin="org.active.role === 'admin'" :room="room" @pinned="sideItem = 'map'" />
         </template>
         <template #gradebook><RoomTools v-if="org.active && auth.me" tool="gradebook" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" /></template>
       </SideMenu>
@@ -660,8 +650,6 @@ h1 {
 .account-menu { position: absolute; z-index: 5; left: 64px; bottom: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); width: min(280px, 75vw); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-raise); }
 .account-menu a, .account-menu button { display: flex; align-items: center; min-height: var(--touch-min); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: var(--color-surface-alt); color: var(--color-ink); font: inherit; text-decoration: none; cursor: pointer; }
 .account-menu span { color: var(--color-ink-muted); overflow-wrap: anywhere; }
-.tool-picker { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); font-weight: var(--weight-semibold); }
-.tool-picker select { min-height: var(--touch-min); padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); font: inherit; }
 .layout {
   flex: 1;
   min-height: 0;
