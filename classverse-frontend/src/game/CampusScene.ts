@@ -20,6 +20,8 @@ export interface SceneDeps {
   sendMove: (m: MoveMsg) => void
   zoom?: () => number
   selectBuilding?: (key: string) => void
+  // walkToBuilding walks to a building door (double-click on the building).
+  walkToBuilding?: (key: string) => void
   // selectShelf opens the library catalog on a shelf category (library rooms only).
   selectShelf?: (cat: string) => void
   selectStation?: (id: string) => void
@@ -70,7 +72,7 @@ export class CampusScene extends Phaser.Scene {
     Phaser.Input.Keyboard.Key
   >
   private path: Vec[] = []
-  private lastClick: { time: number; x: number; y: number } | null = null
+  private lastClick: { time: number; x: number; y: number; building?: string } | null = null
   // Campus camera: fixed (no follow); the user pans it by dragging.
   private centre: Vec | null = null
   private press: { x: number; y: number; centre: Vec; dragged: boolean } | null = null
@@ -217,9 +219,12 @@ export class CampusScene extends Phaser.Scene {
       const building = this.deps.map.buildings.find((b) =>
         to.x >= b.x && to.x < b.x+b.w && to.y >= b.y && to.y < b.y+b.h)
       if (building && this.deps.selectBuilding) {
-        this.lastClick = null
+        const last = this.lastClick
+        const double = last?.building === building.key && p.downTime - last.time <= DOUBLE_CLICK_MS
+        this.lastClick = double ? null : { time: p.downTime, x: p.x, y: p.y, building: building.key }
         this.path = []
         this.deps.selectBuilding(building.key)
+        if (double) this.deps.walkToBuilding?.(building.key)
         return
       }
     }
@@ -237,7 +242,7 @@ export class CampusScene extends Phaser.Scene {
     }
     const last = this.lastClick
     this.lastClick = { time: p.downTime, x: p.x, y: p.y }
-    if (!last || p.downTime - last.time > DOUBLE_CLICK_MS ||
+    if (!last || last.building || p.downTime - last.time > DOUBLE_CLICK_MS ||
       Math.hypot(p.x - last.x, p.y - last.y) > DOUBLE_CLICK_PX) return
     this.lastClick = null
     this.path = findPath(this.deps.map, self, to, this.tablePenalty(self, to))

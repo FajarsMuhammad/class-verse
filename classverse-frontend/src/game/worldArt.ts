@@ -111,6 +111,14 @@ function drawRoom(scene: Phaser.Scene, key: string) {
   return true
 }
 
+// titleChip is the white name chip above buildings and open places; CampusScene rescales 'world-label' on zoom.
+function titleChip(scene: Phaser.Scene, x: number, y: number, name: string) {
+  return scene.add.text(x, y, name, {
+      fontFamily: cssToken('--kv-font-display'), fontSize: '15px', fontStyle: '600',
+      color: cssToken('--kv-ink'), backgroundColor: cssToken('--kv-surface'), padding: { x: 10, y: 5 },
+    }).setOrigin(0.5).setDepth(100000).setResolution(2).setName('world-label')
+}
+
 export function drawWorld(scene: Phaser.Scene, key: string) {
   if (key !== 'campus') return drawRoom(scene, key)
   const g = scene.add.graphics().setDepth(-10)
@@ -124,16 +132,16 @@ export function drawWorld(scene: Phaser.Scene, key: string) {
     g.fillRoundedRect(l.x, l.y, l.w, l.h, world.lawn_style.radius)
   }
   freezeGround(scene, g, world.size.w, world.size.h)
-  for (const z of world.zones) scene.add.image(z.rect.x, z.rect.y, z.sprite).setOrigin(0).setDepth(-5)
   for (const p of world.places) {
     scene.add.image(p.sprite_pos.x, p.sprite_pos.y, p.sprite).setOrigin(0)
       .setDisplaySize(p.size.w, p.size.h).setDepth(p.sprite_pos.y+p.size.h-20)
-    const label = scene.add.text(p.label_anchor.x, p.label_anchor.y, p.name, {
-      fontFamily: cssToken('--kv-font-display'), fontSize: '15px', fontStyle: '600',
-      color: cssToken('--kv-ink'), backgroundColor: cssToken('--kv-surface'), padding: { x: 10, y: 5 },
-    }).setOrigin(0.5).setDepth(100000).setResolution(2)
-    label.setName('world-label')
+    const label = titleChip(scene, p.label_anchor.x, p.label_anchor.y, p.name)
     if (p.id === 'arena') label.setBackgroundColor(cssToken('--kv-ink')).setColor(cssToken('--kv-star'))
+  }
+  // Open places (Taman Diskusi, Alun-alun) carry the same title chip as buildings, centred on their top edge.
+  for (const z of world.zones) {
+    scene.add.image(z.rect.x, z.rect.y, z.sprite).setOrigin(0).setDepth(-5)
+    titleChip(scene, z.rect.x + z.rect.w / 2, z.rect.y, z.name)
   }
   for (const t of world.trees) scene.add.image(t.x, t.y, world.tree_sprite).setOrigin(0).setDepth(t.y+46)
   for (const n of world.npcs) {

@@ -523,6 +523,7 @@ onBeforeUnmount(() => {
               walkTarget: () => walkTarget,
               zoom: () => zoom,
               selectBuilding,
+              walkToBuilding: (key: string) => { selectBuilding(key); walkToPlace() },
               selectShelf,
               selectStation,
               station: () => station,

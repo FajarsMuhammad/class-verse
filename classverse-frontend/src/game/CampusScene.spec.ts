@@ -21,6 +21,7 @@ const pointer = (time: number, x = 90, y = 90) => ({
 }) as Phaser.Input.Pointer
 let scene: InputScene
 const selectBuilding = vi.fn<(key: string) => void>()
+const walkToBuilding = vi.fn<(key: string) => void>()
 beforeEach(() => {
   vi.clearAllMocks()
   scene = new CampusScene() as unknown as InputScene
@@ -28,6 +29,7 @@ beforeEach(() => {
     world: { self: { x: 10, y: 10 }, mapKey: 'campus' },
     map: { buildings: [{ key: 'sains', x: 200, y: 200, w: 100, h: 100 }] },
     selectBuilding,
+    walkToBuilding,
   }
   scene.tablePenalty = () => undefined
   scene.cameras = { main: { zoom: 1, midPoint: { x: 500, y: 400 }, centerOn: vi.fn<(x: number, y: number) => void>() } }
@@ -76,4 +78,14 @@ it('centres a map smaller than the view and clamps a larger one', () => {
   expect(clampCentre(2200, 1000, 100)).toBe(500)
   expect(clampCentre(2200, 1000, 2100)).toBe(1700)
   expect(clampCentre(2200, 1000, 900)).toBe(900)
+})
+
+it('double-clicking a building walks to its door; slow second click only selects again', () => {
+  click(pointer(1000, 210, 210))
+  click(pointer(1600, 212, 210))
+  expect(walkToBuilding).not.toHaveBeenCalled()
+  click(pointer(1800, 214, 212))
+  expect(walkToBuilding).toHaveBeenCalledWith('sains')
+  expect(selectBuilding).toHaveBeenCalledTimes(3)
+  expect(findPath).not.toHaveBeenCalled()
 })
