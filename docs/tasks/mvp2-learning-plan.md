@@ -21,6 +21,7 @@ memakai konvensi repo `docs/tasks/`, bukan direktori task kedua.
 | Persetujuan lanjutan | **Inisial; hover menampilkan nama lengkap dan kelas** | Sediakan juga focus keyboard dan tap; kelas dari rombel, bukan ruang virtual |
 | Persetujuan kelas | **Satu kelas aktif per siswa per sekolah per tahun ajaran** | Kelas/rombel menjadi data tersendiri; bukan label bebas profil atau kelas mata kuliah jamak |
 | Persetujuan C1 | **Pengajar/admin mengelola kelas dan siswa; admin memilih tahun ajaran aktif** | C1 setelah Q1 sebelum R1; perpindahan menyimpan riwayat, tidak ada kenaikan kelas otomatis |
+| 2026-11 C2 | **Admin mengelola tahun ajaran, kelas, pengajar kelas, dan penempatan; wali kelas mengelola siswa kelasnya; guru mapel melihat** | Menggantikan hak kelola C1; rincian di `docs/tasks/c2-class-management.md` |
 | 2026-11-13 | **Modul = katalog terbuka per gedung/jenjang**, bisa dibuka dari mana saja, bukan khusus kelas atau hanya di dalam ruang | Kelas mengarahkan, bukan mengunci: "Tugaskan ke kelas" dan "Sematkan modul di ruang" menjadi slice A1 setelah C1 |
 | 2026-11-13 | **Langkah modul bebas dibuka**; progres tetap dicatat per siswa | Urutan wajib (kunci langkah) hanya untuk modul yang ditugaskan, di A1 |
 
