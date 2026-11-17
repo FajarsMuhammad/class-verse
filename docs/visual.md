@@ -176,6 +176,9 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   disembunyikan agar draf tidak hilang; titik merah bila ada pesan baru), **Katalog** di Perpustakaan atau
   **Stasiun** di Menara Sains/Ruang Guru.
 - Guru/admin desktop: **Peta, Chat, Modul, Kelola, Rapor**; Katalog tambahan hanya di Perpustakaan.
+  Katalog guru adalah panel pendamping (peta tetap terlihat) dan tidak terbuka otomatis saat masuk; guru mulai di Peta.
+  Panel Peta di dalam gedung punya tombol **Keluar ruang** (berjalan ke pintu lalu keluar) sebagai alternatif
+  aksesibel untuk keluar otomatis di pintu. Menu akun tertutup saat klik di luar; pesan simpan profil hilang 4 detik.
   Tidak ada item Belajar terpisah untuk guru, termasuk di Ruang Guru: isi pendamping berada pada menu **Peta**
   sesuai `reff-design-3.png`. Peta membuka panel ruang 320 px di kiri dan peta aktif di kanan; dapat diciutkan.
   **Peta dan Chat** bergantian memakai panel pendamping, bukan dua kolom. Chat menampilkan konteks ruang/zona, pesan bergulir dan input tetap

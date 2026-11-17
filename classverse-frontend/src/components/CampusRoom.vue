@@ -78,6 +78,17 @@ const accountOpen = ref(false)
 const profileOpen = ref(false)
 const profileStatus = ref('')
 const profileTrigger = ref<HTMLButtonElement | null>(null)
+// Account popover: closes on outside click; save notice clears itself.
+const accountMenu = ref<HTMLElement | null>(null)
+function onOutside(e: PointerEvent) {
+  const t = e.target as Node
+  if (accountOpen.value && !accountMenu.value?.contains(t) && !profileTrigger.value?.contains(t)) accountOpen.value = false
+}
+let statusTimer: ReturnType<typeof setTimeout> | undefined
+watch(profileStatus, (s) => {
+  clearTimeout(statusTimer)
+  if (s) statusTimer = setTimeout(() => { profileStatus.value = '' }, 4000)
+})
 async function closeProfile() {
   profileOpen.value = false
   await nextTick()
@@ -137,7 +148,7 @@ const sideItems = computed<SideItem[]>(() => [
     icon: org.isTeacher ? 'M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16' : icons.learn,
     companion: true, dot: !org.isTeacher && !!pinKey.value && pinKey.value !== seenPin.value && sideItem.value !== 'learn' },
   { key: 'chat', label: 'Chat', icon: icons.chat, keep: true, companion: true, dot: sideItem.value !== 'chat' && chatCount.value > seenChat.value },
-  ...(contentRoom.value && (!org.isTeacher || library.value) ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value }] : []),
+  ...(contentRoom.value && (!org.isTeacher || library.value) ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value && !org.isTeacher, companion: true }] : []),
   ...toolItems.value,
 ])
 // The panel remembers being collapsed so the map stays wide; when open, content rooms start on their catalog.
@@ -155,7 +166,7 @@ watch(chatCount, (n) => { if (sideItem.value === 'chat') seenChat.value = n })
 watch(() => current.value?.room_id, () => {
   if (!sideItem.value) return
   if (!sideItems.value.some((i) => i.key === sideItem.value)) sideItem.value = org.isTeacher ? 'map' : 'learn'
-  if (contentRoom.value && (!org.isTeacher || library.value)) sideItem.value = 'catalog'
+  if (contentRoom.value && !org.isTeacher) sideItem.value = 'catalog'
 })
 function selectStation(id: string) {
   station.value = id
@@ -344,7 +355,10 @@ onMounted(() => {
         : null
   }, 150)
 })
+onMounted(() => document.addEventListener('pointerdown', onOutside))
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onOutside)
+  clearTimeout(statusTimer)
   clearInterval(timer)
   measure.disconnect()
 })
@@ -371,6 +385,10 @@ onBeforeUnmount(() => {
           <RoomLearningPin v-if="!org.isTeacher && !campus && !kicked && org.active && room.pin?.value" :key="current?.room_id"
             :room="room" :org-id="org.active.id" :staff="false" />
           <button v-if="org.isTeacher && campus" class="btn-secondary" @click="toggleDirectory">Daftar gedung</button>
+          <button v-if="org.isTeacher && !campus && !kicked" type="button" class="btn-secondary leave-link" :aria-busy="leaving"
+            :disabled="traveling || status !== 'open'" @click="leaveRoom">
+            {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
+          </button>
           <details v-if="org.isTeacher" class="people-list">
             <summary>Orang di ruang ini ({{ online }})</summary>
             <p>{{ auth.me?.display_name }} (kamu)</p>
@@ -552,7 +570,7 @@ onBeforeUnmount(() => {
         </footer>
         </div>
       </div>
-      <aside v-if="accountOpen" class="account-menu" aria-label="Akun dan navigasi" @keydown.esc.stop="accountOpen = false; profileTrigger?.focus()">
+      <aside v-if="accountOpen" ref="accountMenu" class="account-menu" aria-label="Akun dan navigasi" @keydown.esc.stop="accountOpen = false; profileTrigger?.focus()">
         <strong>{{ auth.me?.display_name }}</strong>
         <span>{{ schoolName }}</span>
         <button type="button" @click="accountOpen = false; profileOpen = true">Profil</button>
@@ -766,6 +784,7 @@ h1 {
 }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .people-list { margin-bottom: var(--space-3); }
+.leave-link { align-self: flex-start; margin-bottom: var(--space-2); }
 .people-list summary { min-height: var(--touch-min); cursor: pointer; }
 .people-list p { margin: var(--space-2) 0; }
 .workspace-logo, .account-button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--touch-min); min-height: var(--touch-min); border-radius: var(--radius-pill); }
