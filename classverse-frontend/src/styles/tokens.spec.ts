@@ -19,3 +19,9 @@ describe('MVP 2 design tokens', () => {
     expect(css).toMatch(/@media not all and \(pointer: coarse\) \{\s*:root \{ --touch-min: var\(--control-h\); \}/)
   })
 })
+
+it('keeps proportional surface and text tokens as the shared design pattern', () => {
+  expect(css).toContain('--kv-radius-button: 10px;')
+  expect(css).toContain('--kv-radius-input: 12px;')
+  expect(css).toContain('--text-md: 14px;')
+})

@@ -50,7 +50,7 @@ const id = useId()
 .input {
   min-height: var(--touch-min);
   padding: 0 var(--space-3);
-  border: 2px solid var(--color-input-border);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-ink);

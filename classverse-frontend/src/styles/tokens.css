@@ -64,8 +64,8 @@
   --kv-font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
   --kv-font-display: 'Fredoka', sans-serif;
   --kv-radius-chip: 999px;
-  --kv-radius-button: 14px;
-  --kv-radius-input: 16px;
+  --kv-radius-button: 10px;
+  --kv-radius-input: 12px;
   --kv-radius-card: 22px;
   --kv-radius-map: 26px;
   --kv-radius-lawn: 40px;
@@ -139,7 +139,7 @@
   --font-body: var(--kv-font-ui); /* everything else */
   --text-xs: 12px; /* name tags on the map */
   --text-sm: 13px; /* meta, sender names */
-  --text-md: 15px; /* chat messages, list items (minimum for body copy) */
+  --text-md: 14px; /* secondary body copy, list items; forms retain 16px on touch */
   --text-base: 16px;
   --text-lg: 18px;
   --text-xl: 20px; /* screen titles in headers */

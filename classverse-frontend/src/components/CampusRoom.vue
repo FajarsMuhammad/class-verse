@@ -705,7 +705,7 @@ h1 {
   font-weight: var(--weight-bold);
 }
 .dropdown-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
-.dropdown-head h2 { margin: 0; font-size: var(--text-base); }
+.dropdown-head h2 { margin: 0; font-size: var(--text-md); }
 .dropdown-head { margin-bottom: var(--space-2); }
 /* The header already names the building; DoorRooms keeps its heading for screen readers. */
 .buildings :deep(#door-title) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

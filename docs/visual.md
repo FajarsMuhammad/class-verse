@@ -156,6 +156,15 @@ Ukuran proporsional ala Gather. Token di `tokens.css`; komponen baru wajib memak
   dengan tombol kirim 36 px di dalamnya. Kartu mengambang: `--kv-shadow-float`, ikon badge 28 px.
 - Info orang online **hanya di Chat** (bagian "n orang online" yang bisa dibuka), tidak di peta/panel lain.
 - Target tetap ≥24 px (WCAG 2.2 AA 2.5.8); fokus terlihat wajib.
+- Pola permukaan: garis struktural **1 px `--kv-line`**, tanpa bayangan hitam bertingkat. Kartu memakai
+  `--kv-shadow-card`; fokus dan status pilihan tetap kontras, bukan diganti garis dekoratif pucat.
+- Radius bersama: tombol `--radius-md` **10 px**, isian/dialog kecil `--radius-lg` **12 px**.
+  Teks daftar/isi sekunder `--text-md` **14 px**; metadata `--text-sm` **13 px**. Isian tetap 16 px
+  untuk menghindari zoom otomatis iOS. Judul halaman dan ilustrasi tidak dikecilkan seragam.
+- Daftar tugas mengikuti pola baris: tanpa kotak bersarang, pemisah 1 px antarbaris, hover lembut,
+  judul semibold + metadata. Gunakan pola ini untuk daftar sejenis berikutnya.
+- Komponen baru menggunakan token dan kelas bersama di `src/styles/forms.css`. Perubahan pola
+  dilakukan di token/pemilik bersama dahulu, bukan menambah override global pada setiap elemen.
 
 | Komponen | Spesifikasi |
 | --- | --- |

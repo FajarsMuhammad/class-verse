@@ -116,7 +116,7 @@ onMounted(() => {
   </section>
 </template>
 <style scoped>
-.assignment-manager { padding: var(--space-6); margin-top: var(--space-6); border: 2px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow-wrap: anywhere; }
+.assignment-manager { padding: var(--space-6); margin-top: var(--space-6); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); background: var(--color-surface); overflow-wrap: anywhere; }
 h2, h3 { font-family: var(--font-display); }
 fieldset { display: flex; flex-wrap: wrap; gap: var(--space-4); border: 0; padding: 0; min-width: 0; }
 label { display: flex; flex: 1; flex-direction: column; gap: var(--space-2); min-width: min(100%, 200px); }

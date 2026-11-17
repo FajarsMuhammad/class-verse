@@ -72,7 +72,8 @@ Aturan:
 - Semua warna, font, ukuran teks, radius, dan spacing diambil dari `classverse-frontend/src/styles/tokens.css`. Jangan menulis hex atau ukuran font langsung di komponen.
 - Font di-host sendiri dari `classverse-frontend/src/assets/fonts/`; jangan memuat Google Fonts.
 - Avatar preset di `classverse-frontend/src/assets/avatars/`. UI shell (lobby, panel, chat) di Vue; peta dan avatar yang bergerak di Phaser.
-- Elemen interaktif minimal 44×44 px, pakai `<button>`/`<a>`/`<input>` asli, ikon-only wajib `aria-label`.
+- Ikuti pola **Kontrol ringkas** di `docs/visual.md`: tinggi kontrol memakai `--touch-min` (36 px desktop, 44 px layar sentuh), bukan angka tetap. Garis struktural 1 px `--kv-line`, radius/teks dari token; fokus dan status pilihan tetap kontras.
+- Pakai `<button>`/`<a>`/`<input>` asli, ikon-only wajib `aria-label`. Komponen baru memakai token dan kelas bersama `src/styles/forms.css`; jangan mengembalikan pola kartu bersarang/garis tebal.
 
 ## Keamanan (wajib, lihat spec bagian Keamanan)
 

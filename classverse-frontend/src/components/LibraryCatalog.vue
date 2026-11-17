@@ -144,7 +144,7 @@ const shelfLabel = (key: string) => shelves.find((s) => s.key === key)?.label ??
 .search {
   min-height: var(--touch-min);
   padding: 0 var(--space-3);
-  border: 2px solid var(--color-input-border);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-lg);
   font: inherit;
 }
@@ -203,7 +203,7 @@ const shelfLabel = (key: string) => shelves.find((s) => s.key === key)?.label ??
 }
 .heading {
   margin: 0;
-  font-size: var(--text-base);
+  font-size: var(--text-md);
 }
 .empty {
   margin: 0;

@@ -64,7 +64,7 @@ const status = computed(() => {
   flex: none;
   width: 48px;
   height: 64px;
-  border: 2px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-sm);
 }
 .body {
@@ -80,7 +80,7 @@ const status = computed(() => {
   margin: 0;
 }
 .title {
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   overflow-wrap: anywhere;
 }
 .author {

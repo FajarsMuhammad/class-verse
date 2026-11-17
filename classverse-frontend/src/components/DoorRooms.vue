@@ -91,7 +91,7 @@ watch(
 .door { font-size: var(--text-sm); }
 h2 {
   margin: 0;
-  font: var(--weight-semibold) var(--text-base)/var(--line-tight) var(--font-display);
+  font: var(--weight-semibold) var(--text-md)/var(--line-tight) var(--font-display);
 }
 p,
 span {

@@ -23,7 +23,7 @@ function state(seat: Seat) {
 </template>
 
 <style scoped>
-h3 { font: var(--weight-semibold) var(--text-lg)/var(--line-tight) var(--kv-font-display); }
+h3 { font: var(--weight-semibold) var(--text-base)/var(--line-tight) var(--kv-font-display); }
 p { color: var(--kv-text-muted); font-size: var(--text-sm); }
 .seats { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--touch-min), 1fr)); gap: var(--space-2); }
 button {

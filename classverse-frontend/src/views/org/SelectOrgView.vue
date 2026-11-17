@@ -52,7 +52,7 @@ async function choose(id: string) {
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   color: var(--color-ink);
@@ -73,7 +73,7 @@ async function choose(id: string) {
 .choice-name {
   font-family: var(--font-display);
   font-weight: var(--weight-semibold);
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
 }
 
 .badge {

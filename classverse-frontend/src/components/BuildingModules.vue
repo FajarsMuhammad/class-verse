@@ -27,7 +27,7 @@ onMounted(() => dialog.value?.showModal())
   width: min(100% - var(--space-6), 1100px);
   max-height: calc(100dvh - var(--space-6));
   padding: var(--space-5);
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   box-shadow: 0 8px 0 var(--kv-ink);
   border-radius: var(--radius-2xl);
   background: var(--kv-learning-ground);
@@ -46,7 +46,7 @@ onMounted(() => dialog.value?.showModal())
   gap: var(--space-3);
   margin-bottom: var(--space-5);
   padding: var(--space-5);
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-2xl);
   background: var(--kv-subject-ipa);
   color: var(--kv-surface);

@@ -112,7 +112,7 @@ async function save() {
 
 <style scoped>
 dialog {
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-2xl);
   padding: var(--space-6);
   background: var(--color-surface);
@@ -147,7 +147,7 @@ select {
   width: 100%;
   min-height: var(--touch-min);
   padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-input-border);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-ink);

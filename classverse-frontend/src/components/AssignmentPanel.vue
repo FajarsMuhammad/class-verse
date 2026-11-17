@@ -86,13 +86,17 @@ onMounted(load)
   </section>
 </template>
 <style scoped>
-.tasks { padding: var(--space-4); background: var(--color-surface); border: 2px solid var(--color-border); border-radius: var(--radius-lg); min-width: 0; }
+.tasks { padding: var(--space-3) 0; background: var(--color-surface); border-block: 1px solid var(--kv-line); min-width: 0; font-size: var(--text-md); }
 header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 h3, h4 { font-family: var(--font-display); margin-block: var(--space-2); }
 button { min-height: var(--touch-min); font: inherit; color: var(--color-ink); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2); cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
 button:disabled { opacity: .6; cursor: not-allowed; }
-.task-list { padding: 0; list-style: none; }
-.task-list button { display: flex; flex-direction: column; gap: var(--space-2); text-align: left; width: 100%; margin-block: var(--space-2); }
+.task-list { margin: var(--space-2) 0; padding: 0; list-style: none; }
+.task-list li { margin: 0; }
+.task-list li + li { border-top: 1px solid var(--kv-line); }
+.task-list button { display: flex; flex-direction: column; gap: var(--space-1); text-align: left; width: 100%; margin: 0; padding: var(--space-3) var(--space-2); border: 0; border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.task-list button:hover:not(:disabled) { background: var(--color-surface-alt); }
+button:focus-visible { outline: 3px solid var(--color-primary-strong); outline-offset: -3px; }
 ol { padding-left: var(--space-5); }
 li { margin-block: var(--space-2); }
 .body { white-space: pre-wrap; overflow-wrap: anywhere; }

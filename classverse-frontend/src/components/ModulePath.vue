@@ -197,14 +197,14 @@ function closed(position: number) {
 }
 .module {
   padding: var(--space-5);
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--kv-radius-card);
   background: var(--kv-learning-surface);
-  box-shadow: 0 7px 0 var(--kv-ink);
+  box-shadow: var(--kv-shadow-card);
 }
 .module h3 {
   margin: 0;
-  font-size: var(--text-base);
+  font-size: var(--text-md);
 }
 .muted {
   margin: var(--space-1) 0 0;
@@ -259,8 +259,8 @@ function closed(position: number) {
   position: relative;
   width: 76px;
   height: 76px;
-  border: 3px solid var(--kv-ink);
-  box-shadow: 0 5px 0 var(--kv-ink);
+  border: 1px solid var(--kv-line);
+  box-shadow: var(--kv-shadow-card);
   font-size: var(--text-2xl);
   border-radius: 50%;
   background: var(--kv-star);
@@ -268,7 +268,7 @@ function closed(position: number) {
   font-weight: var(--weight-semibold);
 }
 .step.done .dot { background: var(--kv-subject-ipa); color: var(--kv-surface); }
-.dot small { position: absolute; right: -8px; top: -6px; display: grid; place-items: center; width: 26px; height: 26px; border: 2px solid var(--kv-ink); border-radius: 50%; background: var(--kv-surface); color: var(--kv-ink); font-size: var(--text-xs); }
+.dot small { position: absolute; right: -8px; top: -6px; display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--kv-line); border-radius: 50%; background: var(--kv-surface); color: var(--kv-ink); font-size: var(--text-xs); }
 @media (min-width: 900px) {
   .step:nth-child(4n + 2) { margin-left: 20%; }
   .step:nth-child(4n) { margin-right: 20%; }
@@ -296,10 +296,10 @@ function closed(position: number) {
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-5);
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--kv-radius-card);
   background: var(--kv-learning-surface);
-  box-shadow: 0 7px 0 var(--kv-ink);
+  box-shadow: var(--kv-shadow-card);
 }
 .quizzes h3 { margin: 0; font-family: var(--font-display); }
 .quiz-card {
@@ -307,7 +307,7 @@ function closed(position: number) {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
 }
 .quiz-icon {
@@ -316,7 +316,7 @@ function closed(position: number) {
   place-items: center;
   width: 48px;
   height: 48px;
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-md);
   background: var(--kv-subject-arena);
   color: var(--kv-surface);

@@ -97,7 +97,7 @@ async function logout() {
   gap: var(--space-6);
   padding: var(--space-3) var(--space-8);
   background: var(--color-surface);
-  border-bottom: 2px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--kv-line);
   flex-wrap: wrap;
 }
 

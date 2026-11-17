@@ -182,7 +182,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.class-panel { padding: var(--space-6); margin-top: var(--space-6); border: 2px solid var(--color-ink); border-radius: var(--radius-lg); background: var(--color-surface); }
+.class-panel { padding: var(--space-6); margin-top: var(--space-6); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); background: var(--color-surface); }
 h2, h3 { font-family: var(--font-display); }
 h2 { margin-top: 0; }
 .muted { color: var(--color-ink-muted); }

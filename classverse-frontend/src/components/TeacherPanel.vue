@@ -194,7 +194,7 @@ function doKick() {
   overflow-y: auto;
   padding: var(--space-4);
   background: var(--color-surface);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-raise);
 }
@@ -245,7 +245,7 @@ h3 {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-md);
 }
 .confirm p,

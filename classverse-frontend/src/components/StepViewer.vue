@@ -57,7 +57,7 @@ onMounted(() => dialog.value?.showModal())
   width: min(100% - var(--space-6), 1280px);
   max-height: calc(100dvh - var(--space-6));
   padding: var(--space-5);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-2xl);
   background: var(--color-surface);
   color: var(--color-ink);

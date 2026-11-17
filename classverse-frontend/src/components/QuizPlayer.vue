@@ -136,9 +136,9 @@ onMounted(() => {
   width: min(100% - var(--space-6), 760px);
   max-height: calc(100dvh - var(--space-6));
   padding: var(--space-5);
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-2xl);
-  box-shadow: 0 8px 0 var(--kv-ink);
+  box-shadow: var(--kv-shadow-card);
   background: var(--kv-learning-surface);
   color: var(--color-ink);
 }
@@ -200,9 +200,9 @@ h3 {
   gap: var(--space-3);
   min-height: 64px;
   padding: var(--space-3) var(--space-4);
-  border: 3px solid var(--kv-ink);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
-  box-shadow: 0 4px 0 var(--kv-ink);
+  box-shadow: var(--kv-shadow-card);
   color: var(--kv-surface);
   font: inherit;
   font-weight: var(--weight-semibold);

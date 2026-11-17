@@ -337,7 +337,7 @@ h1 {
 }
 h2 {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
 }
 .label {
   font-size: var(--text-md);
@@ -413,7 +413,7 @@ h2 {
 .name {
   flex: 1;
   font-weight: var(--weight-bold);
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
 }
 .live {
   padding: var(--space-1) var(--space-3);
@@ -433,7 +433,7 @@ h2 {
 .place {
   min-height: var(--touch-min);
   padding: var(--space-2) var(--space-4);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   color: var(--color-ink);
@@ -461,7 +461,7 @@ h2 {
 }
 .catalog-title {
   margin: 0 0 var(--space-3);
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
 }
 .modules-btn {
   width: 100%;

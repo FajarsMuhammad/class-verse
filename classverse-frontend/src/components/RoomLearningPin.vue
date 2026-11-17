@@ -131,7 +131,7 @@ function set() {
   margin-top: 2px;
 }
 .pin-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
-.pin-text strong { font: var(--weight-semibold) var(--text-lg) / var(--line-tight) var(--kv-font-display); color: var(--kv-ink); }
+.pin-text strong { font: var(--weight-semibold) var(--text-base) / var(--line-tight) var(--kv-font-display); color: var(--kv-ink); }
 .pin-text span { color: var(--kv-primary-soft-text); font-size: var(--text-sm); }
 .open { grid-column: 1 / -1; justify-self: start; }
 .note { margin: 0; color: var(--kv-text-muted); font-size: var(--text-sm); }

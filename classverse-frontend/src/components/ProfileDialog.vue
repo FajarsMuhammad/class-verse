@@ -122,7 +122,7 @@ dialog {
   width: min(640px, calc(100vw - var(--space-8)));
   max-height: calc(100vh - var(--space-8));
   box-sizing: border-box;
-  border: 2px solid var(--color-border-soft);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-2xl);
   padding: var(--space-6);
   background: var(--color-surface);
@@ -169,7 +169,7 @@ legend {
   box-sizing: border-box;
   width: 100%;
   min-height: var(--touch-min);
-  border: 2px solid var(--color-input-border);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
   font: inherit;
@@ -193,7 +193,7 @@ legend {
   justify-items: center;
   gap: var(--space-1);
   padding: var(--space-2);
-  border: 2px solid var(--color-border-soft);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: var(--text-xs);
