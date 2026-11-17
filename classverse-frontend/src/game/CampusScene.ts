@@ -50,6 +50,14 @@ const TABLE_PENALTY = 20
 const MAX_FRAME_MS = 100
 const DOUBLE_CLICK_MS = 400
 const DOUBLE_CLICK_PX = 24
+// A press that moves further than this pans the campus instead of clicking.
+const DRAG_PX = 6
+
+// clampCentre keeps the view inside the map: a map smaller than the view stays centred.
+export function clampCentre(size: number, view: number, centre: number) {
+  if (size <= view) return size / 2
+  return Math.min(size - view / 2, Math.max(view / 2, centre))
+}
 
 // CampusScene draws the map and avatars from World and turns keyboard and
 // clicks into predicted local movement plus `move` messages.
@@ -63,6 +71,9 @@ export class CampusScene extends Phaser.Scene {
   >
   private path: Vec[] = []
   private lastClick: { time: number; x: number; y: number } | null = null
+  // Campus camera: fixed (no follow); the user pans it by dragging.
+  private centre: Vec | null = null
+  private press: { x: number; y: number; centre: Vec; dragged: boolean } | null = null
   private lastSent = 0
   private lastSentPos: { x: number; y: number; dir: Direction } | null = null
   private labels: Phaser.GameObjects.Container[] = []
@@ -96,6 +107,7 @@ export class CampusScene extends Phaser.Scene {
 
   create() {
     const { map } = this.deps
+    this.centre = null
     const newArt = drawWorld(this, this.deps.world.mapKey ?? 'campus')
     drawStations(this, this.deps.world.mapKey ?? 'campus')
     if (!newArt) {
@@ -161,10 +173,43 @@ export class CampusScene extends Phaser.Scene {
       this.game.canvas.parentElement?.removeEventListener('blur', clearInput),
     )
     this.input.on('pointerdown', this.onPointerDown, this)
+    this.input.on('pointermove', this.onPointerMove, this)
+    this.input.on('pointerup', this.onPointerUp, this)
   }
 
   private onPointerDown(p: Phaser.Input.Pointer) {
     if (!p.leftButtonDown()) return
+    const cam = this.cameras.main
+    this.press = { x: p.x, y: p.y, centre: this.centre ?? { x: cam.midPoint.x, y: cam.midPoint.y }, dragged: false }
+  }
+
+  private onPointerMove(p: Phaser.Input.Pointer) {
+    const press = this.press
+    if (!press || !p.isDown || this.deps.world.mapKey !== 'campus') return
+    if (!press.dragged && Math.hypot(p.x - press.x, p.y - press.y) <= DRAG_PX) return
+    press.dragged = true
+    this.lastClick = null
+    const zoom = this.cameras.main.zoom
+    this.panTo({ x: press.centre.x - (p.x - press.x) / zoom, y: press.centre.y - (p.y - press.y) / zoom })
+  }
+
+  private onPointerUp(p: Phaser.Input.Pointer) {
+    const press = this.press
+    this.press = null
+    if (press && !press.dragged) this.onClick(p)
+  }
+
+  private panTo(to: Vec) {
+    const { map } = this.deps
+    const cam = this.cameras.main
+    this.centre = {
+      x: clampCentre(map.pixelWidth, this.scale.width / cam.zoom, to.x),
+      y: clampCentre(map.pixelHeight, this.scale.height / cam.zoom, to.y),
+    }
+    cam.centerOn(this.centre.x, this.centre.y)
+  }
+
+  private onClick(p: Phaser.Input.Pointer) {
     const self = this.deps.world.self
     if (!self) return
     const to = { x: Math.round(p.worldX), y: Math.round(p.worldY) }
@@ -248,7 +293,6 @@ export class CampusScene extends Phaser.Scene {
     this.drawZones()
     this.drawRadius()
     this.drawSpeaking()
-    if (world.mapKey === 'campus' && self) this.cameras.main.centerOn(self.x, self.y)
   }
 
   // tablePenalty makes walks go around other tables. Every table is its own
@@ -351,8 +395,11 @@ export class CampusScene extends Phaser.Scene {
       : Math.min(this.scale.width / map.pixelWidth, free / map.pixelHeight)
     // Centre the map in the band between the toolbars, not the whole canvas.
     const shift = (inset.top - inset.bottom) / 2 / zoom
-    const target = campus ? this.deps.world.self : null
-    camera.setZoom(zoom).centerOn(target?.x ?? map.pixelWidth / 2, target?.y ?? map.pixelHeight / 2 - shift)
+    camera.setZoom(zoom)
+    // Campus starts on the avatar, then stays where the user panned it; zoom keeps that centre.
+    const start = this.centre ?? this.deps.world.self
+    if (campus && start) this.panTo(start)
+    else camera.centerOn(map.pixelWidth / 2, map.pixelHeight / 2 - (campus ? 0 : shift))
     for (const child of this.children.list) {
       if (child.name === 'world-label') (child as Phaser.GameObjects.Text).setScale(1 / zoom)
     }

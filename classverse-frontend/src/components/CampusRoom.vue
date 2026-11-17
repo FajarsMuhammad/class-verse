@@ -430,7 +430,7 @@ onBeforeUnmount(() => {
         <template #gradebook><RoomTools v-if="org.active && auth.me" tool="gradebook" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" /></template>
       </SideMenu>
       <div class="map-column" :class="{ 'map-hidden': pageOpen }" :inert="pageOpen">
-      <div class="map-frame">
+      <div class="map-frame" :class="{ 'no-top': org.isTeacher }">
         <h1 v-if="org.isTeacher" id="map-title" class="sr-only">{{ campus ? schoolName : current?.room_name }}</h1>
         <header v-if="!org.isTeacher" ref="mapTop" class="map-top">
           <button
@@ -478,7 +478,7 @@ onBeforeUnmount(() => {
         >
           <header class="dropdown-head">
             <h2 v-if="directoryOpen">Daftar gedung</h2>
-            <span v-else></span>
+            <h2 v-else aria-hidden="true">{{ panelBuilding?.name }}</h2>
             <button ref="closeButton" class="btn-secondary close" aria-label="Tutup pilihan" @click="closeDirectory">×</button>
           </header>
           <DoorRooms
@@ -666,7 +666,7 @@ onBeforeUnmount(() => {
 .map-zoom {
   position: absolute;
   z-index: 2;
-  top: calc(var(--touch-min) + var(--space-4) + var(--space-6));
+  bottom: var(--space-3);
   right: var(--space-3);
 }
 .map-bottom {
@@ -675,7 +675,7 @@ onBeforeUnmount(() => {
 .map-minimap {
   position: absolute;
   z-index: 2;
-  /* Below the top rail, mirroring the zoom control on the right. */
+  /* Below the top rail; the zoom control sits bottom-right. */
   top: calc(var(--touch-min) + var(--space-4) + var(--space-6));
   left: var(--space-3);
 }
@@ -736,12 +736,15 @@ onBeforeUnmount(() => {
   outline: 3px solid var(--color-primary-strong);
   outline-offset: 2px;
 }
+/* The place card and the room list share the top-right corner so the flow
+   (select → walk to door → pick room) never jumps across the map. */
 .place-detail {
   position: absolute;
   z-index: 3;
-  bottom: calc(var(--space-14) + var(--space-10));
-  left: var(--space-3);
+  top: calc(var(--touch-min) + var(--space-3) + var(--space-2));
+  right: var(--space-3);
 }
+.no-top .place-detail, .no-top .buildings, .no-top .map-minimap { top: var(--space-3); }
 .campus-chat {
   margin-top: var(--space-5);
   background: var(--color-surface);
@@ -835,12 +838,15 @@ h1 {
   font-weight: var(--weight-bold);
 }
 .dropdown-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
-.dropdown-head h2 { margin: 0; font-size: var(--text-lg); }
+.dropdown-head h2 { margin: 0; font-size: var(--text-base); }
+.dropdown-head { margin-bottom: var(--space-2); }
+/* The header already names the building; DoorRooms keeps its heading for screen readers. */
+.buildings :deep(#door-title) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .dropdown-head .close { flex: none; min-width: var(--touch-min); padding: 0; }
 .buildings {
   background: var(--color-surface);
-  border-radius: var(--radius-2xl);
-  padding: var(--space-5);
+  border-radius: var(--kv-radius-card);
+  padding: var(--space-4);
   min-height: 0;
   box-sizing: border-box;
   position: absolute;
@@ -848,10 +854,10 @@ h1 {
   /* Dropdown under the "Daftar gedung" button at the right end of the top rail. */
   top: calc(var(--touch-min) + var(--space-3) + var(--space-2));
   right: var(--space-3);
-  width: min(360px, calc(100% - var(--space-6)));
+  width: min(280px, calc(100% - var(--space-6)));
   max-height: calc(100% - var(--touch-min) - var(--space-8));
-  box-shadow: var(--shadow-raise);
-  border: 2px solid var(--color-border);
+  box-shadow: var(--kv-shadow-float);
+  border: 1px solid var(--kv-line);
   overflow-y: auto;
 }
 h2 {
