@@ -33,6 +33,21 @@ function welcomed() {
 }
 
 describe('World', () => {
+  it('shows allowlisted emotes only for known actors and expires them after three seconds', () => {
+    const w = welcomed()
+    w.apply({ t: 'emote', seq: 2, d: { id: 'b', kind: 'hand' } }, 100)
+    w.apply({ t: 'emote', seq: 3, d: { id: 'unknown', kind: 'wave' } }, 100)
+    expect(w.emotes.size).toBe(1)
+    expect(w.emotes.get('b')?.text).toBe('Aku mau tanya!')
+    w.sample(3099)
+    expect(w.emotes.size).toBe(1)
+    w.sample(3100)
+    expect(w.emotes.size).toBe(0)
+    w.apply({ t: 'emote', seq: 4, d: { id: 'me', kind: 'wave' } }, 3200)
+    expect(w.emotes.has('me')).toBe(true)
+    w.apply({ t: 'left', seq: 5, d: { id: 'me' } }, 3300)
+    expect(w.emotes.size).toBe(0)
+  })
   it('gather resets self, snaps remote avatars and bumps the movement revision', () => {
     const w = welcomed()
     w.self!.x = 900

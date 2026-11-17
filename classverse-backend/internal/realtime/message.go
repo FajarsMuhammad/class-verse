@@ -23,8 +23,9 @@ const (
 	TypeMove   = "move"
 	TypePing   = "ping"
 	TypeTravel = "travel"
-	TypeChat   = "chat" // both directions
-	TypeSeat   = "seat" // mode HP only
+	TypeChat   = "chat"  // both directions
+	TypeEmote  = "emote" // both directions
+	TypeSeat   = "seat"  // mode HP only
 )
 
 // Server → client message types.
@@ -43,10 +44,22 @@ const (
 	TypeRoomState      = "room_state"
 )
 
+// EmoteMsg requests an allowlisted transient reaction.
+type EmoteMsg struct {
+	Key string `json:"kind"`
+}
+
+// EmoteOut identifies the actor; clients display the reaction for three seconds.
+type EmoteOut struct {
+	ID  uuid.UUID `json:"id"`
+	Key string    `json:"kind"`
+}
+
 // CommandMsg requests a teacher action in the current room.
 type CommandMsg struct {
 	Name   string    `json:"name"`
 	Target uuid.UUID `json:"target,omitempty"`
+	Step   uuid.UUID `json:"step,omitempty"`
 }
 
 // ModerationEvent tells staff the result of kick/allow and the open-session
@@ -193,9 +206,19 @@ type ZoneMsg struct {
 	Name string `json:"name"`
 }
 
+// LearningPin is a current-catalog link, not an assignment or synchronized playback.
+type LearningPin struct {
+	ModuleID    uuid.UUID `json:"module_id"`
+	StepID      uuid.UUID `json:"step_id"`
+	Title       string    `json:"title"`
+	BuildingKey string    `json:"building_key"`
+	Level       string    `json:"level"`
+}
+
 // RoomStateMsg carries room settings that can change during a session.
 type RoomStateMsg struct {
-	AllChatEnabled bool `json:"all_chat_enabled"`
+	Pin            *LearningPin `json:"pin"`
+	AllChatEnabled bool         `json:"all_chat_enabled"`
 	// Locked rooms reject new participants (slice 7).
 	Locked bool `json:"locked"`
 	// Muted is personal: true when this receiver may not chat or speak.

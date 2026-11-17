@@ -243,7 +243,7 @@ h2 {
 }
 .item {
   padding: var(--space-4);
-  border: 2px solid var(--color-border-soft);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
 }
 .meta,
@@ -280,6 +280,6 @@ h2 {
 }
 .log-item {
   padding: var(--space-2) 0;
-  border-bottom: 2px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--kv-line);
 }
 </style>

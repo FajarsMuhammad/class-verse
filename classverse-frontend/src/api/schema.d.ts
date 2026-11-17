@@ -407,10 +407,1361 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Pengajar/admin. Memesan kuota sekali untuk seluruh file. `id` dibuat klien dan disimpan sebelum
+         *     request agar retry setelah respons hilang tidak memesan kuota dua kali (POST ulang dengan isi sama → 201
+         *     dengan status yang sama). Isi dicek dari byte file (PDF, MP3, M4A), bukan ekstensi.
+         */
+        post: operations["startUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/uploads/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        /** @description Chunk yang sudah tersimpan menurut storage; klien hanya mengirim nomor yang belum ada. */
+        get: operations["getUpload"];
+        put?: never;
+        post?: never;
+        /** @description Batalkan upload yang belum siap; chunk dihapus dan kuota dilepas. Idempoten. */
+        delete: operations["cancelUpload"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/uploads/{file_id}/parts/{part}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+                part: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Chunk ke-n, tepat `chunk_size` byte kecuali chunk terakhir. Mengirim ulang chunk yang sama aman. */
+        put: operations["putUploadPart"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/uploads/{file_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Gabungkan chunk, cek SHA-256 dan format. Berhasil → file `ready` dan tampil di daftar. Gagal format →
+         *     400 (`validation_failed` atau `pdf_encrypted`), file dibuang dan kuota dilepas. Idempoten.
+         */
+        post: operations["completeUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota. */
+        get: operations["listFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Pengunggah atau admin. Kuota dilepas setelah objek terhapus. Idempoten. */
+        delete: operations["deleteFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files/{file_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Isi file lewat origin aplikasi dengan Bearer token; membership dicek ulang setiap request termasuk tiap
+         *     Range. Satu rentang `bytes=` saja. Storage tidak pernah terbuka ke browser.
+         */
+        get: operations["getFileContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/files/{file_id}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Halaman PDF (mulai 1) atau detik audio terakhir milik pemanggil. */
+        put: operations["saveFilePosition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Katalog urut judul. Peserta hanya melihat buku terbit; `drafts=true` menyertakan draf untuk
+         *     pengajar/admin (diabaikan untuk peserta). Arsip tidak pernah tampil. `position` = posisi baca pemanggil.
+         */
+        get: operations["listBooks"];
+        put?: never;
+        /** @description Pengajar/admin. E-book memakai file PDF siap milik sekolah, audio memakai MP3/M4A, buku fisik tanpa file. */
+        post: operations["createBook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/books/{book_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Mengganti semua field; `published=false` mengembalikan ke draf. */
+        put: operations["updateBook"];
+        post?: never;
+        /** @description Pengajar/admin. Arsipkan; file tidak ikut terhapus. */
+        delete: operations["archiveBook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/books/{book_id}/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Anggota meminjam satu eksemplar buku fisik terbit selama 14 hari. Maksimal 5 pinjaman aktif.
+         *     Diulang saat pinjaman masih aktif mengembalikan pinjaman yang sama (tidak membuat duplikat).
+         */
+        post: operations["borrowBook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pinjamanku — pinjaman aktif pemanggil, jatuh tempo terdekat dulu. */
+        get: operations["listMyLoans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/library/loans/{loan_id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Peminjam mengembalikan pinjamannya sendiri. Diulang aman. */
+        post: operations["returnLoan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Modul (jalur belajar) beserta langkah aktif berurutan. Peserta hanya melihat modul terbit; `drafts=true`
+         *     menyertakan draf untuk pengajar/admin. Arsip tidak pernah tampil. Maksimal 100 modul.
+         */
+        get: operations["listModules"];
+        put?: never;
+        /** @description Pengajar/admin. Gedung khusus staf (Ruang Guru) ditolak. */
+        post: operations["createModule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Mengganti field modul; modul terbit diedit langsung. */
+        put: operations["updateModule"];
+        post?: never;
+        /** @description Pengajar/admin. Arsipkan modul beserta langkahnya; file tidak ikut terhapus. */
+        delete: operations["archiveModule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Pengajar/admin. Langkah baru ditaruh paling akhir; maksimal 50 langkah aktif. */
+        post: operations["addModuleStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/steps/{step_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Mengganti isi langkah. */
+        put: operations["updateModuleStep"];
+        post?: never;
+        /** @description Pengajar/admin. Langkah tidak pernah dihapus permanen agar progres (M2) tetap merujuk data nyata. */
+        delete: operations["archiveModuleStep"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. `step_ids` wajib memuat semua langkah aktif tepat sekali. */
+        put: operations["reorderModuleSteps"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Modul terbit terakhir yang dikerjakan dan masih punya langkah aktif belum selesai; null jika tidak ada. */
+        get: operations["resumeModule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/steps/{step_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description Tandai langkah selesai untuk pemanggil; idempoten. Langkah bebas diselesaikan tanpa urutan wajib.
+         *     Langkah `kuis` ditolak 409 `quiz_step`: selesai otomatis saat lulus kuisnya.
+         */
+        put: operations["completeModuleStep"];
+        post?: never;
+        /** @description Batalkan tanda selesai milik pemanggil; idempoten. */
+        delete: operations["uncompleteModuleStep"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * @description Kuis beserta nilai terbaik dan jumlah percobaan selesai milik pemanggil. Peserta hanya melihat kuis terbit dan
+         *     tidak pernah menerima soal/kunci di sini. `drafts=true` untuk pengajar/admin menyertakan draf serta soal
+         *     lengkap dengan kunci (untuk Kelola). Maksimal 100 kuis.
+         */
+        get: operations["listQuizzes"];
+        put?: never;
+        /** @description Pengajar/admin. Dibuat sebagai draf; terbitkan setelah ada minimal 1 soal. */
+        post: operations["createQuiz"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Percobaan yang sudah dimulai tetap memakai nilai lulus dan soal saat dimulai. */
+        put: operations["updateQuiz"];
+        post?: never;
+        /** @description Pengajar/admin. Arsipkan kuis; riwayat nilai tetap tersimpan. */
+        delete: operations["archiveQuiz"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Pengajar/admin. Soal ditaruh paling akhir; maksimal 50 soal. */
+        post: operations["addQuizQuestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. Percobaan yang sudah dimulai tidak berubah (snapshot). */
+        put: operations["updateQuizQuestion"];
+        post?: never;
+        /** @description Pengajar/admin. Kuis terbit wajib menyisakan minimal 1 soal. */
+        delete: operations["deleteQuizQuestion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. `question_ids` wajib memuat semua soal tepat sekali. */
+        put: operations["reorderQuizQuestions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Melanjutkan percobaan yang belum selesai, atau memulai percobaan baru dengan snapshot soal saat ini.
+         *     Percobaan tidak dibatasi. Kunci dan penjelasan bernilai null sampai percobaan selesai.
+         */
+        post: operations["startQuizAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/attempts/{attempt_id}/answers/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+                index: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Menyimpan atau mengganti pilihan untuk soal ke-`index` (0-based). Diulang aman. Ditolak setelah selesai. */
+        put: operations["answerQuizQuestion"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/attempts/{attempt_id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Server menilai sekali (soal kosong dihitung salah; nilai dibulatkan ke bawah). Diulang mengembalikan hasil
+         *     yang sama. Lulus otomatis menyelesaikan langkah modul `kuis` yang menunjuk kuis ini.
+         */
+        post: operations["finishQuizAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/gradebook": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Staff participant summaries */
+        get: operations["listGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/gradebook/me": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Own academic report */
+        get: operations["getMyGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/gradebook/students/{user_id}": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Own report or school participant report for staff */
+        get: operations["getStudentGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/gradebook/csv": {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Staff filtered CSV, maximum 10000 students; formula-safe */
+        get: operations["exportGradebook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        get: operations["listAssignments"];
+        put?: never;
+        post: operations["issueAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["cancelAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        get: operations["listAssignmentSteps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        get: operations["listAssignmentRoster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/assignments/{assignment_id}/steps/{step_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Ordered monotonic completion; quiz steps require passing contextual attempt, never manual completion */
+        put: operations["completeAssignmentStep"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Tahun ajaran sekolah, terbaru dulu; tepat satu aktif bila ada. */
+        get: operations["listAcademicYears"];
+        put?: never;
+        /** @description Admin. Label `YYYY/YYYY+1`, unik per sekolah. Tahun pertama sekolah otomatis aktif. */
+        post: operations["createAcademicYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Admin. Menjadikan tahun ini satu-satunya tahun aktif; tahun lain tetap tersedia. */
+        put: operations["activateAcademicYear"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/classes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa. */
+        get: operations["listClasses"];
+        put?: never;
+        /** @description Pengajar/admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu. */
+        post: operations["createClass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Semua anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan). */
+        get: operations["listRoster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/roster/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description Pengajar/admin. Menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
+         *     ditutup, riwayat tetap). `class_id: null` mengeluarkan dari kelas. Hanya anggota berperan peserta.
+         */
+        put: operations["placeStudent"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/classes/{class_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Pengajar/admin. */
+        put: operations["renameClass"];
+        post?: never;
+        /** @description Pengajar/admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); riwayat tetap. */
+        delete: operations["archiveClass"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/members/{user_id}/placements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Riwayat kelas peserta di sekolah ini, semua tahun, terbaru dulu. */
+        get: operations["listPlacements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        Level: "SD" | "SMP" | "SMA" | "Umum";
+        ModuleInput: {
+            /** @description Kunci gedung di peta kampus */
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            description: string;
+            published: boolean;
+        };
+        Module: components["schemas"]["ModuleInput"] & {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            updated_at: string;
+            steps: components["schemas"]["ModuleStep"][];
+        };
+        ModuleList: {
+            items: components["schemas"]["Module"][];
+        };
+        /** @enum {string} */
+        StepKind: "materi" | "berkas" | "video" | "kuis";
+        StepInput: {
+            kind: components["schemas"]["StepKind"];
+            title: string;
+            /** @description Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa. */
+            body?: string;
+            /**
+             * Format: uuid
+             * @description Wajib untuk `berkas`: PDF/audio siap milik sekolah
+             */
+            file_id?: string | null;
+            /** @description Wajib untuk `video`: ID atau tautan YouTube (https) */
+            video_id?: string;
+            /**
+             * Format: uuid
+             * @description Wajib untuk `kuis`: kuis terbit milik sekolah
+             */
+            quiz_id?: string | null;
+            minutes: number;
+        };
+        ModuleStep: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["StepKind"];
+            title: string;
+            body: string;
+            /** Format: uuid */
+            file_id: string | null;
+            /**
+             * @description Jenis file langkah `berkas` (hanya di daftar modul)
+             * @enum {string|null}
+             */
+            file_kind: "pdf" | "audio" | null;
+            /** @description ID video YouTube 11 karakter */
+            video_id: string | null;
+            /**
+             * Format: uuid
+             * @description Kuis langkah `kuis`; selesai otomatis saat lulus
+             */
+            quiz_id: string | null;
+            minutes: number;
+            /** @description Posisi baca pemanggil untuk file langkah `berkas` */
+            reader_position: number;
+            /** @description Langkah sudah ditandai selesai oleh pemanggil */
+            done: boolean;
+        };
+        ModuleResume: {
+            /** Format: uuid */
+            module_id: string;
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            done: number;
+            total: number;
+            next_title: string;
+        };
+        QuizInput: {
+            /** @description Kunci gedung di peta kampus */
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            description: string;
+            /** @default 60 */
+            pass_score: number;
+            published: boolean;
+        };
+        Quiz: {
+            /** Format: uuid */
+            id: string;
+            building_key: string;
+            level: components["schemas"]["Level"];
+            title: string;
+            description: string;
+            pass_score: number;
+            published: boolean;
+            /** Format: date-time */
+            updated_at: string;
+            question_count: number;
+            /** @description Nilai tertinggi pemanggil; null jika belum pernah selesai */
+            best_score: number | null;
+            /** @description Jumlah percobaan selesai milik pemanggil */
+            attempts: number;
+            /** @description Hanya untuk pengajar/admin dengan drafts=true */
+            questions?: components["schemas"]["QuizQuestion"][];
+        };
+        QuizList: {
+            items: components["schemas"]["Quiz"][];
+        };
+        QuestionInput: {
+            prompt: string;
+            options: string[];
+            /** @description Indeks pilihan benar */
+            answer: number;
+            explanation?: string;
+        };
+        QuizQuestion: {
+            /** Format: uuid */
+            id: string;
+            prompt: string;
+            options: string[];
+            answer: number;
+            explanation: string;
+        };
+        AttemptQuestion: {
+            prompt: string;
+            options: string[];
+            /** @description Null sampai percobaan selesai */
+            answer: number | null;
+            /** @description Null sampai percobaan selesai */
+            explanation: string | null;
+        };
+        QuizAttempt: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            quiz_id: string;
+            questions: components["schemas"]["AttemptQuestion"][];
+            /** @description Pilihan pemanggil; -1 = belum dijawab */
+            answers: number[];
+            pass_score: number;
+            finished: boolean;
+            correct: number | null;
+            /** @description 0–100, dibulatkan ke bawah */
+            score: number | null;
+            passed: boolean | null;
+        };
+        GradebookModule: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            building_key: string;
+            level: string;
+            archived: boolean;
+            done: number;
+            total: number;
+        };
+        GradebookQuiz: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            building_key: string;
+            archived: boolean;
+            attempts: number;
+            best: number | null;
+            last: number | null;
+        };
+        GradebookTask: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            class_name: string;
+            year_label: string;
+            building_key: string;
+            cancelled: boolean;
+            /** Format: date-time */
+            due_at: string | null;
+            done: number;
+            total: number;
+        };
+        GradebookRow: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            class_name: string;
+            modules_done: number;
+            modules_total: number;
+            quizzes_attempted: number;
+            quizzes_total: number;
+            average_best: number | null;
+        };
+        GradebookPage: {
+            items: components["schemas"]["GradebookRow"][];
+            total: number;
+        };
+        StudentGradebook: {
+            /** Format: uuid */
+            user_id: string;
+            name: string;
+            modules: components["schemas"]["GradebookModule"][];
+            quizzes: components["schemas"]["GradebookQuiz"][];
+            assignments: components["schemas"]["GradebookTask"][];
+            average_best: number | null;
+        };
+        AssignmentInput: {
+            /**
+             * Format: uuid
+             * @description Client-generated retry-safe ID
+             */
+            id: string;
+            /** Format: uuid */
+            class_id: string;
+            /** Format: uuid */
+            module_id: string;
+            /** Format: date-time */
+            due_at?: string | null;
+        };
+        Assignment: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            class_name: string;
+            year_label: string;
+            building_key: string;
+            level: components["schemas"]["Level"];
+            /** Format: date-time */
+            due_at: string | null;
+            cancelled: boolean;
+            done: number;
+            total: number;
+        };
+        AssignmentStep: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["StepKind"];
+            title: string;
+            body: string;
+            /** Format: uuid */
+            file_id: string | null;
+            /** @enum {string|null} */
+            file_kind: "pdf" | "audio" | null;
+            video_id: string | null;
+            /** Format: uuid */
+            quiz_id: string | null;
+            minutes: number;
+            done: boolean;
+            unlocked: boolean;
+        };
+        AssignmentRecipient: {
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            done: number;
+            total: number;
+        };
+        AcademicYear: {
+            /** Format: uuid */
+            id: string;
+            /** @example 2026/2027 */
+            label: string;
+            active: boolean;
+        };
+        ClassInput: {
+            name: string;
+        };
+        SchoolClass: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            academic_year_id: string;
+            name: string;
+            /** @description Jumlah siswa aktif */
+            students: number;
+        };
+        RosterEntry: {
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            avatar_key: string;
+            /**
+             * Format: uuid
+             * @description Null = belum ditempatkan
+             */
+            class_id: string | null;
+        };
+        Placement: {
+            class_name: string;
+            year_label: string;
+            /** Format: date-time */
+            started_at: string;
+            /**
+             * Format: date-time
+             * @description Null = masih di kelas ini
+             */
+            ended_at: string | null;
+        };
+        /** @enum {string} */
+        Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
+        BookInput: {
+            title: string;
+            author: string;
+            shelf: components["schemas"]["Shelf"];
+            /** @enum {string} */
+            level: "SD" | "SMP" | "SMA" | "Umum";
+            /** @enum {string} */
+            format: "buku" | "ebook" | "audio";
+            /** @description Eksemplar fisik; selalu 0 untuk ebook/audio */
+            copies: number;
+            /** Format: uuid */
+            file_id?: string | null;
+            /** @enum {string} */
+            cover: "ipa" | "matematika" | "sejarah" | "bahasa" | "kreatif" | "diskusi" | "kelas" | "arena";
+            published: boolean;
+        };
+        Book: components["schemas"]["BookInput"] & {
+            /** Format: uuid */
+            id: string;
+            /** @description Buku contoh dari seed, boleh dihapus */
+            sample: boolean;
+            position: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** @description Buku fisik: eksemplar yang tidak sedang dipinjam */
+            available: number;
+            my_loan: components["schemas"]["MyLoan"] | null;
+        };
+        MyLoan: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            due_at: string;
+        };
+        Loan: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            book_id: string;
+            title: string;
+            author: string;
+            cover: string;
+            /** Format: date-time */
+            borrowed_at: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            returned_at: string | null;
+        };
+        LoanList: {
+            items: components["schemas"]["Loan"][];
+            max_active: number;
+        };
+        BookList: {
+            items: components["schemas"]["Book"][];
+            next_cursor: string | null;
+        };
+        StartUploadRequest: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: int64 */
+            size: number;
+            /** @enum {string} */
+            kind: "pdf" | "audio";
+            sha256: string;
+        };
+        UploadProgress: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            size: number;
+            /**
+             * Format: int64
+             * @description 5242880 (5 MiB)
+             */
+            chunk_size: number;
+            parts: number[];
+            /** @enum {string} */
+            state: "uploading" | "assembled" | "canceled";
+            /** Format: date-time */
+            expires_at: string;
+        };
+        FileItem: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "pdf" | "audio";
+            /** @enum {string} */
+            content_type: "application/pdf" | "audio/mpeg" | "audio/mp4";
+            /** Format: int64 */
+            size: number;
+            /** Format: uuid */
+            uploaded_by: string;
+            /** Format: date-time */
+            created_at: string;
+            position: number;
+        };
+        FileList: {
+            items: components["schemas"]["FileItem"][];
+            /** Format: int64 */
+            used_bytes: number;
+            /** Format: int64 */
+            quota_bytes: number;
+        };
         ErrorResponse: {
             error: {
                 code: string;
@@ -468,11 +1819,8 @@ export interface components {
             display_name?: string;
             /** Format: date */
             birth_date?: string;
-            /**
-             * @description Sporty presets use sporty-<style>-<color>; legacy SVG keys remain accepted.
-             * @enum {string}
-             */
-            avatar_key?: "default" | "round-nila" | "round-mangga" | "cap-nila" | "cap-mangga" | "glasses-nila" | "glasses-mangga" | "headset-nila" | "headset-mangga" | "bun-nila" | "bun-mangga" | "beret-nila" | "beret-mangga" | "sporty-runner-nila" | "sporty-runner-mangga" | "sporty-runner-zamrud" | "sporty-runner-laut" | "sporty-runner-koral" | "sporty-runner-grafit" | "sporty-cap-nila" | "sporty-cap-mangga" | "sporty-cap-zamrud" | "sporty-cap-laut" | "sporty-cap-koral" | "sporty-cap-grafit" | "sporty-headphones-nila" | "sporty-headphones-mangga" | "sporty-headphones-zamrud" | "sporty-headphones-laut" | "sporty-headphones-koral" | "sporty-headphones-grafit" | "sporty-varsity-nila" | "sporty-varsity-mangga" | "sporty-varsity-zamrud" | "sporty-varsity-laut" | "sporty-varsity-koral" | "sporty-varsity-grafit" | "sporty-ponytail-nila" | "sporty-ponytail-mangga" | "sporty-ponytail-zamrud" | "sporty-ponytail-laut" | "sporty-ponytail-koral" | "sporty-ponytail-grafit" | "sporty-hoodie-nila" | "sporty-hoodie-mangga" | "sporty-hoodie-zamrud" | "sporty-hoodie-laut" | "sporty-hoodie-koral" | "sporty-hoodie-grafit" | "sporty-glasses-nila" | "sporty-glasses-mangga" | "sporty-glasses-zamrud" | "sporty-glasses-laut" | "sporty-glasses-koral" | "sporty-glasses-grafit";
+            /** @description Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid. */
+            avatar_key?: string;
         };
         CreateOrgRequest: {
             name: string;
@@ -518,7 +1866,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        RoomMap: "classroom" | "garden";
+        RoomMap: "classroom" | "garden" | "lab" | "baca" | "library" | "science" | "staff";
         CreateRoomRequest: {
             name: string;
             map_key: components["schemas"]["RoomMap"];
@@ -740,6 +2088,11 @@ export interface components {
     };
     parameters: {
         OrgID: string;
+        AssignmentID: string;
+        YearID: string;
+        QuizID: string;
+        AttemptID: string;
+        FileID: string;
         /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
         InviteCode: string;
     };
@@ -1455,6 +2808,1660 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Sesi upload (baru atau yang sudah ada) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadProgress"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Progres upload */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadProgress"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    cancelUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dibatalkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    putUploadPart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+                part: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Chunk tersimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    completeUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File siap */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadProgress"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listFiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dihapus */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getFileContent: {
+        parameters: {
+            query?: never;
+            header?: {
+                Range?: string;
+            };
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Seluruh file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "audio/mpeg": string;
+                    "audio/mp4": string;
+                };
+            };
+            /** @description Sebagian file; lihat Content-Range */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description range_not_satisfiable; Content-Range: bytes *\/size */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    saveFilePosition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                file_id: components["parameters"]["FileID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    position: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Tersimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listBooks: {
+        parameters: {
+            query?: {
+                shelf?: components["schemas"]["Shelf"];
+                /** @description Cari judul/penulis, teks literal */
+                q?: string;
+                drafts?: boolean;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Satu halaman katalog */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookInput"];
+            };
+        };
+        responses: {
+            /** @description Buku dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookInput"];
+            };
+        };
+        responses: {
+            /** @description Buku diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    borrowBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                book_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pinjaman aktif */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyLoan"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `no_copies`, `loan_limit`, atau `not_loanable` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listMyLoans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pinjaman aktif */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    returnLoan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                loan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dikembalikan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listModules: {
+        parameters: {
+            query?: {
+                building_key?: string;
+                level?: components["schemas"]["Level"];
+                drafts?: boolean;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar modul */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleInput"];
+            };
+        };
+        responses: {
+            /** @description Modul dibuat (tanpa langkah) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Module"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleInput"];
+            };
+        };
+        responses: {
+            /** @description Modul diperbarui (tanpa langkah) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Module"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepInput"];
+            };
+        };
+        responses: {
+            /** @description Langkah dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleStep"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepInput"];
+            };
+        };
+        responses: {
+            /** @description Langkah diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleStep"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    reorderModuleSteps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    step_ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Urutan disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resumeModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lanjutkan belajar */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        resume: components["schemas"]["ModuleResume"] | null;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    completeModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Selesai */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    uncompleteModuleStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tanda selesai dibatalkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listQuizzes: {
+        parameters: {
+            query?: {
+                building_key?: string;
+                level?: components["schemas"]["Level"];
+                drafts?: boolean;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar kuis */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createQuiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizInput"];
+            };
+        };
+        responses: {
+            /** @description Kuis dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quiz"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateQuiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizInput"];
+            };
+        };
+        responses: {
+            /** @description Kuis diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quiz"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveQuiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionInput"];
+            };
+        };
+        responses: {
+            /** @description Soal dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizQuestion"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionInput"];
+            };
+        };
+        responses: {
+            /** @description Soal diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizQuestion"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dihapus */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    reorderQuizQuestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    question_ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Urutan disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startQuizAttempt: {
+        parameters: {
+            query?: {
+                /** @description Own unlocked assignment quiz step; creates/resumes separate task-context attempt */
+                assignment_step_id?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Percobaan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizAttempt"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    answerQuizQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    choice: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Jawaban disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    finishQuizAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: components["parameters"]["QuizID"];
+                attempt_id: components["parameters"]["AttemptID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hasil beserta kunci dan penjelasan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizAttempt"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff participant summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradebookPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMyGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own academic report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentGradebook"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStudentGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own report or school participant report for staff */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentGradebook"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportGradebook: {
+        parameters: {
+            query?: {
+                year_id?: string;
+                class_id?: string;
+                module_id?: string;
+                quiz_id?: string;
+                building_key?: string;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff filtered CSV, maximum 10000 students; formula-safe */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own tasks for participants, all school tasks for staff */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Assignment"][];
+                    };
+                };
+            };
+        };
+    };
+    issueAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentInput"];
+            };
+        };
+        responses: {
+            /** @description Issued or identical retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                    };
+                };
+            };
+        };
+    };
+    cancelAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled; history retained */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAssignmentSteps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own ordered steps; locked body and content references omitted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AssignmentStep"][];
+                    };
+                };
+            };
+        };
+    };
+    listAssignmentRoster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staff only; frozen recipient progress */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AssignmentRecipient"][];
+                    };
+                };
+            };
+        };
+    };
+    completeAssignmentStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                assignment_id: components["parameters"]["AssignmentID"];
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done or identical retry */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listAcademicYears: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar tahun ajaran */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AcademicYear"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createAcademicYear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026/2027 */
+                    label: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Tahun ajaran dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcademicYear"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    activateAcademicYear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diaktifkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listClasses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daftar kelas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SchoolClass"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createClass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassInput"];
+            };
+        };
+        responses: {
+            /** @description Kelas dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolClass"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listRoster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Roster */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RosterEntry"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    placeStudent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    class_id: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    renameClass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassInput"];
+            };
+        };
+        responses: {
+            /** @description Kelas diperbarui */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchoolClass"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    archiveClass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diarsipkan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listPlacements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Riwayat */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Placement"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46" role="img" aria-label="Pohon">
+<rect x="14" y="30" width="8" height="12" rx="0" fill="#8a5a2b" stroke="#1d2140" stroke-width="3"/>
+<circle cx="18" cy="18" r="16" fill="#3f9a4f" stroke="#1d2140" stroke-width="3"/>
+<path d="M30 22 A14 14 0 0 1 12 31" fill="none" stroke="#2f7d3d" stroke-width="6" stroke-linecap="round"/>
+<circle cx="18" cy="18" r="16" fill="none" stroke="#1d2140" stroke-width="3"/>
+</svg>

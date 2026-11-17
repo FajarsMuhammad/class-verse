@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef } from 'vue'
+import { onMounted, ref, useTemplateRef, watch } from 'vue'
 import { errorMessage } from '@/api/client'
 import { roomApi } from '@/api/rooms'
 import type { Room, RoomMap } from '@/api/types'
@@ -11,6 +11,9 @@ const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const name = ref(props.room?.name ?? '')
 const building = ref(props.room?.building_key ?? props.buildings[0]?.key ?? '')
 const mapKey = ref<RoomMap>(props.room?.map_key ?? 'classroom')
+watch(building, (key) => {
+  if (!props.room) mapKey.value = key === 'ruang-guru' ? 'staff' : key === 'sains' ? 'science' : 'classroom'
+}, { immediate: !props.room })
 const scheduled = ref(!!props.room?.scheduled_at)
 const localTime = ref(toLocalInput(props.room?.scheduled_at))
 const busy = ref(false)
@@ -78,7 +81,12 @@ async function save() {
           <label for="room-map">Peta ruang</label>
           <select id="room-map" v-model="mapKey">
             <option value="classroom">Ruang kelas</option>
-            <option value="garden">Taman diskusi</option>
+            <option value="garden">Ruang diskusi</option>
+            <option value="lab">Lab sains</option>
+            <option value="science">Menara Sains — planetarium & stasiun</option>
+            <option v-if="building === 'ruang-guru'" value="staff">Ruang Guru — meja kerja & rapat</option>
+            <option value="baca">Ruang baca</option>
+            <option value="library">Perpustakaan (zona tenang, chat saja)</option>
           </select>
         </template>
         <label class="check"><input v-model="scheduled" type="checkbox" /> Jadwalkan ruang</label>
@@ -104,7 +112,7 @@ async function save() {
 
 <style scoped>
 dialog {
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-2xl);
   padding: var(--space-6);
   background: var(--color-surface);
@@ -139,7 +147,7 @@ select {
   width: 100%;
   min-height: var(--touch-min);
   padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-input-border);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-ink);

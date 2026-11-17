@@ -1,0 +1,528 @@
+{
+  "version": 1,
+  "units": "px (world space). Sprites: top-left at sprite_pos. Characters: anchor bottom-center (feet).",
+  "size": {
+    "w": 2200,
+    "h": 1500
+  },
+  "ground": {
+    "color": "#eef1f6",
+    "dot_color": "#d6dde8",
+    "dot_spacing": 28
+  },
+  "spawn": {
+    "x": 1100,
+    "y": 870
+  },
+  "proximity_radius": 85,
+  "places": [
+    {
+      "id": "angka",
+      "name": "Rumah Angka",
+      "subject": "Matematika",
+      "uiColor": "#2563eb",
+      "sprite": "sprites/buildings/rumah-angka.svg",
+      "sprite_pos": {
+        "x": 260,
+        "y": 184
+      },
+      "size": {
+        "w": 250,
+        "h": 194
+      },
+      "label_anchor": {
+        "x": 385,
+        "y": 164
+      },
+      "entrance": {
+        "x": 385,
+        "y": 364
+      },
+      "interact_radius": 60,
+      "capacity": 120,
+      "room_types": [
+        "kelas",
+        "diskusi"
+      ]
+    },
+    {
+      "id": "sains",
+      "name": "Menara Sains",
+      "subject": "IPA",
+      "uiColor": "#0f766e",
+      "sprite": "sprites/buildings/menara-sains.svg",
+      "sprite_pos": {
+        "x": 1010,
+        "y": 184
+      },
+      "size": {
+        "w": 190,
+        "h": 220
+      },
+      "label_anchor": {
+        "x": 1100,
+        "y": 164
+      },
+      "entrance": {
+        "x": 1100,
+        "y": 390
+      },
+      "interact_radius": 60,
+      "capacity": 120,
+      "room_types": [
+        "lab",
+        "kelas"
+      ]
+    },
+    {
+      "id": "perpus",
+      "name": "Perpustakaan",
+      "subject": "Bahasa & Literasi",
+      "uiColor": "#be185d",
+      "sprite": "sprites/buildings/perpustakaan.svg",
+      "sprite_pos": {
+        "x": 1640,
+        "y": 184
+      },
+      "size": {
+        "w": 290,
+        "h": 186
+      },
+      "label_anchor": {
+        "x": 1785,
+        "y": 164
+      },
+      "entrance": {
+        "x": 1785,
+        "y": 357
+      },
+      "interact_radius": 60,
+      "capacity": 100,
+      "room_types": [
+        "perpustakaan",
+        "baca"
+      ]
+    },
+    {
+      "id": "galeri",
+      "name": "Galeri Budaya",
+      "subject": "Sejarah & IPS",
+      "uiColor": "#b45309",
+      "sprite": "sprites/buildings/galeri-budaya.svg",
+      "sprite_pos": {
+        "x": 260,
+        "y": 1194
+      },
+      "size": {
+        "w": 270,
+        "h": 176
+      },
+      "label_anchor": {
+        "x": 395,
+        "y": 1174
+      },
+      "entrance": {
+        "x": 395,
+        "y": 1350
+      },
+      "interact_radius": 60,
+      "capacity": 80,
+      "room_types": [
+        "kelas"
+      ]
+    },
+    {
+      "id": "studio",
+      "name": "Studio Kreatif",
+      "subject": "Seni & Coding",
+      "uiColor": "#7c3aed",
+      "sprite": "sprites/buildings/studio-kreatif.svg",
+      "sprite_pos": {
+        "x": 980,
+        "y": 1194
+      },
+      "size": {
+        "w": 240,
+        "h": 168
+      },
+      "label_anchor": {
+        "x": 1100,
+        "y": 1174
+      },
+      "entrance": {
+        "x": 1100,
+        "y": 1348
+      },
+      "interact_radius": 60,
+      "capacity": 80,
+      "room_types": [
+        "kelas",
+        "diskusi"
+      ]
+    },
+    {
+      "id": "kelas",
+      "name": "Gedung Kelas",
+      "subject": "Kelas live bersama guru",
+      "uiColor": "#4f46e5",
+      "sprite": "sprites/buildings/gedung-kelas.svg",
+      "sprite_pos": {
+        "x": 1640,
+        "y": 1194
+      },
+      "size": {
+        "w": 260,
+        "h": 192
+      },
+      "label_anchor": {
+        "x": 1770,
+        "y": 1174
+      },
+      "entrance": {
+        "x": 1770,
+        "y": 1372
+      },
+      "interact_radius": 60,
+      "capacity": 240,
+      "room_types": [
+        "kelas"
+      ]
+    },
+    {
+      "id": "arena",
+      "name": "Arena Kuis",
+      "subject": "Semua pelajaran",
+      "uiColor": "#c2410c",
+      "sprite": "sprites/buildings/arena-kuis.svg",
+      "sprite_pos": {
+        "x": 1600,
+        "y": 628
+      },
+      "size": {
+        "w": 460,
+        "h": 270
+      },
+      "label_anchor": {
+        "x": 1830,
+        "y": 620
+      },
+      "label_style": "scoreboard",
+      "entrance": {
+        "x": 1830,
+        "y": 763
+      },
+      "interact_radius": 180,
+      "capacity": 200,
+      "room_types": [
+        "quiz"
+      ]
+    },
+    {
+      "id": "ruang-guru",
+      "name": "Ruang Guru",
+      "subject": "Khusus pengajar dan admin",
+      "uiColor": "#4f46e5",
+      "sprite": "sprites/buildings/gedung-kelas.svg",
+      "sprite_pos": {
+        "x": 650,
+        "y": 184
+      },
+      "size": {
+        "w": 250,
+        "h": 192
+      },
+      "label_anchor": {
+        "x": 775,
+        "y": 164
+      },
+      "entrance": {
+        "x": 775,
+        "y": 364
+      },
+      "interact_radius": 60,
+      "capacity": 40,
+      "room_types": [
+        "kelas",
+        "diskusi"
+      ],
+      "staff_only": true
+    }
+  ],
+  "zones": [
+    {
+      "id": "taman",
+      "name": "Taman Diskusi",
+      "subject": "Belajar bareng",
+      "uiColor": "#15803d",
+      "sprite": "sprites/zones/taman-diskusi.svg",
+      "rect": {
+        "x": 160,
+        "y": 640,
+        "w": 440,
+        "h": 300
+      },
+      "voice": "circle",
+      "capacity": 120,
+      "room_types": [
+        "diskusi"
+      ]
+    },
+    {
+      "id": "alun-alun",
+      "name": "Alun-alun",
+      "subject": "Acara kampus",
+      "uiColor": "#4f46e5",
+      "sprite": "sprites/zones/alun-alun.svg",
+      "rect": {
+        "x": 800,
+        "y": 640,
+        "w": 600,
+        "h": 380
+      },
+      "voice": "circle",
+      "capacity": 300
+    }
+  ],
+  "npcs": [
+    {
+      "id": "kiko",
+      "name": "Kiko",
+      "role": "Pemandu kampus",
+      "sprite": "sprites/characters/npc-kiko.svg",
+      "feet": {
+        "x": 1300,
+        "y": 760
+      },
+      "marker": "sprites/characters/quest-marker.svg"
+    }
+  ],
+  "lawns": [
+    {
+      "x": 200,
+      "y": 100,
+      "w": 370,
+      "h": 350
+    },
+    {
+      "x": 950,
+      "y": 100,
+      "w": 300,
+      "h": 290
+    },
+    {
+      "x": 1590,
+      "y": 100,
+      "w": 390,
+      "h": 345
+    },
+    {
+      "x": 1560,
+      "y": 560,
+      "w": 540,
+      "h": 400
+    },
+    {
+      "x": 200,
+      "y": 1170,
+      "w": 390,
+      "h": 210
+    },
+    {
+      "x": 930,
+      "y": 1170,
+      "w": 340,
+      "h": 210
+    },
+    {
+      "x": 1590,
+      "y": 1170,
+      "w": 360,
+      "h": 210
+    }
+  ],
+  "lawn_style": {
+    "color": "#a9de92",
+    "edge": "#8fcf78",
+    "radius": 40,
+    "stripe": "rgba(255,255,255,0.12) every 36px"
+  },
+  "trees": [
+    {
+      "x": 40,
+      "y": 34
+    },
+    {
+      "x": 196,
+      "y": 34
+    },
+    {
+      "x": 352,
+      "y": 34
+    },
+    {
+      "x": 508,
+      "y": 34
+    },
+    {
+      "x": 664,
+      "y": 34
+    },
+    {
+      "x": 820,
+      "y": 34
+    },
+    {
+      "x": 976,
+      "y": 34
+    },
+    {
+      "x": 1132,
+      "y": 34
+    },
+    {
+      "x": 1288,
+      "y": 34
+    },
+    {
+      "x": 1444,
+      "y": 34
+    },
+    {
+      "x": 1600,
+      "y": 34
+    },
+    {
+      "x": 1756,
+      "y": 34
+    },
+    {
+      "x": 1912,
+      "y": 34
+    },
+    {
+      "x": 2068,
+      "y": 34
+    },
+    {
+      "x": 40,
+      "y": 1446
+    },
+    {
+      "x": 196,
+      "y": 1446
+    },
+    {
+      "x": 352,
+      "y": 1446
+    },
+    {
+      "x": 508,
+      "y": 1446
+    },
+    {
+      "x": 664,
+      "y": 1446
+    },
+    {
+      "x": 820,
+      "y": 1446
+    },
+    {
+      "x": 976,
+      "y": 1446
+    },
+    {
+      "x": 1132,
+      "y": 1446
+    },
+    {
+      "x": 1288,
+      "y": 1446
+    },
+    {
+      "x": 1444,
+      "y": 1446
+    },
+    {
+      "x": 1600,
+      "y": 1446
+    },
+    {
+      "x": 1756,
+      "y": 1446
+    },
+    {
+      "x": 1912,
+      "y": 1446
+    },
+    {
+      "x": 2068,
+      "y": 1446
+    },
+    {
+      "x": 14,
+      "y": 560
+    },
+    {
+      "x": 14,
+      "y": 700
+    },
+    {
+      "x": 14,
+      "y": 840
+    },
+    {
+      "x": 14,
+      "y": 980
+    },
+    {
+      "x": 14,
+      "y": 1120
+    },
+    {
+      "x": 14,
+      "y": 1260
+    },
+    {
+      "x": 2150,
+      "y": 560
+    },
+    {
+      "x": 2150,
+      "y": 700
+    },
+    {
+      "x": 2150,
+      "y": 840
+    },
+    {
+      "x": 2150,
+      "y": 980
+    },
+    {
+      "x": 2150,
+      "y": 1120
+    },
+    {
+      "x": 2150,
+      "y": 1260
+    },
+    {
+      "x": 630,
+      "y": 600
+    },
+    {
+      "x": 1530,
+      "y": 1000
+    },
+    {
+      "x": 640,
+      "y": 1030
+    },
+    {
+      "x": 1540,
+      "y": 560
+    }
+  ],
+  "tree_sprite": "sprites/props/tree.svg"
+}

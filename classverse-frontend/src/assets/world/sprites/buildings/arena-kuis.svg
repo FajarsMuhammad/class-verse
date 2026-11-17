@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="460" height="270" viewBox="0 0 460 270" role="img" aria-label="Arena Kuis">
+<ellipse cx="230" cy="135" rx="228" ry="133" fill="#fdba74" stroke="#1d2140" stroke-width="3"/>
+<clipPath id="ring"><ellipse cx="230" cy="135" rx="213" ry="118"/></clipPath>
+<g clip-path="url(#ring)"><rect width="460" height="270" fill="#fb923c"/><path d="M230 135 L530.0 135.0 L528.4 166.4 Z" fill="#f97316"/><path d="M230 135 L523.4 197.4 L515.3 227.7 Z" fill="#f97316"/><path d="M230 135 L504.1 257.0 L489.8 285.0 Z" fill="#f97316"/><path d="M230 135 L472.7 311.3 L452.9 335.7 Z" fill="#f97316"/><path d="M230 135 L430.7 357.9 L406.3 377.7 Z" fill="#f97316"/><path d="M230 135 L380.0 394.8 L352.0 409.1 Z" fill="#f97316"/><path d="M230 135 L322.7 420.3 L292.4 428.4 Z" fill="#f97316"/><path d="M230 135 L261.4 433.4 L230.0 435.0 Z" fill="#f97316"/><path d="M230 135 L198.6 433.4 L167.6 428.4 Z" fill="#f97316"/><path d="M230 135 L137.3 420.3 L108.0 409.1 Z" fill="#f97316"/><path d="M230 135 L80.0 394.8 L53.7 377.7 Z" fill="#f97316"/><path d="M230 135 L29.3 357.9 L7.1 335.7 Z" fill="#f97316"/><path d="M230 135 L-12.7 311.3 L-29.8 285.0 Z" fill="#f97316"/><path d="M230 135 L-44.1 257.0 L-55.3 227.7 Z" fill="#f97316"/><path d="M230 135 L-63.4 197.4 L-68.4 166.4 Z" fill="#f97316"/><path d="M230 135 L-70.0 135.0 L-68.4 103.6 Z" fill="#f97316"/><path d="M230 135 L-63.4 72.6 L-55.3 42.3 Z" fill="#f97316"/><path d="M230 135 L-44.1 13.0 L-29.8 -15.0 Z" fill="#f97316"/><path d="M230 135 L-12.7 -41.3 L7.1 -65.7 Z" fill="#f97316"/><path d="M230 135 L29.3 -87.9 L53.7 -107.7 Z" fill="#f97316"/><path d="M230 135 L80.0 -124.8 L108.0 -139.1 Z" fill="#f97316"/><path d="M230 135 L137.3 -150.3 L167.6 -158.4 Z" fill="#f97316"/><path d="M230 135 L198.6 -163.4 L230.0 -165.0 Z" fill="#f97316"/><path d="M230 135 L261.4 -163.4 L292.4 -158.4 Z" fill="#f97316"/><path d="M230 135 L322.7 -150.3 L352.0 -139.1 Z" fill="#f97316"/><path d="M230 135 L380.0 -124.8 L406.3 -107.7 Z" fill="#f97316"/><path d="M230 135 L430.7 -87.9 L452.9 -65.7 Z" fill="#f97316"/><path d="M230 135 L472.7 -41.3 L489.8 -15.0 Z" fill="#f97316"/><path d="M230 135 L504.1 13.0 L515.3 42.3 Z" fill="#f97316"/><path d="M230 135 L523.4 72.6 L528.4 103.6 Z" fill="#f97316"/></g>
+<ellipse cx="230" cy="135" rx="213" ry="118" fill="none" stroke="#1d2140" stroke-width="3"/>
+<ellipse cx="230" cy="135" rx="196" ry="101" fill="#86efac" stroke="#1d2140" stroke-width="3"/>
+<rect x="158" y="120" width="30" height="30" rx="7" fill="#2563eb" stroke="#1d2140" stroke-width="3"/>
+<circle cx="173" cy="135" r="7" fill="#ffffff"/>
+<rect x="196" y="120" width="30" height="30" rx="7" fill="#c2410c" stroke="#1d2140" stroke-width="3"/>
+<polygon points="211,127 219,141 203,141" fill="#ffffff"/>
+<rect x="234" y="120" width="30" height="30" rx="7" fill="#0f766e" stroke="#1d2140" stroke-width="3"/>
+<rect x="242" y="128" width="14" height="14" rx="1" fill="#ffffff"/>
+<rect x="272" y="120" width="30" height="30" rx="7" fill="#7c3aed" stroke="#1d2140" stroke-width="3"/>
+<polygon points="287,126 296,135 287,144 278,135" fill="#ffffff"/>
+<rect x="20" y="10" width="4" height="40" fill="#1d2140"/><polygon points="24,10 46,17 24,25" fill="#ef4444"/>
+<rect x="436" y="10" width="4" height="40" fill="#1d2140"/><polygon points="436,10 414,17 436,25" fill="#2563eb"/>
+</svg>

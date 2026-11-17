@@ -246,6 +246,19 @@ func TestGatewayRejects(t *testing.T) {
 	}
 }
 
+func TestGatewayDevOrigins(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	gw, err := NewGateway(nil, nil, nil, testOrigin, log, "http://10.80.3.43:5173")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for origin, want := range map[string]bool{testOrigin: true, "http://10.80.3.43:5173": true, "http://10.80.3.44:5173": false, "": false} {
+		if got := gw.allowed(origin); got != want {
+			t.Errorf("allowed(%q)=%v want %v", origin, got, want)
+		}
+	}
+}
+
 func TestGatewayAuthTimeout(t *testing.T) {
 	if testing.Short() {
 		t.Skip("waits for the 5 s auth timeout")

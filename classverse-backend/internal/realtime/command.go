@@ -13,6 +13,7 @@ type commandCmd struct {
 	seq    uint64
 	name   string
 	target uuid.UUID
+	step   uuid.UUID
 }
 
 // moderatedCmd comes back from the hub worker after a kick/allow was written.
@@ -39,11 +40,17 @@ func (r *room) command(c commandCmd) {
 		return
 	}
 	switch c.name {
+	case "learning_pin", "learning_unpin":
+		r.pinLearning(m, c, reject)
 	case "gather":
 		r.gather(m, c.seq, reject)
 	case "voice_broadcast", "voice_broadcast_off":
 		if r.campus {
 			reject(CodeForbidden, "Suara ke semua hanya tersedia di ruang")
+			return
+		}
+		if r.mapd.Quiet {
+			reject(CodeForbidden, "Perpustakaan zona tenang, suara mati")
 			return
 		}
 		on := c.name == "voice_broadcast"
@@ -203,7 +210,7 @@ func (r *room) moderated(c moderatedCmd) {
 
 // state is the room_state a member sees: shared settings plus their own mute.
 func (r *room) state(id uuid.UUID) RoomStateMsg {
-	s := RoomStateMsg{AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id], VoiceBroadcast: r.broadcasters()}
+	s := RoomStateMsg{Pin: r.pin, AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id], VoiceBroadcast: r.broadcasters()}
 	if m := r.members[id]; m != nil {
 		s.VoiceIdentity = m.voiceIdentity
 		s.VoiceChannel = m.voiceChannel

@@ -146,3 +146,20 @@ describe('ChatPanel', () => {
     expect(w.get('.count').text()).toContain('-1')
   })
 })
+
+describe('ChatPanel presence', () => {
+  it('shows who is online inside the chat, as a collapsible list', () => {
+    const chat = state()
+    const w = mount(ChatPanel, {
+      props: { chat, version: chat.version, error: '', disabled: false, campus: false, online: 3, people: ['Kamu', 'Bu Rina', 'Budi'] },
+    })
+    const summary = w.get('.presence summary')
+    expect(summary.text()).toContain('3 orang online')
+    expect(w.findAll('.presence li').map((li) => li.text())).toEqual(['Kamu', 'Bu Rina', 'Budi'])
+  })
+
+  it('hides presence when the caller does not pass it (phone list mode)', () => {
+    const chat = state()
+    expect(mountPanel(chat).find('.presence').exists()).toBe(false)
+  })
+})

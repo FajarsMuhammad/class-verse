@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="290" height="186" viewBox="0 0 290 186" role="img" aria-label="Perpustakaan">
+<rect x="14" y="1" width="250" height="24" rx="5" fill="#ec4899" stroke="#1d2140" stroke-width="3"/>
+<rect x="17" y="17" width="244" height="5" fill="#db2777"/>
+<rect x="219" y="1" width="45" height="24" fill="#fffdf6" stroke="#1d2140" stroke-width="3"/>
+<line x1="223" y1="7" x2="260" y2="7" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="223" y1="12" x2="260" y2="12" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="223" y1="17" x2="260" y2="17" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="223" y1="22" x2="260" y2="22" stroke="#d6d3d1" stroke-width="2"/>
+<rect x="43" y="22" width="228" height="24" rx="5" fill="#fbbf24" stroke="#1d2140" stroke-width="3"/>
+<rect x="46" y="38" width="222" height="5" fill="#f59e0b"/>
+<rect x="226" y="22" width="45" height="24" fill="#fffdf6" stroke="#1d2140" stroke-width="3"/>
+<line x1="230" y1="28" x2="267" y2="28" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="230" y1="33" x2="267" y2="33" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="230" y1="38" x2="267" y2="38" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="230" y1="43" x2="267" y2="43" stroke="#d6d3d1" stroke-width="2"/>
+<rect x="12" y="43" width="266" height="26" rx="5" fill="#38bdf8" stroke="#1d2140" stroke-width="3"/>
+<rect x="15" y="61" width="260" height="5" fill="#0ea5e9"/>
+<rect x="12" y="43" width="45" height="26" fill="#fffdf6" stroke="#1d2140" stroke-width="3"/>
+<line x1="16" y1="49" x2="53" y2="49" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="16" y1="54" x2="53" y2="54" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="16" y1="59" x2="53" y2="59" stroke="#d6d3d1" stroke-width="2"/>
+<line x1="16" y1="64" x2="53" y2="64" stroke="#d6d3d1" stroke-width="2"/>
+<rect x="20" y="69" width="250" height="104" rx="0" fill="#fce7f3" stroke="#1d2140" stroke-width="3"/>
+<path d="M43 121 V98.0 A13.0 13.0 0 0 1 69 98.0 V121" fill="#e0f2fe" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M81 121 V98.0 A13.0 13.0 0 0 1 107 98.0 V121" fill="#e0f2fe" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M183 121 V98.0 A13.0 13.0 0 0 1 209 98.0 V121" fill="#e0f2fe" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M221 121 V98.0 A13.0 13.0 0 0 1 247 98.0 V121" fill="#e0f2fe" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M122 173 V140.0 A23.0 23.0 0 0 1 168 140.0 V173" fill="#c8935a" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<rect x="10" y="173" width="270" height="12" rx="4" fill="#cbd5e1" stroke="#1d2140" stroke-width="3"/>
+</svg>

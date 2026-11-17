@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   api,
   ApiError,
+  errorMessage,
   getAccessToken,
   onTokenChange,
   refreshAccessToken,
@@ -25,6 +26,11 @@ function authHeader(init: RequestInit | undefined): string | undefined {
 
 const unauthenticated = () =>
   Response.json({ error: { code: 'unauthenticated', message: 'x' } }, { status: 401 })
+
+it('explains why a room cannot be archived instead of reporting a server failure', () => {
+  const message = 'Ruang masih dipakai. Arsipkan setelah kosong 5 menit.'
+  expect(errorMessage(new ApiError(409, { code: 'room_busy', message }))).toBe(message)
+})
 
 describe('api client', () => {
   beforeEach(() => setAccessToken('old'))

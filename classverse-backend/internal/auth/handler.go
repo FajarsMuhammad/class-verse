@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -64,8 +65,10 @@ type Handler struct {
 	tokens      *Tokens
 	google      Google
 	frontendURL string
-	log         *slog.Logger
-	limit       limiters
+	// DevOrigins are extra development-only origins (config.DevOrigins).
+	DevOrigins []string
+	log        *slog.Logger
+	limit      limiters
 }
 
 // NewHandler wires the HTTP layer. google and orgs may be nil.
@@ -157,7 +160,7 @@ func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	h.writeSession(w, sess)
+	h.writeSession(w, r, sess)
 	return nil
 }
 
@@ -182,7 +185,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	h.writeSession(w, sess)
+	h.writeSession(w, r, sess)
 	return nil
 }
 
@@ -196,11 +199,11 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) error {
 	sess, err := h.svc.Refresh(r.Context(), readCookie(r, refreshCookie))
 	if err != nil {
 		if errors.Is(err, ErrUnauthenticated) || errors.Is(err, ErrSessionRevoked) {
-			clearCookie(w, refreshCookie, refreshPath, http.SameSiteStrictMode)
+			clearCookie(w, refreshCookie, refreshPath, http.SameSiteStrictMode, h.secure(r))
 		}
 		return err
 	}
-	h.writeSession(w, sess)
+	h.writeSession(w, r, sess)
 	return nil
 }
 
@@ -211,7 +214,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) error {
 	if err := h.svc.Logout(r.Context(), readCookie(r, refreshCookie)); err != nil {
 		return err
 	}
-	clearCookie(w, refreshCookie, refreshPath, http.SameSiteStrictMode)
+	clearCookie(w, refreshCookie, refreshPath, http.SameSiteStrictMode, h.secure(r))
 	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
@@ -241,7 +244,7 @@ func (h *Handler) googleStart(w http.ResponseWriter, r *http.Request) error {
 // googleCallback always redirects to the frontend; errors go in ?error=<code>.
 func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	stored := readCookie(r, oauthCookie)
-	clearCookie(w, oauthCookie, oauthPath, http.SameSiteLaxMode)
+	clearCookie(w, oauthCookie, oauthPath, http.SameSiteLaxMode, true)
 
 	fail := func(code string) {
 		http.Redirect(w, r, h.frontendURL+"/auth/callback?error="+url.QueryEscape(code), http.StatusFound)
@@ -279,7 +282,8 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 		fail("internal_error")
 		return
 	}
-	setRefreshCookie(w, sess.RefreshToken)
+	// Top-level redirect without Origin: stays Secure (Google login needs HTTPS or localhost).
+	setRefreshCookie(w, sess.RefreshToken, true)
 	http.Redirect(w, r, h.frontendURL+"/auth/callback", http.StatusFound)
 }
 
@@ -365,30 +369,38 @@ type tokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-func (h *Handler) writeSession(w http.ResponseWriter, sess Session) {
-	setRefreshCookie(w, sess.RefreshToken)
+func (h *Handler) writeSession(w http.ResponseWriter, r *http.Request, sess Session) {
+	setRefreshCookie(w, sess.RefreshToken, h.secure(r))
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, http.StatusOK, tokenResponse{AccessToken: sess.AccessToken})
 }
 
-func setRefreshCookie(w http.ResponseWriter, token string) {
+func setRefreshCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookie,
 		Value:    token,
 		Path:     refreshPath,
 		MaxAge:   int(refreshTokenTTL.Seconds()),
 		HttpOnly: true,
-		// Secure even in development: browsers treat localhost as a secure context.
-		Secure:   true,
+		// Secure except for development LAN origins (see Handler.secure).
+		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 	})
 }
 
-func clearCookie(w http.ResponseWriter, name, path string, sameSite http.SameSite) {
+func clearCookie(w http.ResponseWriter, name, path string, sameSite http.SameSite, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name: name, Value: "", Path: path, MaxAge: -1,
-		HttpOnly: true, Secure: true, SameSite: sameSite,
+		HttpOnly: true, Secure: secure, SameSite: sameSite,
 	})
+}
+
+// secure is false only for a configured plain-HTTP development origin, where
+// browsers would drop a Secure cookie (localhost is exempt, LAN IPs are not).
+// DevOrigins is empty in production (config refuses it).
+func (h *Handler) secure(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	return !strings.HasPrefix(origin, "http://") || !slices.Contains(h.DevOrigins, origin)
 }
 
 func readCookie(r *http.Request, name string) string {
@@ -401,7 +413,7 @@ func readCookie(r *http.Request, name string) string {
 
 // checkOrigin guards cookie-authenticated endpoints against cross-site requests.
 func (h *Handler) checkOrigin(r *http.Request) error {
-	if r.Header.Get("Origin") != h.frontendURL {
+	if o := r.Header.Get("Origin"); o != h.frontendURL && !slices.Contains(h.DevOrigins, o) {
 		return &httpx.Error{Status: http.StatusForbidden, Code: "forbidden", Message: "Asal permintaan tidak diizinkan"}
 	}
 	return nil

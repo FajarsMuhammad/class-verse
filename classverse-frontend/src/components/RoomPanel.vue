@@ -266,7 +266,7 @@ p {
 }
 .new-room {
   min-height: 300px;
-  border: 2px dashed var(--color-border);
+  border: 1px dashed var(--color-border);
   border-radius: var(--radius-2xl);
   background: transparent;
   color: var(--color-ink);
@@ -294,7 +294,7 @@ p {
   margin-top: var(--space-5);
 }
 .confirm {
-  border-top: 2px solid var(--color-border-soft);
+  border-top: 1px solid var(--kv-line);
   margin-top: var(--space-3);
 }
 </style>

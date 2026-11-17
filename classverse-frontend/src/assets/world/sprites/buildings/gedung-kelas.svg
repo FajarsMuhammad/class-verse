@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="192" viewBox="0 0 260 192" role="img" aria-label="Gedung Kelas">
+<polygon points="130,2 165,27 95,27" fill="#6366f1" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<rect x="102" y="27" width="56" height="34" rx="0" fill="#e0e7ff" stroke="#1d2140" stroke-width="3"/>
+<circle cx="130" cy="44" r="11" fill="#ffffff" stroke="#1d2140" stroke-width="3"/>
+<path d="M130 37 V44 H136" fill="none" stroke="#1d2140" stroke-width="3" stroke-linecap="round"/>
+<polygon points="21,61 239,61 258,92 2,92" fill="#6366f1" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<line x1="18" y1="70" x2="242" y2="70" stroke="#000" stroke-opacity="0.14" stroke-width="3"/>
+<line x1="18" y1="80" x2="242" y2="80" stroke="#000" stroke-opacity="0.14" stroke-width="3"/>
+<rect x="10" y="92" width="240" height="86" rx="0" fill="#fffdf6" stroke="#1d2140" stroke-width="3"/>
+<rect x="29" y="102" width="26" height="20" rx="3" fill="#bfe6ff" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="62" y="102" width="26" height="20" rx="3" fill="#bfe6ff" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="29" y="129" width="26" height="20" rx="3" fill="#fde68a" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="62" y="129" width="26" height="20" rx="3" fill="#bfe6ff" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="172" y="102" width="26" height="20" rx="3" fill="#bfe6ff" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="205" y="102" width="26" height="20" rx="3" fill="#fde68a" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="172" y="129" width="26" height="20" rx="3" fill="#bfe6ff" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="205" y="129" width="26" height="20" rx="3" fill="#bfe6ff" stroke="#1d2140" stroke-width="2.5"/>
+<rect x="108" y="132" width="44" height="46" rx="0" fill="#c8935a" stroke="#1d2140" stroke-width="3"/>
+<rect x="110" y="134" width="40" height="6" fill="#6366f1"/>
+<rect x="3" y="178" width="254" height="12" rx="4" fill="#cbd5e1" stroke="#1d2140" stroke-width="3"/>
+</svg>

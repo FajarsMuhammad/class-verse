@@ -172,7 +172,7 @@ const label = computed(() =>
   gap: var(--space-2);
   margin: 0;
   padding: var(--space-2) var(--space-4);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-pill);
   background: var(--color-surface-alt);
   white-space: nowrap;

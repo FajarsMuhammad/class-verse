@@ -34,6 +34,7 @@ type Admission struct {
 	BuildingKey string
 	ScheduledAt *time.Time
 	AllChat     bool
+	Pin         *LearningPin
 	UserID      uuid.UUID
 	Name        string
 	Avatar      string
@@ -114,9 +115,11 @@ type member struct {
 	stride        stride
 	moves         moveBudget
 	dirty         bool
+	viewReady     bool               // visibility has been synchronized since join/reconnect
 	seen          map[uuid.UUID]bool // ids the client currently shows (area of interest)
 	zone          Zone               // zone the avatar stands in, zero when none
 	chat          chatBudget
+	emoteAt       time.Time
 	seatAt        time.Time // last accepted seat (mode HP), 1 per second
 	voiceIdentity string
 	voiceChannel  string
@@ -165,6 +168,7 @@ type room struct {
 	spawnN      int
 	emptySince  time.Time
 	sessionOpen bool
+	pin         *LearningPin
 	allChat     bool
 	// Session moderation state; lives as long as the room actor (see design).
 	locked       bool
@@ -179,7 +183,7 @@ type room struct {
 func newRoom(adm Admission, mapd *MapData, hub *Hub, now func() time.Time, log *slog.Logger) *room {
 	return &room{
 		id: adm.RoomID, orgID: adm.OrgID, name: adm.RoomName, buildingKey: adm.BuildingKey,
-		mapd: mapd, campus: mapd.Key == campusKey, capacity: adm.Capacity, now: now, log: log, hub: hub,
+		mapd: mapd, campus: mapd.Key == campusKey, capacity: adm.Capacity, now: now, log: log, hub: hub, pin: adm.Pin,
 		allChat: adm.AllChat || mapd.Key == campusKey,
 		inbox:   make(chan any, inboxSize), done: make(chan struct{}),
 		members: make(map[uuid.UUID]*member), reserved: make(map[uuid.UUID]bool),
@@ -233,6 +237,8 @@ func (r *room) handle(cmd any) {
 		c.result <- r.join(c.c, c.adm)
 	case leaveCmd:
 		r.leave(c.c)
+	case emoteCmd:
+		r.emote(c)
 	case moveCmd:
 		r.move(c.c, c.seq, c.m)
 	case reserveCmd:
@@ -261,6 +267,8 @@ func (r *room) handle(cmd any) {
 			r.broadcast(newOut(TypeProfileUpdated, c.p), uuid.Nil)
 		}
 		close(c.done)
+	case learningPinResult:
+		r.applyLearningPin(c)
 	case commandCmd:
 		r.command(c)
 	case moderatedCmd:
@@ -314,6 +322,7 @@ func (r *room) join(c *conn, adm Admission) error {
 		m.conn, m.heldUntil = c, time.Time{}
 		m.p.Name, m.p.Avatar, m.p.Role = adm.Name, adm.Avatar, adm.Role
 		m.seen = map[uuid.UUID]bool{}
+		m.viewReady = false
 		m.stride = newStride(r.mapd.WalkSpeed, r.now())
 		r.sendWelcome(m, TypeWelcome)
 		return nil
@@ -380,6 +389,7 @@ func (r *room) sendWelcome(m *member, typ string) {
 		}
 	}
 	m.conn.send(newOut(typ, w))
+	m.conn.send(newOut(TypeRoomState, r.state(m.p.ID)))
 	// A (re)connected client starts without a zone; tell it the current one.
 	if m.zone.Key != "" {
 		m.conn.send(newOut(TypeZone, ZoneMsg{Key: m.zone.Key, Name: m.zone.Name}))
@@ -513,35 +523,7 @@ func (r *room) tick(now time.Time) (stopped bool) {
 	r.retryVoice(now)
 	r.updateZones()
 
-	for _, recv := range r.members {
-		if recv.conn == nil {
-			continue
-		}
-		var snap SnapshotMsg
-		for id, o := range r.members {
-			if id == recv.p.ID {
-				continue
-			}
-			visible := !r.campus || inAOI(r.mapd, recv.p.X, recv.p.Y, o.p.X, o.p.Y)
-			switch {
-			case visible && (!recv.seen[id] || o.dirty):
-				recv.seen[id] = true
-				snap.P = append(snap.P, Position{ID: id, X: o.p.X, Y: o.p.Y, Dir: o.p.Dir})
-			case !visible && recv.seen[id]:
-				delete(recv.seen, id)
-				snap.Out = append(snap.Out, id)
-			}
-		}
-		if len(snap.P) > 0 || len(snap.Out) > 0 {
-			if snap.P == nil {
-				snap.P = []Position{}
-			}
-			recv.conn.send(newOut(TypeSnapshot, snap))
-		}
-	}
-	for _, m := range r.members {
-		m.dirty = false
-	}
+	r.sendSnapshots()
 
 	r.ticks++
 	if r.campus && r.ticks%buildingsEvery == 0 {
@@ -758,10 +740,10 @@ func (r *room) seat(c seatCmd) {
 	m.dirty = true
 }
 
-// nearPoint returns a check that accepts avatars within doorRadius of (x, y).
-func nearPoint(x, y int) func(Participant) error {
+// nearPoint returns a check that accepts avatars within radius px of (x, y).
+func nearPoint(x, y int, radius float64) func(Participant) error {
 	return func(p Participant) error {
-		if math.Hypot(float64(p.X-x), float64(p.Y-y)) > doorRadius {
+		if math.Hypot(float64(p.X-x), float64(p.Y-y)) > radius {
 			return errNotAtDoor
 		}
 		return nil

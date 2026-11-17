@@ -42,8 +42,11 @@ HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
 
 - Desktop: workspace selebar viewport dengan margin ringkas; peta mengisi area kiri dan chat tetap di kanan
   (320–360 px). Tinggi mengikuti viewport, daftar pesan scroll sendiri. Overview peta tetap, tanpa kamera follow.
-- Daftar gedung bukan sidebar permanen: tombol **Daftar gedung** membuka panel sementara di area peta;
-  memilih gedung membuka preview ruang dan petunjuk tujuan, tanpa teleport.
+- Daftar **Gedung** ada di panel Peta (guru) / Belajar (peserta) saat di peta sekolah: tiap gedung + deskripsi +
+  jumlah orang/live. Ini jalan keyboard & pembaca layar (peta = canvas). Memilih membuka kartu tempat yang sama
+  dengan klik peta (pojok kanan atas), tanpa teleport. Tidak ada tombol/dropdown "Daftar gedung" terpisah.
+  Bagian **Gedung (n)** menempel di bawah panel (sticky), bisa diciutkan; status buka/tutup diingat
+  (`kv-places-open`). Daftar bergulir sendiri (maks 40vh).
 - Dekat pintu: kartu nama gedung + **Pilih ruang**. Pemilihan ruang tidak menutup chat.
 - Layar sempit: pilihan tampilan **Peta / Chat**; mode HP tanpa movement tetap slice 8.
 
@@ -63,7 +66,7 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
 ```
 
 - Baris atas: tombol kembali (ikon + `aria-label`), nama ruang, jumlah online; pengajar menambah Kumpulkan peserta,
-  Kunci ruang, Chat semua ruangan, dan Peserta (popover moderasi). Peta sekolah: nama sekolah + Daftar gedung.
+  Kunci ruang, Chat semua ruangan, dan Peserta (popover moderasi). Peta sekolah: nama sekolah.
 - Baris bawah: mic bulat 52 px, status suara, Bicara ke semua ruang (pengajar), petunjuk gerak.
 - Kedua rail melayang di atas peta, satu baris dengan tinggi tetap 60 px; kamera di-fit di pita antara keduanya.
   Chip kanal suara berlebar tetap; pesan/error melayang di atas rail, tidak menambah tinggi. Status sambungan
@@ -78,6 +81,15 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
   avatar di kursi atas; name tag yang bertumpuk digeser ke bawah.
 - Mode HP: kontrol pengajar sama (dalam kartu lipat), label tanpa huruf kapital, header satu baris akun
   + satu baris navigasi yang bisa digeser.
+
+## D1 — Referensi Menara Sains dan Ruang Guru
+
+Referensi lokal terbaru: `kelasverse-assets/reference/m2/` (export HTML dan PNG pengguna).
+Implementasi dan batas: [`tasks/design-science-staff.md`](tasks/design-science-staff.md).
+Interior baru dipilih eksplisit saat membuat ruang; ruang lama tidak diganti. Jalur modul mengikuti header
+teal/latar mint/node bulat referensi dengan progres nyata, tanpa gembok urutan katalog. Pemutar materi/video
+memakai daftar isi dan navigasi bebas. Jadwal, XP, simulasi, rekaman dan statistik contoh tidak ditampilkan
+sebagai layanan/data nyata. Modul tetap dapat dibuka dari luar ruang.
 
 ## Peta (Phaser)
 
@@ -132,26 +144,136 @@ status terpilih memakai radio/border selain warna. Phaser memakai aset yang sama
 
 ## Komponen dasar
 
+### Kontrol ringkas (berlaku untuk semua UI, mulai 2026-11, referensi `reff-design-4.png`)
+
+Ukuran proporsional ala Gather. Token di `tokens.css`; komponen baru wajib memakainya, tanpa angka tinggi tetap.
+
+- `--touch-min` = tinggi kontrol. Pointer non-sentuh (mouse/trackpad): **36 px** (`--control-h`);
+  layar sentuh (`pointer: coarse`): tetap **44 px**. Jangan tulis `44px`/`48px` langsung.
+- `--control-sm` 32 px: tombol tutup/ghost, tab segmen, aksi baris sekunder. `--control-radius` 10 px.
+- Tombol `.btn-primary`/`.btn-secondary`: teks 13 px semibold, padding 16, garis 1 px `--kv-line`, hover lembut.
+- Tab = segmented control (track `--color-surface-alt`, tab aktif chip putih). Composer = satu field bergaris
+  dengan tombol kirim 36 px di dalamnya. Kartu mengambang: `--kv-shadow-float`, ikon badge 28 px.
+- Info orang online **hanya di Chat** (bagian "n orang online" yang bisa dibuka), tidak di peta/panel lain.
+- Target tetap ≥24 px (WCAG 2.2 AA 2.5.8); fokus terlihat wajib.
+- Pola permukaan: garis struktural **1 px `--kv-line`**, tanpa bayangan hitam bertingkat. Kartu memakai
+  `--kv-shadow-card`; fokus dan status pilihan tetap kontras, bukan diganti garis dekoratif pucat.
+- Radius bersama: tombol `--radius-md` **10 px**, isian/dialog kecil `--radius-lg` **12 px**.
+  Teks daftar/isi sekunder `--text-md` **14 px**; metadata `--text-sm` **13 px**. Isian tetap 16 px
+  untuk menghindari zoom otomatis iOS. Judul halaman dan ilustrasi tidak dikecilkan seragam.
+- Daftar tugas mengikuti pola baris: tanpa kotak bersarang, pemisah 1 px antarbaris, hover lembut,
+  judul semibold + metadata. Gunakan pola ini untuk daftar sejenis berikutnya.
+- Komponen baru menggunakan token dan kelas bersama di `src/styles/forms.css`. Perubahan pola
+  dilakukan di token/pemilik bersama dahulu, bukan menambah override global pada setiap elemen.
+
 | Komponen | Spesifikasi |
 | --- | --- |
-| Tombol utama | Tinggi 48, radius 16, latar Nila, teks putih Nunito 700 15–16 px |
-| Tombol sekunder | Tinggi 44–48, border 2 px `--color-border`, latar putih, teks Tinta |
-| Tombol ikon (mic, kirim) | 44×44 (52 di toolbar ruang), wajib `aria-label`; mic bulat Tinta, ikon garis |
+| Tombol utama | Tinggi `--touch-min` (36 desktop/44 sentuh), radius 10, latar Nila, teks putih 13 px 600 |
+| Tombol sekunder | Tinggi `--touch-min`, border 1 px `--kv-line`, latar putih, teks Tinta |
+| Tombol ikon (mic, kirim) | Persegi `--touch-min`, wajib `aria-label`; mic bulat Tinta, ikon garis |
 | Chip zona | Pill tinggi 36–44, aktif: latar `--color-accent-soft`, border Mangga, teks `--color-accent-ink` |
 | Badge | Pill kecil 12–13 px: live (hijau), jadwal (Mangga), info (Nila lembut) |
 | Bubble chat | Orang lain: `--color-surface-alt`, sudut kiri-bawah 6 px; sendiri: Nila, teks putih, sudut kanan-bawah 6 px; nama pengirim 13 px di atasnya |
 | Banner broadcast | Latar `--color-primary-soft`, teks `--color-primary-strong` 600, di atas chat |
 | Kartu | Putih, radius 24 (20 di HP), padding 14–28 |
-| Input chat | Tinggi 44, border 2 px `--color-input-border`, radius 14, label tersembunyi untuk screen reader |
+| Input chat | Di dalam composer bergaris 1 px radius 12, tinggi 36, label tersembunyi untuk screen reader |
+
+### Penyusunan modul dan kuis — pola LMS
+
+- Daftar awal berupa baris judul, gedung, jenjang, jumlah isi, status Draf/Terbit, dan **Buka**.
+  Filter **Jenjang** berisi Semua jenjang dan level yang sudah didukung. Filter tetap saat kembali
+  dari penyusun; membuat item baru mengikuti jenjang filter (default SD bila Semua jenjang).
+- **Buka** menampilkan satu item saja. **Kembali ke daftar** keluar dari penyusun; jika form masih
+  terbuka, minta konfirmasi sebelum membuang perubahan. Daftar tidak memuat seluruh soal/langkah.
+- Item baru selalu draf. Setelah menyimpan identitas, langsung buka form soal/materi pertama jika
+  isinya kosong. Satu form isi aktif; daftar isi disembunyikan selama mengisi form.
+- Kuis: pertanyaan, pilihan A–D, radio jawaban benar, penjelasan opsional yang bisa dibuka.
+  Daftar soal hanya ringkasan, tanpa membentangkan semua opsi. Modul: daftar urut materi dengan
+  jenis dan durasi; form hanya memperlihatkan field sesuai jenis materi.
+- **Pengaturan** menyunting identitas (dan nilai lulus untuk kuis). **Terbitkan** terpisah dari simpan
+  form, tidak tersedia untuk item kosong. Validasi server tetap berlaku. **Jadikan draf** menyembunyikan
+  item terbit dari katalog peserta; riwayat hasil tidak dihapus.
+- **Pratinjau isi** adalah ringkasan baca-saja isi tersimpan, bukan simulasi attempt: soal beserta
+  kunci untuk guru, atau teks materi modul. Pemutar berkas/video dan pengerjaan kuis tetap di alur peserta.
+- Gaya bersama penyusun berada di `src/styles/authoring.css`; gunakan ulang pola daftar → satu item →
+  satu form. Jangan kembali ke kartu bersarang yang membuka semua isi sekaligus.
 
 ## Aturan aksesibilitas
 
-- Semua yang bisa diketuk minimal 44×44 px.
+- Layar sentuh: semua yang bisa diketuk minimal 44×44 px. Mouse/trackpad: 36 px (lihat Kontrol ringkas), minimal 24 px.
 - Kontras teks minimal 4.5:1, termasuk label abu-abu kecil (`--color-ink-muted` sudah lolos di atas putih dan Kabut).
 - Pakai elemen asli (`<button>`, `<a>`, `<input>` + `<label>`), bukan `div` yang diberi click handler.
 - Warna yang harus dibedakan juga berbeda terang-gelapnya, bukan hanya hue.
-- Gerak di peta bisa dengan keyboard (WASD/panah) dan klik; mode HP tidak butuh gerak sama sekali.
+- Gerak di peta memakai keyboard (WASD/panah) atau klik dua kali lantai (maksimal 400 ms, jarak 24 px layar).
+  Gedung/rak/stasiun tetap sekali klik. Peta menerima fokus keyboard saat masuk; fokus chat/form tidak direbut kembali.
+  Mode HP tidak butuh gerak sama sekali.
 
 ## Di luar MVP
 
 Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung detail dibuat saat implementasi peta di Fase 4.
+
+## Menu samping ruang (2026-11, referensi `docs/screens/sidemenu.png` dan `reff-design-1..3.png`)
+
+- Desktop/tablet: rel ikon tipis (60 px) selalu tampil di kiri peta + satu panel yang bisa diciutkan. Kolom
+  kiri "Panel belajar" dan kolom kanan chat/katalog dihapus; peta mengisi sisa lebar. Menciutkan panel menambah
+  lebar peta, posisi/koneksi ruang tidak berubah.
+- Item untuk semua: **Belajar** (profil, tugas, lanjutkan belajar, kursi), **Chat** (tetap ter-mount saat
+  disembunyikan agar draf tidak hilang; titik merah bila ada pesan baru), **Katalog** di Perpustakaan atau
+  **Stasiun** di Menara Sains/Ruang Guru.
+- Guru/admin desktop: **Peta, Chat, Kelola, Rapor**; Katalog tambahan hanya di Perpustakaan.
+  Katalog guru adalah panel pendamping (peta tetap terlihat) dan tidak terbuka otomatis saat masuk; guru mulai di Peta.
+  Peta sekolah: kamera tidak mengikuti avatar. Mulai di posisi avatar, lalu digeser dengan klik-tahan-geser
+  (gerak >6 px = geser, bukan klik; dibatasi tepi peta, peta lebih kecil dari layar tetap di tengah). Zoom di
+  kanan bawah. Kartu tempat (Menuju pintu/Lihat modul) dan daftar ruang (Masuk ruang) sama-sama ringkas 280 px
+  di pojok kanan atas, agar alur pilih gedung → pintu → masuk tidak berpindah posisi.
+  Klik dua kali (≤400 ms) berlaku di semua peta: gedung = pilih + jalan ke pintunya; stasiun/rak di ruangan =
+  pilih + jalan ke petak bebas terdekat; lantai = jalan ke titik itu. Pilihan stasiun/rak menunggu 400 ms agar panel
+  yang terbuka tidak menggeser peta di antara dua klik. Taman Diskusi dan Alun-alun punya chip judul seperti gedung.
+  Kartu tempat mengikuti `reff-design-4.png`: ikon + judul, tutup ikon, satu tombol utama lebar 36 px dan tombol
+  ikon persegi 36 px (Lihat modul); tombol Masuk ruang 32 px.
+  Panel Peta di dalam gedung punya tombol **Keluar ruang** (berjalan ke pintu lalu keluar) sebagai alternatif
+  aksesibel untuk keluar otomatis di pintu. Menu akun tertutup saat klik di luar; pesan simpan profil hilang 4 detik.
+  Tidak ada item Belajar terpisah untuk guru, termasuk di Ruang Guru: isi pendamping berada pada menu **Peta**
+  sesuai `reff-design-3.png`. Peta membuka panel ruang 320 px di kiri dan peta aktif di kanan; dapat diciutkan.
+  **Peta dan Chat** bergantian memakai panel pendamping, bukan dua kolom. Chat menampilkan konteks ruang/zona, pesan bergulir dan input tetap
+  di bawah; draf serta indikator pesan baru tetap terjaga.
+  **Kelola, Rapor** dan katalog guru terbuka sebagai halaman penuh di samping rel.
+  Tombol **Kembali ke peta** di atas halaman kembali ke Peta beserta panel ruang; item **Peta** pada rel
+  membuka/menutup panel itu. Panel pendamping memakai tombol ciut. Escape dari halaman juga kembali ke Peta.
+  Peta tetap ter-mount, berdimensi nonzero, tersembunyi dan inert saat halaman dibuka: koneksi/posisi tidak
+  direset dan tidak ada fokus keyboard pada peta tersembunyi. Draf chat tetap terjaga.
+  **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola adalah menu induk dengan submenu kiri
+  ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Tugas, Ruang & undangan, Buku perpustakaan, Berkas,
+  dan Kontrol sesi saat berada di ruang. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
+  dimuat. Lebar ≤1000 px submenu berbaris di atas konten. Modul belajar dibatasi `perpus` di Perpustakaan.
+  Aksi **Sematkan ke [nama ruang]**
+  berada pada detail modul terbit yang memiliki isi, bukan pemilih terpisah di atas daftar. Klik membuka
+  pilihan Seluruh modul / Mulai dari materi. Di kampus, tampilkan petunjuk untuk masuk ruang terlebih dahulu.
+  Saat disconnect/travel/dikeluarkan, sematkan tidak aktif; pergantian ruang menutup form sematan.
+  Panel Peta guru memuat **Materi sesi ini**, judul modul/materi, **Buka materi**, **Ganti**, **Lepas**.
+  Ganti/Pilih modul membuka **Kelola → Modul belajar**; sesudah mengirim sematan kembali ke Peta, status aktual mengikuti
+  pesan server. Mode HP memakai pengelola modul yang sama dari Pilih/Ganti, tanpa pemilih modul kedua.
+  Tidak ada bilah sematan di atas peta.
+- Header aplikasi dan header peta desktop dihapus **untuk guru dan peserta** (workspace sama). Peta memenuhi tinggi viewport dengan sela 4 px;
+  menu awal ciut jika belum ada preferensi. Akun di bawah rel menyimpan Profil, Ganti sekolah, Moderasi,
+  Keluar akun (peserta: + Rapor; Moderasi hanya staf). Identitas Kelasverse di atas rel kembali ke peta.
+  Daftar gedung di panel Peta/Belajar; daftar orang online di Chat. "Keluar ruang" ada di panel Peta/Belajar.
+  Header halaman non-peta dan mode HP tetap.
+- Bingkai hitam luar interior dihapus; warna dinding luar memakai `--kv-map-ground` agar menyatu dengan
+  viewport. Lantai, furnitur, pintu dan collision tidak berubah.
+- Avatar keluar otomatis saat kembali ke pintu interior: setelah berjarak >56 px dari pintu, masuk radius
+  40 px memicu travel sekali; spawn di pintu tidak langsung keluar. Server tetap memeriksa radius 48 px.
+  Disconnect, travel dan pergantian ruang mereset pemicu. Tombol keluar mode HP tetap tersedia.
+- Peserta melihat sematan sebagai kartu "Dari pengajar" di atas panel Belajar; titik pada ikon Belajar bila ada
+  sematan baru saat panel tertutup. Tombol **Buka materi** hanya membuka layar pengguna sendiri,
+  bukan sinkronisasi playback atau pemindahan layar semua peserta. Kartu ringkas: latar Nila lembut,
+  garis 1 px dan radius token, tanpa rotasi/garis tebal.
+- Status ciut menu disimpan di `localStorage` (`kv-side-collapsed`) sehingga peta tetap lebar setelah muat ulang.
+  Penempatan menu saja; server tetap memeriksa peran, bukan lokasi avatar.
+- Fokus: membuka item memindah fokus ke judul panel; menciutkan/Escape mengembalikan fokus ke tombol rel.
+  Escape di dalam `<dialog>` (pembaca, kuis) tidak menutup panel. Pembukaan otomatis saat masuk ruang tidak
+  mencuri fokus dari peta.
+- Layar sempit (≤900 px): rel mendatar di atas, panel di atas peta. Mode HP (daftar) tidak berubah; alat guru di
+  HP lewat halaman **Kelola sekolah** (`/kelola-ruang?bagian=ruang|modul|kelas|perpustakaan`).
+- Pustakawan non-guru belum menjadi peran sendiri; tambahkan peran khusus katalog bila sekolah memakai petugas
+  perpustakaan yang tidak boleh melihat nilai.

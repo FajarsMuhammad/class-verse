@@ -133,7 +133,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 | `auth` | `token`, `mode?` (`map`/`list`) | Validasi JWT dan membership organisasi; `list` = mode HP (slice 8) |
 | `move` | `x`, `y`, `dir` | Maks 15 pesan/detik; ditolak jika menembus collision atau melebihi kecepatan maksimum |
 | `chat` | `text`, `scope` (`near` / `zone` / `room`) | Maks 3 pesan/detik; difilter; `room` ditolak jika chat semua ruangan dimatikan |
-| `emote` | `kind` | Maks 1/detik |
+| `emote` | `kind` (`wave`, `hand`, `quiz`, `cheer`) | Maks 1/detik; ditolak saat dibisukan; hanya koneksi aktif |
 | `cmd` | `name` (`broadcast`, `gather`, `mute`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
 | `ping` | `ts` | Dibalas `pong` untuk mengukur latency |
 | `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali mode HP); koneksi dipindah tanpa reconnect |
@@ -149,6 +149,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 | `zone` | `zoneId` atau kosong | Peserta masuk/keluar zona |
 | `chat` | `from`, `text`, `scope`, `at` | Dikirim hanya ke penerima yang memenuhi radius/zona |
 | `event` | `name`, `by`, data | Hasil `cmd` pengajar (misalnya gather, mute) |
+| `emote` | `id`, `kind` | Reaksi sementara 3 detik; satu ruang, campus hanya area of interest. Tidak disimpan atau diputar ulang saat reconnect/travel |
 | `error` | `code`, `message`, `seq` | Pesan ditolak |
 | `traveled` | isi welcome untuk ruang tujuan | Setelah travel berhasil, termasuk saat kembali ke peta sekolah |
 | `buildings` | jumlah orang dan kelas live per gedung | Setiap 5 detik, hanya di peta sekolah |
@@ -157,7 +158,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 **Reconnect.** Client otomatis menyambung ulang dengan backoff 1, 2, 4, 8 detik. Jika kembali dalam 30 detik, posisi terakhir dipertahankan dan peserta lain tidak melihat `left`.
 
-**Proximity.** Penerima chat `near` dihitung server dari jarak Euclid titik kaki. Properti peta Tiled `near_tiles` menentukan radius (bilangan bulat 1–10, default 5), dikalikan ukuran tile: peta sekolah 5 tile (160 px), kelas/taman 3 tile (96 px), sesuai revisi yang disetujui setelah slice 9. Server dan frontend membaca properti yang sama. Zona dibaca dari layer objek di file Tiled. Untuk 40 orang per room, perhitungan O(n²) per tick masih sangat murah, jadi spatial index belum diperlukan.
+**Proximity.** Penerima chat `near` dihitung server dari jarak Euclid titik kaki. Properti peta Tiled `near_radius` (px, 16–320) menentukan radius; MVP 2 memakai 85 px di semua peta (paket desain revamp). Peta tanpa `near_radius` masih memakai `near_tiles` × ukuran tile (rentang 1–10, default 5). Server dan frontend membaca properti yang sama. Zona dibaca dari layer objek di file Tiled. Interior berkapasitas 40 tetap full-room. Snapshot idle dilewati setelah visibility tersinkronisasi; kampus memakai indeks sel AOI ketika ada perubahan. Receiver hanya mengambil kandidat sel sekitar serta memeriksa daftar `seen` untuk avatar keluar; konversi UUID posisi dibagi per tick. Kerumunan semua-terlihat tetap berbiaya kuadratik. Benchmark dan batas kapasitas: [`tasks/realtime-capacity.md`](tasks/realtime-capacity.md).
 
 **Peta sekolah.** Setiap organisasi punya satu room dengan `map_key = 'campus'`, dibuat otomatis saat organisasi dibuat; semua peserta muncul di sini setelah masuk. Kapasitasnya 200, jadi `snapshot` hanya berisi avatar dalam radius 24 tile dari penerima (area of interest berbasis grid sel 8×8 tile), agar bandwidth per peserta tetap kecil. Gedung dan pintunya didefinisikan di layer objek file Tiled peta sekolah; setiap ruang menyimpan `building_key` gedungnya. Satu koneksi WebSocket dipakai sepanjang sesi: `travel` memindahkan peserta antar room di dalam hub, dan keluar dari ruang mengembalikannya ke pintu gedung asal.
 
@@ -165,9 +166,11 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 - *Peta.* File Tiled `.tmj` ada di `classverse-backend/maps/`, di-embed ke binary, dan disajikan `GET /api/maps/{map_key}` (publik, bukan data organisasi; `ETag` + `Cache-Control: no-cache`). Server dan Phaser membaca file yang sama. Tile 32 px. Layer tile `ground`, layer tile `collision` (tile ≠ 0 tidak bisa dilewati), layer objek `spawn` (persegi) dan `buildings` (persegi per gedung dengan properti `key`, `name`, `roof`, `staff_only`, plus objek titik `door` yang properti `building`-nya menunjuk `key`). Urutan id tile adalah kontrak di `maps/README.md`. Revisi D3-02 disetujui sesudah review visual: frontend menggambar ilustrasi flat utuh beresolusi 2× dari token `--map-*`/`--roof-*` dan bounds gedung Tiled, bukan atlas tile untuk tampilan gedung. Collision/spawn/pintu tetap mengikuti Tiled. Kamera overview menampilkan seluruh sekolah dan menyesuaikan resize; avatar dan label mempertahankan ukuran layar.
 - *Room peta sekolah.* `GET /api/orgs/{org_id}` mengembalikan `campus_room_id`; client membuka `/ws/rooms/{campus_room_id}`.
-- *Auth WebSocket.* Upgrade hanya dari Origin `FRONTEND_URL`. Pesan pertama wajib `auth {token}` dalam 5 detik; server memverifikasi JWT dan membership organisasi pemilik room lalu mengirim `welcome`. Gagal → `error` lalu close 4401 (token), 4403 (tidak boleh), 4404 (room tidak ada/bukan anggota).
+- *Auth WebSocket.* Upgrade hanya dari Origin `FRONTEND_URL` (plus `DEV_ALLOWED_ORIGINS` di development). Pesan pertama wajib `auth {token}` dalam 5 detik; server memverifikasi JWT dan membership organisasi pemilik room lalu mengirim `welcome`. Gagal → `error` lalu close 4401 (token), 4403 (tidak boleh), 4404 (room tidak ada/bukan anggota).
 - *Satu koneksi per user.* Koneksi baru user yang sama menggantikan yang lama; yang lama ditutup dengan 4409 `replaced` dan client tidak reconnect otomatis.
-- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum per peta dari properti peta Tiled `walk_speed` (px/detik, bilangan bulat 80–400, default 160; disetujui setelah review slice 5 karena peta sekolah tampil di zoom ±0,4 sehingga 160 px/detik terasa lambat): `campus` 320, `classroom`/`garden` 160. Server dan client membaca angka yang sama dari file peta. Kecepatan ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah `walk_speed` × 1,25 px per detik, maksimal setengah detik gerak, dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi dan menghentikan jalur klik. Koreksi posisi setelah perpindahan zona voice berhasil memakai envelope sama dengan `continue_path: true` agar jalur klik tetap berlanjut; field ini tidak dikirim untuk penolakan.
+- *Movement.* Koordinat pixel dunia (integer, titik kaki avatar), `dir` `up`/`down`/`left`/`right`. Kecepatan maksimum per peta dari properti peta Tiled `walk_speed` (px/detik, bilangan bulat 80–400, default 160; disetujui setelah review slice 5 karena peta sekolah tampil di zoom ±0,4 sehingga 160 px/detik terasa lambat): `campus` 320, interior (`classroom`/`garden`/`lab`/`baca`/`library`) 160. Batas dunia memakai `world_width`/`world_height` (px) bila ada; MVP 2: kampus 2200×1500, interior 1044×684 (lantai 1000×640 + dinding 22 px), kecuali `library` 1244×764 (lantai 1200×720 dari `floor_size`).
+  Peta dengan properti `quiet: true` (`library`) adalah zona tenang: server tidak memberi identitas voice, `voice_broadcast`
+  ditolak `forbidden`, chat tetap jalan. Server dan client membaca angka yang sama dari file peta. Kecepatan ditegakkan sebagai budget jarak (token bucket) agar jitter jaringan tidak menolak gerak sah: budget bertambah `walk_speed` × 1,25 px per detik, maksimal setengah detik gerak, dan setiap `move` memakai jaraknya; `move` diterima jika jarak ≤ budget + 8 px, tujuan bukan tile collision dan di dalam peta, dan lintasan (dicek tiap 8 px) tidak melewati collision. Lebih dari 15 `move`/detik dibuang. Ditolak → `error {code: "move_rejected", seq, x, y}` berisi posisi resmi dan menghentikan jalur klik. Koreksi posisi setelah perpindahan zona voice berhasil memakai envelope sama dengan `continue_path: true` agar jalur klik tetap berlanjut; field ini tidak dikirim untuk penolakan.
 - *Pesan.* `welcome {self_id, room_id, map_key, participants: [{id, name, avatar, role, x, y, dir}]}`; `joined` = satu participant; `left {id}`; `snapshot {p: [{id, x, y, dir}], out: [id]}` dengan `out` = id yang keluar dari area of interest penerima; `ping {ts}` → `pong {ts}`. `seq` server naik per koneksi.
 - *Area of interest* hanya di peta sekolah: grid sel 8×8 tile, radius 24 tile; penerima mendapat avatar yang berubah di radius dan avatar yang baru masuk radius. `joined`/`left` dikirim ke seluruh room.
 - *Reconnect.* Putus → avatar ditahan 30 detik dan tetap terlihat. Kembali ke room yang sama dalam 30 detik → posisi lama tanpa `left`/`joined`. Client backoff 1, 2, 4, 8 detik (8 berulang).
@@ -185,7 +188,7 @@ Access token berumur pendek di memory browser, refresh token panjang di cookie H
 | Token | Bentuk | Umur | Disimpan di |
 | --- | --- | --- | --- |
 | Access token | JWT, ditandatangani Ed25519 | 15 menit | Memory frontend (state Pinia), bukan localStorage |
-| Refresh token | String acak 32 byte (opaque) | 30 hari, geser saat dipakai | Cookie `kv_refresh` dengan `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`; di database hanya hash SHA-256 |
+| Refresh token | String acak 32 byte (opaque) | 30 hari, geser saat dipakai | Cookie `kv_refresh` dengan `HttpOnly; Secure; SameSite=Strict; Path=/api/auth` (development: origin `DEV_ALLOWED_ORIGINS` berskema `http://` tanpa `Secure`, ditolak di production); di database hanya hash SHA-256 |
 
 Claim JWT dibuat minimal: `sub` (user id), `iat`, `exp`, `jti`. Role tidak dimasukkan ke token karena role berbeda per organisasi dan bisa dicabut kapan saja; role dicek dari database (dengan cache singkat) pada setiap request yang butuh otorisasi.
 
@@ -238,6 +241,67 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-008 | `sqlc` + `pgx`, bukan GORM | Query eksplisit, performa terprediksi, konsisten dengan prinsip kode sederhana | — |
 | ADR-009 | Peta sekolah adalah room biasa (`map_key = campus`) dengan area of interest | Memakai ulang hub dan protokol yang sama, tanpa service terpisah | Satu sekolah butuh lebih dari 200 orang di peta bersamaan |
 | ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
+| ADR-011 | Redis hanya untuk leaderboard mingguan (sorted set per organisasi per minggu WIB); Postgres `point_events` tetap sumber kebenaran | Top-N dan peringkat per user O(log n) tanpa agregasi `SUM` tiap request; reset mingguan lewat kunci berganti tanpa job; bisa dibangun ulang dari Postgres | Redis dipakai untuk state room (ADR-002) atau data yang tidak bisa dibangun ulang |
+
+## MVP 2 fitur belajar — keputusan dan batas perencanaan
+
+Status: F1, L1, L2, M1 selesai; M2 progres modul diimplementasikan. Rencana dan checklist tunggal:
+[`docs/tasks/mvp2-learning-plan.md`](tasks/mvp2-learning-plan.md). Keputusan ini tidak mengubah ADR-002:
+state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
+
+- **Berkas:** MinIO dipilih; verifikasi upstream menghentikan penggunaan OSS legacy yang diarsipkan.
+  Setelah evaluasi dan license dari pengguna, fondasi dev memakai **AIStor Free** single-node, image dipin digest
+  di profile Compose `storage`. PDF + audio dibaca di aplikasi, EPUB ditunda, tanpa RAG. Metadata dan kuota di
+  Postgres, objek privat di MinIO. Kuota **5.000.000.000 byte/org**, batas **50.000.000 byte/file**; reservasi
+  upload ikut dihitung. Batas kapasitas VPS tetap perlu dipantau di luar kuota per sekolah.
+- **Urutan:** F1 → L1 → L2 → M1 → M2 → Q1 → C1 → A1 → R1 → Q2 → B1 → B2. Langkah kuis ditambahkan setelah Q1, riwayat
+  Arena di Rapor setelah Q2; migration tidak boleh bergantung tabel dari slice mendatang.
+- **Leaderboard:** klasemen live per sesi kuis; ranking mingguan sekolah dengan filter gedung/mapel di Redis.
+  Progres per modul di Rapor, ranking rombel ditunda. UTC untuk penyimpanan; minggu ditentukan `Asia/Jakarta`.
+- **Identitas leaderboard:** inisial, detail hover/focus/tap nama lengkap + kelas; hanya anggota organisasi.
+  `users.display_name` bukan jaminan nama legal; sumber nama tooltip masih perlu konfirmasi. Kelas berasal dari
+  C1, bukan label bebas membership dan bukan room aktif.
+- **Kelas/rombel (C1):** satu kelas aktif per siswa per organisasi per tahun ajaran. Migration `00014` memakai
+  `academic_years`, `classes`, `class_enrollments` dengan FK komposit organisasi dan unique parsial penempatan
+  aktif `(org_id, academic_year_id, user_id) WHERE ended_at IS NULL`. Pindah kelas atomik, riwayat tetap;
+  pengajar/admin mengelola roster, admin memilih satu tahun ajaran aktif per sekolah (disetujui). Tahun lama
+  tetap tersedia untuk Rapor, tanpa kenaikan otomatis. `internal/class` mengelola tahun, kelas, roster peserta,
+  dan riwayat; panel Kelola memakai endpoint staff-only. Admin membuat tahun berlabel `YYYY/YYYY+1` dan
+  mengaktifkan satu tahun; tahun pertama otomatis aktif. Pengajar/admin membuat/mengganti nama kelas dan
+  mengarsipkan kelas kosong saja. Perpindahan mengunci membership peserta lalu kelas tujuan; arsip mengunci
+  kelas sebelum menghitung roster. Unique parsial menjadi pengaman terakhir terhadap penempatan ganda.
+  `PUT .../academic-years/{year_id}/roster/{user_id}` wajib `class_id` UUID atau `null` eksplisit untuk keluar;
+  penempatan sama idempotent, penempatan lama ditutup dalam transaksi. Hasil belajar tidak diubah.
+  Nama kelas unik tanpa beda huruf besar per tahun di antara kelas nonarsip. Riwayat menyimpan ID kelas
+  (nama mengikuti perubahan nama), waktu masuk/keluar dan pembuat penempatan; membership deletion CASCADE.
+  Belum ada tooltip kelas, assignment, auto-promosi, atau pembatasan room/katalog berdasarkan kelas.
+  Tidak mengubah izin masuk ruang atau membuat leaderboard per kelas secara otomatis.
+- **Modul (M1/M2):** katalog terbit per gedung/jenjang terbuka bagi anggota sekolah dari mana saja;
+  bukan dibatasi rombel atau lokasi avatar (disetujui 2026-11-13). Modul terbit diedit langsung; langkah hanya
+  diarsip, tanpa revisi immutable. `module_progress(org_id,user_id,step_id,completed_at)` menyimpan tanda selesai
+  pemanggil; FK komposit ke membership dan langkah satu organisasi. Selesai idempotent mempertahankan waktu pertama,
+  batal selesai menghapus tanda; server memeriksa akses dan mengunci modul dalam transaksi yang sama.
+  Semua langkah bebas dibuka, termasuk yang belum selesai. Total menghitung langkah aktif saja. Lanjutkan belajar
+  memilih modul terbit dengan tanda selesai terbaru dan langkah aktif belum selesai; tanpa aktivitas selesai
+  tidak ada rekomendasi. Arsip tidak menghapus riwayat progres; keluar membership menghapus progres sesuai FK.
+- **A1 (migration 00015–00016):** tugaskan modul ke rombel (tenggat opsional) dan sematkan modul/langkah saat sesi ruang;
+  tidak menutup katalog bagi anggota lain. Urutan wajib berlaku untuk modul yang ditugaskan; detail skema
+  dan aturan penugasan ada di `docs/tasks/a1-assignments.md`. Tugas menyimpan snapshot penerima/isi/order, progres
+  terpisah monotonic dengan check urutan server; issuance retry-safe memakai UUID client. Lock roster school/year
+  menyerialkan issuance terhadap perpindahan. Quiz attempt memiliki konteks tugas/step nullable; unique open attempt
+  per quiz/user/context (`NULLS NOT DISTINCT`) menjaga katalog dan tugas terpisah. Pass konteks hanya menandai
+  tugas, pass katalog tetap mengisi M2. Snapshot file tetap menjadi referensi delete dan aksesnya memeriksa penerima
+  serta predecessor. Sematan disimpan di sesi, disebar `room_state.pin`; worker sesi existing melakukan DB I/O,
+  bukan actor. `learning_pin` target module + optional step; `learning_unpin` menghapus. New session tanpa sematan.
+- **Antre buku:** ditunda; tidak ada reservasi/denda dalam L2.
+
+Rincian teknis **masih usulan**, tidak menimpa ADR lama: transport baca autentikasi/range (proxy vs presigned)
+perlu spike; PDF.js/Redis belum dipin. SDK storage `minio-go/v7` v7.4.1 sudah diuji di AIStor lokal. Redis memakai proyeksi idempotent total absolut dari
+Postgres dengan pekerjaan durable, bukan increment buta setelah commit; detail worker/rebuild harus diuji.
+Nama package mengikuti domain (`file`, `library`, `module`, `quiz`, `leaderboard`). Package `report` yang sudah
+ada menangani laporan moderasi, bukan Rapor. R1 memakai `internal/gradebook` read-only: `GET /api/orgs/{org_id}/gradebook`
+(staf, paging), `/gradebook/me`, `/gradebook/students/{user_id}`, `/gradebook/csv` (staf, CSV formula-safe).
+Tidak menambah service generik, ORM, atau akses langsung store fitur lain.
 
 ## Data model
 
@@ -332,7 +396,7 @@ CREATE TABLE rooms (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id           uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name             text NOT NULL,
-    map_key          text NOT NULL,      -- 'campus' | 'classroom' | 'garden'
+    map_key          text NOT NULL,      -- 'campus' | 'classroom' | 'garden' | 'lab' | 'baca' | 'library' (MVP 2)
     building_key     text,               -- gedung di peta sekolah; null untuk peta sekolah
     capacity         int NOT NULL DEFAULT 40,
     all_chat_enabled boolean NOT NULL DEFAULT true,
@@ -510,7 +574,8 @@ Contoh potongan OpenAPI untuk satu endpoint:
 ## Slice 5 — Ruang dan travel (R5-01…R5-08 disetujui)
 
 - *Akses masuk.* Semua role wajib berdiri di pintu gedung; tidak ada teleport dari daftar/kelola ruang.
-  CTA kelola memakai **Lihat di peta**. Server memakai posisi resmi room asal, radius 48 px dari titik `door`.
+  CTA kelola memakai **Lihat di peta**. Server memakai posisi resmi room asal, radius `interact_radius` gedung dari titik `door` (16–200 px, default 48;
+  MVP 2: 60 px, Arena 180 px; nilai di luar rentang menggagalkan load peta). Keluar ruang tetap 48 px dari titik `exit`.
   Ruang Guru (`staff_only`) hanya teacher/admin. Non-member dan room organisasi lain tetap `not_found`.
 - *Jadwal.* `scheduled_at` null bisa dimasuki sekarang. Jadwal masa depan menolak participant (`scheduled`);
   teacher/admin boleh masuk lebih awal. **Buka sekarang** = PATCH `scheduled_at: null`. Sesi dimulai saat kedatangan
@@ -539,11 +604,11 @@ Contoh potongan OpenAPI untuk satu endpoint:
 ## Slice 6 — Chat dan zona (C6-01…C6-10 disetujui)
 
 - *Dekat.* Penerima `near` = avatar terhubung dengan jarak Euclid titik kaki ≤ radius peta saat pesan diterima server:
-  peta sekolah 160 px (5 tile), kelas/taman 96 px (3 tile), dari properti Tiled `near_tiles` (default 5, rentang 1–10).
-  Revisi setelah slice 9 ini memperkecil jangkauan ruang, bukan mengubah isolasi suara atau chat zona.
+  85 px di semua peta MVP 2, dari properti Tiled `near_radius`; peta lama tanpa properti itu memakai `near_tiles` × tile.
+  Radius tidak mengubah isolasi suara atau chat zona.
   Pengirim selalu menerima salinannya. Avatar dalam grace reconnect tidak menerima.
-- *Zona.* Layer objek `zones` pada classroom/garden: persegi dengan properti `key` unik, nama objek = label. Zona aktif =
-  persegi yang memuat titik kaki, dihitung server tiap tick; perubahan dikirim `zone {key, name}` hanya ke pemiliknya
+- *Zona.* Layer objek `zones` pada peta interior: properti `key` unik, nama objek = label; `shape: "circle"` berarti elips di
+  dalam kotak objek (MVP 2 memakai lingkaran voice dari `rooms.json`), tanpa properti itu persegi. Zona aktif = bentuk yang memuat titik kaki, dihitung server tiap tick; perubahan dikirim `zone {key, name}` hanya ke pemiliknya
   (`key` kosong = keluar zona). Peta sekolah tanpa zona.
 - *Scope.* Tab Zona (hanya saat di zona) / Dekat / Semua. `zone` ditolak `not_in_zone` jika pengirim tidak di zona saat
   diterima. `broadcast` untuk slice 7.
@@ -613,12 +678,12 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
   Ruang Guru, schedule, capacity, lock, ban and travel serialization still apply. Arrival at spawn, return to the
   origin building door as before. Accepted risk: a desktop client can forge `list` to skip walking; the door is
   presence UX, not access control.
-- *Seat.* Client → server `seat {zone}` (list mode, classroom/garden only, 1 per second → `rate_limited`). Server
+- *Seat.* Client → server `seat {zone}` (list mode, interior maps only, 1 per second → `rate_limited`). Server
   places the avatar on a walkable tile inside the zone (zone centres are tables, so not the literal centre; spread
   like spawn); `zone: ""` returns to the spawn ("Area umum"). Unknown zone → `bad_message`; campus or map
   connection → `forbidden`. Zone/snapshot follow on the next tick; gather still moves everyone to spawn. Map parsing
   rejects zones without a walkable tile.
-- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (within the map's `near_tiles` radius) are computed from welcome/snapshot
+- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (within the map's proximity radius) are computed from welcome/snapshot
   positions; building counts reuse `buildings`, room rows reuse the rooms list (`people`, `live`).
 - *Teacher.* Phone keeps the announcement tab and the teacher panel (collapsible).
 
@@ -656,3 +721,13 @@ The user approved server-enforced zone audio without distance attenuation, confi
 - *UI.* Mic 52×52 round Tinta (`aria-pressed`, off on entry and after travel), status line naming the heard channel,
   teacher switch "Bicara ke semua ruang", "Aktifkan suara" when autoplay is blocked, `--color-speaking` ring on
   active speakers (LiveKit active speakers).
+
+## Q1 — Kuis mandiri
+
+- Tabel `quizzes`, `quiz_questions` (tepat 4 opsi, `answer` 0–3, boleh dihapus), `quiz_attempts` (snapshot soal di
+  `questions jsonb`, `answers smallint[]` dengan -1 = kosong, `score`/`correct` ditulis sekali saat selesai). Satu
+  attempt terbuka per anggota/kuis (unique index parsial); `Start` mengunci kuis lalu melanjutkan attempt terbuka.
+- Kunci dan penjelasan tidak dikirim ke peserta sampai attempt selesai; daftar kuis peserta tidak memuat soal.
+  Nilai `floor(benar × 100 / jumlah)`; lulus jika ≥ `pass_score` snapshot attempt. Nilai terbaik untuk Rapor.
+- Langkah modul `kuis` (`module_steps.quiz_id`, FK org-scoped) hanya menunjuk kuis terbit; lulus menulis
+  `module_progress` pada transaksi `Finish` yang sama. Penandaan manual ditolak 409 `quiz_step`.

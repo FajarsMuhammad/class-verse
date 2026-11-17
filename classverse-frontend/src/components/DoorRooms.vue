@@ -88,26 +88,34 @@ watch(
 </template>
 
 <style scoped>
-.door {
-  border-top: 2px solid var(--color-border-soft);
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-}
+.door { font-size: var(--text-sm); }
 h2 {
-  font: var(--weight-semibold) var(--text-xl)/var(--line-tight) var(--font-display);
+  margin: 0;
+  font: var(--weight-semibold) var(--text-md)/var(--line-tight) var(--font-display);
 }
 p,
 span {
+  margin: var(--space-1) 0;
   color: var(--color-ink-muted);
+  font-size: var(--text-xs);
 }
 ul {
+  margin: var(--space-3) 0 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-2);
 }
 li {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
 }
+li > strong, li > span { grid-column: 1; }
+li > span { margin: 0; }
+li > button { grid-column: 2; grid-row: 1 / span 3; min-height: 0; height: var(--control-sm); padding: 0 var(--space-3); border-radius: 10px; font-size: var(--text-xs); font-weight: var(--weight-semibold); }
 </style>

@@ -40,6 +40,21 @@ describe('useVoice admissions', () => {
       identity: 'user:one',
     })
   })
+  it('stays off in the quiet library instead of waiting for an identity', async () => {
+    const chat = new ChatState()
+    const current = ref({ room_id: 'room', map_key: 'library' } as WelcomeMsg)
+    let voice!: ReturnType<typeof useVoice>
+    const wrapper = mount(defineComponent({ setup() {
+      voice = useVoice({ current, chat, chatVersion: ref(0) })
+      return () => null
+    } }))
+    await flushPromises()
+    expect(voice.status.value).toBe('off')
+    expect(voice.error.value).toBe('')
+    expect(mocks.token).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('does not reconnect when unrelated chat state changes', async () => {
     const chat = new ChatState()
     chat.voiceIdentity = 'user:one'

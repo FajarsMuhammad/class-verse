@@ -9,6 +9,225 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AssignmentStepFileKind.
+const (
+	AssignmentStepFileKindAudio AssignmentStepFileKind = "audio"
+	AssignmentStepFileKindPdf   AssignmentStepFileKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the AssignmentStepFileKind enum.
+func (e AssignmentStepFileKind) Valid() bool {
+	switch e {
+	case AssignmentStepFileKindAudio:
+		return true
+	case AssignmentStepFileKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookCover.
+const (
+	BookCoverArena      BookCover = "arena"
+	BookCoverBahasa     BookCover = "bahasa"
+	BookCoverDiskusi    BookCover = "diskusi"
+	BookCoverIpa        BookCover = "ipa"
+	BookCoverKelas      BookCover = "kelas"
+	BookCoverKreatif    BookCover = "kreatif"
+	BookCoverMatematika BookCover = "matematika"
+	BookCoverSejarah    BookCover = "sejarah"
+)
+
+// Valid indicates whether the value is a known member of the BookCover enum.
+func (e BookCover) Valid() bool {
+	switch e {
+	case BookCoverArena:
+		return true
+	case BookCoverBahasa:
+		return true
+	case BookCoverDiskusi:
+		return true
+	case BookCoverIpa:
+		return true
+	case BookCoverKelas:
+		return true
+	case BookCoverKreatif:
+		return true
+	case BookCoverMatematika:
+		return true
+	case BookCoverSejarah:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookFormat.
+const (
+	BookFormatAudio BookFormat = "audio"
+	BookFormatBuku  BookFormat = "buku"
+	BookFormatEbook BookFormat = "ebook"
+)
+
+// Valid indicates whether the value is a known member of the BookFormat enum.
+func (e BookFormat) Valid() bool {
+	switch e {
+	case BookFormatAudio:
+		return true
+	case BookFormatBuku:
+		return true
+	case BookFormatEbook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookLevel.
+const (
+	BookLevelSD   BookLevel = "SD"
+	BookLevelSMA  BookLevel = "SMA"
+	BookLevelSMP  BookLevel = "SMP"
+	BookLevelUmum BookLevel = "Umum"
+)
+
+// Valid indicates whether the value is a known member of the BookLevel enum.
+func (e BookLevel) Valid() bool {
+	switch e {
+	case BookLevelSD:
+		return true
+	case BookLevelSMA:
+		return true
+	case BookLevelSMP:
+		return true
+	case BookLevelUmum:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookInputCover.
+const (
+	BookInputCoverArena      BookInputCover = "arena"
+	BookInputCoverBahasa     BookInputCover = "bahasa"
+	BookInputCoverDiskusi    BookInputCover = "diskusi"
+	BookInputCoverIpa        BookInputCover = "ipa"
+	BookInputCoverKelas      BookInputCover = "kelas"
+	BookInputCoverKreatif    BookInputCover = "kreatif"
+	BookInputCoverMatematika BookInputCover = "matematika"
+	BookInputCoverSejarah    BookInputCover = "sejarah"
+)
+
+// Valid indicates whether the value is a known member of the BookInputCover enum.
+func (e BookInputCover) Valid() bool {
+	switch e {
+	case BookInputCoverArena:
+		return true
+	case BookInputCoverBahasa:
+		return true
+	case BookInputCoverDiskusi:
+		return true
+	case BookInputCoverIpa:
+		return true
+	case BookInputCoverKelas:
+		return true
+	case BookInputCoverKreatif:
+		return true
+	case BookInputCoverMatematika:
+		return true
+	case BookInputCoverSejarah:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookInputFormat.
+const (
+	BookInputFormatAudio BookInputFormat = "audio"
+	BookInputFormatBuku  BookInputFormat = "buku"
+	BookInputFormatEbook BookInputFormat = "ebook"
+)
+
+// Valid indicates whether the value is a known member of the BookInputFormat enum.
+func (e BookInputFormat) Valid() bool {
+	switch e {
+	case BookInputFormatAudio:
+		return true
+	case BookInputFormatBuku:
+		return true
+	case BookInputFormatEbook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BookInputLevel.
+const (
+	BookInputLevelSD   BookInputLevel = "SD"
+	BookInputLevelSMA  BookInputLevel = "SMA"
+	BookInputLevelSMP  BookInputLevel = "SMP"
+	BookInputLevelUmum BookInputLevel = "Umum"
+)
+
+// Valid indicates whether the value is a known member of the BookInputLevel enum.
+func (e BookInputLevel) Valid() bool {
+	switch e {
+	case BookInputLevelSD:
+		return true
+	case BookInputLevelSMA:
+		return true
+	case BookInputLevelSMP:
+		return true
+	case BookInputLevelUmum:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileItemContentType.
+const (
+	Applicationpdf FileItemContentType = "application/pdf"
+	Audiomp4       FileItemContentType = "audio/mp4"
+	Audiompeg      FileItemContentType = "audio/mpeg"
+)
+
+// Valid indicates whether the value is a known member of the FileItemContentType enum.
+func (e FileItemContentType) Valid() bool {
+	switch e {
+	case Applicationpdf:
+		return true
+	case Audiomp4:
+		return true
+	case Audiompeg:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileItemKind.
+const (
+	FileItemKindAudio FileItemKind = "audio"
+	FileItemKindPdf   FileItemKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the FileItemKind enum.
+func (e FileItemKind) Valid() bool {
+	switch e {
+	case FileItemKindAudio:
+		return true
+	case FileItemKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InviteRole.
 const (
 	InviteRoleParticipant InviteRole = "participant"
@@ -21,6 +240,30 @@ func (e InviteRole) Valid() bool {
 	case InviteRoleParticipant:
 		return true
 	case InviteRoleTeacher:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Level.
+const (
+	LevelSD   Level = "SD"
+	LevelSMA  Level = "SMA"
+	LevelSMP  Level = "SMP"
+	LevelUmum Level = "Umum"
+)
+
+// Valid indicates whether the value is a known member of the Level enum.
+func (e Level) Valid() bool {
+	switch e {
+	case LevelSD:
+		return true
+	case LevelSMA:
+		return true
+	case LevelSMP:
+		return true
+	case LevelUmum:
 		return true
 	default:
 		return false
@@ -51,6 +294,24 @@ func (e ModerationActionAction) Valid() bool {
 	case Unlock:
 		return true
 	case Unmute:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleStepFileKind.
+const (
+	ModuleStepFileKindAudio ModuleStepFileKind = "audio"
+	ModuleStepFileKindPdf   ModuleStepFileKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the ModuleStepFileKind enum.
+func (e ModuleStepFileKind) Valid() bool {
+	switch e {
+	case ModuleStepFileKindAudio:
+		return true
+	case ModuleStepFileKindPdf:
 		return true
 	default:
 		return false
@@ -119,202 +380,278 @@ func (e Role) Valid() bool {
 
 // Defines values for RoomMap.
 const (
+	Baca      RoomMap = "baca"
 	Classroom RoomMap = "classroom"
 	Garden    RoomMap = "garden"
+	Lab       RoomMap = "lab"
+	Library   RoomMap = "library"
+	Science   RoomMap = "science"
+	Staff     RoomMap = "staff"
 )
 
 // Valid indicates whether the value is a known member of the RoomMap enum.
 func (e RoomMap) Valid() bool {
 	switch e {
+	case Baca:
+		return true
 	case Classroom:
 		return true
 	case Garden:
+		return true
+	case Lab:
+		return true
+	case Library:
+		return true
+	case Science:
+		return true
+	case Staff:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for UpdateMeRequestAvatarKey.
+// Defines values for Shelf.
 const (
-	BeretMangga            UpdateMeRequestAvatarKey = "beret-mangga"
-	BeretNila              UpdateMeRequestAvatarKey = "beret-nila"
-	BunMangga              UpdateMeRequestAvatarKey = "bun-mangga"
-	BunNila                UpdateMeRequestAvatarKey = "bun-nila"
-	CapMangga              UpdateMeRequestAvatarKey = "cap-mangga"
-	CapNila                UpdateMeRequestAvatarKey = "cap-nila"
-	Default                UpdateMeRequestAvatarKey = "default"
-	GlassesMangga          UpdateMeRequestAvatarKey = "glasses-mangga"
-	GlassesNila            UpdateMeRequestAvatarKey = "glasses-nila"
-	HeadsetMangga          UpdateMeRequestAvatarKey = "headset-mangga"
-	HeadsetNila            UpdateMeRequestAvatarKey = "headset-nila"
-	RoundMangga            UpdateMeRequestAvatarKey = "round-mangga"
-	RoundNila              UpdateMeRequestAvatarKey = "round-nila"
-	SportyCapGrafit        UpdateMeRequestAvatarKey = "sporty-cap-grafit"
-	SportyCapKoral         UpdateMeRequestAvatarKey = "sporty-cap-koral"
-	SportyCapLaut          UpdateMeRequestAvatarKey = "sporty-cap-laut"
-	SportyCapMangga        UpdateMeRequestAvatarKey = "sporty-cap-mangga"
-	SportyCapNila          UpdateMeRequestAvatarKey = "sporty-cap-nila"
-	SportyCapZamrud        UpdateMeRequestAvatarKey = "sporty-cap-zamrud"
-	SportyGlassesGrafit    UpdateMeRequestAvatarKey = "sporty-glasses-grafit"
-	SportyGlassesKoral     UpdateMeRequestAvatarKey = "sporty-glasses-koral"
-	SportyGlassesLaut      UpdateMeRequestAvatarKey = "sporty-glasses-laut"
-	SportyGlassesMangga    UpdateMeRequestAvatarKey = "sporty-glasses-mangga"
-	SportyGlassesNila      UpdateMeRequestAvatarKey = "sporty-glasses-nila"
-	SportyGlassesZamrud    UpdateMeRequestAvatarKey = "sporty-glasses-zamrud"
-	SportyHeadphonesGrafit UpdateMeRequestAvatarKey = "sporty-headphones-grafit"
-	SportyHeadphonesKoral  UpdateMeRequestAvatarKey = "sporty-headphones-koral"
-	SportyHeadphonesLaut   UpdateMeRequestAvatarKey = "sporty-headphones-laut"
-	SportyHeadphonesMangga UpdateMeRequestAvatarKey = "sporty-headphones-mangga"
-	SportyHeadphonesNila   UpdateMeRequestAvatarKey = "sporty-headphones-nila"
-	SportyHeadphonesZamrud UpdateMeRequestAvatarKey = "sporty-headphones-zamrud"
-	SportyHoodieGrafit     UpdateMeRequestAvatarKey = "sporty-hoodie-grafit"
-	SportyHoodieKoral      UpdateMeRequestAvatarKey = "sporty-hoodie-koral"
-	SportyHoodieLaut       UpdateMeRequestAvatarKey = "sporty-hoodie-laut"
-	SportyHoodieMangga     UpdateMeRequestAvatarKey = "sporty-hoodie-mangga"
-	SportyHoodieNila       UpdateMeRequestAvatarKey = "sporty-hoodie-nila"
-	SportyHoodieZamrud     UpdateMeRequestAvatarKey = "sporty-hoodie-zamrud"
-	SportyPonytailGrafit   UpdateMeRequestAvatarKey = "sporty-ponytail-grafit"
-	SportyPonytailKoral    UpdateMeRequestAvatarKey = "sporty-ponytail-koral"
-	SportyPonytailLaut     UpdateMeRequestAvatarKey = "sporty-ponytail-laut"
-	SportyPonytailMangga   UpdateMeRequestAvatarKey = "sporty-ponytail-mangga"
-	SportyPonytailNila     UpdateMeRequestAvatarKey = "sporty-ponytail-nila"
-	SportyPonytailZamrud   UpdateMeRequestAvatarKey = "sporty-ponytail-zamrud"
-	SportyRunnerGrafit     UpdateMeRequestAvatarKey = "sporty-runner-grafit"
-	SportyRunnerKoral      UpdateMeRequestAvatarKey = "sporty-runner-koral"
-	SportyRunnerLaut       UpdateMeRequestAvatarKey = "sporty-runner-laut"
-	SportyRunnerMangga     UpdateMeRequestAvatarKey = "sporty-runner-mangga"
-	SportyRunnerNila       UpdateMeRequestAvatarKey = "sporty-runner-nila"
-	SportyRunnerZamrud     UpdateMeRequestAvatarKey = "sporty-runner-zamrud"
-	SportyVarsityGrafit    UpdateMeRequestAvatarKey = "sporty-varsity-grafit"
-	SportyVarsityKoral     UpdateMeRequestAvatarKey = "sporty-varsity-koral"
-	SportyVarsityLaut      UpdateMeRequestAvatarKey = "sporty-varsity-laut"
-	SportyVarsityMangga    UpdateMeRequestAvatarKey = "sporty-varsity-mangga"
-	SportyVarsityNila      UpdateMeRequestAvatarKey = "sporty-varsity-nila"
-	SportyVarsityZamrud    UpdateMeRequestAvatarKey = "sporty-varsity-zamrud"
+	ShelfDongeng    Shelf = "dongeng"
+	ShelfInggris    Shelf = "inggris"
+	ShelfKomik      Shelf = "komik"
+	ShelfMatematika Shelf = "matematika"
+	ShelfNovel      Shelf = "novel"
+	ShelfReferensi  Shelf = "referensi"
+	ShelfSains      Shelf = "sains"
+	ShelfSejarah    Shelf = "sejarah"
 )
 
-// Valid indicates whether the value is a known member of the UpdateMeRequestAvatarKey enum.
-func (e UpdateMeRequestAvatarKey) Valid() bool {
+// Valid indicates whether the value is a known member of the Shelf enum.
+func (e Shelf) Valid() bool {
 	switch e {
-	case BeretMangga:
+	case ShelfDongeng:
 		return true
-	case BeretNila:
+	case ShelfInggris:
 		return true
-	case BunMangga:
+	case ShelfKomik:
 		return true
-	case BunNila:
+	case ShelfMatematika:
 		return true
-	case CapMangga:
+	case ShelfNovel:
 		return true
-	case CapNila:
+	case ShelfReferensi:
 		return true
-	case Default:
+	case ShelfSains:
 		return true
-	case GlassesMangga:
-		return true
-	case GlassesNila:
-		return true
-	case HeadsetMangga:
-		return true
-	case HeadsetNila:
-		return true
-	case RoundMangga:
-		return true
-	case RoundNila:
-		return true
-	case SportyCapGrafit:
-		return true
-	case SportyCapKoral:
-		return true
-	case SportyCapLaut:
-		return true
-	case SportyCapMangga:
-		return true
-	case SportyCapNila:
-		return true
-	case SportyCapZamrud:
-		return true
-	case SportyGlassesGrafit:
-		return true
-	case SportyGlassesKoral:
-		return true
-	case SportyGlassesLaut:
-		return true
-	case SportyGlassesMangga:
-		return true
-	case SportyGlassesNila:
-		return true
-	case SportyGlassesZamrud:
-		return true
-	case SportyHeadphonesGrafit:
-		return true
-	case SportyHeadphonesKoral:
-		return true
-	case SportyHeadphonesLaut:
-		return true
-	case SportyHeadphonesMangga:
-		return true
-	case SportyHeadphonesNila:
-		return true
-	case SportyHeadphonesZamrud:
-		return true
-	case SportyHoodieGrafit:
-		return true
-	case SportyHoodieKoral:
-		return true
-	case SportyHoodieLaut:
-		return true
-	case SportyHoodieMangga:
-		return true
-	case SportyHoodieNila:
-		return true
-	case SportyHoodieZamrud:
-		return true
-	case SportyPonytailGrafit:
-		return true
-	case SportyPonytailKoral:
-		return true
-	case SportyPonytailLaut:
-		return true
-	case SportyPonytailMangga:
-		return true
-	case SportyPonytailNila:
-		return true
-	case SportyPonytailZamrud:
-		return true
-	case SportyRunnerGrafit:
-		return true
-	case SportyRunnerKoral:
-		return true
-	case SportyRunnerLaut:
-		return true
-	case SportyRunnerMangga:
-		return true
-	case SportyRunnerNila:
-		return true
-	case SportyRunnerZamrud:
-		return true
-	case SportyVarsityGrafit:
-		return true
-	case SportyVarsityKoral:
-		return true
-	case SportyVarsityLaut:
-		return true
-	case SportyVarsityMangga:
-		return true
-	case SportyVarsityNila:
-		return true
-	case SportyVarsityZamrud:
+	case ShelfSejarah:
 		return true
 	default:
 		return false
 	}
+}
+
+// Defines values for StartUploadRequestKind.
+const (
+	StartUploadRequestKindAudio StartUploadRequestKind = "audio"
+	StartUploadRequestKindPdf   StartUploadRequestKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the StartUploadRequestKind enum.
+func (e StartUploadRequestKind) Valid() bool {
+	switch e {
+	case StartUploadRequestKindAudio:
+		return true
+	case StartUploadRequestKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StepKind.
+const (
+	Berkas StepKind = "berkas"
+	Kuis   StepKind = "kuis"
+	Materi StepKind = "materi"
+	Video  StepKind = "video"
+)
+
+// Valid indicates whether the value is a known member of the StepKind enum.
+func (e StepKind) Valid() bool {
+	switch e {
+	case Berkas:
+		return true
+	case Kuis:
+		return true
+	case Materi:
+		return true
+	case Video:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UploadProgressState.
+const (
+	Assembled UploadProgressState = "assembled"
+	Canceled  UploadProgressState = "canceled"
+	Uploading UploadProgressState = "uploading"
+)
+
+// Valid indicates whether the value is a known member of the UploadProgressState enum.
+func (e UploadProgressState) Valid() bool {
+	switch e {
+	case Assembled:
+		return true
+	case Canceled:
+		return true
+	case Uploading:
+		return true
+	default:
+		return false
+	}
+}
+
+// AcademicYear defines model for AcademicYear.
+type AcademicYear struct {
+	Active bool               `json:"active"`
+	Id     openapi_types.UUID `json:"id"`
+
+	// Label Example: 2026/2027
+	Label string `json:"label"`
 }
 
 // AccessTokenResponse defines model for AccessTokenResponse.
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
+}
+
+// Assignment defines model for Assignment.
+type Assignment struct {
+	BuildingKey string             `json:"building_key"`
+	Cancelled   bool               `json:"cancelled"`
+	ClassName   string             `json:"class_name"`
+	Done        int                `json:"done"`
+	DueAt       *time.Time         `json:"due_at"`
+	Id          openapi_types.UUID `json:"id"`
+	Level       Level              `json:"level"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+	YearLabel   string             `json:"year_label"`
+}
+
+// AssignmentInput defines model for AssignmentInput.
+type AssignmentInput struct {
+	ClassId openapi_types.UUID `json:"class_id"`
+	DueAt   *time.Time         `json:"due_at,omitempty"`
+
+	// Id Client-generated retry-safe ID
+	Id       openapi_types.UUID `json:"id"`
+	ModuleId openapi_types.UUID `json:"module_id"`
+}
+
+// AssignmentRecipient defines model for AssignmentRecipient.
+type AssignmentRecipient struct {
+	DisplayName string             `json:"display_name"`
+	Done        int                `json:"done"`
+	Total       int                `json:"total"`
+	UserId      openapi_types.UUID `json:"user_id"`
+}
+
+// AssignmentStep defines model for AssignmentStep.
+type AssignmentStep struct {
+	Body     string                  `json:"body"`
+	Done     bool                    `json:"done"`
+	FileId   *openapi_types.UUID     `json:"file_id"`
+	FileKind *AssignmentStepFileKind `json:"file_kind"`
+	Id       openapi_types.UUID      `json:"id"`
+	Kind     StepKind                `json:"kind"`
+	Minutes  int                     `json:"minutes"`
+	QuizId   *openapi_types.UUID     `json:"quiz_id"`
+	Title    string                  `json:"title"`
+	Unlocked bool                    `json:"unlocked"`
+	VideoId  *string                 `json:"video_id"`
+}
+
+// AssignmentStepFileKind defines model for AssignmentStep.FileKind.
+type AssignmentStepFileKind string
+
+// AttemptQuestion defines model for AttemptQuestion.
+type AttemptQuestion struct {
+	// Answer Null sampai percobaan selesai
+	Answer *int `json:"answer"`
+
+	// Explanation Null sampai percobaan selesai
+	Explanation *string  `json:"explanation"`
+	Options     []string `json:"options"`
+	Prompt      string   `json:"prompt"`
+}
+
+// Book defines model for Book.
+type Book struct {
+	Author string `json:"author"`
+
+	// Available Buku fisik: eksemplar yang tidak sedang dipinjam
+	Available int `json:"available"`
+
+	// Copies Eksemplar fisik; selalu 0 untuk ebook/audio
+	Copies    int                 `json:"copies"`
+	Cover     BookCover           `json:"cover"`
+	FileId    *openapi_types.UUID `json:"file_id,omitempty"`
+	Format    BookFormat          `json:"format"`
+	Id        openapi_types.UUID  `json:"id"`
+	Level     BookLevel           `json:"level"`
+	MyLoan    *MyLoan             `json:"my_loan"`
+	Position  int                 `json:"position"`
+	Published bool                `json:"published"`
+
+	// Sample Buku contoh dari seed, boleh dihapus
+	Sample    bool      `json:"sample"`
+	Shelf     Shelf     `json:"shelf"`
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// BookCover defines model for Book.Cover.
+type BookCover string
+
+// BookFormat defines model for Book.Format.
+type BookFormat string
+
+// BookLevel defines model for Book.Level.
+type BookLevel string
+
+// BookInput defines model for BookInput.
+type BookInput struct {
+	Author string `json:"author"`
+
+	// Copies Eksemplar fisik; selalu 0 untuk ebook/audio
+	Copies    int                 `json:"copies"`
+	Cover     BookInputCover      `json:"cover"`
+	FileId    *openapi_types.UUID `json:"file_id,omitempty"`
+	Format    BookInputFormat     `json:"format"`
+	Level     BookInputLevel      `json:"level"`
+	Published bool                `json:"published"`
+	Shelf     Shelf               `json:"shelf"`
+	Title     string              `json:"title"`
+}
+
+// BookInputCover defines model for BookInput.Cover.
+type BookInputCover string
+
+// BookInputFormat defines model for BookInput.Format.
+type BookInputFormat string
+
+// BookInputLevel defines model for BookInput.Level.
+type BookInputLevel string
+
+// BookList defines model for BookList.
+type BookList struct {
+	Items      []Book  `json:"items"`
+	NextCursor *string `json:"next_cursor"`
+}
+
+// ClassInput defines model for ClassInput.
+type ClassInput struct {
+	Name string `json:"name"`
 }
 
 // CreateInviteRequest defines model for CreateInviteRequest.
@@ -362,6 +699,84 @@ type ErrorResponse struct {
 	} `json:"error"`
 }
 
+// FileItem defines model for FileItem.
+type FileItem struct {
+	ContentType FileItemContentType `json:"content_type"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Id          openapi_types.UUID  `json:"id"`
+	Kind        FileItemKind        `json:"kind"`
+	Name        string              `json:"name"`
+	Position    int                 `json:"position"`
+	Size        int64               `json:"size"`
+	UploadedBy  openapi_types.UUID  `json:"uploaded_by"`
+}
+
+// FileItemContentType defines model for FileItem.ContentType.
+type FileItemContentType string
+
+// FileItemKind defines model for FileItem.Kind.
+type FileItemKind string
+
+// FileList defines model for FileList.
+type FileList struct {
+	Items      []FileItem `json:"items"`
+	QuotaBytes int64      `json:"quota_bytes"`
+	UsedBytes  int64      `json:"used_bytes"`
+}
+
+// GradebookModule defines model for GradebookModule.
+type GradebookModule struct {
+	Archived    bool               `json:"archived"`
+	BuildingKey string             `json:"building_key"`
+	Done        int                `json:"done"`
+	Id          openapi_types.UUID `json:"id"`
+	Level       string             `json:"level"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+}
+
+// GradebookPage defines model for GradebookPage.
+type GradebookPage struct {
+	Items []GradebookRow `json:"items"`
+	Total int            `json:"total"`
+}
+
+// GradebookQuiz defines model for GradebookQuiz.
+type GradebookQuiz struct {
+	Archived    bool               `json:"archived"`
+	Attempts    int                `json:"attempts"`
+	Best        *int               `json:"best"`
+	BuildingKey string             `json:"building_key"`
+	Id          openapi_types.UUID `json:"id"`
+	Last        *int               `json:"last"`
+	Title       string             `json:"title"`
+}
+
+// GradebookRow defines model for GradebookRow.
+type GradebookRow struct {
+	AverageBest      *float32           `json:"average_best"`
+	ClassName        string             `json:"class_name"`
+	ModulesDone      int                `json:"modules_done"`
+	ModulesTotal     int                `json:"modules_total"`
+	Name             string             `json:"name"`
+	QuizzesAttempted int                `json:"quizzes_attempted"`
+	QuizzesTotal     int                `json:"quizzes_total"`
+	UserId           openapi_types.UUID `json:"user_id"`
+}
+
+// GradebookTask defines model for GradebookTask.
+type GradebookTask struct {
+	BuildingKey string             `json:"building_key"`
+	Cancelled   bool               `json:"cancelled"`
+	ClassName   string             `json:"class_name"`
+	Done        int                `json:"done"`
+	DueAt       *time.Time         `json:"due_at"`
+	Id          openapi_types.UUID `json:"id"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+	YearLabel   string             `json:"year_label"`
+}
+
 // Invite defines model for Invite.
 type Invite struct {
 	// Code Bentuk tampilan ABCD-EFGH
@@ -390,6 +805,27 @@ type InvitePreview struct {
 
 // InviteRole defines model for InviteRole.
 type InviteRole string
+
+// Level defines model for Level.
+type Level string
+
+// Loan defines model for Loan.
+type Loan struct {
+	Author     string             `json:"author"`
+	BookId     openapi_types.UUID `json:"book_id"`
+	BorrowedAt time.Time          `json:"borrowed_at"`
+	Cover      string             `json:"cover"`
+	DueAt      time.Time          `json:"due_at"`
+	Id         openapi_types.UUID `json:"id"`
+	ReturnedAt *time.Time         `json:"returned_at"`
+	Title      string             `json:"title"`
+}
+
+// LoanList defines model for LoanList.
+type LoanList struct {
+	Items     []Loan `json:"items"`
+	MaxActive int    `json:"max_active"`
+}
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -436,6 +872,79 @@ type ModerationLog struct {
 	NextCursor *string            `json:"next_cursor"`
 }
 
+// Module defines model for Module.
+type Module struct {
+	// BuildingKey Kunci gedung di peta kampus
+	BuildingKey string             `json:"building_key"`
+	Description string             `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
+	Level       Level              `json:"level"`
+	Published   bool               `json:"published"`
+	Steps       []ModuleStep       `json:"steps"`
+	Title       string             `json:"title"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
+// ModuleInput defines model for ModuleInput.
+type ModuleInput struct {
+	// BuildingKey Kunci gedung di peta kampus
+	BuildingKey string `json:"building_key"`
+	Description string `json:"description"`
+	Level       Level  `json:"level"`
+	Published   bool   `json:"published"`
+	Title       string `json:"title"`
+}
+
+// ModuleList defines model for ModuleList.
+type ModuleList struct {
+	Items []Module `json:"items"`
+}
+
+// ModuleResume defines model for ModuleResume.
+type ModuleResume struct {
+	BuildingKey string             `json:"building_key"`
+	Done        int                `json:"done"`
+	Level       Level              `json:"level"`
+	ModuleId    openapi_types.UUID `json:"module_id"`
+	NextTitle   string             `json:"next_title"`
+	Title       string             `json:"title"`
+	Total       int                `json:"total"`
+}
+
+// ModuleStep defines model for ModuleStep.
+type ModuleStep struct {
+	Body string `json:"body"`
+
+	// Done Langkah sudah ditandai selesai oleh pemanggil
+	Done   bool                `json:"done"`
+	FileId *openapi_types.UUID `json:"file_id"`
+
+	// FileKind Jenis file langkah `berkas` (hanya di daftar modul)
+	FileKind *ModuleStepFileKind `json:"file_kind"`
+	Id       openapi_types.UUID  `json:"id"`
+	Kind     StepKind            `json:"kind"`
+	Minutes  int                 `json:"minutes"`
+
+	// QuizId Kuis langkah `kuis`; selesai otomatis saat lulus
+	QuizId *openapi_types.UUID `json:"quiz_id"`
+
+	// ReaderPosition Posisi baca pemanggil untuk file langkah `berkas`
+	ReaderPosition int    `json:"reader_position"`
+	Title          string `json:"title"`
+
+	// VideoId ID video YouTube 11 karakter
+	VideoId *string `json:"video_id"`
+}
+
+// ModuleStepFileKind Jenis file langkah `berkas` (hanya di daftar modul)
+type ModuleStepFileKind string
+
+// MyLoan defines model for MyLoan.
+type MyLoan struct {
+	DueAt time.Time          `json:"due_at"`
+	Id    openapi_types.UUID `json:"id"`
+}
+
 // OrgSummary defines model for OrgSummary.
 type OrgSummary struct {
 	Id   openapi_types.UUID `json:"id"`
@@ -454,6 +963,87 @@ type Organization struct {
 	Name         string             `json:"name"`
 	Role         Role               `json:"role"`
 	Slug         string             `json:"slug"`
+}
+
+// Placement defines model for Placement.
+type Placement struct {
+	ClassName string `json:"class_name"`
+
+	// EndedAt Null = masih di kelas ini
+	EndedAt   *time.Time `json:"ended_at"`
+	StartedAt time.Time  `json:"started_at"`
+	YearLabel string     `json:"year_label"`
+}
+
+// QuestionInput defines model for QuestionInput.
+type QuestionInput struct {
+	// Answer Indeks pilihan benar
+	Answer      int      `json:"answer"`
+	Explanation *string  `json:"explanation,omitempty"`
+	Options     []string `json:"options"`
+	Prompt      string   `json:"prompt"`
+}
+
+// Quiz defines model for Quiz.
+type Quiz struct {
+	// Attempts Jumlah percobaan selesai milik pemanggil
+	Attempts int `json:"attempts"`
+
+	// BestScore Nilai tertinggi pemanggil; null jika belum pernah selesai
+	BestScore     *int               `json:"best_score"`
+	BuildingKey   string             `json:"building_key"`
+	Description   string             `json:"description"`
+	Id            openapi_types.UUID `json:"id"`
+	Level         Level              `json:"level"`
+	PassScore     int                `json:"pass_score"`
+	Published     bool               `json:"published"`
+	QuestionCount int                `json:"question_count"`
+
+	// Questions Hanya untuk pengajar/admin dengan drafts=true
+	Questions *[]QuizQuestion `json:"questions,omitempty"`
+	Title     string          `json:"title"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// QuizAttempt defines model for QuizAttempt.
+type QuizAttempt struct {
+	// Answers Pilihan pemanggil; -1 = belum dijawab
+	Answers   []int              `json:"answers"`
+	Correct   *int               `json:"correct"`
+	Finished  bool               `json:"finished"`
+	Id        openapi_types.UUID `json:"id"`
+	PassScore int                `json:"pass_score"`
+	Passed    *bool              `json:"passed"`
+	Questions []AttemptQuestion  `json:"questions"`
+	QuizId    openapi_types.UUID `json:"quiz_id"`
+
+	// Score 0–100, dibulatkan ke bawah
+	Score *int `json:"score"`
+}
+
+// QuizInput defines model for QuizInput.
+type QuizInput struct {
+	// BuildingKey Kunci gedung di peta kampus
+	BuildingKey string `json:"building_key"`
+	Description string `json:"description"`
+	Level       Level  `json:"level"`
+	PassScore   *int   `json:"pass_score,omitempty"`
+	Published   bool   `json:"published"`
+	Title       string `json:"title"`
+}
+
+// QuizList defines model for QuizList.
+type QuizList struct {
+	Items []Quiz `json:"items"`
+}
+
+// QuizQuestion defines model for QuizQuestion.
+type QuizQuestion struct {
+	Answer      int                `json:"answer"`
+	Explanation string             `json:"explanation"`
+	Id          openapi_types.UUID `json:"id"`
+	Options     []string           `json:"options"`
+	Prompt      string             `json:"prompt"`
 }
 
 // RegisterRequest defines model for RegisterRequest.
@@ -531,18 +1121,81 @@ type RoomList struct {
 // RoomMap defines model for RoomMap.
 type RoomMap string
 
+// RosterEntry defines model for RosterEntry.
+type RosterEntry struct {
+	AvatarKey string `json:"avatar_key"`
+
+	// ClassId Null = belum ditempatkan
+	ClassId     *openapi_types.UUID `json:"class_id"`
+	DisplayName string              `json:"display_name"`
+	UserId      openapi_types.UUID  `json:"user_id"`
+}
+
+// SchoolClass defines model for SchoolClass.
+type SchoolClass struct {
+	AcademicYearId openapi_types.UUID `json:"academic_year_id"`
+	Id             openapi_types.UUID `json:"id"`
+	Name           string             `json:"name"`
+
+	// Students Jumlah siswa aktif
+	Students int `json:"students"`
+}
+
+// Shelf defines model for Shelf.
+type Shelf string
+
+// StartUploadRequest defines model for StartUploadRequest.
+type StartUploadRequest struct {
+	Id     openapi_types.UUID     `json:"id"`
+	Kind   StartUploadRequestKind `json:"kind"`
+	Name   string                 `json:"name"`
+	Sha256 string                 `json:"sha256"`
+	Size   int64                  `json:"size"`
+}
+
+// StartUploadRequestKind defines model for StartUploadRequest.Kind.
+type StartUploadRequestKind string
+
+// StepInput defines model for StepInput.
+type StepInput struct {
+	// Body Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa.
+	Body *string `json:"body,omitempty"`
+
+	// FileId Wajib untuk `berkas`: PDF/audio siap milik sekolah
+	FileId  *openapi_types.UUID `json:"file_id,omitempty"`
+	Kind    StepKind            `json:"kind"`
+	Minutes int                 `json:"minutes"`
+
+	// QuizId Wajib untuk `kuis`: kuis terbit milik sekolah
+	QuizId *openapi_types.UUID `json:"quiz_id,omitempty"`
+	Title  string              `json:"title"`
+
+	// VideoId Wajib untuk `video`: ID atau tautan YouTube (https)
+	VideoId *string `json:"video_id,omitempty"`
+}
+
+// StepKind defines model for StepKind.
+type StepKind string
+
+// StudentGradebook defines model for StudentGradebook.
+type StudentGradebook struct {
+	Assignments []GradebookTask    `json:"assignments"`
+	AverageBest *float32           `json:"average_best"`
+	Modules     []GradebookModule  `json:"modules"`
+	Name        string             `json:"name"`
+	Quizzes     []GradebookQuiz    `json:"quizzes"`
+	UserId      openapi_types.UUID `json:"user_id"`
+}
+
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
-	// AvatarKey Sporty presets use sporty-<style>-<color>; legacy SVG keys remain accepted.
-	AvatarKey *UpdateMeRequestAvatarKey `json:"avatar_key,omitempty"`
-	BirthDate *openapi_types.Date       `json:"birth_date,omitempty"`
+	// AvatarKey Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid.
+	AvatarKey *string             `json:"avatar_key,omitempty"`
+	BirthDate *openapi_types.Date `json:"birth_date,omitempty"`
 
 	// DisplayName NFC, trimmed, repeated spaces collapsed; prohibited words rejected
 	DisplayName *string `json:"display_name,omitempty"`
 }
-
-// UpdateMeRequestAvatarKey Sporty presets use sporty-<style>-<color>; legacy SVG keys remain accepted.
-type UpdateMeRequestAvatarKey string
 
 // UpdateRoomRequest defines model for UpdateRoomRequest.
 type UpdateRoomRequest struct {
@@ -551,6 +1204,20 @@ type UpdateRoomRequest struct {
 	Name           *string    `json:"name,omitempty"`
 	ScheduledAt    *time.Time `json:"scheduled_at,omitempty"`
 }
+
+// UploadProgress defines model for UploadProgress.
+type UploadProgress struct {
+	// ChunkSize 5242880 (5 MiB)
+	ChunkSize int64               `json:"chunk_size"`
+	ExpiresAt time.Time           `json:"expires_at"`
+	Id        openapi_types.UUID  `json:"id"`
+	Parts     []int               `json:"parts"`
+	Size      int64               `json:"size"`
+	State     UploadProgressState `json:"state"`
+}
+
+// UploadProgressState defines model for UploadProgress.State.
+type UploadProgressState string
 
 // UserRef defines model for UserRef.
 type UserRef struct {
@@ -575,11 +1242,26 @@ type VoiceToken struct {
 	Url string `json:"url"`
 }
 
+// AssignmentID defines model for AssignmentID.
+type AssignmentID = openapi_types.UUID
+
+// AttemptID defines model for AttemptID.
+type AttemptID = openapi_types.UUID
+
+// FileID defines model for FileID.
+type FileID = openapi_types.UUID
+
 // InviteCode defines model for InviteCode.
 type InviteCode = string
 
 // OrgID defines model for OrgID.
 type OrgID = openapi_types.UUID
+
+// QuizID defines model for QuizID.
+type QuizID = openapi_types.UUID
+
+// YearID defines model for YearID.
+type YearID = openapi_types.UUID
 
 // AccessToken defines model for AccessToken.
 type AccessToken = AccessTokenResponse
@@ -611,8 +1293,78 @@ type ValidationFailed = ErrorResponse
 // VoiceUnavailable defines model for VoiceUnavailable.
 type VoiceUnavailable = ErrorResponse
 
+// CreateAcademicYearJSONBody defines parameters for CreateAcademicYear.
+type CreateAcademicYearJSONBody struct {
+	// Label Example: 2026/2027
+	Label string `json:"label"`
+}
+
+// PlaceStudentJSONBody defines parameters for PlaceStudent.
+type PlaceStudentJSONBody struct {
+	ClassId *openapi_types.UUID `json:"class_id"`
+}
+
+// GetFileContentParams defines parameters for GetFileContent.
+type GetFileContentParams struct {
+	Range *string `json:"Range,omitempty"`
+}
+
+// SaveFilePositionJSONBody defines parameters for SaveFilePosition.
+type SaveFilePositionJSONBody struct {
+	Position int `json:"position"`
+}
+
+// ListGradebookParams defines parameters for ListGradebook.
+type ListGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
+	Offset      *int                `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit       *int                `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ExportGradebookParams defines parameters for ExportGradebook.
+type ExportGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
+}
+
+// GetMyGradebookParams defines parameters for GetMyGradebook.
+type GetMyGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
+}
+
+// GetStudentGradebookParams defines parameters for GetStudentGradebook.
+type GetStudentGradebookParams struct {
+	YearId      *openapi_types.UUID `form:"year_id,omitempty" json:"year_id,omitempty"`
+	ClassId     *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	ModuleId    *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+	QuizId      *openapi_types.UUID `form:"quiz_id,omitempty" json:"quiz_id,omitempty"`
+	BuildingKey *string             `form:"building_key,omitempty" json:"building_key,omitempty"`
+}
+
 // ListInvitesParams defines parameters for ListInvites.
 type ListInvitesParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListBooksParams defines parameters for ListBooks.
+type ListBooksParams struct {
+	Shelf *Shelf `form:"shelf,omitempty" json:"shelf,omitempty"`
+
+	// Q Cari judul/penulis, teks literal
+	Q      *string `form:"q,omitempty" json:"q,omitempty"`
+	Drafts *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
@@ -621,6 +1373,41 @@ type ListInvitesParams struct {
 type ListModerationLogParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// ListModulesParams defines parameters for ListModules.
+type ListModulesParams struct {
+	BuildingKey *string `form:"building_key,omitempty" json:"building_key,omitempty"`
+	Level       *Level  `form:"level,omitempty" json:"level,omitempty"`
+	Drafts      *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+}
+
+// ReorderModuleStepsJSONBody defines parameters for ReorderModuleSteps.
+type ReorderModuleStepsJSONBody struct {
+	StepIds []openapi_types.UUID `json:"step_ids"`
+}
+
+// ListQuizzesParams defines parameters for ListQuizzes.
+type ListQuizzesParams struct {
+	BuildingKey *string `form:"building_key,omitempty" json:"building_key,omitempty"`
+	Level       *Level  `form:"level,omitempty" json:"level,omitempty"`
+	Drafts      *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+}
+
+// StartQuizAttemptParams defines parameters for StartQuizAttempt.
+type StartQuizAttemptParams struct {
+	// AssignmentStepId Own unlocked assignment quiz step; creates/resumes separate task-context attempt
+	AssignmentStepId *openapi_types.UUID `form:"assignment_step_id,omitempty" json:"assignment_step_id,omitempty"`
+}
+
+// AnswerQuizQuestionJSONBody defines parameters for AnswerQuizQuestion.
+type AnswerQuizQuestionJSONBody struct {
+	Choice int `json:"choice"`
+}
+
+// ReorderQuizQuestionsJSONBody defines parameters for ReorderQuizQuestions.
+type ReorderQuizQuestionsJSONBody struct {
+	QuestionIds []openapi_types.UUID `json:"question_ids"`
 }
 
 // ListReportsParams defines parameters for ListReports.
@@ -655,11 +1442,71 @@ type UpdateMeJSONRequestBody = UpdateMeRequest
 // CreateOrgJSONRequestBody defines body for CreateOrg for application/json ContentType.
 type CreateOrgJSONRequestBody = CreateOrgRequest
 
+// CreateAcademicYearJSONRequestBody defines body for CreateAcademicYear for application/json ContentType.
+type CreateAcademicYearJSONRequestBody CreateAcademicYearJSONBody
+
+// CreateClassJSONRequestBody defines body for CreateClass for application/json ContentType.
+type CreateClassJSONRequestBody = ClassInput
+
+// PlaceStudentJSONRequestBody defines body for PlaceStudent for application/json ContentType.
+type PlaceStudentJSONRequestBody PlaceStudentJSONBody
+
+// IssueAssignmentJSONRequestBody defines body for IssueAssignment for application/json ContentType.
+type IssueAssignmentJSONRequestBody = AssignmentInput
+
+// RenameClassJSONRequestBody defines body for RenameClass for application/json ContentType.
+type RenameClassJSONRequestBody = ClassInput
+
+// SaveFilePositionJSONRequestBody defines body for SaveFilePosition for application/json ContentType.
+type SaveFilePositionJSONRequestBody SaveFilePositionJSONBody
+
 // CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
 type CreateInviteJSONRequestBody = CreateInviteRequest
 
+// CreateBookJSONRequestBody defines body for CreateBook for application/json ContentType.
+type CreateBookJSONRequestBody = BookInput
+
+// UpdateBookJSONRequestBody defines body for UpdateBook for application/json ContentType.
+type UpdateBookJSONRequestBody = BookInput
+
+// CreateModuleJSONRequestBody defines body for CreateModule for application/json ContentType.
+type CreateModuleJSONRequestBody = ModuleInput
+
+// UpdateModuleJSONRequestBody defines body for UpdateModule for application/json ContentType.
+type UpdateModuleJSONRequestBody = ModuleInput
+
+// ReorderModuleStepsJSONRequestBody defines body for ReorderModuleSteps for application/json ContentType.
+type ReorderModuleStepsJSONRequestBody ReorderModuleStepsJSONBody
+
+// AddModuleStepJSONRequestBody defines body for AddModuleStep for application/json ContentType.
+type AddModuleStepJSONRequestBody = StepInput
+
+// UpdateModuleStepJSONRequestBody defines body for UpdateModuleStep for application/json ContentType.
+type UpdateModuleStepJSONRequestBody = StepInput
+
+// CreateQuizJSONRequestBody defines body for CreateQuiz for application/json ContentType.
+type CreateQuizJSONRequestBody = QuizInput
+
+// UpdateQuizJSONRequestBody defines body for UpdateQuiz for application/json ContentType.
+type UpdateQuizJSONRequestBody = QuizInput
+
+// AnswerQuizQuestionJSONRequestBody defines body for AnswerQuizQuestion for application/json ContentType.
+type AnswerQuizQuestionJSONRequestBody AnswerQuizQuestionJSONBody
+
+// ReorderQuizQuestionsJSONRequestBody defines body for ReorderQuizQuestions for application/json ContentType.
+type ReorderQuizQuestionsJSONRequestBody ReorderQuizQuestionsJSONBody
+
+// AddQuizQuestionJSONRequestBody defines body for AddQuizQuestion for application/json ContentType.
+type AddQuizQuestionJSONRequestBody = QuestionInput
+
+// UpdateQuizQuestionJSONRequestBody defines body for UpdateQuizQuestion for application/json ContentType.
+type UpdateQuizQuestionJSONRequestBody = QuestionInput
+
 // CreateRoomJSONRequestBody defines body for CreateRoom for application/json ContentType.
 type CreateRoomJSONRequestBody = CreateRoomRequest
+
+// StartUploadJSONRequestBody defines body for StartUpload for application/json ContentType.
+type StartUploadJSONRequestBody = StartUploadRequest
 
 // CreateReportJSONRequestBody defines body for CreateReport for application/json ContentType.
 type CreateReportJSONRequestBody = CreateReportRequest

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190" height="220" viewBox="0 0 190 220" role="img" aria-label="Menara Sains">
+<g transform="rotate(-28 95 30)"><rect x="95" y="23" width="60" height="14" rx="4" fill="#64748b" stroke="#1d2140" stroke-width="3"/></g>
+<path d="M25 66 A65 66 0 0 1 155 66 Z" fill="#99f6e4" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M81 66 V16 A8 8 0 0 1 97 16 V66 Z" fill="#134e4a"/>
+<rect x="34" y="66" width="112" height="140" rx="0" fill="#14b8a6" stroke="#1d2140" stroke-width="3"/>
+<rect x="56" y="68" width="4" height="136" fill="#000000" fill-opacity="0.10"/>
+<rect x="78" y="68" width="4" height="136" fill="#000000" fill-opacity="0.10"/>
+<rect x="100" y="68" width="4" height="136" fill="#000000" fill-opacity="0.10"/>
+<rect x="122" y="68" width="4" height="136" fill="#000000" fill-opacity="0.10"/>
+<rect x="144" y="68" width="4" height="136" fill="#000000" fill-opacity="0.10"/>
+<circle cx="90" cy="98" r="17" fill="#cffafe" stroke="#1d2140" stroke-width="3"/>
+<circle cx="90" cy="98" r="11" fill="none" stroke="#67e8f9" stroke-width="4"/>
+<circle cx="90" cy="137" r="12" fill="#cffafe" stroke="#1d2140" stroke-width="3"/>
+<path d="M71 206 V179.0 A19.0 19.0 0 0 1 109 179.0 V206" fill="#c8935a" stroke="#1d2140" stroke-width="3" stroke-linejoin="round"/>
+<rect x="15" y="206" width="150" height="12" rx="4" fill="#cbd5e1" stroke="#1d2140" stroke-width="3"/>
+<circle cx="172" cy="94" r="14" fill="#fbbf24" stroke="#1d2140" stroke-width="3"/>
+<ellipse cx="172" cy="94" rx="22" ry="6" fill="none" stroke="#1d2140" stroke-width="3" transform="rotate(-20 172 94)"/>
+</svg>

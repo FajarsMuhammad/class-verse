@@ -17,13 +17,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/db/seed"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/assignment"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/class"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/file"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/gradebook"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/invite"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/library"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/module"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/config"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/logx"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/mail"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/quiz"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/realtime"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/report"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/room"
@@ -54,6 +62,10 @@ func run() error {
 		return fmt.Errorf("connect database: %w", err)
 	}
 	defer pool.Close()
+
+	if len(os.Args) > 1 {
+		return runCommand(ctx, cfg, pool, os.Args[1:])
+	}
 
 	a, err := newApp(ctx, cfg, pool, log)
 	if err != nil {
@@ -145,6 +157,16 @@ func (p voicePresence) VoiceMember(ctx context.Context, roomID, userID uuid.UUID
 func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) (*app, error) {
 	now := func() time.Time { return time.Now().UTC() }
 
+	var uploads *file.Handler
+	if cfg.Storage.Endpoint != "" {
+		s, err := file.NewStorage(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.AccessKey, cfg.Storage.SecretKey, cfg.Storage.Secure)
+		if err != nil {
+			return nil, err
+		}
+		uploader := file.NewUploader(file.NewService(file.NewStore(pool), now), s)
+		go uploader.RunCleanup(ctx, log)
+		uploads = file.NewHandler(uploader, log, now)
+	}
 	orgSvc := org.NewService(org.NewStore(pool), now, log)
 	inviteSvc := invite.NewService(invite.NewStore(pool), orgSvc, now, log)
 
@@ -156,7 +178,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	inviteHandler := invite.NewHandler(inviteSvc, cfg.FrontendURL, now, log)
 	mapHandler := realtime.NewMapHandler(log)
 
-	mapData, err := realtime.LoadMaps("campus", "classroom", "garden")
+	mapData, err := realtime.LoadMaps("campus", "classroom", "garden", "lab", "baca", "library", "science", "staff")
 	if err != nil {
 		return nil, fmt.Errorf("load maps: %w", err)
 	}
@@ -173,12 +195,18 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	}
 	go runChatRetention(ctx, rtStore, now, purgeInterval, log)
 	authHandler.SetProfilePublisher(hub)
-	gateway, err := realtime.NewGateway(hub, tokens, rtStore, cfg.FrontendURL, log)
+	gateway, err := realtime.NewGateway(hub, tokens, rtStore, cfg.FrontendURL, log, cfg.DevOrigins...)
 	if err != nil {
 		return nil, err
 	}
 	roomSvc := room.NewService(room.NewStore(pool), orgSvc, campusBuildings{mapData["campus"]}, roomOccupancy{hub}, now, log)
 	roomHandler := room.NewHandler(roomSvc, log)
+	libraryHandler := library.NewHandler(library.NewService(pool, orgSvc, now), log)
+	moduleHandler := module.NewHandler(module.NewService(pool, orgSvc, campusBuildings{mapData["campus"]}, now), log)
+	quizHandler := quiz.NewHandler(quiz.NewService(pool, orgSvc, campusBuildings{mapData["campus"]}, now), log)
+	classHandler := class.NewHandler(class.NewService(pool, orgSvc, now), log)
+	assignmentHandler := assignment.NewHandler(assignment.NewService(pool, orgSvc, now), log)
+	gradebookHandler := gradebook.NewHandler(gradebook.NewService(pool, orgSvc, campusBuildings{mapData["campus"]}), log, now)
 	reportHandler := report.NewHandler(report.NewService(report.NewStore(pool), orgSvc, now), log)
 	lk, err := voice.NewLiveKit(cfg.LiveKit.URL, cfg.LiveKit.APIKey, cfg.LiveKit.APISecret, now)
 	if err != nil {
@@ -214,6 +242,15 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 				roomHandler.Routes(r)
 				reportHandler.Routes(r)
 				voiceHandler.Routes(r)
+				libraryHandler.Routes(r)
+				moduleHandler.Routes(r)
+				quizHandler.Routes(r)
+				classHandler.Routes(r)
+				assignmentHandler.Routes(r)
+				gradebookHandler.Routes(r)
+				if uploads != nil {
+					uploads.Routes(r)
+				}
 			})
 		},
 		ws: func(r chi.Router) {
@@ -246,5 +283,34 @@ func newAuth(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, orgs au
 	} else {
 		log.Warn("google login disabled: GOOGLE_* not set")
 	}
-	return auth.NewHandler(svc, tokens, google, orgs, cfg.FrontendURL, now, log), tokens, nil
+	h := auth.NewHandler(svc, tokens, google, orgs, cfg.FrontendURL, now, log)
+	h.DevOrigins = cfg.DevOrigins
+	return h, tokens, nil
+}
+
+// runCommand runs an explicit operator command instead of the server.
+func runCommand(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, args []string) error {
+	if len(args) != 2 || args[0] != "seed-library" {
+		return errors.New("usage: server seed-library <org-id>")
+	}
+	orgID, err := uuid.Parse(args[1])
+	if err != nil {
+		return fmt.Errorf("seed-library: invalid org id: %w", err)
+	}
+	if cfg.Storage.Endpoint == "" {
+		return errors.New("seed-library: STORAGE_* not configured")
+	}
+	s, err := file.NewStorage(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.AccessKey, cfg.Storage.SecretKey, cfg.Storage.Secure)
+	if err != nil {
+		return err
+	}
+	now := func() time.Time { return time.Now().UTC() }
+	uploads := file.NewUploader(file.NewService(file.NewStore(pool), now), s)
+	books := library.NewService(pool, org.NewService(org.NewStore(pool), now, slog.Default()), now)
+	b, err := books.SeedSample(ctx, uploads, orgID, seed.TataSurya)
+	if err != nil {
+		return fmt.Errorf("seed-library: %w", err)
+	}
+	fmt.Printf("sample book ready: %s (%s)\n", b.Title, b.ID)
+	return nil
 }

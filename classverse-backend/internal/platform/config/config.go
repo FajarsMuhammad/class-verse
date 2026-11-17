@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -32,16 +33,28 @@ func (g Google) Enabled() bool {
 
 // Config holds all settings the server needs at startup.
 type Config struct {
-	AppEnv        string
-	HTTPAddr      string
-	DatabaseURL   string
-	FrontendURL   string
+	AppEnv      string
+	HTTPAddr    string
+	DatabaseURL string
+	FrontendURL string
+	// DevOrigins are extra plain-HTTP frontend origins (LAN testing), development only.
+	DevOrigins    []string
 	SMTPAddr      string
 	SMTPFrom      string
 	JWTPrivateKey ed25519.PrivateKey
 	OTPHMACKey    []byte
 	Google        Google
 	LiveKit       LiveKit
+	Storage       Storage
+}
+
+// Storage is optional; credentials are never logged.
+type Storage struct {
+	Endpoint  string
+	Bucket    string
+	AccessKey string
+	SecretKey string
+	Secure    bool
 }
 
 // LiveKit configures voice (slice 9). All empty disables voice; validation
@@ -117,6 +130,32 @@ func Load(getenv func(string) string) (Config, error) {
 			errs = append(errs, fmt.Errorf("OTP_HMAC_KEY must be base64 of at least %d bytes", minOTPKeyLen))
 		} else {
 			cfg.OTPHMACKey = key
+		}
+	}
+	cfg.Storage = Storage{Endpoint: optional("STORAGE_ENDPOINT", ""), Bucket: optional("STORAGE_BUCKET", ""), AccessKey: optional("STORAGE_ACCESS_KEY", ""), SecretKey: optional("STORAGE_SECRET_KEY", ""), Secure: optional("STORAGE_SECURE", "true") != "false"}
+	if cfg.Storage.Endpoint == "" && cfg.Storage.Bucket == "" && cfg.Storage.AccessKey == "" && cfg.Storage.SecretKey == "" {
+		cfg.Storage = Storage{}
+	} else if countSet(cfg.Storage.Endpoint, cfg.Storage.Bucket, cfg.Storage.AccessKey, cfg.Storage.SecretKey) != 4 {
+		errs = append(errs, errors.New("STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY, and STORAGE_SECRET_KEY must be set together"))
+	}
+	if raw := optional("STORAGE_SECURE", "true"); raw != "true" && raw != "false" {
+		errs = append(errs, errors.New("STORAGE_SECURE must be true or false"))
+	}
+	if cfg.IsProduction() && cfg.Storage.Endpoint != "" && !cfg.Storage.Secure {
+		errs = append(errs, errors.New("production storage requires TLS"))
+	}
+	if raw := optional("DEV_ALLOWED_ORIGINS", ""); raw != "" {
+		if cfg.IsProduction() {
+			errs = append(errs, errors.New("DEV_ALLOWED_ORIGINS is not allowed in production"))
+		}
+		for _, o := range strings.Split(raw, ",") {
+			o = strings.TrimRight(strings.TrimSpace(o), "/")
+			u, err := url.Parse(o)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil {
+				errs = append(errs, fmt.Errorf("DEV_ALLOWED_ORIGINS entry %q must be an origin like http://10.0.0.5:5173", o))
+				continue
+			}
+			cfg.DevOrigins = append(cfg.DevOrigins, o)
 		}
 	}
 	g := cfg.Google

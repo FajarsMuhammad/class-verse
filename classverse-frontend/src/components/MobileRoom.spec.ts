@@ -82,6 +82,7 @@ function handle(welcome: WelcomeMsg, map: MapData): RoomHandle {
     people: ref([]),
     rejoin: vi.fn<RoomHandle['rejoin']>(),
     sendMove: vi.fn<RoomHandle['sendMove']>(),
+    sendEmote: vi.fn<RoomHandle['sendEmote']>(() => true),
     seat: vi.fn<RoomHandle['seat']>(),
     start: vi.fn<RoomHandle['start']>(),
   } as RoomHandle
@@ -118,6 +119,19 @@ describe('MobileRoom', () => {
     expect(w.text()).toContain('Kamu di Meja 3')
     expect(w.text()).toContain('Sari')
     expect(w.find('canvas').exists()).toBe(false)
+  })
+
+  it('disables emotes while the teacher mutes this participant', async () => {
+    const room = handle(inRoom, classroom)
+    const w = mount(MobileRoom, {
+      props: { room, roomId: 'campus-1', schoolName: 'SMA 1', statusText: '' },
+    })
+    const toggle = () => w.get<HTMLButtonElement>('.emote .toggle').element
+    expect(toggle().disabled).toBe(false)
+    room.chat.apply({ t: 'room_state', seq: 2, d: { all_chat_enabled: true, muted: true } })
+    room.chatVersion.value = room.chat.version
+    await w.vm.$nextTick()
+    expect(toggle().disabled).toBe(true)
   })
 
   it('back button travels to the campus', async () => {

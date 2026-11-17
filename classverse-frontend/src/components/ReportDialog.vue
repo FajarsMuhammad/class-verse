@@ -105,7 +105,7 @@ textarea {
   width: 100%;
   box-sizing: border-box;
   padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-input-border);
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
   font: inherit;
   resize: vertical;

@@ -73,6 +73,7 @@ func TestRoomLifecycle(t *testing.T) {
 	}{
 		{"unknown building", CreateInput{Name: "Biologi", MapKey: MapClassroom, BuildingKey: "fake"}},
 		{"campus map", CreateInput{Name: "Biologi", MapKey: "campus", BuildingKey: "kelas-a"}},
+		{"staff interior in public building", CreateInput{Name: "Guru", MapKey: "staff", BuildingKey: "kelas-a"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := svc.Create(ctx, user.ID, school.ID, tt.input)
@@ -90,6 +91,9 @@ func TestRoomLifecycle(t *testing.T) {
 	if created.Capacity != 40 || created.Name != "Biologi" {
 		t.Fatalf("room=%+v", created)
 	}
+	if lib, err := svc.Create(ctx, user.ID, school.ID, CreateInput{Name: "Literasi", MapKey: MapLibrary, BuildingKey: "kelas-a"}); err != nil || lib.MapKey != MapLibrary {
+		t.Fatalf("library room=%+v err=%v", lib, err)
+	}
 	renamed := "Kimia"
 	updated, err := svc.Update(ctx, user.ID, created.ID, UpdateInput{Name: &renamed})
 	if err != nil || updated.ScheduledAt == nil || !updated.ScheduledAt.Equal(scheduled) {
@@ -99,9 +103,23 @@ func TestRoomLifecycle(t *testing.T) {
 	if err != nil || opened.ScheduledAt != nil {
 		t.Fatalf("open now=%+v err=%v", opened, err)
 	}
+	// Both rooms share the fake clock's created_at, so order between them is by random UUID.
 	page, err := svc.List(ctx, user.ID, school.ID, "kelas-a", 1, "")
-	if err != nil || len(page.Items) != 1 || page.Items[0].ID != created.ID {
+	if err != nil || len(page.Items) != 1 || page.NextCursor == "" {
 		t.Fatalf("page=%+v err=%v", page, err)
+	}
+	next, err := svc.List(ctx, user.ID, school.ID, "kelas-a", 1, page.NextCursor)
+	if err != nil || len(next.Items) != 1 || next.Items[0].ID == page.Items[0].ID ||
+		(page.Items[0].ID != created.ID && next.Items[0].ID != created.ID) {
+		t.Fatalf("pages=%+v %+v err=%v", page, next, err)
+	}
+	for _, input := range []CreateInput{
+		{Name: "Menara Sains", MapKey: "science", BuildingKey: "kelas-a"},
+		{Name: "Ruang Guru", MapKey: "staff", BuildingKey: "ruang-guru"},
+	} {
+		if r, err := svc.Create(ctx, user.ID, school.ID, input); err != nil || r.MapKey != input.MapKey {
+			t.Fatalf("new interior=%+v err=%v", r, err)
+		}
 	}
 	if _, err := svc.Get(ctx, uuid.New(), created.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("outsider error=%v", err)

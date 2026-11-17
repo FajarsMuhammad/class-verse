@@ -188,6 +188,58 @@ func (ns NullReportStatus) Value() (driver.Value, error) {
 	return string(ns.ReportStatus), nil
 }
 
+type AcademicYear struct {
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	Label     string
+	Active    bool
+	CreatedAt pgtype.Timestamptz
+}
+
+type Assignment struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	ClassID     uuid.UUID
+	ModuleID    uuid.UUID
+	Title       string
+	ClassName   string
+	YearLabel   string
+	BuildingKey string
+	Level       string
+	DueAt       pgtype.Timestamptz
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	CancelledAt pgtype.Timestamptz
+}
+
+type AssignmentProgress struct {
+	OrgID        uuid.UUID
+	AssignmentID uuid.UUID
+	UserID       uuid.UUID
+	StepID       uuid.UUID
+	CompletedAt  pgtype.Timestamptz
+}
+
+type AssignmentRecipient struct {
+	OrgID        uuid.UUID
+	AssignmentID uuid.UUID
+	UserID       uuid.UUID
+}
+
+type AssignmentStep struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	AssignmentID uuid.UUID
+	Position     int32
+	Kind         string
+	Title        string
+	Body         string
+	FileID       uuid.NullUUID
+	VideoID      pgtype.Text
+	QuizID       uuid.NullUUID
+	Minutes      int32
+}
+
 type ChatMessage struct {
 	ID        int64
 	SessionID uuid.UUID
@@ -198,6 +250,27 @@ type ChatMessage struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type Class struct {
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AcademicYearID uuid.UUID
+	Name           string
+	CreatedBy      uuid.UUID
+	CreatedAt      pgtype.Timestamptz
+	ArchivedAt     pgtype.Timestamptz
+}
+
+type ClassEnrollment struct {
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AcademicYearID uuid.UUID
+	ClassID        uuid.UUID
+	UserID         uuid.UUID
+	StartedAt      pgtype.Timestamptz
+	EndedAt        pgtype.Timestamptz
+	CreatedBy      uuid.UUID
+}
+
 type EmailOtp struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -205,6 +278,37 @@ type EmailOtp struct {
 	Attempts   int32
 	ExpiresAt  pgtype.Timestamptz
 	ConsumedAt pgtype.Timestamptz
+}
+
+type File struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	UploadedBy  uuid.UUID
+	Kind        string
+	Name        string
+	ContentType pgtype.Text
+	SizeBytes   int64
+	Sha256      []byte
+	ObjectKey   string
+	Status      string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+}
+
+type FileStorage struct {
+	OrgID      uuid.UUID
+	QuotaBytes int64
+	UsedBytes  int64
+}
+
+type FileUpload struct {
+	OrgID          uuid.UUID
+	FileID         uuid.UUID
+	ExpectedSha256 []byte
+	MultipartID    string
+	State          string
+	ExpiresAt      pgtype.Timestamptz
 }
 
 type Invite struct {
@@ -218,6 +322,35 @@ type Invite struct {
 	ExpiresAt pgtype.Timestamptz
 	RevokedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+}
+
+type LibraryBook struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	Title       string
+	Author      string
+	Shelf       string
+	Level       string
+	Format      string
+	Copies      int32
+	FileID      uuid.NullUUID
+	Cover       string
+	Sample      bool
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	PublishedAt pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+}
+
+type LibraryLoan struct {
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	BookID     uuid.UUID
+	UserID     uuid.UUID
+	BorrowedAt pgtype.Timestamptz
+	DueAt      pgtype.Timestamptz
+	ReturnedAt pgtype.Timestamptz
 }
 
 type Membership struct {
@@ -237,6 +370,44 @@ type ModerationAction struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type Module struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	BuildingKey string
+	Level       string
+	Title       string
+	Description string
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	PublishedAt pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+}
+
+type ModuleProgress struct {
+	OrgID       uuid.UUID
+	UserID      uuid.UUID
+	StepID      uuid.UUID
+	CompletedAt pgtype.Timestamptz
+}
+
+type ModuleStep struct {
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	ModuleID   uuid.UUID
+	Position   int32
+	Kind       string
+	Title      string
+	Body       string
+	FileID     uuid.NullUUID
+	VideoID    pgtype.Text
+	Minutes    int32
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+	ArchivedAt pgtype.Timestamptz
+	QuizID     uuid.NullUUID
+}
+
 type Organization struct {
 	ID        uuid.UUID
 	Name      string
@@ -244,6 +415,58 @@ type Organization struct {
 	LogoUrl   pgtype.Text
 	CreatedBy uuid.UUID
 	CreatedAt pgtype.Timestamptz
+}
+
+type Quiz struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	BuildingKey string
+	Level       string
+	Title       string
+	Description string
+	PassScore   int16
+	CreatedBy   uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	PublishedAt pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+}
+
+type QuizAttempt struct {
+	ID               uuid.UUID
+	OrgID            uuid.UUID
+	QuizID           uuid.UUID
+	UserID           uuid.UUID
+	Questions        []byte
+	Answers          []int16
+	PassScore        int16
+	StartedAt        pgtype.Timestamptz
+	FinishedAt       pgtype.Timestamptz
+	Correct          pgtype.Int2
+	Score            pgtype.Int2
+	AssignmentID     uuid.NullUUID
+	AssignmentStepID uuid.NullUUID
+}
+
+type QuizQuestion struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	QuizID      uuid.UUID
+	Position    int32
+	Prompt      string
+	Options     []string
+	Answer      int16
+	Explanation string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type ReaderPosition struct {
+	OrgID     uuid.UUID
+	FileID    uuid.UUID
+	UserID    uuid.UUID
+	Position  int32
+	UpdatedAt pgtype.Timestamptz
 }
 
 type RefreshToken struct {
@@ -285,11 +508,19 @@ type Room struct {
 	ArchivedAt     pgtype.Timestamptz
 }
 
+type RoomLocationHistory struct {
+	RoomID      uuid.UUID
+	BuildingKey pgtype.Text
+	MapKey      string
+}
+
 type RoomSession struct {
-	ID        uuid.UUID
-	RoomID    uuid.UUID
-	StartedAt pgtype.Timestamptz
-	EndedAt   pgtype.Timestamptz
+	ID          uuid.UUID
+	RoomID      uuid.UUID
+	StartedAt   pgtype.Timestamptz
+	EndedAt     pgtype.Timestamptz
+	PinModuleID uuid.NullUUID
+	PinStepID   uuid.NullUUID
 }
 
 type SessionAttendance struct {

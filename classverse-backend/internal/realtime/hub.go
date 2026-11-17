@@ -56,6 +56,7 @@ const (
 	jobClose
 	jobChat
 	jobMod
+	jobLearningPin
 )
 
 type sessionJob struct {
@@ -65,6 +66,7 @@ type sessionJob struct {
 	at     time.Time
 	chat   *chatJob
 	mod    *modJob
+	pin    *learningPinJob
 }
 
 // chatJob stores one message; deliver runs on the worker with the stored id
@@ -378,13 +380,13 @@ func (h *Hub) travel(c *conn, from *room, dest Admission) (*room, error) {
 		if !ok {
 			return nil, ErrNoAccess
 		}
-		check = nearPoint(b.DoorX, b.DoorY)
+		check = nearPoint(b.DoorX, b.DoorY, float64(b.InteractRadius))
 		var err error
 		if x, y, err = destMap.SpawnPoint(int(c.userID[0])); err != nil {
 			return nil, err
 		}
 	case !from.campus && dest.MapKey == campusKey:
-		check = nearPoint(from.mapd.ExitX, from.mapd.ExitY)
+		check = nearPoint(from.mapd.ExitX, from.mapd.ExitY, doorRadius)
 		b, ok := destMap.Building(from.buildingKey)
 		if !ok {
 			return nil, errUnavailable
@@ -597,6 +599,14 @@ func (h *Hub) recordLoop() {
 		case jobClose:
 			err = h.sessions.CloseSession(ctx, j.roomID, j.at)
 			delete(open, j.roomID)
+		case jobLearningPin:
+			p, ok := h.sessions.(LearningPinner)
+			if !ok {
+				j.pin.done(nil, errUnavailable)
+				return
+			}
+			pin, pinErr := p.SaveLearningPin(ctx, j.roomID, j.pin.actor, j.pin.module, j.pin.step)
+			j.pin.done(pin, pinErr)
 		case jobMod:
 			m, ok := h.sessions.(Moderator)
 			if !ok {

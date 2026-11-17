@@ -6,9 +6,9 @@
  */
 
 @font-face {
-  font-family: 'Nunito';
-  src: url('../assets/fonts/Nunito-Variable.ttf') format('truetype');
-  font-weight: 200 1000;
+  font-family: 'Plus Jakarta Sans';
+  src: url('../assets/fonts/PlusJakartaSans-Variable.ttf') format('truetype');
+  font-weight: 200 800;
   font-display: swap;
 }
 
@@ -20,21 +20,77 @@
 }
 
 :root {
+  /* MVP 2 hand-off: kelasverse-assets/tokens/tokens.css, fonts hosted locally. */
+  --kv-ink: #1d2140;
+  --kv-text: #1d2140;
+  --kv-text-muted: #5b6078;
+  --kv-page: #f4f6fb;
+  --kv-surface: #ffffff;
+  --kv-surface-soft: #f7f8fc;
+  --kv-line: #e9ebf3;
+  --kv-line-soft: #eef0f6;
+  --kv-segment-bg: #f1f3f9;
+  --kv-primary: #5b4ee0;
+  --kv-primary-soft: #f1edff;
+  --kv-primary-soft-text: #4338ca;
+  --kv-success: #10b981;
+  --kv-danger-soft: #ffe4e6;
+  --kv-danger-text: #be123c;
+  --kv-info-soft: #e7f0ff;
+  --kv-info-text: #1d4ed8;
+  --kv-star-soft: #fff6e0;
+  --kv-star: #f59e0b;
+  --kv-star-text: #92400e;
+  --kv-arena-soft: #fff1e8;
+  --kv-arena-text: #c2410c;
+  --kv-map-ground: #eef1f6;
+  --kv-learning-ground: #ccfbf1;
+  --kv-learning-dot: #99f6e4;
+  --kv-learning-surface: #fffef5;
+  --kv-map-lawn: #a9de92;
+  /* Room shell details from reference/Library.dc.html. */
+  --kv-room-window: #bfe6ff;
+  --kv-room-door: #c8935a;
+  --kv-library-wall: #e8cfd9;
+  --kv-subject-matematika: #2563eb;
+  --kv-subject-ipa: #0f766e;
+  --kv-subject-bahasa: #be185d;
+  --kv-subject-arena: #c2410c;
+  --kv-subject-diskusi: #15803d;
+  --kv-subject-sejarah: #b45309;
+  --kv-subject-kreatif: #7c3aed;
+  --kv-subject-kelas: #4f46e5;
+  --kv-subject-kiko: #a16207;
+  --kv-font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --kv-font-display: 'Fredoka', sans-serif;
+  --kv-radius-chip: 999px;
+  --kv-radius-button: 10px;
+  --kv-radius-input: 12px;
+  --kv-radius-card: 22px;
+  --kv-radius-map: 26px;
+  --kv-radius-lawn: 40px;
+  --kv-shadow-card: 0 10px 30px rgba(29,33,64,0.06);
+  --kv-shadow-float: 0 12px 30px rgba(29,33,64,0.14);
+  --kv-shadow-popover: 0 16px 40px rgba(29,33,64,0.16);
+  --kv-shadow-button: 0 8px 18px rgba(29,33,64,0.22);
+  --kv-shadow-sign: 0 6px 14px rgba(29,33,64,0.18);
+
+  /* Compatibility aliases while existing components move to MVP 2. */
   /* Brand */
-  --color-primary: #4f46e5; /* Nila: primary actions, own chat bubble, active nav */
-  --color-primary-strong: #3730a3; /* text on primary-soft, hover */
-  --color-primary-soft: #e7e5ff; /* teacher badge, broadcast banner, active tab */
+  --color-primary: var(--kv-primary); /* Nila: primary actions, own chat bubble, active nav */
+  --color-primary-strong: var(--kv-primary-soft-text); /* text on primary-soft, hover */
+  --color-primary-soft: var(--kv-primary-soft); /* teacher badge, broadcast banner, active tab */
   --color-accent: #f5a524; /* Mangga: zones, highlights */
   --color-accent-soft: #fdebc8; /* active zone chip, schedule badge */
   --color-accent-ink: #7a4b00; /* text on accent-soft */
   --color-accent-line: #d18e1a; /* dashed zone outline */
 
   /* Neutrals */
-  --color-ink: #23203a; /* Tinta: main text, mic button */
-  --color-ink-muted: #5a5672; /* secondary text (passes 4.5:1 on white and bg) */
-  --color-bg: #f7f5ff; /* Kabut: app background */
-  --color-surface: #ffffff;
-  --color-surface-alt: #f1effb; /* other people's chat bubbles, inactive tabs */
+  --color-ink: var(--kv-ink); /* Tinta: main text, mic button */
+  --color-ink-muted: var(--kv-text-muted); /* secondary text (passes 4.5:1 on white and bg) */
+  --color-bg: var(--kv-page); /* Kabut: app background */
+  --color-surface: var(--kv-surface);
+  --color-surface-alt: var(--kv-surface-soft); /* other people's chat bubbles, inactive tabs */
   --color-border: #d6d1ee; /* secondary button border */
   --color-border-soft: #ece9f7; /* dividers */
   --color-input-border: #e3dff5;
@@ -79,11 +135,11 @@
   --avatar-kit-grafit-light: #919bb4;
 
   /* Typography */
-  --font-display: 'Fredoka', system-ui, sans-serif; /* headings, room and building names */
-  --font-body: 'Nunito', system-ui, sans-serif; /* everything else */
+  --font-display: var(--kv-font-display); /* headings, room and building names */
+  --font-body: var(--kv-font-ui); /* everything else */
   --text-xs: 12px; /* name tags on the map */
   --text-sm: 13px; /* meta, sender names */
-  --text-md: 15px; /* chat messages, list items (minimum for body copy) */
+  --text-md: 14px; /* secondary body copy, list items; forms retain 16px on touch */
   --text-base: 16px;
   --text-lg: 18px;
   --text-xl: 20px; /* screen titles in headers */
@@ -100,12 +156,12 @@
   /* Shape */
   --radius-xs: 6px; /* chat bubble tail corner */
   --radius-sm: 10px;
-  --radius-md: 14px; /* buttons, inputs */
-  --radius-lg: 16px;
+  --radius-md: var(--kv-radius-button); /* buttons, inputs */
+  --radius-lg: var(--kv-radius-input);
   --radius-xl: 20px; /* cards on mobile */
-  --radius-2xl: 24px; /* cards, panels, map frame */
-  --radius-pill: 999px;
-  --shadow-raise: 0 6px 0 rgba(35, 32, 58, 0.12); /* buildings and floating labels only */
+  --radius-2xl: var(--kv-radius-card); /* cards, panels, map frame */
+  --radius-pill: var(--kv-radius-chip);
+  --shadow-raise: var(--kv-shadow-sign); /* buildings and floating labels only */
 
   /* Spacing (4px base) */
   --space-1: 4px;
@@ -120,6 +176,18 @@
 
   /* Interaction */
   --touch-min: 44px; /* minimum height/width of anything tappable */
+  /* Compact desktop controls inside panels and floating cards (reff-design-4).
+     Phone list mode and full pages keep --touch-min. */
+  --control-h: 36px; /* primary / icon actions */
+  --control-sm: 32px; /* ghost, close, tabs, secondary row actions */
+  --control-radius: 10px;
+}
+
+/* Proportional UI everywhere (docs/visual.md "Kontrol ringkas"): with anything but a touch pointer (mouse/trackpad)
+   every control that sizes itself with --touch-min shrinks to the compact height. Touch screens keep 44px.
+   WCAG 2.2 AA target size (24px) is still met. */
+@media not all and (pointer: coarse) {
+  :root { --touch-min: var(--control-h); }
 }
 
 html {

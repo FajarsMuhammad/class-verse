@@ -8,6 +8,7 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",
+    "test:world": "cd scripts && python3 -m unittest -q test_generate_world",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s \"lint:*\"",
@@ -18,6 +19,7 @@
   },
   "dependencies": {
     "livekit-client": "^2.23.0",
+    "pdfjs-dist": "6.5.438",
     "phaser": "^3.90.0",
     "pinia": "^4.0.3",
     "vue": "^3.5.42",

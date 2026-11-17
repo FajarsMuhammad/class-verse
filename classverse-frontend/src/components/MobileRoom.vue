@@ -2,6 +2,14 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import ChatPanel from '@/components/ChatPanel.vue'
+import LibraryCatalog from '@/components/LibraryCatalog.vue'
+import BuildingModules from '@/components/BuildingModules.vue'
+import ResumeLearning from '@/components/ResumeLearning.vue'
+import AssignmentPanel from '@/components/AssignmentPanel.vue'
+import RoomLearningPin from '@/components/RoomLearningPin.vue'
+import ModuleManager from '@/components/ModuleManager.vue'
+import RoomStations from '@/components/RoomStations.vue'
+import EmoteBar from '@/components/EmoteBar.vue'
 import DoorRooms from '@/components/DoorRooms.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import TeacherPanel from '@/components/TeacherPanel.vue'
@@ -33,6 +41,11 @@ const {
   rejoin,
 } = props.room
 const org = useOrgStore()
+const modulesOf = ref<Building | null>(null)
+const progressKey = ref(0)
+const station = ref('')
+const choosingModule = ref(false)
+watch(() => current.value?.room_id, () => { choosingModule.value = false })
 
 // Positions arrive in snapshots without a reactive signal; refresh lists twice a second.
 const tick = ref(0)
@@ -41,6 +54,14 @@ onMounted(() => {
   timer = setInterval(() => tick.value++, 500)
 })
 onBeforeUnmount(() => clearInterval(timer))
+
+const activeEmotes = computed(() => {
+  void tick.value
+  const now = performance.now()
+  return [...world.emotes].filter(([, e]) => e.until > now).map(([id, e]) => ({
+    id, text: e.text, name: id === world.selfId ? world.selfName : world.avatars.get(id)?.name ?? '',
+  }))
+})
 
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
 // Building names are only on the campus map; remember them for the room header.
@@ -51,6 +72,11 @@ watch(map, (m) => {
 const openKey = ref('')
 // Collapse on every room change so an opened building reloads fresh counts.
 watch(current, () => (openKey.value = ''))
+// ChatState is not reactive; chatVersion changes with it (room_state carries muted).
+const muted = computed(() => {
+  void chatVersion.value
+  return chat.muted && !campus.value
+})
 const zoneKey = computed(() => {
   void chatVersion.value
   return chat.zone.key
@@ -173,9 +199,14 @@ function reported() {
               list-mode
               @travel="travel"
             />
+            <button v-if="!b.staffOnly" type="button" class="btn-secondary modules-btn" @click="modulesOf = b">
+              Lihat modul<span class="sr"> {{ b.name }}</span>
+            </button>
           </div>
         </li>
       </ul>
+      <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
+        :building-name="modulesOf.name" @close="modulesOf = null; progressKey++" />
     </template>
 
     <template v-else>
@@ -216,7 +247,26 @@ function reported() {
       </section>
     </template>
 
+    <RoomStations v-if="!kicked && org.active && ['science', 'staff'].includes(current?.map_key ?? '')"
+      :key="current?.room_id" class="card" :org-id="org.active.id" :map-key="current!.map_key" :station="station"
+      :teacher="org.isTeacher" @select="station = $event" />
+    <RoomLearningPin v-if="!kicked && org.active && current?.map_key !== 'campus' && (org.isTeacher || room.pin?.value)" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" @change="choosingModule = true" />
+    <section v-if="choosingModule && org.isTeacher && !kicked && org.active" class="card" aria-label="Pilih materi sesi">
+      <button type="button" class="btn-secondary" @click="choosingModule = false">Tutup daftar modul</button>
+      <ModuleManager :org-id="org.active.id" :room="room" @pinned="choosingModule = false" />
+    </section>
+    <AssignmentPanel v-if="!kicked && org.active" :key="`tasks-${org.active.id}`" :org-id="org.active.id" />
+    <ResumeLearning v-if="!kicked && org.active" class="card" :org-id="org.active.id" :refresh-key="progressKey" />
+    <section v-if="!kicked && current?.map_key === 'library' && org.active" class="card" aria-labelledby="catalog-title">
+      <h2 id="catalog-title" class="catalog-title">Katalog</h2>
+      <LibraryCatalog :key="current.room_id" :org-id="org.active.id" />
+    </section>
+
     <section v-if="!kicked" class="card chat" aria-label="Chat">
+      <EmoteBar :send="room.sendEmote" :disabled="status !== 'open' || traveling || kicked || muted" />
+      <div role="status">
+        <p v-for="reaction in activeEmotes" :key="reaction.id">{{ reaction.name }}: {{ reaction.text }}</p>
+      </div>
       <ChatPanel
         :chat="chat"
         :version="chatVersion"
@@ -294,7 +344,7 @@ h1 {
 }
 h2 {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
 }
 .label {
   font-size: var(--text-md);
@@ -370,7 +420,7 @@ h2 {
 .name {
   flex: 1;
   font-weight: var(--weight-bold);
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
 }
 .live {
   padding: var(--space-1) var(--space-3);
@@ -390,7 +440,7 @@ h2 {
 .place {
   min-height: var(--touch-min);
   padding: var(--space-2) var(--space-4);
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   color: var(--color-ink);
@@ -415,5 +465,21 @@ h2 {
   min-height: 420px;
   display: flex;
   flex-direction: column;
+}
+.catalog-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-base);
+}
+.modules-btn {
+  width: 100%;
+  min-height: var(--touch-min);
+  margin-top: var(--space-2);
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 </style>

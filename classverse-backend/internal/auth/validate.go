@@ -70,6 +70,10 @@ func validateDisplayName(v *ValidationError, name string) string {
 func prohibitedName(name string) bool { return moderation.ContainsProfanity(name) }
 
 func validAvatar(key string) bool {
+	if strings.HasPrefix(key, "look-") {
+		return len(key) == 10 && key[6] == '-' && key[8] == '-' &&
+			key[5] >= '0' && key[5] <= '5' && key[7] >= '0' && key[7] <= '4' && key[9] >= '0' && key[9] <= '9'
+	}
 	if key == "default" {
 		return true
 	}

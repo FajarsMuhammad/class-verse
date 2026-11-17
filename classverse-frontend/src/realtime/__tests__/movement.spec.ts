@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { directionOf, moveToward, PREDICTION_FACTOR, step } from '../movement'
-import { findPath } from '../pathfind'
+import { findPath, nearestOpen } from '../pathfind'
 import { smallMap } from './fixtures'
 import { MapData } from '../mapdata'
 
@@ -114,5 +114,13 @@ describe('findPath', () => {
 
   it('returns nothing for a blocked target', () => {
     expect(findPath(map, { x: 48, y: 48 }, { x: 80, y: 80 })).toEqual([])
+  })
+})
+
+describe('nearestOpen', () => {
+  it('keeps an open point and moves a blocked one to the closest open tile centre', () => {
+    expect(nearestOpen(map, { x: 48, y: 48 })).toEqual({ x: 48, y: 48 })
+    expect(nearestOpen(map, { x: 80, y: 84 })).toEqual({ x: 80, y: 112 })
+    expect(nearestOpen(smallMap(['###', '###']), { x: 16, y: 16 })).toBeNull()
   })
 })

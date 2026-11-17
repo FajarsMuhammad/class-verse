@@ -2,6 +2,27 @@ import type { MapData } from './mapdata'
 import type { Vec } from './movement'
 
 const MAX_EXPANDED = 6000
+// How far (tiles) nearestOpen looks for a free tile around a blocked target.
+const NEAREST_TILES = 4
+
+// nearestOpen returns `to` when walkable, else the closest open tile centre within
+// NEAREST_TILES (so a double-click on furniture walks up to it), or null.
+export function nearestOpen(map: MapData, to: Vec): Vec | null {
+  const ts = map.tileSize
+  const gx = Math.floor(to.x / ts)
+  const gy = Math.floor(to.y / ts)
+  if (!map.isTileBlocked(gx, gy)) return to
+  let best: Vec | null = null
+  let bestD = Infinity
+  for (let ty = gy - NEAREST_TILES; ty <= gy + NEAREST_TILES; ty++)
+    for (let tx = gx - NEAREST_TILES; tx <= gx + NEAREST_TILES; tx++) {
+      if (map.isTileBlocked(tx, ty)) continue
+      const c = { x: tx * ts + ts / 2, y: ty * ts + ts / 2 }
+      const d = Math.hypot(c.x - to.x, c.y - to.y)
+      if (d < bestD) { best = c; bestD = d }
+    }
+  return best
+}
 
 // findPath returns waypoints (tile centres, in pixels) from `from` to `to`
 // using A* on the collision grid with 8-way moves that never cut corners.

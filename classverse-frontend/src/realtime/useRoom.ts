@@ -6,15 +6,19 @@ import { fetchMap, type MapData } from './mapdata'
 import { ChatState } from './chat'
 import type {
   BannedUser,
+  LearningPin,
   BuildingCount,
   ChatScope,
   ConnectionMode,
   MoveMsg,
+  EmoteKey,
   WelcomeMsg,
 } from './messages'
 import { World } from './world'
 
 export interface RoomHandle {
+  pin?: Ref<LearningPin | null>
+  pinLearning?: (moduleID: string, stepID?: string) => void
   status: Ref<ConnectionStatus>
   map: Ref<MapData | null>
   world: World
@@ -46,6 +50,7 @@ export interface RoomHandle {
   people: Ref<{ id: string; name: string; role: string }[]>
   rejoin: () => void
   sendMove: (m: MoveMsg) => void
+  sendEmote: (key: EmoteKey) => boolean
   // seat picks a zone in mode HP ('' = general area).
   seat: (zone: string) => void
   start: (roomId: string, mapKey: string, mode?: ConnectionMode) => Promise<void>
@@ -54,6 +59,7 @@ export interface RoomHandle {
 // useRoom connects to one room over WebSocket and keeps a World in sync.
 // The connection closes when the component unmounts.
 export function useRoom(): RoomHandle {
+  const pin = ref<LearningPin | null>(null)
   const status = ref<ConnectionStatus>('connecting')
   const map = shallowRef<MapData | null>(null)
   const online = ref(0)
@@ -72,6 +78,8 @@ export function useRoom(): RoomHandle {
   const chatError = ref('')
   const chatErrors = new Set(['rate_limited', 'not_in_zone', 'all_chat_disabled'])
   let lastChatSeq = -1
+  // Seqs of sent emotes; their rejections are transient and never block the map.
+  const emoteSeqs = new Set<number>()
   let client: RealtimeClient | null = null
   let lastVersion = -1
   const abort = new AbortController()
@@ -105,10 +113,12 @@ export function useRoom(): RoomHandle {
           mutedIds.value = msg.d!.muted ?? []
         }
         if (msg.t === 'error' && msg.d!.code === 'kicked') kicked.value = true
+        if (msg.t === 'welcome') emoteSeqs.clear() // seq restarts after every auth
         if (msg.t === 'welcome' || msg.t === 'traveled') {
           kicked.value = false
           banned.value = []
           mutedIds.value = []
+          pin.value = null
           current.value = msg.d!
           traveling.value = false
           error.value = ''
@@ -123,8 +133,11 @@ export function useRoom(): RoomHandle {
               if (!abort.signal.aborted && version === mapVersion)
                 error.value = 'Peta gagal dimuat. Muat ulang halaman.'
             })
-        } else if (msg.t === 'buildings') buildings.value = msg.d!.items
-        else if (
+        } else if (msg.t === 'room_state') pin.value = msg.d!.pin ?? null
+        else if (msg.t === 'buildings') buildings.value = msg.d!.items
+        else if (msg.t === 'error' && emoteSeqs.delete(msg.d!.seq ?? -1)) {
+          // The bar already cools down and is disabled while muted.
+        } else if (
           msg.t === 'error' &&
           (chatErrors.has(msg.d!.code) ||
             (msg.d!.code === 'bad_message' && msg.d!.seq === lastChatSeq))
@@ -153,6 +166,12 @@ export function useRoom(): RoomHandle {
   })
 
   return {
+    pin,
+    pinLearning: (moduleID, stepID) => {
+      if (status.value !== 'open' || traveling.value) return
+      if (moduleID) client?.send('cmd', { name: 'learning_pin', target: moduleID, step: stepID })
+      else client?.send('cmd', { name: 'learning_unpin' })
+    },
     status,
     map,
     world,
@@ -213,6 +232,14 @@ export function useRoom(): RoomHandle {
     },
     seat: (zone) => {
       if (status.value === 'open' && !traveling.value) client?.send('seat', { zone })
+    },
+    sendEmote: (key) => {
+      if (status.value !== 'open' || traveling.value || kicked.value) return false
+      const seq = client?.sendSeq('emote', { kind: key }) ?? null
+      if (seq === null) return false
+      emoteSeqs.add(seq)
+      if (emoteSeqs.size > 20) emoteSeqs.delete(emoteSeqs.values().next().value!)
+      return true
     },
     sendMove: (m) => {
       if (!traveling.value && map.value) void client?.send('move', m)

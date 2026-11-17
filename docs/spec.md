@@ -42,6 +42,34 @@ MVP dibagi dua milestone. M1 harus bisa dipakai kelas sungguhan sebelum M2 dimul
 
 Screen share kemungkinan jadi kandidat pertama setelah M2, karena pengajar biasanya butuh menampilkan materi.
 
+### Tambahan scope — MVP 2 fitur belajar (disetujui, belum diimplementasikan)
+
+MVP 2 fitur belajar berbeda dari milestone voice **M2** di atas. Batas out-of-scope sebelumnya tetap catatan
+MVP awal; perluasan ini disetujui pengguna melalui rencana `docs/tasks/mvp2-learning-plan.md`.
+
+| Urutan | Hasil peserta/pengajar | Batas disetujui |
+| --- | --- | --- |
+| F1 | Unggah materi dan baca di aplikasi | MinIO privat; PDF + audio dulu, EPUB menyusul; kuota 5 GB per sekolah dan maks 50 MB/file; tanpa RAG |
+| L1 → L2 | Katalog, klik rak, baca digital, pinjam/kembali fisik | Satu contoh berlabel untuk pengujian; tanpa antre/denda; maks 5 pinjaman aktif, 14 hari |
+| M1 → M2 | Modul per gedung dan progres nyata | Pengajar/admin mengisi; katalog terbuka bagi semua anggota sekolah, dibuka dari mana saja; langkah bebas dibuka, progres dicatat per siswa |
+| Q1 → C1 → A1 → R1 | Kuis mandiri, kelas/rombel, tugaskan modul ke kelas dan sematkan di ruang, rapor | Penilaian server; pengajar/admin mengelola kelas/siswa, admin memilih tahun ajaran aktif; peserta hanya rapor sendiri |
+| Q2 | Arena Kuis live dan klasemen sesi | Batas ruang 40 sampai kapasitas baru terbukti; nilai tersimpan, bukan angka prototipe |
+| B1 → B2 | Leaderboard dan gamifikasi bertahap | Redis untuk ranking mingguan sekolah + filter gedung/mapel; progres modul di Rapor, bukan ranking modul |
+
+Identitas leaderboard: tampil **inisial**, hover menampilkan **nama lengkap dan kelas**; detail yang sama wajib
+tersedia lewat focus keyboard dan tap. Ini bukan anonimisasi: anggota organisasi dapat melihat nama lengkap.
+Sumber kelas: fitur rombel tersendiri (C1), **maksimal satu kelas aktif per siswa per sekolah per tahun ajaran**.
+Kelas berbeda dari ruang virtual. Kelas sekolah/tahun lain tidak saling menimpa; perpindahan mempertahankan riwayat.
+Data existing belum punya rombel; tidak ada penempatan otomatis. Sumber nama lengkap masih perlu dikonfirmasi
+karena data sekarang hanya punya nama tampilan. Pengajar/admin mengelola kelas dan penempatan siswa; admin
+memilih satu tahun ajaran aktif per sekolah. Tahun lama tetap tersedia untuk Rapor, tanpa kenaikan kelas otomatis.
+C1 dikerjakan setelah Q1 sebelum R1; belum ada perubahan schema atau kode.
+Tidak ada direktori publik, tidak menebak kelas dari ruang, tidak menambah nama legal tanpa keputusan terpisah.
+
+Kriteria lintas slice: data nyata, isolasi organisasi, otorisasi server, retry tidak menggandakan pinjaman/nilai/poin,
+mode HP tetap bisa dipakai, dan akun/ruang lama tidak dihapus. Rumus poin/XP dan aturan retry kuis belum final;
+lihat keputusan tersisa serta acceptance criteria di rencana.
+
 ## User stories dan acceptance criteria
 
 Setiap story punya ID agar bisa dirujuk di ticket, API spec, dan test. Story M1 kecuali ditandai M2.
@@ -72,7 +100,7 @@ Setiap story punya ID agar bisa dirujuk di ticket, API spec, dan test. Story M1 
 - Tersedia minimal 12 avatar preset dengan beberapa pilihan warna.
 - Nama tampilan 3–24 karakter dan melewati filter kata kasar.
 
-**US-05** Sebagai peserta, saya ingin berjalan dengan keyboard (WASD/panah) atau klik agar bisa berpindah tempat.
+**US-05** Sebagai peserta, saya ingin berjalan dengan keyboard (WASD/panah) atau klik dua kali tujuan agar bisa berpindah tempat.
 
 - Posisi peserta lain terlihat bergerak mulus, jeda di bawah 200 ms pada koneksi normal.
 - Avatar tidak bisa menembus dinding atau objek.
@@ -135,7 +163,11 @@ Karena peserta SMA sebagian masih di bawah 18 tahun, aturan ini berlaku sejak M1
 5. **Log moderasi.** Aksi mute, kick, dan report disimpan untuk audit admin; isi chat disimpan maksimal 30 hari.
 6. **Voice tidak direkam.** Audio hanya di-relay secara real-time, tidak disimpan di server.
 7. **Persetujuan.** Pengguna di bawah 18 tahun bergabung lewat undangan sekolah; sekolah bertanggung jawab memperoleh persetujuan orang tua/wali sesuai UU PDP Pasal 25. Mekanisme ini perlu dikonfirmasi dengan konsultan hukum sebelum peluncuran.
-8. **Data minimal.** Hanya menyimpan nama tampilan, email, tanggal lahir, role, dan keanggotaan organisasi.
+8. **Data minimal.** MVP awal menyimpan nama tampilan, email, tanggal lahir, role, dan keanggotaan organisasi.
+   Perluasan fitur belajar menyimpan berkas sekolah, pinjaman, progres, jawaban/nilai, dan event poin sesuai scope
+   MVP 2 di atas, termasuk kelas dan riwayat penempatan per tahun ajaran. Sumber nama lengkap serta kebijakan
+   retensi data belajar harus ditetapkan sebelum
+   fitur terkait dirilis; jangan menganggap retensi chat 30 hari berlaku otomatis pada rapor.
 
 ## Non-functional requirements
 

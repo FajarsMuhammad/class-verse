@@ -128,6 +128,43 @@ func TestHandlerRegisterVerifyRefreshFlow(t *testing.T) {
 	}
 }
 
+// Development LAN access over plain HTTP: browsers drop Secure cookies on
+// http://<ip>, so the configured dev origins get a non-Secure cookie there.
+func TestDevLANOriginCookie(t *testing.T) {
+	e := newEnv(t)
+	h := NewHandler(e.svc, e.tokens, nil, nil, testFrontend, e.clock.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h.DevOrigins = []string{"http://10.80.3.43:5173"}
+	srv := chi.NewRouter()
+	srv.Route("/api", h.Routes)
+
+	rec := do(srv, http.MethodPost, "/api/auth/register", `{"email":"lan@b.co","password":"rahasia-123","display_name":"Lan","birth_date":"2008-05-17"}`)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("register = %d %s", rec.Code, rec.Body)
+	}
+	lan := withOrigin("http://10.80.3.43:5173")
+	rec = do(srv, http.MethodPost, "/api/auth/verify-email", `{"email":"lan@b.co","code":"`+e.mailer.lastCode()+`"}`, lan)
+	c := findCookie(t, rec, refreshCookie)
+	if c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("LAN cookie = %+v", c)
+	}
+	rec = do(srv, http.MethodPost, "/api/auth/refresh", "", withCookie(c), lan)
+	if rec.Code != http.StatusOK || findCookie(t, rec, refreshCookie).Secure {
+		t.Fatalf("LAN refresh = %d %s", rec.Code, rec.Body)
+	}
+	// The configured frontend keeps Secure; unlisted origins stay rejected.
+	rec = do(srv, http.MethodPost, "/api/auth/login", `{"email":"lan@b.co","password":"rahasia-123"}`, withOrigin(testFrontend))
+	if !findCookie(t, rec, refreshCookie).Secure {
+		t.Error("frontend cookie lost Secure")
+	}
+	rec = do(srv, http.MethodPost, "/api/auth/login", `{"email":"lan@b.co","password":"rahasia-123"}`, withOrigin("http://10.9.9.9:5173"))
+	if !findCookie(t, rec, refreshCookie).Secure {
+		t.Error("unlisted origin got a non-Secure cookie")
+	}
+	if rec := do(srv, http.MethodPost, "/api/auth/refresh", "", withCookie(c), withOrigin("http://10.9.9.9:5173")); rec.Code != http.StatusForbidden {
+		t.Errorf("unlisted refresh = %d", rec.Code)
+	}
+}
+
 func TestHandlerProfilePartial(t *testing.T) {
 	e := newEnv(t)
 	h := newTestServer(t, e, nil)
@@ -148,6 +185,10 @@ func TestHandlerProfilePartial(t *testing.T) {
 	rec = do(h, http.MethodPatch, "/api/me", `{"avatar_key":"sporty-headphones-zamrud"}`, withBearer(session.AccessToken))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"avatar_key":"sporty-headphones-zamrud"`) {
 		t.Fatal("sporty profile update failed")
+	}
+	rec = do(h, http.MethodPatch, "/api/me", `{"avatar_key":"look-5-4-9"}`, withBearer(session.AccessToken))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"avatar_key":"look-5-4-9"`) {
+		t.Fatal("composed avatar update failed")
 	}
 	if rec := do(h, http.MethodPatch, "/api/me", `{}`); rec.Code != http.StatusUnauthorized {
 		t.Fatal("unauthenticated patch accepted")

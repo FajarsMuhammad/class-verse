@@ -34,6 +34,11 @@ const (
 const (
 	MapClassroom = "classroom"
 	MapGarden    = "garden"
+	MapLab       = "lab"
+	MapReading   = "baca"
+	MapLibrary   = "library" // quiet zone: chat only, no voice
+	MapScience   = "science"
+	MapStaff     = "staff"
 )
 
 // Domain errors.
@@ -136,8 +141,13 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 	}
 	var v ValidationError
 	name := validateName(&v, in.Name)
-	if in.MapKey != MapClassroom && in.MapKey != MapGarden {
-		v.add("map_key", "Pilih peta kelas atau taman diskusi")
+	switch in.MapKey {
+	case MapClassroom, MapGarden, MapLab, MapReading, MapLibrary, MapScience, MapStaff:
+	default:
+		v.add("map_key", "Pilih peta ruang yang tersedia")
+	}
+	if in.MapKey == MapStaff && in.BuildingKey != staffKey {
+		v.add("building_key", "Interior Ruang Guru hanya tersedia di gedung Ruang Guru")
 	}
 	if _, ok := s.buildings.Building(in.BuildingKey); !ok {
 		v.add("building_key", "Gedung tidak ditemukan")

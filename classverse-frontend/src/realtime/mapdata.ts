@@ -54,9 +54,17 @@ export interface Building {
   h: number
   doorX: number
   doorY: number
+  interactRadius?: number
+}
+
+export interface Seat {
+  key: string
+  x: number
+  y: number
 }
 
 export interface Zone {
+  circle?: boolean
   key: string
   name: string
   x: number
@@ -71,6 +79,9 @@ export class MapData {
   readonly tileSize: number
   readonly buildings: Building[]
   readonly zones: Zone[]
+  readonly seats: Seat[]
+  // Quiet maps (the library) are chat only; the server issues no voice identity.
+  readonly quiet: boolean
   // Max walking speed in px/s from the map property walk_speed (same rule as
   // the server, internal/realtime/mapdata.go).
   readonly walkSpeed: number
@@ -93,6 +104,7 @@ export class MapData {
     this.buildings = parseBuildings(raw)
     this.zones = (raw.layers.find((l) => l.name === 'zones')?.objects ?? []).map((o) => ({
       key: prop(o, 'key', ''),
+      circle: prop<string>(o, 'shape', '') === 'circle',
       name: o.name ?? '',
       x: o.x,
       y: o.y,
@@ -101,18 +113,28 @@ export class MapData {
     }))
     const speed = raw.properties?.find((p) => p.name === 'walk_speed')?.value
     this.walkSpeed = typeof speed === 'number' ? speed : Movement.maxSpeed
+    this.quiet = raw.properties?.find((p) => p.name === 'quiet')?.value === true
     const near = raw.properties?.find((p) => p.name === 'near_tiles')?.value
-    this.nearRadius = (typeof near === 'number' ? near : DEFAULT_NEAR_TILES) * this.tileSize
+    const radius = raw.properties?.find((p) => p.name === 'near_radius')?.value
+    this.nearRadius = typeof radius === 'number' ? radius : (typeof near === 'number' ? near : DEFAULT_NEAR_TILES) * this.tileSize
     const exit = raw.layers.find((l) => l.name === 'exit')?.objects?.[0]
     this.exit = exit ? { x: Math.round(exit.x), y: Math.round(exit.y) } : null
+    this.seats = (raw.layers.find((l) => l.name === 'seats')?.objects ?? [])
+      .filter((o) => Number.isFinite(o.x) && Number.isFinite(o.y) && !this.isBlocked(o.x, o.y))
+      .map((o) => ({ key: o.name ?? String(o.id), x: Math.round(o.x), y: Math.round(o.y) }))
   }
 
   get pixelWidth() {
-    return this.width * this.tileSize
+    return this.propertySize('world_width', this.width * this.tileSize)
   }
 
   get pixelHeight() {
-    return this.height * this.tileSize
+    return this.propertySize('world_height', this.height * this.tileSize)
+  }
+
+  private propertySize(name: string, fallback: number) {
+    const value = this.raw.properties?.find((p) => p.name === name)?.value
+    return typeof value === 'number' && value > 0 && value <= fallback ? value : fallback
   }
 
   // blocked reports whether a pixel point is outside the map or on a
@@ -163,6 +185,7 @@ function parseBuildings(raw: TiledMap): Building[] {
       const door = doors.get(key)
       return {
         key,
+        interactRadius: prop(o, 'interact_radius', 48),
         name: prop(o, 'name', o.name ?? key),
         roof: prop(o, 'roof', ''),
         description: prop(o, 'description', ''),
