@@ -18,8 +18,12 @@ export const orgApi = {
 }
 
 export const inviteApi = {
-  list: (orgId: string, cursor?: string) =>
-    api<InviteList>(`/api/orgs/${enc(orgId)}/invites` + (cursor ? `?cursor=${enc(cursor)}` : '')),
+  list: (orgId: string, cursor?: string, classId?: string) => {
+    const qs = new URLSearchParams()
+    if (cursor) qs.set('cursor', cursor)
+    if (classId) qs.set('class_id', classId)
+    return api<InviteList>(`/api/orgs/${enc(orgId)}/invites${qs.size ? `?${qs}` : ''}`)
+  },
   create: (orgId: string, input: CreateInviteRequest) =>
     api<Invite>(`/api/orgs/${enc(orgId)}/invites`, { method: 'POST', body: input }),
   revoke: (orgId: string, inviteId: string) =>

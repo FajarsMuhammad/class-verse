@@ -2001,12 +2001,19 @@ export interface components {
             created_at: string;
         };
         CreateInviteRequest: {
+            /**
+             * Format: uuid
+             * @description Opsional, kelas aktif sekolah ini. Admin atau wali kelas aktif; role wajib participant.
+             */
+            class_id?: string;
             role: components["schemas"]["InviteRole"];
             /** @default 7 */
             expires_in_days: number;
             max_uses?: number | null;
         };
         Invite: {
+            /** Format: uuid */
+            class_id?: string;
             /** Format: uuid */
             id: string;
             /** @description Bentuk tampilan ABCD-EFGH */
@@ -2138,10 +2145,17 @@ export interface components {
             next_cursor: string | null;
         };
         InvitePreview: {
+            class_name?: string;
+            year_label?: string;
             org_name: string;
             role: components["schemas"]["InviteRole"];
         };
         Membership: {
+            /**
+             * @description Hasil penempatan undangan kelas. Keanggotaan tetap berhasil; kelas lama tidak dipindah. Tidak ada untuk undangan sekolah.
+             * @enum {string}
+             */
+            placement_status?: "placed" | "has_class" | "class_unavailable" | "not_student";
             /** Format: uuid */
             org_id: string;
             /** Format: uuid */
@@ -2548,6 +2562,7 @@ export interface operations {
     listInvites: {
         parameters: {
             query?: {
+                class_id?: string;
                 limit?: number;
                 cursor?: string;
             };

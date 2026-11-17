@@ -59,10 +59,10 @@ Lanjutan C1. Status: **C2a–C2d selesai** (migration 00017 `class_teachers`); b
   API `/staff`, `/classes/{id}/teachers[/{user}]`, `/academic-years/{id}/moves|copy|promotions`; bukti
   `internal/class/c2_test.go` (real Postgres, termasuk wali ganda serentak) dan e2e `/tmp/kv-e2e/c2.mjs`.
 
-## Lanjutan disetujui
+## Undangan berkelas — selesai
 
 - **Wali kelas boleh mengundang siswa ke kelasnya** (undangan berkelas): siswa yang menerima undangan menjadi
-  peserta sekolah dan langsung ditempatkan di kelas itu pada tahun ajaran undangan. Dikerjakan setelah C2b
-  (butuh data wali kelas). Invariant: undangan hanya untuk peran peserta, kelas belum diarsip, wali masih aktif
+  peserta sekolah dan ditempatkan di kelas itu pada tahun ajaran undangan. Migration `00018_class_invites`,
+  form di detail Kelas → Siswa; API undangan lama diperluas dengan `class_id` dan `placement_status`. Invariant: undangan hanya untuk peran peserta, kelas belum diarsip, wali masih aktif
   saat undangan dibuat; penerimaan tetap gagal aman bila siswa sudah punya kelas aktif di tahun itu
   (keanggotaan sekolah tetap dibuat, penempatan dilaporkan konflik, bukan dipindah diam-diam).

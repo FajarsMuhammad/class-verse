@@ -13,9 +13,9 @@ import (
 )
 
 const createInvite = `-- name: CreateInvite :one
-INSERT INTO invites (org_id, code, role, max_uses, created_by, expires_at, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at
+INSERT INTO invites (org_id, code, role, max_uses, created_by, expires_at, created_at, class_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at, class_id
 `
 
 type CreateInviteParams struct {
@@ -26,6 +26,7 @@ type CreateInviteParams struct {
 	CreatedBy uuid.UUID
 	ExpiresAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+	ClassID   uuid.NullUUID
 }
 
 func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error) {
@@ -37,6 +38,7 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (Inv
 		arg.CreatedBy,
 		arg.ExpiresAt,
 		arg.CreatedAt,
+		arg.ClassID,
 	)
 	var i Invite
 	err := row.Scan(
@@ -50,12 +52,13 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (Inv
 		&i.ExpiresAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
+		&i.ClassID,
 	)
 	return i, err
 }
 
 const getInviteByCodeForUpdate = `-- name: GetInviteByCodeForUpdate :one
-SELECT id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at FROM invites
+SELECT id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at, class_id FROM invites
 WHERE code = $1
 FOR UPDATE
 `
@@ -74,12 +77,13 @@ func (q *Queries) GetInviteByCodeForUpdate(ctx context.Context, code string) (In
 		&i.ExpiresAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
+		&i.ClassID,
 	)
 	return i, err
 }
 
 const getInviteInOrg = `-- name: GetInviteInOrg :one
-SELECT id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at FROM invites
+SELECT id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at, class_id FROM invites
 WHERE id = $1 AND org_id = $2
 `
 
@@ -102,14 +106,39 @@ func (q *Queries) GetInviteInOrg(ctx context.Context, arg GetInviteInOrgParams) 
 		&i.ExpiresAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
+		&i.ClassID,
+	)
+	return i, err
+}
+
+const getInviteMembership = `-- name: GetInviteMembership :one
+SELECT org_id, user_id, role, joined_at FROM memberships WHERE org_id = $1 AND user_id = $2
+`
+
+type GetInviteMembershipParams struct {
+	OrgID  uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) GetInviteMembership(ctx context.Context, arg GetInviteMembershipParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, getInviteMembership, arg.OrgID, arg.UserID)
+	var i Membership
+	err := row.Scan(
+		&i.OrgID,
+		&i.UserID,
+		&i.Role,
+		&i.JoinedAt,
 	)
 	return i, err
 }
 
 const getInvitePreview = `-- name: GetInvitePreview :one
-SELECT i.id, i.org_id, i.role, i.max_uses, i.used_count, i.expires_at, i.revoked_at, o.name AS org_name
+SELECT i.id, i.org_id, i.role, i.max_uses, i.used_count, i.expires_at, i.revoked_at, o.name AS org_name,
+ c.name AS class_name, y.label AS year_label
 FROM invites i
 JOIN organizations o ON o.id = i.org_id
+LEFT JOIN classes c ON c.org_id = i.org_id AND c.id = i.class_id
+LEFT JOIN academic_years y ON y.org_id = c.org_id AND y.id = c.academic_year_id
 WHERE i.code = $1
 `
 
@@ -122,6 +151,8 @@ type GetInvitePreviewRow struct {
 	ExpiresAt pgtype.Timestamptz
 	RevokedAt pgtype.Timestamptz
 	OrgName   string
+	ClassName pgtype.Text
+	YearLabel pgtype.Text
 }
 
 func (q *Queries) GetInvitePreview(ctx context.Context, code string) (GetInvitePreviewRow, error) {
@@ -136,6 +167,8 @@ func (q *Queries) GetInvitePreview(ctx context.Context, code string) (GetInviteP
 		&i.ExpiresAt,
 		&i.RevokedAt,
 		&i.OrgName,
+		&i.ClassName,
+		&i.YearLabel,
 	)
 	return i, err
 }
@@ -152,19 +185,21 @@ func (q *Queries) IncrementInviteUse(ctx context.Context, id uuid.UUID) error {
 }
 
 const listActiveInvites = `-- name: ListActiveInvites :many
-SELECT id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at FROM invites
+SELECT id, org_id, code, role, max_uses, used_count, created_by, expires_at, revoked_at, created_at, class_id FROM invites
 WHERE org_id = $1
+  AND ($2::uuid IS NULL OR class_id = $2)
   AND revoked_at IS NULL
-  AND expires_at > $2
+  AND expires_at > $3
   AND (max_uses IS NULL OR used_count < max_uses)
-  AND ($3::timestamptz IS NULL
-       OR (created_at, id) < ($3::timestamptz, $4::uuid))
+  AND ($4::timestamptz IS NULL
+       OR (created_at, id) < ($4::timestamptz, $5::uuid))
 ORDER BY created_at DESC, id DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListActiveInvitesParams struct {
 	OrgID           uuid.UUID
+	ClassID         uuid.NullUUID
 	Now             pgtype.Timestamptz
 	CursorCreatedAt pgtype.Timestamptz
 	CursorID        uuid.NullUUID
@@ -175,6 +210,7 @@ type ListActiveInvitesParams struct {
 func (q *Queries) ListActiveInvites(ctx context.Context, arg ListActiveInvitesParams) ([]Invite, error) {
 	rows, err := q.db.Query(ctx, listActiveInvites,
 		arg.OrgID,
+		arg.ClassID,
 		arg.Now,
 		arg.CursorCreatedAt,
 		arg.CursorID,
@@ -198,6 +234,7 @@ func (q *Queries) ListActiveInvites(ctx context.Context, arg ListActiveInvitesPa
 			&i.ExpiresAt,
 			&i.RevokedAt,
 			&i.CreatedAt,
+			&i.ClassID,
 		); err != nil {
 			return nil, err
 		}

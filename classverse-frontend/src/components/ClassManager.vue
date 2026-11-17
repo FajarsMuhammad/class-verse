@@ -2,13 +2,14 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 import { classApi, type AcademicYear, type SchoolClass } from '@/api/classes'
 import ClassTeachers from './ClassTeachers.vue'
+import InvitePanel from './InvitePanel.vue'
 import StudentRoster from './StudentRoster.vue'
 import YearSetup from './YearSetup.vue'
 
 // C2: Kelas, Siswa and Tahun ajaran are separate Kelola pages. Admin manages years, classes, class teachers and
 // placements; a wali kelas manages students of their own class; everyone else reads (server enforces it too).
 type View = 'classes' | 'students' | 'years'
-const props = withDefaults(defineProps<{ orgId: string; isAdmin: boolean; view?: View }>(), { view: 'classes' })
+const props = withDefaults(defineProps<{ orgId: string; isAdmin: boolean; userId?: string; view?: View }>(), { view: 'classes' })
 const years = ref<AcademicYear[]>([])
 const yearID = ref('')
 const classes = ref<SchoolClass[]>([])
@@ -151,6 +152,7 @@ onMounted(load)
         </div>
         <div v-if="tab === 'students'" role="tabpanel" aria-label="Siswa">
           <StudentRoster :org-id="orgId" :year-id="yearID" :year-label="selectedYear?.label ?? ''" :classes="classes" :is-admin="isAdmin" :class-id="opened.id" @changed="refreshClasses" />
+          <InvitePanel v-if="userId && (isAdmin || opened.my_role === 'homeroom')" :key="opened.id" :org-id="orgId" :my-id="userId" :my-role="isAdmin ? 'admin' : 'teacher'" :class-id="opened.id" />
         </div>
         <div v-else-if="tab === 'teachers'" role="tabpanel" aria-label="Pengajar">
           <ClassTeachers :org-id="orgId" :class-id="opened.id" :is-admin="isAdmin" @changed="refreshClasses" />

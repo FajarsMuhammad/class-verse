@@ -53,7 +53,7 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
       </template>
       <template v-else-if="section === 'kelas'">
         <h2 class="section-title">Kelas</h2>
-        <ClassManager :key="`classes-${org.active.id}`" :org-id="org.active.id" :is-admin="org.active.role === 'admin'" view="classes" />
+        <ClassManager :key="`classes-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me?.id" :is-admin="org.active.role === 'admin'" view="classes" />
         <h2 class="section-title">Siswa</h2>
         <ClassManager :key="`students-${org.active.id}`" :org-id="org.active.id" :is-admin="org.active.role === 'admin'" view="students" />
         <template v-if="org.active.role === 'admin'">

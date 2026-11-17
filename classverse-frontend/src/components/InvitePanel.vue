@@ -5,7 +5,7 @@ import { errorMessage } from '@/api/client'
 import { inviteApi } from '@/api/orgs'
 import type { Invite, InviteRole, Role } from '@/api/types'
 
-const props = defineProps<{ orgId: string; myRole: Role; myId: string }>()
+const props = defineProps<{ orgId: string; myRole: Role; myId: string; classId?: string }>()
 
 const invites = ref<Invite[]>([])
 const nextCursor = ref<string | null>(null)
@@ -22,7 +22,7 @@ const roleLabel: Record<InviteRole, string> = { teacher: 'Pengajar', participant
 
 async function load(cursor?: string) {
   try {
-    const page = await inviteApi.list(props.orgId, cursor)
+    const page = await inviteApi.list(props.orgId, cursor, props.classId)
     invites.value = cursor ? [...invites.value, ...page.items] : page.items
     nextCursor.value = page.next_cursor
   } catch (e) {
@@ -37,7 +37,8 @@ async function create() {
   try {
     const uses = maxUses.value.trim() === '' ? null : Number(maxUses.value)
     const inv = await inviteApi.create(props.orgId, {
-      role: role.value,
+      role: props.classId ? 'participant' : role.value,
+      ...(props.classId ? { class_id: props.classId } : {}),
       expires_in_days: days.value,
       max_uses: uses,
     })
@@ -83,13 +84,14 @@ onMounted(() => load())
 </script>
 
 <template>
-  <section class="panel" aria-labelledby="invite-title">
-    <h2 id="invite-title" class="title">Undang anggota</h2>
+  <section class="panel" :class="{ embedded: classId }" aria-labelledby="invite-title">
+    <h2 id="invite-title" class="title">{{ classId ? 'Undang siswa ke kelas ini' : 'Undang anggota' }}</h2>
+    <p v-if="classId" class="muted">Undangan peserta. Siswa yang sudah punya kelas di tahun ajaran ini tidak dipindahkan; hubungi admin.</p>
     <p v-if="error" class="alert" role="alert">{{ error }}</p>
     <p class="sr-status" role="status">{{ status }}</p>
 
     <form class="create" @submit.prevent="create">
-      <div class="field">
+      <div v-if="!classId" class="field">
         <label :for="ids.role" class="label">Sebagai</label>
         <select :id="ids.role" v-model="role" class="input">
           <option value="participant">Peserta</option>
@@ -117,9 +119,9 @@ onMounted(() => load())
       </button>
     </form>
 
-    <p v-if="invites.length === 0" class="empty">Belum ada undangan aktif.</p>
+    <p v-if="(classId ? invites.filter(i => i.class_id === classId) : invites).length === 0" class="empty">Belum ada undangan aktif.</p>
     <ul v-else class="list">
-      <li v-for="inv in invites" :key="inv.id" class="item">
+      <li v-for="inv in (classId ? invites.filter(i => i.class_id === classId) : invites)" :key="inv.id" class="item">
         <div class="meta">
           <span class="code">{{ inv.code }}</span>
           <span class="badge">{{ roleLabel[inv.role] }}</span>
@@ -154,6 +156,9 @@ onMounted(() => load())
 </template>
 
 <style scoped>
+.panel.embedded { padding: var(--space-3) 0 0; border: 0; border-top: 1px solid var(--kv-line); border-radius: 0; box-shadow: none; }
+.embedded .title { font-size: var(--text-md); }
+.embedded .item { background: transparent; border-radius: 0; border-bottom: 1px solid var(--kv-line); padding: var(--space-3) 0; }
 .panel {
   display: flex;
   flex-direction: column;

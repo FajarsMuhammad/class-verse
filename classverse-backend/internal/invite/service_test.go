@@ -177,7 +177,7 @@ func TestAcceptRules(t *testing.T) {
 		t.Errorf("unknown code = %v", err)
 	}
 
-	page, err := f.svc.List(ctx, f.admin, f.orgID, 0, "")
+	page, err := f.svc.List(ctx, f.admin, f.orgID, 0, "", nil)
 	if err != nil || len(page.Items) != 1 || page.Items[0].UsedCount != 1 {
 		t.Fatalf("List = %+v, %v (already-member accept must not count)", page, err)
 	}
@@ -276,7 +276,7 @@ func TestListPagination(t *testing.T) {
 	seen := map[uuid.UUID]bool{}
 	cursor := ""
 	for pages := 0; ; pages++ {
-		page, err := f.svc.List(ctx, f.admin, f.orgID, 2, cursor)
+		page, err := f.svc.List(ctx, f.admin, f.orgID, 2, cursor, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -297,10 +297,10 @@ func TestListPagination(t *testing.T) {
 	if len(seen) != 5 {
 		t.Errorf("saw %d invites, want 5", len(seen))
 	}
-	if _, err := f.svc.List(ctx, f.admin, f.orgID, 2, "garbage!"); !errors.Is(err, ErrInvalidCursor) {
+	if _, err := f.svc.List(ctx, f.admin, f.orgID, 2, "garbage!", nil); !errors.Is(err, ErrInvalidCursor) {
 		t.Errorf("bad cursor = %v", err)
 	}
-	if _, err := f.svc.List(ctx, f.member, f.orgID, 2, ""); !errors.Is(err, org.ErrForbidden) {
+	if _, err := f.svc.List(ctx, f.member, f.orgID, 2, "", nil); !errors.Is(err, org.ErrForbidden) {
 		t.Errorf("participant list = %v", err)
 	}
 }

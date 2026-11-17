@@ -244,7 +244,9 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   direset dan tidak ada fokus keyboard pada peta tersembunyi. Draf chat tetap terjaga.
   **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola adalah menu induk dengan submenu kiri
   ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Siswa, Tugas, Ruang & undangan, Buku perpustakaan,
-  Berkas, Tahun ajaran (admin), dan Kontrol sesi saat berada di ruang. Kelas = daftar per tahun ajaran → satu
+  Berkas, Tahun ajaran (admin), dan Kontrol sesi saat berada di ruang. Detail Kelas → Siswa menyediakan **Undang
+  siswa ke kelas ini** untuk admin/wali aktif; memakai form undangan lama dalam permukaan datar. Penerima melihat
+  kelas/tahun sebelum gabung; konflik penempatan tetap ditampilkan bersama tautan Buka sekolah. Kelas = daftar per tahun ajaran → satu
   kelas dengan tab Siswa/Pengajar/Pengaturan (Pengaturan hanya admin); baris kelas menampilkan wali kelas, jumlah
   guru mapel, dan lencana peran pemanggil. Siswa = direktori per halaman 50 dari server dengan filter kelas termasuk
   **Belum punya kelas**, centang → **Pindahkan ke kelas** (hasil per siswa). Tahun ajaran (admin) memuat **Siapkan

@@ -288,6 +288,30 @@ func (e Level) Valid() bool {
 	}
 }
 
+// Defines values for MembershipPlacementStatus.
+const (
+	MembershipPlacementStatusClassUnavailable MembershipPlacementStatus = "class_unavailable"
+	MembershipPlacementStatusHasClass         MembershipPlacementStatus = "has_class"
+	MembershipPlacementStatusNotStudent       MembershipPlacementStatus = "not_student"
+	MembershipPlacementStatusPlaced           MembershipPlacementStatus = "placed"
+)
+
+// Valid indicates whether the value is a known member of the MembershipPlacementStatus enum.
+func (e MembershipPlacementStatus) Valid() bool {
+	switch e {
+	case MembershipPlacementStatusClassUnavailable:
+		return true
+	case MembershipPlacementStatusHasClass:
+		return true
+	case MembershipPlacementStatusNotStudent:
+		return true
+	case MembershipPlacementStatusPlaced:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ModerationActionAction.
 const (
 	Allow  ModerationActionAction = "allow"
@@ -763,9 +787,11 @@ type ClassTeacherRole string
 
 // CreateInviteRequest defines model for CreateInviteRequest.
 type CreateInviteRequest struct {
-	ExpiresInDays *int       `json:"expires_in_days,omitempty"`
-	MaxUses       *int       `json:"max_uses,omitempty"`
-	Role          InviteRole `json:"role"`
+	// ClassId Opsional, kelas aktif sekolah ini. Admin atau wali kelas aktif; role wajib participant.
+	ClassId       *openapi_types.UUID `json:"class_id,omitempty"`
+	ExpiresInDays *int                `json:"expires_in_days,omitempty"`
+	MaxUses       *int                `json:"max_uses,omitempty"`
+	Role          InviteRole          `json:"role"`
 }
 
 // CreateOrgRequest defines model for CreateOrgRequest.
@@ -886,6 +912,8 @@ type GradebookTask struct {
 
 // Invite defines model for Invite.
 type Invite struct {
+	ClassId *openapi_types.UUID `json:"class_id,omitempty"`
+
 	// Code Bentuk tampilan ABCD-EFGH
 	Code      string             `json:"code"`
 	CreatedAt time.Time          `json:"created_at"`
@@ -906,8 +934,10 @@ type InviteList struct {
 
 // InvitePreview defines model for InvitePreview.
 type InvitePreview struct {
-	OrgName string     `json:"org_name"`
-	Role    InviteRole `json:"role"`
+	ClassName *string    `json:"class_name,omitempty"`
+	OrgName   string     `json:"org_name"`
+	Role      InviteRole `json:"role"`
+	YearLabel *string    `json:"year_label,omitempty"`
 }
 
 // InviteRole defines model for InviteRole.
@@ -955,9 +985,15 @@ type Me struct {
 type Membership struct {
 	JoinedAt time.Time          `json:"joined_at"`
 	OrgId    openapi_types.UUID `json:"org_id"`
-	Role     Role               `json:"role"`
-	UserId   openapi_types.UUID `json:"user_id"`
+
+	// PlacementStatus Hasil penempatan undangan kelas. Keanggotaan tetap berhasil; kelas lama tidak dipindah. Tidak ada untuk undangan sekolah.
+	PlacementStatus *MembershipPlacementStatus `json:"placement_status,omitempty"`
+	Role            Role                       `json:"role"`
+	UserId          openapi_types.UUID         `json:"user_id"`
 }
+
+// MembershipPlacementStatus Hasil penempatan undangan kelas. Keanggotaan tetap berhasil; kelas lama tidak dipindah. Tidak ada untuk undangan sekolah.
+type MembershipPlacementStatus string
 
 // ModerationAction defines model for ModerationAction.
 type ModerationAction struct {
@@ -1525,8 +1561,9 @@ type GetStudentGradebookParams struct {
 
 // ListInvitesParams defines parameters for ListInvites.
 type ListInvitesParams struct {
-	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	ClassId *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
+	Limit   *int                `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor  *string             `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // ListBooksParams defines parameters for ListBooks.

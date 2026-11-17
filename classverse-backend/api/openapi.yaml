@@ -174,6 +174,7 @@ paths:
       operationId: listInvites
       description: Undangan aktif (belum kedaluwarsa, dicabut, atau habis), terbaru dulu.
       parameters:
+        - { name: class_id, in: query, schema: { type: string, format: uuid } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -2270,6 +2271,7 @@ components:
       type: object
       required: [role]
       properties:
+        class_id: { type: string, format: uuid, description: "Opsional, kelas aktif sekolah ini. Admin atau wali kelas aktif; role wajib participant." }
         role: { $ref: "#/components/schemas/InviteRole" }
         expires_in_days: { type: integer, minimum: 1, maximum: 7, default: 7 }
         max_uses: { type: integer, minimum: 1, maximum: 500, nullable: true }
@@ -2277,6 +2279,7 @@ components:
       type: object
       required: [id, code, link, role, max_uses, used_count, expires_at, created_by, created_at]
       properties:
+        class_id: { type: string, format: uuid }
         id: { type: string, format: uuid }
         code: { type: string, description: Bentuk tampilan ABCD-EFGH }
         link: { type: string }
@@ -2417,12 +2420,15 @@ components:
       type: object
       required: [org_name, role]
       properties:
+        class_name: { type: string }
+        year_label: { type: string }
         org_name: { type: string }
         role: { $ref: "#/components/schemas/InviteRole" }
     Membership:
       type: object
       required: [org_id, user_id, role, joined_at]
       properties:
+        placement_status: { type: string, enum: [placed, has_class, class_unavailable, not_student], description: "Hasil penempatan undangan kelas. Keanggotaan tetap berhasil; kelas lama tidak dipindah. Tidak ada untuk undangan sekolah." }
         org_id: { type: string, format: uuid }
         user_id: { type: string, format: uuid }
         role: { $ref: "#/components/schemas/Role" }

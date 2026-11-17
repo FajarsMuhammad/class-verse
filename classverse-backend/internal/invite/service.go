@@ -50,6 +50,7 @@ type Authorizer interface {
 
 // Invite is an invite as shown to admins and teachers.
 type Invite struct {
+	ClassID   *uuid.UUID
 	ID        uuid.UUID
 	Code      string // display form ABCD-EFGH
 	Role      org.Role
@@ -62,20 +63,24 @@ type Invite struct {
 
 // Preview is what a user sees before joining.
 type Preview struct {
-	OrgName string
-	Role    org.Role
+	OrgName   string
+	Role      org.Role
+	ClassName string
+	YearLabel string
 }
 
 // Membership is the result of joining.
 type Membership struct {
-	OrgID    uuid.UUID
-	UserID   uuid.UUID
-	Role     org.Role
-	JoinedAt time.Time
+	PlacementStatus string // placed, has_class, class_unavailable, not_student; empty for school-only invites
+	OrgID           uuid.UUID
+	UserID          uuid.UUID
+	Role            org.Role
+	JoinedAt        time.Time
 }
 
 // CreateInput is the body of POST /api/orgs/{org_id}/invites.
 type CreateInput struct {
+	ClassID       *uuid.UUID
 	Role          org.Role
 	ExpiresInDays *int
 	MaxUses       *int
@@ -124,6 +129,9 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 		}
 		uses = pgtype.Int4{Int32: int32(min(max(*in.MaxUses, 0), maxUses)), Valid: true}
 	}
+	if in.ClassID != nil && in.Role != org.RoleParticipant {
+		fields["role"] = "Undangan kelas hanya untuk peserta"
+	}
 	if len(fields) > 0 {
 		return Invite{}, &ValidationError{Fields: fields}
 	}
@@ -137,9 +145,21 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 		if err != nil {
 			return Invite{}, err
 		}
-		row, err := s.store.CreateInvite(ctx, query.CreateInviteParams{
-			OrgID: orgID, Code: code, Role: query.OrgRole(in.Role), MaxUses: uses, CreatedBy: userID,
-			ExpiresAt: pgTime(now.Add(time.Duration(days) * 24 * time.Hour)), CreatedAt: pgTime(now),
+		var row query.Invite
+		err = s.store.InTx(ctx, func(q *query.Queries) error {
+			var classID uuid.NullUUID
+			if in.ClassID != nil {
+				if _, err := inviteClass(ctx, q, orgID, *in.ClassID, userID); err != nil {
+					return err
+				}
+				classID = uuid.NullUUID{UUID: *in.ClassID, Valid: true}
+			}
+			var err error
+			row, err = q.CreateInvite(ctx, query.CreateInviteParams{
+				OrgID: orgID, Code: code, Role: query.OrgRole(in.Role), MaxUses: uses, CreatedBy: userID,
+				ExpiresAt: pgTime(now.Add(time.Duration(days) * 24 * time.Hour)), CreatedAt: pgTime(now), ClassID: classID,
+			})
+			return err
 		})
 		if isUniqueViolation(err) {
 			continue // code collision, try another
@@ -155,7 +175,7 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 }
 
 // List returns active invites, newest first.
-func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, limit int, cursor string) (Page, error) {
+func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, limit int, cursor string, classID *uuid.UUID) (Page, error) {
 	if _, err := s.auth.Authorize(ctx, userID, orgID, org.RoleTeacher); err != nil {
 		return Page{}, err
 	}
@@ -164,6 +184,9 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, limit int, 
 	}
 	limit = min(limit, maxLimit)
 	params := query.ListActiveInvitesParams{OrgID: orgID, Now: pgTime(s.now()), RowLimit: int32(limit + 1)} //nolint:gosec // bounded by maxLimit
+	if classID != nil {
+		params.ClassID = uuid.NullUUID{UUID: *classID, Valid: true}
+	}
 	if cursor != "" {
 		at, id, err := decodeCursor(cursor)
 		if err != nil {
@@ -228,7 +251,7 @@ func (s *Service) Preview(ctx context.Context, rawCode string) (Preview, error) 
 	if !usable(row.RevokedAt, row.ExpiresAt, row.MaxUses, row.UsedCount, s.now()) {
 		return Preview{}, ErrExpired
 	}
-	return Preview{OrgName: row.OrgName, Role: org.Role(row.Role)}, nil
+	return Preview{OrgName: row.OrgName, Role: org.Role(row.Role), ClassName: row.ClassName.String, YearLabel: row.YearLabel.String}, nil
 }
 
 // Accept joins the organization of the code. The invite row is locked so
@@ -240,8 +263,9 @@ func (s *Service) Accept(ctx context.Context, userID uuid.UUID, rawCode string) 
 	}
 	now := s.now()
 	var (
-		m       query.Membership
-		outcome error
+		m         query.Membership
+		placement string
+		outcome   error
 	)
 	err := s.store.InTx(ctx, func(q *query.Queries) error {
 		u, err := q.GetUserEligibility(ctx, userID)
@@ -264,18 +288,51 @@ func (s *Service) Accept(ctx context.Context, userID uuid.UUID, rawCode string) 
 			outcome = ErrExpired
 			return nil
 		}
+		// Class placement shares the roster lock and lock order used by class.Service.
+		var target *query.Class
+		if inv.ClassID.Valid {
+			c, err := q.GetClass(ctx, query.GetClassParams{OrgID: inv.OrgID, ID: inv.ClassID.UUID})
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("get invite class: %w", err)
+			}
+			placement = "class_unavailable"
+			if err == nil {
+				if err := q.LockAssignmentRoster(ctx, query.LockAssignmentRosterParams{OrgID: inv.OrgID, YearID: c.AcademicYearID}); err != nil {
+					return fmt.Errorf("lock invite roster: %w", err)
+				}
+				c, err := inviteClass(ctx, q, inv.OrgID, c.ID, inv.CreatedBy)
+				if err == nil {
+					target = &c
+				} else if !errors.Is(err, ErrForbidden) && !errors.Is(err, ErrNotFound) {
+					return err
+				}
+			}
+		}
 		m, err = q.CreateMembership(ctx, query.CreateMembershipParams{
 			OrgID: inv.OrgID, UserID: userID, Role: inv.Role, JoinedAt: pgTime(now),
 		})
+		newMember := err == nil
 		if errors.Is(err, pgx.ErrNoRows) {
-			outcome = ErrAlreadyMember
-			return nil
+			if !inv.ClassID.Valid {
+				outcome = ErrAlreadyMember
+				return nil
+			}
+			m, err = q.GetInviteMembership(ctx, query.GetInviteMembershipParams{OrgID: inv.OrgID, UserID: userID})
 		}
 		if err != nil {
-			return fmt.Errorf("create membership: %w", err)
+			return fmt.Errorf("create/get membership: %w", err)
 		}
-		if err := q.IncrementInviteUse(ctx, inv.ID); err != nil {
-			return fmt.Errorf("increment invite use: %w", err)
+		placed := false
+		if target != nil {
+			placement, placed, err = placeInviteStudent(ctx, q, m, *target, inv.CreatedBy, now)
+			if err != nil {
+				return err
+			}
+		}
+		if newMember || placed {
+			if err := q.IncrementInviteUse(ctx, inv.ID); err != nil {
+				return fmt.Errorf("increment invite use: %w", err)
+			}
 		}
 		return nil
 	})
@@ -286,7 +343,7 @@ func (s *Service) Accept(ctx context.Context, userID uuid.UUID, rawCode string) 
 		return Membership{}, outcome
 	}
 	s.log.InfoContext(ctx, "invite accepted", slog.String("org_id", m.OrgID.String()), slog.String("user_id", userID.String()))
-	return Membership{OrgID: m.OrgID, UserID: m.UserID, Role: org.Role(m.Role), JoinedAt: m.JoinedAt.Time}, nil
+	return Membership{OrgID: m.OrgID, UserID: m.UserID, Role: org.Role(m.Role), JoinedAt: m.JoinedAt.Time, PlacementStatus: placement}, nil
 }
 
 func usable(revokedAt, expiresAt pgtype.Timestamptz, maxUses pgtype.Int4, used int32, now time.Time) bool {
@@ -300,6 +357,10 @@ func toInvite(r query.Invite) Invite {
 	inv := Invite{
 		ID: r.ID, Code: displayCode(r.Code), Role: org.Role(r.Role), UsedCount: int(r.UsedCount),
 		ExpiresAt: r.ExpiresAt.Time, CreatedBy: r.CreatedBy, CreatedAt: r.CreatedAt.Time,
+	}
+	if r.ClassID.Valid {
+		id := r.ClassID.UUID
+		inv.ClassID = &id
 	}
 	if r.MaxUses.Valid {
 		n := int(r.MaxUses.Int32)

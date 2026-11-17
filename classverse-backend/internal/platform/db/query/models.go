@@ -376,6 +376,7 @@ type Invite struct {
 	ExpiresAt pgtype.Timestamptz
 	RevokedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+	ClassID   uuid.NullUUID
 }
 
 type LibraryBook struct {
