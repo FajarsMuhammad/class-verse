@@ -56,6 +56,7 @@ const {
   map,
   world,
   online,
+  people,
   error,
   sendMove,
   start,
@@ -253,17 +254,16 @@ let timer: ReturnType<typeof setInterval> | undefined
 
 // Floating toolbars: the scene reads their height to keep the floor visible.
 // Plain (non-reactive) values; Phaser polls them every frame.
-const mapTop = ref<HTMLElement | null>(null)
 const mapBottom = ref<HTMLElement | null>(null)
 let inset = { top: 0, bottom: 0 }
 const measure = new ResizeObserver(() => {
   const gap = 12 // --space-3 between a toolbar and the frame edge
   inset = {
-    top: mapTop.value ? mapTop.value.offsetHeight + gap * 2 : 0,
+    top: 0,
     bottom: mapBottom.value ? mapBottom.value.offsetHeight + gap * 2 : 0,
   }
 })
-watch([mapTop, mapBottom], (els) => {
+watch([mapBottom], (els) => {
   measure.disconnect()
   for (const el of els) if (el) measure.observe(el)
 })
@@ -368,24 +368,19 @@ onBeforeUnmount(() => {
   <section v-else class="workspace" aria-labelledby="map-title">
     <div class="layout" :class="{ 'menu-open': !!sideItem, 'page-open': pageOpen }">
       <SideMenu v-model:active="sideItem" class="side" :full-page="org.isTeacher" :items="sideItems" :label="org.isTeacher ? 'Menu ruang dan alat guru' : 'Menu ruang'">
-        <template v-if="org.isTeacher" #identity>
+        <template #identity>
           <RouterLink class="workspace-logo" :to="{ name: 'home' }" aria-label="Kelasverse — peta sekolah"><img :src="logoUrl" alt="" width="32" height="32" /></RouterLink>
         </template>
-        <template v-if="org.isTeacher" #account>
+        <template #account>
           <button ref="profileTrigger" class="account-button" type="button" aria-label="Akun dan navigasi" :aria-expanded="accountOpen" @click="accountOpen = !accountOpen">{{ auth.me?.display_name?.slice(0, 1) }}</button>
         </template>
         <template #[mapPanelKey]>
           <RoomLearningPin v-if="!org.isTeacher && !campus && !kicked && org.active && room.pin?.value" :key="current?.room_id"
             :room="room" :org-id="org.active.id" :staff="false" />
-          <button v-if="org.isTeacher && !campus && !kicked" type="button" class="btn-secondary leave-link" :aria-busy="leaving"
+          <button v-if="!campus && !kicked" type="button" class="btn-secondary leave-link" :aria-busy="leaving"
             :disabled="traveling || status !== 'open'" @click="leaveRoom">
             {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
           </button>
-          <details v-if="org.isTeacher" class="people-list">
-            <summary>Orang di ruang ini ({{ online }})</summary>
-            <p>{{ auth.me?.display_name }} (kamu)</p>
-            <p v-for="person in [...world.avatars.values()].filter(p => !p.hidden)" :key="person.id">{{ person.name }}</p>
-          </details>
           <LearningPanel embedded :org-id="org.active?.id" :progress-key="progressKey" :name="auth.me?.display_name ?? ''"
             :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
             :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
@@ -396,7 +391,8 @@ onBeforeUnmount(() => {
         <template #chat>
           <p class="panel-note">{{ campus ? schoolName : current?.room_name }} · {{ chat.zone.name || 'Area umum' }}</p>
           <ChatPanel class="side-chat" :chat="chat" :version="chatVersion" :error="chatError" :disabled="status !== 'open'"
-            :campus="campus" :teacher="org.isTeacher" @send="sendChat" @report="reporting = $event" />
+            :campus="campus" :teacher="org.isTeacher" :online="online"
+            :people="[`${auth.me?.display_name ?? ''} (kamu)`, ...people.map((p) => p.name)]" @send="sendChat" @report="reporting = $event" />
           <p v-if="reportNotice" role="status" class="room-meta">{{ reportNotice }}</p>
         </template>
         <template #catalog>
@@ -424,35 +420,8 @@ onBeforeUnmount(() => {
         <template #gradebook><RoomTools v-if="org.active && auth.me" tool="gradebook" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" /></template>
       </SideMenu>
       <div class="map-column" :class="{ 'map-hidden': pageOpen }" :inert="pageOpen">
-      <div class="map-frame" :class="{ 'no-top': org.isTeacher }">
-        <h1 v-if="org.isTeacher" id="map-title" class="sr-only">{{ campus ? schoolName : current?.room_name }}</h1>
-        <header v-if="!org.isTeacher" ref="mapTop" class="map-top">
-          <button
-            v-if="!campus && !kicked"
-            type="button"
-            class="back"
-            :aria-busy="leaving"
-            :disabled="traveling || status !== 'open'"
-            @click="leaveRoom"
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path
-                d="M15 5l-7 7 7 7"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
-          </button>
-          <div class="title">
-            <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
-            <p role="status" data-testid="connection-status">{{ statusText }}</p>
-          </div>
-
-        </header>
+      <div class="map-frame">
+        <h1 id="map-title" class="sr-only">{{ campus ? schoolName : current?.room_name }}</h1>
         <aside
           v-if="campus && roomsOpen"
           id="building-directory"
@@ -539,7 +508,8 @@ onBeforeUnmount(() => {
         <span>{{ schoolName }}</span>
         <button type="button" @click="accountOpen = false; profileOpen = true">Profil</button>
         <RouterLink :to="{ name: 'select-org' }">Ganti sekolah</RouterLink>
-        <RouterLink :to="{ name: 'moderation' }">Moderasi</RouterLink>
+        <RouterLink v-if="!org.isTeacher" :to="{ name: 'gradebook' }">Rapor</RouterLink>
+        <RouterLink v-if="org.isTeacher" :to="{ name: 'moderation' }">Moderasi</RouterLink>
         <button type="button" @click="logout">Keluar akun</button>
         <button type="button" @click="accountOpen = false; profileTrigger?.focus()">Tutup</button>
       </aside>
@@ -589,7 +559,6 @@ onBeforeUnmount(() => {
    them (`inset`). Overflowing content scrolls sideways instead of wrapping. */
 /* Rails are transparent; only their pill-shaped children take space and clicks,
    so the map stays visible (and clickable) between them. */
-.map-top,
 .map-bottom {
   position: absolute;
   z-index: 2;
@@ -602,7 +571,6 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
   pointer-events: none;
 }
-.map-top > *,
 .map-bottom > * {
   pointer-events: auto;
   box-shadow: var(--shadow-raise);
@@ -621,12 +589,6 @@ onBeforeUnmount(() => {
   font-weight: var(--weight-semibold);
   white-space: nowrap;
 }
-.map-top {
-  top: var(--space-3);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.map-top .title { flex-shrink: 0; }
 .map-zoom {
   position: absolute;
   z-index: 2;
@@ -639,8 +601,8 @@ onBeforeUnmount(() => {
 .map-minimap {
   position: absolute;
   z-index: 2;
-  /* Below the top rail; the zoom control sits bottom-right. */
-  top: calc(var(--touch-min) + var(--space-4) + var(--space-6));
+  /* The zoom control sits bottom-right. */
+  top: var(--space-3);
   left: var(--space-3);
 }
 .float-note {
@@ -657,58 +619,14 @@ onBeforeUnmount(() => {
   font-weight: var(--weight-bold);
   box-shadow: var(--shadow-raise);
 }
-.title {
-  flex: 0 1 auto;
-  min-width: 6rem;
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  min-height: var(--touch-min);
-  padding: var(--space-1) var(--space-4);
-  box-sizing: border-box;
-  background: var(--color-surface);
-  overflow: hidden;
-}
-.title + * { margin-left: auto; flex: none; white-space: nowrap; }
-.title p {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  white-space: nowrap;
-}
-.back {
-  flex: none;
-  min-height: var(--touch-min);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0 var(--space-3) 0 var(--space-2);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font: inherit;
-  font-weight: var(--weight-bold);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.back:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.back:focus-visible {
-  outline: 3px solid var(--color-primary-strong);
-  outline-offset: 2px;
-}
 /* The place card and the room list share the top-right corner so the flow
    (select → walk to door → pick room) never jumps across the map. */
 .place-detail {
   position: absolute;
   z-index: 3;
-  top: calc(var(--touch-min) + var(--space-3) + var(--space-2));
+  top: var(--space-3);
   right: var(--space-3);
 }
-.no-top .place-detail, .no-top .buildings, .no-top .map-minimap { top: var(--space-3); }
 .campus-chat {
   margin-top: var(--space-5);
   background: var(--color-surface);
@@ -732,10 +650,13 @@ h1 {
   font-weight: var(--weight-bold);
 }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.people-list { margin-bottom: var(--space-3); }
-.leave-link { align-self: flex-start; margin-bottom: var(--space-2); }
-.people-list summary { min-height: var(--touch-min); cursor: pointer; }
-.people-list p { margin: var(--space-2) 0; }
+.leave-link {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1);
+  min-height: 0; height: var(--control-sm); margin-bottom: var(--space-2); padding: 0 var(--space-3);
+  border: 1px solid var(--kv-line); border-radius: var(--control-radius); background: var(--kv-surface);
+  font-size: var(--text-sm); font-weight: var(--weight-semibold);
+}
+.leave-link:hover:not(:disabled) { background: var(--color-primary-soft); }
 .workspace-logo, .account-button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--touch-min); min-height: var(--touch-min); border-radius: var(--radius-pill); }
 .account-button { border: 1px solid var(--color-border); background: var(--color-primary-soft); color: var(--color-primary-strong); font: inherit; font-weight: var(--weight-bold); cursor: pointer; }
 .account-menu { position: absolute; z-index: 5; left: 64px; bottom: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); width: min(280px, 75vw); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-raise); }
@@ -800,7 +721,7 @@ h1 {
   position: absolute;
   z-index: 4;
   /* Room list: same top-right corner as the place card it replaces. */
-  top: calc(var(--touch-min) + var(--space-3) + var(--space-2));
+  top: var(--space-3);
   right: var(--space-3);
   width: min(280px, calc(100% - var(--space-6)));
   max-height: calc(100% - var(--touch-min) - var(--space-8));
@@ -848,15 +769,7 @@ li span {
   border-color: var(--color-speaking);
 }
 @media (max-width: 900px) {
-  /* Teacher controls overflow narrow screens: scroll the rail, keep pills whole. */
-  .map-top { overflow-x: auto; padding: var(--space-1) 0; scrollbar-width: none; }
-  .map-top > * { flex: none; }
-  .map-top .title { flex: 0 1 auto; max-width: 55vw; }
   .quiet-chip { white-space: normal; min-width: 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-lg); }
-  /* Keep the place name readable; the status stays available to screen readers. */
-  .title p {
-    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
-  }
   /* Narrow screens: rail across the top, the open panel above the map. */
   .layout { flex-direction: column; min-height: 400px; }
   .layout.menu-open .side { max-height: 55%; }

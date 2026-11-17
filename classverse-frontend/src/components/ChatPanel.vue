@@ -11,6 +11,9 @@ const props = defineProps<{
   disabled: boolean
   campus: boolean
   teacher?: boolean
+  // Presence lives in the chat (map and panels show no online counts). Omit both to hide it.
+  online?: number
+  people?: string[]
 }>()
 const emit = defineEmits<{
   send: [text: string, scope: ChatScope]
@@ -97,6 +100,15 @@ function time(iso: string) {
 
 <template>
   <section class="chat" aria-label="Chat">
+    <details v-if="online !== undefined" class="presence">
+      <summary>
+        <span class="dot" aria-hidden="true"></span>{{ online }} orang online
+        <svg class="chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </summary>
+      <ul>
+        <li v-for="(name, i) in people ?? []" :key="i">{{ name }}</li>
+      </ul>
+    </details>
     <div class="tabs" role="tablist" aria-label="Tujuan chat">
       <button
         v-for="t in tabs"
@@ -174,7 +186,7 @@ function time(iso: string) {
         aria-label="Kirim pesan"
         :disabled="disabled || roomOff || !text.trim() || remaining < 0"
       >
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path
             d="M5 12h14M13 6l6 6-6 6"
             fill="none"
@@ -198,16 +210,39 @@ function time(iso: string) {
 </template>
 
 <style scoped>
+/* Compact controls (docs/visual.md "Kontrol ringkas", reff-design-4): --control-h buttons,
+   --control-sm ghost/secondary, 10px radius, 1px lines. */
 .chat {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
   min-height: 0;
   height: 100%;
 }
+svg { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.presence { border: 1px solid var(--kv-line); border-radius: var(--control-radius); background: var(--kv-surface); }
+.presence summary {
+  display: flex; align-items: center; gap: var(--space-2); height: var(--control-sm); padding: 0 var(--space-3);
+  font-size: var(--text-sm); font-weight: var(--weight-semibold); cursor: pointer; list-style: none;
+}
+.presence summary::-webkit-details-marker { display: none; }
+.presence summary:focus-visible { outline: 3px solid var(--color-primary-strong); outline-offset: 1px; border-radius: var(--control-radius); }
+.presence .chev { margin-left: auto; stroke-width: 2; color: var(--kv-text-muted); transition: transform 0.15s; }
+.presence[open] .chev { transform: rotate(180deg); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-speaking); flex: none; }
+.presence ul {
+  margin: 0; padding: 0 var(--space-3) var(--space-2); list-style: none; max-height: 160px; overflow-y: auto;
+  font-size: var(--text-sm); color: var(--kv-ink);
+}
+.presence li { padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Segmented control: one track, the active tab is a raised white chip. */
 .tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--control-radius);
+  background: var(--color-surface-alt);
 }
 .tab.broadcast {
   flex-basis: 100%;
@@ -215,46 +250,47 @@ function time(iso: string) {
 .tab {
   flex: 1 1 0;
   min-width: 0;
+  height: var(--control-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-height: var(--touch-min);
-  padding: var(--space-2) var(--space-2);
-  border: 2px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
-  color: var(--color-ink);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--kv-text-muted);
   font: inherit;
-  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   cursor: pointer;
 }
+.tab:hover { color: var(--kv-ink); }
 .tab[aria-selected='true'] {
-  background: var(--color-primary-soft);
+  background: var(--kv-surface);
   color: var(--color-primary-strong);
-  border-color: var(--color-primary);
+  box-shadow: 0 1px 3px rgba(29, 33, 64, 0.12);
 }
 .tab.zone[aria-selected='true'] {
-  background: var(--color-accent-soft);
   color: var(--color-accent-ink);
-  border-color: var(--color-accent);
 }
+.tab:focus-visible { outline: 3px solid var(--color-primary-strong); outline-offset: -3px; }
 .zone-note {
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-sm);
+  margin: 0;
+  font-size: var(--text-xs);
   color: var(--color-accent-ink);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-semibold);
 }
 .log {
   flex: 1;
   min-height: 160px;
   overflow-y: auto;
-  margin-top: var(--space-3);
   padding: var(--space-2) 0;
-  border-top: 2px solid var(--color-border-soft);
 }
 .empty {
-  color: var(--color-ink-muted);
-  font-size: var(--text-md);
+  margin: var(--space-4) var(--space-2);
+  color: var(--kv-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 .line {
   display: flex;
@@ -266,10 +302,10 @@ function time(iso: string) {
   align-items: flex-end;
 }
 .who {
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  font-weight: var(--weight-bold);
-  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--kv-text-muted);
+  font-weight: var(--weight-semibold);
+  margin-bottom: 2px;
   display: flex;
   gap: var(--space-2);
   align-items: center;
@@ -288,84 +324,88 @@ function time(iso: string) {
   max-width: 90%;
   padding: var(--space-2) var(--space-3);
   background: var(--color-surface-alt);
-  border-radius: var(--radius-md);
-  border-bottom-left-radius: var(--radius-xs);
-  font-size: var(--text-md);
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  font-size: var(--text-sm);
   line-height: var(--line-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .report {
   order: 3;
-  min-height: var(--touch-min);
-  padding: 0 var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-1);
   border: 0;
+  border-radius: 6px;
   background: transparent;
-  color: var(--color-ink-muted);
+  color: var(--kv-text-muted);
   font: inherit;
-  font-size: var(--text-sm);
-  text-decoration: underline;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
+.report:hover { background: var(--color-surface-alt); color: var(--kv-ink); }
 .report:focus-visible {
   outline: 3px solid var(--color-primary-strong);
 }
 .mine .bubble {
   background: var(--color-primary);
   color: var(--color-surface);
-  border-bottom-left-radius: var(--radius-md);
-  border-bottom-right-radius: var(--radius-xs);
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 4px;
 }
 .error {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   color: var(--color-ink);
   font-weight: var(--weight-bold);
   font-size: var(--text-sm);
 }
+/* Composer: one bordered field, the send button sits inside it. */
 .compose {
   display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  gap: var(--space-1);
   align-items: flex-end;
+  padding: 3px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 12px;
+  background: var(--kv-surface);
 }
+.compose:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
 textarea {
   flex: 1;
-  min-height: var(--touch-min);
+  min-height: var(--control-h);
   max-height: 120px;
-  resize: vertical;
+  resize: none;
   box-sizing: border-box;
-  padding: var(--space-2) var(--space-3);
-  border: 2px solid var(--color-input-border);
-  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  border: 0;
+  background: transparent;
   font: inherit;
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   color: var(--color-ink);
-  background: var(--color-surface);
 }
-textarea:focus-visible {
-  outline: 3px solid var(--color-primary-strong);
-  outline-offset: 1px;
-}
+textarea:focus-visible { outline: none; }
 .send {
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: var(--control-h);
+  height: var(--control-h);
   flex: none;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--control-radius);
   background: var(--color-primary);
   color: var(--color-surface);
   cursor: pointer;
 }
+.send:hover:not(:disabled) { background: var(--color-primary-strong); }
+.send:focus-visible { outline: 3px solid var(--color-primary-strong); outline-offset: 2px; }
 .send:disabled {
   background: var(--color-border);
   cursor: not-allowed;
 }
 .count {
-  margin: var(--space-1) 0 0;
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--kv-text-muted);
   text-align: right;
 }
 .count.over {
@@ -380,4 +420,5 @@ textarea:focus-visible {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+@media (prefers-reduced-motion: reduce) { .presence .chev { transition: none; } }
 </style>

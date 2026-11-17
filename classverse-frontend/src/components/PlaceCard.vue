@@ -63,19 +63,19 @@ p { margin: 0; font-size: var(--text-xs); line-height: 1.4; color: var(--kv-text
 .restriction, .occupancy { margin: var(--space-2) 0 0 calc(28px + var(--space-2)); }
 .restriction { color: var(--kv-primary-soft-text); }
 .close {
-  display: grid; place-items: center; flex: none; width: 32px; height: 32px; margin: -4px -4px 0 0;
+  display: grid; place-items: center; flex: none; width: var(--control-sm); height: var(--control-sm); margin: -4px -4px 0 0;
   border: 0; border-radius: 8px; background: transparent; color: var(--kv-text-muted); cursor: pointer;
 }
 .close:hover { background: var(--color-primary-soft); color: var(--kv-ink); }
 .actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 .primary, .icon {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-  height: 36px; border-radius: 10px; font: var(--weight-semibold) var(--text-sm)/1 var(--font-body); cursor: pointer;
+  height: var(--control-h); border-radius: var(--control-radius); font: var(--weight-semibold) var(--text-sm)/1 var(--font-body); cursor: pointer;
 }
 .primary { flex: 1; min-width: 0; padding: 0 var(--space-3); border: 0; background: var(--color-primary); color: var(--color-surface); }
 .primary:hover:not(:disabled) { background: var(--color-primary-strong); }
 .primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.icon { flex: none; width: 36px; padding: 0; border: 1px solid var(--kv-line); background: var(--kv-surface); color: var(--kv-ink); }
+.icon { flex: none; width: var(--control-h); padding: 0; border: 1px solid var(--kv-line); background: var(--kv-surface); color: var(--kv-ink); }
 .icon:hover { background: var(--color-primary-soft); }
 .close:focus-visible, .primary:focus-visible, .icon:focus-visible { outline: 3px solid var(--color-primary-strong); outline-offset: 2px; }
 </style>

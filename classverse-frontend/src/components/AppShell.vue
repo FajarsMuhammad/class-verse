@@ -12,7 +12,8 @@ const props = defineProps<{ immersive?: boolean }>()
 const auth = useAuthStore()
 const org = useOrgStore()
 const router = useRouter()
-const mapWorkspace = computed(() => props.immersive && org.isTeacher &&
+// Map workspace (teacher and participant): no top header; brand and account live in the side rail.
+const mapWorkspace = computed(() => props.immersive &&
   !(typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse) and (max-width: 767px)').matches))
 const profileButton = useTemplateRef<HTMLButtonElement>('profileButton')
 const profileOpen = ref(false)

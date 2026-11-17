@@ -176,6 +176,11 @@
 
   /* Interaction */
   --touch-min: 44px; /* minimum height/width of anything tappable */
+  /* Compact desktop controls inside panels and floating cards (reff-design-4).
+     Phone list mode and full pages keep --touch-min. */
+  --control-h: 36px; /* primary / icon actions */
+  --control-sm: 32px; /* ghost, close, tabs, secondary row actions */
+  --control-radius: 10px;
 }
 
 html {
