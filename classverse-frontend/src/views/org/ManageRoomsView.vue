@@ -52,7 +52,14 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
           :is-admin="org.active.role === 'admin'" />
       </template>
       <template v-else-if="section === 'kelas'">
-        <ClassManager :key="`classes-${org.active.id}`" :org-id="org.active.id" :is-admin="org.active.role === 'admin'" />
+        <h2 class="section-title">Kelas</h2>
+        <ClassManager :key="`classes-${org.active.id}`" :org-id="org.active.id" :is-admin="org.active.role === 'admin'" view="classes" />
+        <h2 class="section-title">Siswa</h2>
+        <ClassManager :key="`students-${org.active.id}`" :org-id="org.active.id" :is-admin="org.active.role === 'admin'" view="students" />
+        <template v-if="org.active.role === 'admin'">
+          <h2 class="section-title">Tahun ajaran</h2>
+          <ClassManager :key="`years-${org.active.id}`" :org-id="org.active.id" is-admin view="years" />
+        </template>
         <AssignmentManager :key="`assignments-${org.active.id}`" :org-id="org.active.id" />
       </template>
       <template v-else>
@@ -67,6 +74,7 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
 
 <style scoped>
 .head { margin-bottom: var(--space-4); }
+.section-title { margin: var(--space-6) 0 var(--space-3); font: var(--weight-semibold) var(--text-lg)/var(--line-tight) var(--font-display); }
 .title { margin: 0; font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-3xl); line-height: var(--line-tight); }
 .sub { margin: var(--space-2) 0 0; color: var(--color-ink-muted); font-size: var(--text-lg); }
 .sections { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }

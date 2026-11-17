@@ -32,3 +32,12 @@ it('hides session controls on campus', async () => {
   expect(w.find('[data-tool="session"]').exists()).toBe(false)
   expect(w.get('[aria-current="page"]').text()).toBe('Modul belajar')
 })
+it('shows Kelas and Siswa separately; Tahun ajaran only for admin', async () => {
+  const staff = mount(TeacherTools, { props: { orgId: 'o', userId: 'u', isAdmin: false, room }, global: { stubs } })
+  expect(staff.find('[data-tool="classes"]').exists()).toBe(true)
+  expect(staff.find('[data-tool="students"]').exists()).toBe(true)
+  expect(staff.find('[data-tool="years"]').exists()).toBe(false)
+  const admin = mount(TeacherTools, { props: { orgId: 'o', userId: 'u', isAdmin: true, room }, global: { stubs } })
+  await admin.get('[data-tool="years"]').trigger('click')
+  expect(admin.emitted('update:modelValue')).toEqual([['years']])
+})

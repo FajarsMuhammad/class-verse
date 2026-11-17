@@ -243,8 +243,9 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   Peta tetap ter-mount, berdimensi nonzero, tersembunyi dan inert saat halaman dibuka: koneksi/posisi tidak
   direset dan tidak ada fokus keyboard pada peta tersembunyi. Draf chat tetap terjaga.
   **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola adalah menu induk dengan submenu kiri
-  ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Tugas, Ruang & undangan, Buku perpustakaan, Berkas,
-  dan Kontrol sesi saat berada di ruang. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
+  ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Siswa, Tugas, Ruang & undangan, Buku perpustakaan,
+  Berkas, Tahun ajaran (admin), dan Kontrol sesi saat berada di ruang. Kelas = daftar per tahun ajaran → satu
+  kelas dengan tab Siswa/Pengaturan; Siswa = direktori dengan filter kelas termasuk **Belum punya kelas**. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
   dimuat. Lebar ≤1000 px submenu berbaris di atas konten. Modul belajar dibatasi `perpus` di Perpustakaan.
   Aksi **Sematkan ke [nama ruang]**
   berada pada detail modul terbit yang memiliki isi, bukan pemilih terpisah di atas daftar. Klik membuka

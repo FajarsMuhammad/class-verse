@@ -20,7 +20,7 @@ const emit = defineEmits<{ pinned: [] }>()
   <ModuleManager v-if="tool === 'modules'" :org-id="orgId" :room="room" @pinned="emit('pinned')" />
   <ModuleManager v-else-if="tool === 'library-modules'" :org-id="orgId" building-key="perpus" :room="room" @pinned="emit('pinned')" />
   <QuizManager v-else-if="tool === 'quizzes'" :org-id="orgId" />
-  <ClassManager v-else-if="tool === 'classes'" :org-id="orgId" :is-admin="isAdmin" />
+  <ClassManager v-else-if="tool === 'classes' || tool === 'students' || tool === 'years'" :org-id="orgId" :is-admin="isAdmin" :view="tool" />
   <AssignmentManager v-else-if="tool === 'assignments'" :org-id="orgId" />
   <GradebookReport v-else-if="tool === 'gradebook'" embedded />
   <template v-else-if="tool === 'rooms'">

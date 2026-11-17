@@ -1,6 +1,6 @@
 # C2 — Kelola kelas, siswa, dan pengajar kelas
 
-Lanjutan C1. Status: **disetujui, belum dikerjakan.** Branch per slice, bertumpuk dari `teacher-workspace-fixes`.
+Lanjutan C1. Status: **C2a selesai; C2b–C2d belum.** Branch per slice, bertumpuk dari `teacher-workspace-fixes`.
 
 ## Keputusan (disetujui pengguna)
 
@@ -26,7 +26,7 @@ Lanjutan C1. Status: **disetujui, belum dikerjakan.** Branch per slice, bertumpu
 
 ## Slice
 
-### C2a — Pisahkan Kelas, Siswa, Tahun ajaran (frontend, tanpa migration)
+### C2a — Pisahkan Kelas, Siswa, Tahun ajaran (frontend, tanpa migration) — selesai
 
 - `TeacherTools`: submenu Kelas, Siswa; Tahun ajaran hanya untuk admin.
 - Kelas: pilih tahun ajaran (default aktif), cari, daftar ringkas (nama, jumlah siswa) → detail satu kelas
@@ -55,6 +55,10 @@ Lanjutan C1. Status: **disetujui, belum dikerjakan.** Branch per slice, bertumpu
 - Salin struktur kelas (dan opsional pengajarnya) dari tahun sebelumnya; konflik nama dilewati dan dilaporkan.
 - Wizard naik kelas (pemetaan kelas lama → baru, pratinjau, konfirmasi) — dirancang setelah C2c dipakai.
 
-## Belum diputuskan
+## Lanjutan disetujui
 
-- Apakah wali kelas boleh mengundang siswa baru langsung ke kelasnya (undangan berkelas). Usulan: tidak di C2.
+- **Wali kelas boleh mengundang siswa ke kelasnya** (undangan berkelas): siswa yang menerima undangan menjadi
+  peserta sekolah dan langsung ditempatkan di kelas itu pada tahun ajaran undangan. Dikerjakan setelah C2b
+  (butuh data wali kelas). Invariant: undangan hanya untuk peran peserta, kelas belum diarsip, wali masih aktif
+  saat undangan dibuat; penerimaan tetap gagal aman bila siswa sudah punya kelas aktif di tahun itu
+  (keanggotaan sekolah tetap dibuat, penempatan dilaporkan konflik, bukan dipindah diam-diam).
