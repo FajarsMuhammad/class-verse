@@ -181,6 +181,8 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   (gerak >6 px = geser, bukan klik; dibatasi tepi peta, peta lebih kecil dari layar tetap di tengah). Zoom di
   kanan bawah. Kartu tempat (Menuju pintu/Lihat modul) dan daftar ruang (Masuk ruang) sama-sama ringkas 280 px
   di pojok kanan atas, agar alur pilih gedung → pintu → masuk tidak berpindah posisi.
+  Klik dua kali gedung (≤400 ms) = pilih + jalan ke pintunya. Taman Diskusi dan Alun-alun punya chip judul
+  seperti gedung.
   Panel Peta di dalam gedung punya tombol **Keluar ruang** (berjalan ke pintu lalu keluar) sebagai alternatif
   aksesibel untuk keluar otomatis di pintu. Menu akun tertutup saat klik di luar; pesan simpan profil hilang 4 detik.
   Tidak ada item Belajar terpisah untuk guru, termasuk di Ruang Guru: isi pendamping berada pada menu **Peta**
