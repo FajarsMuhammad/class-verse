@@ -7,6 +7,7 @@ import BuildingModules from '@/components/BuildingModules.vue'
 import ResumeLearning from '@/components/ResumeLearning.vue'
 import AssignmentPanel from '@/components/AssignmentPanel.vue'
 import RoomLearningPin from '@/components/RoomLearningPin.vue'
+import ModuleManager from '@/components/ModuleManager.vue'
 import RoomStations from '@/components/RoomStations.vue'
 import EmoteBar from '@/components/EmoteBar.vue'
 import DoorRooms from '@/components/DoorRooms.vue'
@@ -43,6 +44,8 @@ const org = useOrgStore()
 const modulesOf = ref<Building | null>(null)
 const progressKey = ref(0)
 const station = ref('')
+const choosingModule = ref(false)
+watch(() => current.value?.room_id, () => { choosingModule.value = false })
 
 // Positions arrive in snapshots without a reactive signal; refresh lists twice a second.
 const tick = ref(0)
@@ -247,7 +250,11 @@ function reported() {
     <RoomStations v-if="!kicked && org.active && ['science', 'staff'].includes(current?.map_key ?? '')"
       :key="current?.room_id" class="card" :org-id="org.active.id" :map-key="current!.map_key" :station="station"
       :teacher="org.isTeacher" @select="station = $event" />
-    <RoomLearningPin v-if="!kicked && org.active && current?.map_key !== 'campus' && (org.isTeacher || room.pin?.value)" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" />
+    <RoomLearningPin v-if="!kicked && org.active && current?.map_key !== 'campus' && (org.isTeacher || room.pin?.value)" :key="current?.room_id" :room="room" :org-id="org.active.id" :staff="org.isTeacher" @change="choosingModule = true" />
+    <section v-if="choosingModule && org.isTeacher && !kicked && org.active" class="card" aria-label="Pilih materi sesi">
+      <button type="button" class="btn-secondary" @click="choosingModule = false">Tutup daftar modul</button>
+      <ModuleManager :org-id="org.active.id" :room="room" @pinned="choosingModule = false" />
+    </section>
     <AssignmentPanel v-if="!kicked && org.active" :key="`tasks-${org.active.id}`" :org-id="org.active.id" />
     <ResumeLearning v-if="!kicked && org.active" class="card" :org-id="org.active.id" :refresh-key="progressKey" />
     <section v-if="!kicked && current?.map_key === 'library' && org.active" class="card" aria-labelledby="catalog-title">

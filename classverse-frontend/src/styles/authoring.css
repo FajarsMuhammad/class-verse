@@ -27,6 +27,9 @@
 .feedback summary { cursor: pointer; min-height: var(--touch-min); font-size: var(--text-sm); }
 .feedback label { display: block; font-size: var(--text-sm); color: var(--kv-text-muted); }
 .feedback textarea { width: 100%; }
+.pin-action { align-self: flex-start; }
+.pin-form { display: grid; gap: var(--space-2); max-width: 520px; padding: var(--space-3); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); }
+.pin-form .hint { margin: 0; }
 .preview-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-md); }
 @media (max-width: 600px) {
   .catalog-row { flex-wrap: wrap; }

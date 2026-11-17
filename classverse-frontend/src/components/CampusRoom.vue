@@ -128,8 +128,6 @@ const icons = {
   moderation: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',
 } as const
 const toolPlace = computed(() => !org.isTeacher || kicked.value ? null : current.value?.map_key === 'staff' ? 'staff' : library.value ? 'library' : null)
-// Staff "Modul" holds the live-session pin in every interior; Ruang Guru/Perpustakaan add their managers there.
-const pinPlace = computed(() => org.isTeacher && !kicked.value && !campus.value)
 const toolItems = computed<SideItem[]>(() => org.isTeacher && !kicked.value ? [
   { key: 'modules', label: 'Modul', icon: icons.modules, wide: true },
   { key: 'tools', label: 'Kelola', icon: icons.classes, wide: true },
@@ -375,8 +373,8 @@ onBeforeUnmount(() => {
           <button ref="profileTrigger" class="account-button" type="button" aria-label="Akun dan navigasi" :aria-expanded="accountOpen" @click="accountOpen = !accountOpen">{{ auth.me?.display_name?.slice(0, 1) }}</button>
         </template>
         <template #[mapPanelKey]>
-          <RoomLearningPin v-if="!org.isTeacher && !campus && !kicked && org.active && room.pin?.value" :key="current?.room_id"
-            :room="room" :org-id="org.active.id" :staff="false" />
+          <RoomLearningPin v-if="!campus && !kicked && org.active && (org.isTeacher || room.pin?.value)" :key="current?.room_id"
+            :room="room" :org-id="org.active.id" :staff="org.isTeacher" @change="sideItem = 'modules'" />
           <button v-if="!campus && !kicked" type="button" class="btn-secondary leave-link" :aria-busy="leaving"
             :disabled="traveling || status !== 'open'" @click="leaveRoom">
             {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
@@ -402,9 +400,9 @@ onBeforeUnmount(() => {
             @manage="sideItem = 'modules'" />
         </template>
         <template #modules>
-          <RoomLearningPin v-if="pinPlace && org.active" :key="current?.room_id" :room="room" :org-id="org.active.id" staff />
           <RoomTools v-if="org.active && auth.me" :tool="toolPlace === 'library' ? 'library-modules' : 'modules'"
-            :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" />
+            :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" :room="room"
+            @pinned="sideItem = 'map'" />
         </template>
         <template #tools>
           <TeacherPanel v-if="!campus && !kicked" :room="room" />

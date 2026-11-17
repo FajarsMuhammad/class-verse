@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, useId } from 'vue'
+import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
+import type { RoomHandle } from '@/realtime/useRoom'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
 import { kindLabel, levels, moduleApi } from '@/api/modules'
@@ -9,7 +10,8 @@ import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Modul (M1-01): staff author paths per building and level. Steps are archived, never deleted.
 // buildingKey limits the manager to one building (Perpustakaan tools open it for `perpus` only).
-const props = defineProps<{ orgId: string; buildingKey?: string }>()
+const props = defineProps<{ orgId: string; buildingKey?: string; room?: RoomHandle }>()
+const emit = defineEmits<{ pinned: [] }>()
 
 const id = useId()
 const modules = ref<Module[]>([])
@@ -30,6 +32,21 @@ const selected = ref<string | null>(null)
 const visible = computed(() => modules.value.filter((item) => !levelFilter.value || item.level === levelFilter.value))
 const active = computed(() => modules.value.find((item) => item.id === selected.value))
 const preview = ref(false)
+const pinChoosing = ref(false)
+const pinStep = ref('')
+const pinRoom = computed(() => props.room?.current.value)
+const canPin = computed(() => !!props.room?.pinLearning && props.room.status.value === 'open' &&
+  !props.room.traveling?.value && !props.room.kicked?.value && !!pinRoom.value && pinRoom.value.map_key !== 'campus')
+watch(() => pinRoom.value?.room_id, () => { pinChoosing.value = false; pinStep.value = '' })
+watch(selected, () => { pinChoosing.value = false; pinStep.value = '' })
+function pinModule() {
+  const item = active.value
+  if (!item?.published || !item.steps.length || !canPin.value) return
+  if (pinStep.value && !item.steps.some((step) => step.id === pinStep.value)) return
+  props.room?.pinLearning?.(item.id, pinStep.value || undefined)
+  pinChoosing.value = false
+  emit('pinned')
+}
 const editorHeading = ref<HTMLElement | null>(null)
 async function focusEditor() {
   await nextTick()
@@ -197,6 +214,28 @@ onMounted(async () => {
       <button type="button" class="btn-secondary" :disabled="busy" @click="edit(active)">Pengaturan</button>
       <button type="button" class="btn-primary" :disabled="busy || (!active.published && !active.steps.length)" @click="setPublished(active)">{{ active.published ? 'Jadikan draf' : 'Terbitkan' }}</button>
     </div>
+    <template v-if="active && room && !editing && !stepFor">
+      <p v-if="pinRoom?.map_key === 'campus'" class="hint">Masuk ruang untuk menyematkan modul.</p>
+      <template v-else-if="active.published && active.steps.length">
+        <button v-if="!pinChoosing" type="button" class="btn-secondary pin-action" data-action="pin" :disabled="!canPin" @click="pinChoosing = true">
+          Sematkan ke {{ pinRoom?.room_name || 'ruang ini' }}
+        </button>
+        <form v-else class="pin-form" @submit.prevent="pinModule">
+          <strong>Sematkan ke {{ pinRoom?.room_name || 'ruang ini' }}</strong>
+          <label :for="`${id}-pin-step`">Mulai dari</label>
+          <select :id="`${id}-pin-step`" v-model="pinStep">
+            <option value="">Seluruh modul</option>
+            <option v-for="s in active.steps" :key="s.id" :value="s.id">{{ s.title }}</option>
+          </select>
+          <p class="hint">Peserta membuka materi di layar masing-masing; layar mereka tidak berpindah otomatis.</p>
+          <div class="actions">
+            <button type="submit" class="btn-primary" :disabled="!canPin">Sematkan</button>
+            <button type="button" class="btn-secondary" @click="pinChoosing = false">Batal</button>
+          </div>
+        </form>
+      </template>
+      <p v-else class="hint">Terbitkan modul berisi materi sebelum menyematkan.</p>
+    </template>
     <p v-if="active && !active.published && !active.steps.length" class="hint">Tambahkan minimal satu materi sebelum menerbitkan.</p>
     <div v-if="!selected && !editing" class="catalog">
       <label :for="`${id}-filter`">Jenjang</label>

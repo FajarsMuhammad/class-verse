@@ -28,18 +28,19 @@ it('participant opens the pin only on explicit action and sees no staff controls
   expect(w.get('.opened').text()).toBe('m s')
 })
 
-it('staff choose only published modules, can pick a starting step, and unpin', async () => {
+it('staff manage session status here but choose modules in module details', async () => {
   const room = makeRoom(false)
   const w = mount(RoomLearningPin, { props: { room, orgId: 'org', staff: true } })
-  expect(w.text()).toContain('Sematkan di ruang ini')
-  await w.findAll('button').find((b) => b.text() === 'Pilih modul')!.trigger('click'); await flushPromises()
-  const [moduleSelect, stepSelect] = w.findAll('select')
-  expect(moduleSelect!.findAll('option').map((o) => o.text())).toEqual(['Pilih modul', 'Tata Surya (SD)'])
-  await moduleSelect!.setValue('m'); await stepSelect!.setValue('s')
-  await w.get('form').trigger('submit')
-  expect(room.pinLearning).toHaveBeenCalledWith('m', 's')
-  room.pin!.value = { module_id: 'm', step_id: '', title: 'Tata Surya', building_key: 'sains', level: 'SD' }
+  expect(w.text()).toContain('Materi sesi ini')
+  await w.get('.choose').trigger('click')
+  expect(w.emitted('change')).toHaveLength(1)
+  expect(w.find('select').exists()).toBe(false)
+  room.pin!.value = { module_id: 'm', step_id: 's', title: 'Tata Surya', building_key: 'sains', level: 'SD' }
   await flushPromises()
-  await w.findAll('button').find((b) => b.text() === 'Lepas sematan')!.trigger('click')
+  expect(w.text()).toContain('Planet')
+  expect(w.get('.open').text()).toBe('Buka materi')
+  await w.findAll('button').find((b) => b.text() === 'Ganti')!.trigger('click')
+  expect(w.emitted('change')).toHaveLength(2)
+  await w.findAll('button').find((b) => b.text() === 'Lepas')!.trigger('click')
   expect(room.pinLearning).toHaveBeenLastCalledWith('')
 })

@@ -1,4 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { ref, shallowRef } from 'vue'
+import type { RoomHandle } from '@/realtime/useRoom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import ModuleManager from './ModuleManager.vue'
 import { ApiError } from '@/api/client'
@@ -123,4 +125,32 @@ it('starts the first content form after creating a filtered draft', async () => 
   expect(create).toHaveBeenCalledWith('o', expect.objectContaining({ level: 'SMA', published: false }))
   expect(w.find('textarea[maxlength="5000"]').exists()).toBe(true)
   expect(w.find('.catalog').exists()).toBe(false)
+})
+
+it('pins only a published module from its detail, with a named current-room target', async () => {
+  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [{ ...draft, published: true }] })
+  const pinLearning = vi.fn<NonNullable<RoomHandle['pinLearning']>>()
+  const room = { status: ref('open'), current: shallowRef({ room_id: 'r', map_key: 'classroom', room_name: 'Kelas IPA' }), pinLearning } as unknown as RoomHandle
+  const w = mount(ModuleManager, { props: { orgId: 'o', room } })
+  await flushPromises()
+  expect(w.find('[data-action="pin"]').exists()).toBe(false)
+  await w.get('.catalog-row button').trigger('click')
+  expect(w.get('[data-action="pin"]').text()).toContain('Kelas IPA')
+  await w.get('[data-action="pin"]').trigger('click')
+  await w.get('.pin-form select').setValue('b')
+  await w.get('.pin-form').trigger('submit')
+  expect(pinLearning).toHaveBeenCalledWith('m1', 'b')
+  expect(w.emitted('pinned')).toHaveLength(1)
+  room.status.value = 'closed'
+  await flushPromises()
+  expect(w.get('[data-action="pin"]').attributes('disabled')).toBeDefined()
+})
+
+it('explains that a room is required on campus and never offers drafts for pinning', async () => {
+  const room = { status: ref('open'), current: shallowRef({ room_id: 'c', map_key: 'campus' }), pinLearning: vi.fn<NonNullable<RoomHandle['pinLearning']>>() } as unknown as RoomHandle
+  const w = mount(ModuleManager, { props: { orgId: 'o', room } })
+  await flushPromises()
+  await w.get('.catalog-row button').trigger('click')
+  expect(w.find('[data-action="pin"]').exists()).toBe(false)
+  expect(w.text()).toContain('Masuk ruang untuk menyematkan modul')
 })

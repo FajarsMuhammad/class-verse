@@ -244,8 +244,14 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   direset dan tidak ada fokus keyboard pada peta tersembunyi. Draf chat tetap terjaga.
   **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola memakai satu pemilih alat:
   Kuis, Kelas, Tugas, Ruang (termasuk undangan), Buku perpustakaan, Berkas. Kontrol sesi juga di Kelola.
-  Modul berisi pengelola modul (dibatasi `perpus` di Perpustakaan), dan kartu **Sematkan di ruang ini**
-  pada interior. Tidak ada bilah sematan di atas peta.
+  Modul berisi pengelola modul (dibatasi `perpus` di Perpustakaan). Aksi **Sematkan ke [nama ruang]**
+  berada pada detail modul terbit yang memiliki isi, bukan pemilih terpisah di atas daftar. Klik membuka
+  pilihan Seluruh modul / Mulai dari materi. Di kampus, tampilkan petunjuk untuk masuk ruang terlebih dahulu.
+  Saat disconnect/travel/dikeluarkan, sematkan tidak aktif; pergantian ruang menutup form sematan.
+  Panel Peta guru memuat **Materi sesi ini**, judul modul/materi, **Buka materi**, **Ganti**, **Lepas**.
+  Ganti/Pilih modul membuka daftar Modul; sesudah mengirim sematan kembali ke Peta, status aktual mengikuti
+  pesan server. Mode HP memakai pengelola modul yang sama dari Pilih/Ganti, tanpa pemilih modul kedua.
+  Tidak ada bilah sematan di atas peta.
 - Header aplikasi dan header peta desktop dihapus **untuk guru dan peserta** (workspace sama). Peta memenuhi tinggi viewport dengan sela 4 px;
   menu awal ciut jika belum ada preferensi. Akun di bawah rel menyimpan Profil, Ganti sekolah, Moderasi,
   Keluar akun (peserta: + Rapor; Moderasi hanya staf). Identitas Kelasverse di atas rel kembali ke peta.
@@ -257,8 +263,9 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   40 px memicu travel sekali; spawn di pintu tidak langsung keluar. Server tetap memeriksa radius 48 px.
   Disconnect, travel dan pergantian ruang mereset pemicu. Tombol keluar mode HP tetap tersedia.
 - Peserta melihat sematan sebagai kartu "Dari pengajar" di atas panel Belajar; titik pada ikon Belajar bila ada
-  sematan baru saat panel tertutup. Satu elemen tegas: kartu nila bergaya catatan yang ditempel (pushpin),
-  sisanya tenang.
+  sematan baru saat panel tertutup. Tombol **Buka materi** hanya membuka layar pengguna sendiri,
+  bukan sinkronisasi playback atau pemindahan layar semua peserta. Kartu ringkas: latar Nila lembut,
+  garis 1 px dan radius token, tanpa rotasi/garis tebal.
 - Status ciut menu disimpan di `localStorage` (`kv-side-collapsed`) sehingga peta tetap lebar setelah muat ulang.
   Penempatan menu saja; server tetap memeriksa peran, bukan lokasi avatar.
 - Fokus: membuka item memindah fokus ke judul panel; menciutkan/Escape mengembalikan fokus ke tombol rel.
