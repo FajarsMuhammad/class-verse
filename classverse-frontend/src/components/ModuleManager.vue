@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useId } from 'vue'
+import { computed, nextTick, onMounted, ref, useId } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
 import { kindLabel, levels, moduleApi } from '@/api/modules'
 import { quizApi } from '@/api/quizzes'
-import type { FileItem, Module, ModuleInput, ModuleStep, Quiz, StepInput } from '@/api/types'
+import type { FileItem, Level, Module, ModuleInput, ModuleStep, Quiz, StepInput } from '@/api/types'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Modul (M1-01): staff author paths per building and level. Steps are archived, never deleted.
@@ -25,6 +25,33 @@ const fields = ref<Record<string, string>>({})
 const busy = ref(false)
 const message = ref('')
 const error = ref('')
+const levelFilter = ref<Level | ''>('')
+const selected = ref<string | null>(null)
+const visible = computed(() => modules.value.filter((item) => !levelFilter.value || item.level === levelFilter.value))
+const active = computed(() => modules.value.find((item) => item.id === selected.value))
+const preview = ref(false)
+const editorHeading = ref<HTMLElement | null>(null)
+async function focusEditor() {
+  await nextTick()
+  editorHeading.value?.focus()
+}
+function openItem(item: Module) {
+  selected.value = item.id
+  preview.value = false
+  editing.value = null
+  stepFor.value = null
+  fields.value = {}
+  error.value = ''
+  void focusEditor()
+}
+function back() {
+  if ((editing.value || stepFor.value) && !window.confirm('Tutup form tanpa menyimpan perubahan?')) return
+  selected.value = null
+  editing.value = null
+  stepFor.value = null
+  preview.value = false
+}
+
 
 function blank(): ModuleInput {
   return { building_key: '', level: 'SD', title: '', description: '', published: false }
@@ -64,24 +91,42 @@ async function run(fn: () => Promise<unknown>, done: string) {
 }
 
 function edit(m?: Module) {
+  selected.value = m?.id ?? null
+  preview.value = false
   stepFor.value = null
   editing.value = m?.id ?? 'new'
   fields.value = {}
   form.value = m
     ? { building_key: m.building_key, level: m.level, title: m.title, description: m.description, published: m.published }
-    : { ...blank(), building_key: choices.value[0]?.key ?? '' }
+    : { ...blank(), level: levelFilter.value || 'SD', building_key: choices.value[0]?.key ?? '' }
 }
 async function save() {
   const body = form.value
   const ok = await run(
-    () => (editing.value === 'new' ? moduleApi.create(props.orgId, body) : moduleApi.update(props.orgId, editing.value!, body)),
+    async () => {
+      const saved = editing.value === 'new'
+        ? await moduleApi.create(props.orgId, { ...body, published: false })
+        : await moduleApi.update(props.orgId, editing.value!, body)
+      selected.value = saved.id
+    },
     `${body.title.trim()} ${body.published ? 'terbit' : 'disimpan sebagai draf'}.`,
   )
-  if (ok) editing.value = null
+  if (ok) {
+    editing.value = null
+    const item = active.value
+    if (item && !item.steps.length) editStep(item)
+    void focusEditor()
+  }
+}
+async function setPublished(item: Module) {
+  const { building_key, level, title, description } = item
+  await run(() => moduleApi.update(props.orgId, item.id, {
+    building_key, level, title, description, published: !item.published,
+  }), item.published ? 'Kembali menjadi draf.' : 'Modul diterbitkan.')
 }
 async function archive(m: Module) {
   if (!window.confirm(`Arsipkan modul ${m.title}? Peserta tidak bisa membukanya lagi; file tetap ada.`)) return
-  await run(() => moduleApi.archive(props.orgId, m.id), `${m.title} diarsipkan.`)
+  if (await run(() => moduleApi.archive(props.orgId, m.id), `${m.title} diarsipkan.`)) selected.value = null
 }
 
 function editStep(m: Module, s?: ModuleStep) {
@@ -93,10 +138,10 @@ function editStep(m: Module, s?: ModuleStep) {
     ? { kind: s.kind, title: s.title, body: s.body, file_id: s.file_id, video_id: s.video_id ?? '', quiz_id: s.quiz_id, minutes: s.minutes }
     : blankStep()
   if (!files.value.length) {
-    fileApi.list(props.orgId).then((r) => (files.value = r.items)).catch(() => (files.value = []))
+    fileApi.list(props.orgId).then((r) => (files.value = r.items)).catch((err) => { error.value = errorMessage(err) })
   }
   // Only published quizzes of this building can be linked (the server checks too).
-  quizApi.list(props.orgId, { building_key: m.building_key }).then((r) => (quizzes.value = r.items)).catch(() => (quizzes.value = []))
+  quizApi.list(props.orgId, { building_key: m.building_key }).then((r) => (quizzes.value = r.items)).catch((err) => { error.value = errorMessage(err) })
 }
 async function saveStep() {
   const mid = stepFor.value!
@@ -133,15 +178,43 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="manager" :aria-labelledby="`${id}-title`">
-    <header class="head">
+  <section class="manager authoring" :aria-labelledby="`${id}-title`">
+    <header v-if="!selected && !editing" class="head">
       <h2 :id="`${id}-title`" class="title">Modul belajar</h2>
       <button v-if="!editing" type="button" class="btn-primary" :disabled="!choices.length" @click="edit()">+ Modul baru</button>
     </header>
-    <p class="sub">Jalur belajar per gedung dan jenjang. Draf hanya terlihat pengajar; peserta membuka modul terbit dari detail gedung.</p>
+    <p v-if="!selected && !editing" class="sub">Jalur belajar per gedung dan jenjang. Draf hanya terlihat pengajar; peserta membuka modul terbit dari detail gedung.</p>
     <p v-if="message" class="notice" role="status">{{ message }}</p>
     <p v-if="error" class="alert" role="alert">{{ error }}</p>
 
+    <header v-if="selected || editing" class="editor-head">
+      <button type="button" class="btn-secondary" data-action="back" :disabled="busy" @click="back">Kembali ke daftar</button>
+      <h3 ref="editorHeading" class="editor-title" tabindex="-1">{{ active?.title || 'Modul baru' }}</h3>
+      <span v-if="active" class="chip">{{ active.published ? 'Terbit' : 'Draf' }}</span>
+    </header>
+    <div v-if="active && !editing && !stepFor" class="editor-actions actions">
+      <button type="button" class="btn-secondary" :aria-pressed="preview" @click="preview = !preview">{{ preview ? 'Kembali menyusun' : 'Pratinjau isi' }}</button>
+      <button type="button" class="btn-secondary" :disabled="busy" @click="edit(active)">Pengaturan</button>
+      <button type="button" class="btn-primary" :disabled="busy || (!active.published && !active.steps.length)" @click="setPublished(active)">{{ active.published ? 'Jadikan draf' : 'Terbitkan' }}</button>
+    </div>
+    <p v-if="active && !active.published && !active.steps.length" class="hint">Tambahkan minimal satu materi sebelum menerbitkan.</p>
+    <div v-if="!selected && !editing" class="catalog">
+      <label :for="`${id}-filter`">Jenjang</label>
+      <select :id="`${id}-filter`" v-model="levelFilter" aria-label="Filter jenjang">
+        <option value="">Semua jenjang</option>
+        <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
+      </select>
+      <p v-if="!visible.length" class="hint">Belum ada modul untuk jenjang ini.</p>
+      <ul class="catalog-list">
+        <li v-for="item in visible" :key="item.id" class="catalog-row">
+          <div><strong>{{ item.title }}</strong>
+            <p class="meta">{{ buildingName(item.building_key) }} · {{ item.level }} · {{ item.steps.length }} langkah</p>
+          </div>
+          <span class="chip">{{ item.published ? 'Terbit' : 'Draf' }}</span>
+          <button type="button" class="btn-secondary" :aria-label="`Buka ${item.title}`" @click="openItem(item)">Buka</button>
+        </li>
+      </ul>
+    </div>
     <form v-if="editing" class="form" novalidate @submit.prevent="save">
       <h3 class="form-title">{{ editing === 'new' ? 'Modul baru' : 'Ubah modul' }}</h3>
       <div class="grid">
@@ -161,15 +234,15 @@ onMounted(async () => {
         <label :for="`${id}-d`">Deskripsi</label>
         <textarea :id="`${id}-d`" v-model="form.description" maxlength="500" rows="2" />
       </div>
-      <label class="check"><input v-model="form.published" type="checkbox" /> Terbitkan untuk peserta</label>
+      <p v-if="editing === 'new'" class="hint">Disimpan sebagai draf. Tambahkan isi, lalu terbitkan.</p>
       <div class="actions">
         <button type="submit" class="btn-primary" :disabled="busy">Simpan</button>
         <button type="button" class="btn-secondary" :disabled="busy" @click="editing = null">Batal</button>
       </div>
     </form>
 
-    <p v-if="!modules.length" class="sub">Belum ada modul. Buat modul pertama.</p>
-    <article v-for="m in modules" :key="m.id" class="module" :aria-labelledby="`${id}-${m.id}`">
+    <p v-if="!selected && !editing && !modules.length" class="sub">Belum ada modul. Buat modul pertama.</p>
+    <article v-for="m in active && !editing ? [active] : []" :key="m.id" class="module" :aria-labelledby="`${id}-${m.id}`">
       <div class="module-head">
         <div>
           <h3 :id="`${id}-${m.id}`">{{ m.title }}</h3>
@@ -178,15 +251,14 @@ onMounted(async () => {
             <span v-if="!m.published" class="chip">Draf</span>
           </p>
         </div>
-        <div class="actions">
-          <button type="button" class="btn-secondary" :disabled="busy" @click="edit(m)">Ubah<span class="sr"> {{ m.title }}</span></button>
+        <div v-if="!preview" class="actions">
           <button type="button" class="btn-secondary" :disabled="busy" @click="archive(m)">Arsipkan<span class="sr"> {{ m.title }}</span></button>
         </div>
       </div>
-      <ol class="steps">
+      <ol v-if="!stepFor" class="steps">
         <li v-for="(s, i) in m.steps" :key="s.id">
-          <span class="step-title"><strong>{{ i + 1 }}. {{ s.title }}</strong> <small>{{ kindLabel[s.kind] }} · {{ s.minutes }} mnt</small></span>
-          <span class="actions">
+          <span class="step-title"><strong>{{ i + 1 }}. {{ s.title }}</strong> <small>{{ kindLabel[s.kind] }} · {{ s.minutes }} mnt</small><p v-if="preview" class="preview-body">{{ s.body }}</p></span>
+          <span v-if="!preview" class="actions">
             <button type="button" class="btn-secondary icon" :disabled="busy || i === 0" :aria-label="`Naikkan ${s.title}`" @click="move(m, i, -1)">↑</button>
             <button type="button" class="btn-secondary icon" :disabled="busy || i === m.steps.length - 1" :aria-label="`Turunkan ${s.title}`" @click="move(m, i, 1)">↓</button>
             <button type="button" class="btn-secondary" :disabled="busy" @click="editStep(m, s)">Ubah<span class="sr"> langkah {{ s.title }}</span></button>
@@ -245,7 +317,7 @@ onMounted(async () => {
           <button type="button" class="btn-secondary" :disabled="busy" @click="stepFor = null">Batal</button>
         </div>
       </form>
-      <button v-else type="button" class="btn-secondary add" :disabled="busy" @click="editStep(m)">+ Langkah<span class="sr"> di {{ m.title }}</span></button>
+      <button v-else-if="!preview" type="button" class="btn-primary add" :disabled="busy" @click="editStep(m)">+ Langkah<span class="sr"> di {{ m.title }}</span></button>
     </article>
 
   </section>
@@ -395,3 +467,5 @@ small {
   }
 }
 </style>
+
+<style scoped src="../styles/authoring.css"></style>

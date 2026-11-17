@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useId } from 'vue'
+import { computed, nextTick, onMounted, ref, useId } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { levels } from '@/api/modules'
 import { quizApi, shapes } from '@/api/quizzes'
-import type { QuestionInput, Quiz, QuizInput, QuizQuestion } from '@/api/types'
+import type { Level, QuestionInput, Quiz, QuizInput, QuizQuestion } from '@/api/types'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Kuis (Q1-01): staff author four-option quizzes per building and level. Started attempts keep
@@ -22,6 +22,33 @@ const fields = ref<Record<string, string>>({})
 const busy = ref(false)
 const message = ref('')
 const error = ref('')
+const levelFilter = ref<Level | ''>('')
+const selected = ref<string | null>(null)
+const visible = computed(() => quizzes.value.filter((item) => !levelFilter.value || item.level === levelFilter.value))
+const active = computed(() => quizzes.value.find((item) => item.id === selected.value))
+const preview = ref(false)
+const editorHeading = ref<HTMLElement | null>(null)
+async function focusEditor() {
+  await nextTick()
+  editorHeading.value?.focus()
+}
+function openItem(item: Quiz) {
+  selected.value = item.id
+  preview.value = false
+  editing.value = null
+  questionFor.value = null
+  fields.value = {}
+  error.value = ''
+  void focusEditor()
+}
+function back() {
+  if ((editing.value || questionFor.value) && !window.confirm('Tutup form tanpa menyimpan perubahan?')) return
+  selected.value = null
+  editing.value = null
+  questionFor.value = null
+  preview.value = false
+}
+
 
 function blank(): QuizInput {
   return { building_key: '', level: 'SD', title: '', description: '', pass_score: 60, published: false }
@@ -60,24 +87,42 @@ async function run(fn: () => Promise<unknown>, done: string) {
 }
 
 function edit(z?: Quiz) {
+  selected.value = z?.id ?? null
+  preview.value = false
   questionFor.value = null
   editing.value = z?.id ?? 'new'
   fields.value = {}
   form.value = z
     ? { building_key: z.building_key, level: z.level, title: z.title, description: z.description, pass_score: z.pass_score, published: z.published }
-    : { ...blank(), building_key: choices.value[0]?.key ?? '' }
+    : { ...blank(), level: levelFilter.value || 'SD', building_key: choices.value[0]?.key ?? '' }
 }
 async function save() {
   const body = form.value
   const ok = await run(
-    () => (editing.value === 'new' ? quizApi.create(props.orgId, body) : quizApi.update(props.orgId, editing.value!, body)),
+    async () => {
+      const saved = editing.value === 'new'
+        ? await quizApi.create(props.orgId, { ...body, published: false })
+        : await quizApi.update(props.orgId, editing.value!, body)
+      selected.value = saved.id
+    },
     `${body.title.trim()} ${body.published ? 'terbit' : 'disimpan sebagai draf'}.`,
   )
-  if (ok) editing.value = null
+  if (ok) {
+    editing.value = null
+    const item = active.value
+    if (item && !item.questions?.length) editQuestion(item)
+    void focusEditor()
+  }
+}
+async function setPublished(item: Quiz) {
+  const { building_key, level, title, description } = item
+  await run(() => quizApi.update(props.orgId, item.id, {
+    building_key, level, title, description, pass_score: item.pass_score, published: !item.published,
+  }), item.published ? 'Kembali menjadi draf.' : 'Kuis diterbitkan.')
 }
 async function archive(z: Quiz) {
   if (!window.confirm(`Arsipkan kuis ${z.title}? Peserta tidak bisa memainkannya lagi; riwayat nilai tetap tersimpan.`)) return
-  await run(() => quizApi.archive(props.orgId, z.id), `${z.title} diarsipkan.`)
+  if (await run(() => quizApi.archive(props.orgId, z.id), `${z.title} diarsipkan.`)) selected.value = null
 }
 
 function editQuestion(z: Quiz, q?: QuizQuestion) {
@@ -120,18 +165,46 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="manager" :aria-labelledby="`${id}-title`">
-    <header class="head">
+  <section class="manager authoring" :aria-labelledby="`${id}-title`">
+    <header v-if="!selected && !editing" class="head">
       <h2 :id="`${id}-title`" class="title">Kuis</h2>
       <button v-if="!editing" type="button" class="btn-primary" :disabled="!choices.length" @click="edit()">+ Kuis baru</button>
     </header>
-    <p class="sub">
+    <p v-if="!selected && !editing" class="sub">
       Soal pilihan ganda tepat 4 pilihan. Server menilai; kunci dan penjelasan terlihat peserta setelah kuis selesai.
       Peserta boleh mengulang; Rapor memakai nilai tertinggi.
     </p>
     <p v-if="message" class="notice" role="status">{{ message }}</p>
-    <p v-if="error" class="alert" role="alert">{{ error }}</p>
+    <p v-if="error" class="alert" role="alert">{{ error }} {{ !editing ? fields.questions : '' }}</p>
 
+    <header v-if="selected || editing" class="editor-head">
+      <button type="button" class="btn-secondary" data-action="back" :disabled="busy" @click="back">Kembali ke daftar</button>
+      <h3 ref="editorHeading" class="editor-title" tabindex="-1">{{ active?.title || 'Kuis baru' }}</h3>
+      <span v-if="active" class="chip">{{ active.published ? 'Terbit' : 'Draf' }}</span>
+    </header>
+    <div v-if="active && !editing && !questionFor" class="editor-actions actions">
+      <button type="button" class="btn-secondary" :aria-pressed="preview" @click="preview = !preview">{{ preview ? 'Kembali menyusun' : 'Pratinjau isi' }}</button>
+      <button type="button" class="btn-secondary" :disabled="busy" @click="edit(active)">Pengaturan</button>
+      <button type="button" class="btn-primary" :disabled="busy || (!active.published && !active.question_count)" @click="setPublished(active)">{{ active.published ? 'Jadikan draf' : 'Terbitkan' }}</button>
+    </div>
+    <p v-if="active && !active.published && !active.question_count" class="hint">Tambahkan minimal satu soal sebelum menerbitkan.</p>
+    <div v-if="!selected && !editing" class="catalog">
+      <label :for="`${id}-filter`">Jenjang</label>
+      <select :id="`${id}-filter`" v-model="levelFilter" aria-label="Filter jenjang">
+        <option value="">Semua jenjang</option>
+        <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
+      </select>
+      <p v-if="!visible.length" class="hint">Belum ada kuis untuk jenjang ini.</p>
+      <ul class="catalog-list">
+        <li v-for="item in visible" :key="item.id" class="catalog-row">
+          <div><strong>{{ item.title }}</strong>
+            <p class="meta">{{ buildingName(item.building_key) }} · {{ item.level }} · {{ item.question_count }} soal · lulus {{ item.pass_score }}</p>
+          </div>
+          <span class="chip">{{ item.published ? 'Terbit' : 'Draf' }}</span>
+          <button type="button" class="btn-secondary" :aria-label="`Buka ${item.title}`" @click="openItem(item)">Buka</button>
+        </li>
+      </ul>
+    </div>
     <form v-if="editing" class="form" novalidate @submit.prevent="save">
       <h3 class="form-title">{{ editing === 'new' ? 'Kuis baru' : 'Ubah kuis' }}</h3>
       <div class="grid">
@@ -154,7 +227,7 @@ onMounted(async () => {
           :aria-invalid="!!fields.pass_score" />
         <p :class="fields.pass_score ? 'field-error' : 'hint'">{{ fields.pass_score || 'Nilai 0–100. Lulus juga menyelesaikan langkah modul yang memakai kuis ini.' }}</p>
       </div>
-      <label class="check"><input v-model="form.published" type="checkbox" /> Terbitkan untuk peserta</label>
+      <p v-if="editing === 'new'" class="hint">Disimpan sebagai draf. Tambahkan isi, lalu terbitkan.</p>
       <p v-if="fields.questions" class="field-error">{{ fields.questions }}</p>
       <div class="actions">
         <button type="submit" class="btn-primary" :disabled="busy">Simpan</button>
@@ -162,8 +235,8 @@ onMounted(async () => {
       </div>
     </form>
 
-    <p v-if="!quizzes.length" class="sub">Belum ada kuis. Buat kuis pertama.</p>
-    <article v-for="z in quizzes" :key="z.id" class="quiz" :aria-labelledby="`${id}-${z.id}`">
+    <p v-if="!selected && !editing && !quizzes.length" class="sub">Belum ada kuis. Buat kuis pertama.</p>
+    <article v-for="z in active && !editing ? [active] : []" :key="z.id" class="quiz" :aria-labelledby="`${id}-${z.id}`">
       <div class="quiz-head">
         <div>
           <h3 :id="`${id}-${z.id}`">{{ z.title }}</h3>
@@ -172,22 +245,21 @@ onMounted(async () => {
             <span v-if="!z.published" class="chip">Draf</span>
           </p>
         </div>
-        <div class="actions">
-          <button type="button" class="btn-secondary" :disabled="busy" @click="edit(z)">Ubah<span class="sr"> {{ z.title }}</span></button>
+        <div v-if="!preview" class="actions">
           <button type="button" class="btn-secondary" :disabled="busy" @click="archive(z)">Arsipkan<span class="sr"> {{ z.title }}</span></button>
         </div>
       </div>
-      <ol class="questions">
+      <ol v-if="!questionFor" class="questions">
         <li v-for="(q, i) in z.questions ?? []" :key="q.id">
           <div class="question-text">
             <strong>{{ i + 1 }}. {{ q.prompt }}</strong>
-            <ul class="options">
+            <ul v-if="preview" class="options">
               <li v-for="(o, oi) in q.options" :key="oi" :class="{ correct: oi === q.answer }">
                 <span aria-hidden="true">{{ shapes[oi]!.symbol }}</span> {{ o }}<span v-if="oi === q.answer"> (jawaban benar)</span>
               </li>
             </ul>
           </div>
-          <span class="actions">
+          <span v-if="!preview" class="actions">
             <button type="button" class="btn-secondary icon" :disabled="busy || i === 0" :aria-label="`Naikkan ${q.prompt}`" @click="move(z, i, -1)">↑</button>
             <button type="button" class="btn-secondary icon" :disabled="busy || i === (z.questions?.length ?? 0) - 1" :aria-label="`Turunkan ${q.prompt}`" @click="move(z, i, 1)">↓</button>
             <button type="button" class="btn-secondary" :disabled="busy" @click="editQuestion(z, q)">Ubah<span class="sr"> soal {{ q.prompt }}</span></button>
@@ -204,22 +276,24 @@ onMounted(async () => {
           <legend>Pilihan (tandai jawaban benar)</legend>
           <div v-for="(_, oi) in question.options" :key="oi" class="option-row">
             <input :id="`${id}-qa${oi}`" v-model="question.answer" type="radio" :name="`${id}-answer`" :value="oi"
-              :aria-label="`Jawaban benar: pilihan ${shapes[oi]!.name}`" />
-            <label :for="`${id}-qo${oi}`" class="shape-label"><span aria-hidden="true">{{ shapes[oi]!.symbol }}</span> {{ shapes[oi]!.name }}</label>
+              :aria-label="`Jawaban benar: pilihan ${String.fromCharCode(65 + oi)}`" />
+            <label :for="`${id}-qo${oi}`" class="shape-label"><span aria-hidden="true">{{ shapes[oi]!.symbol }}</span> {{ String.fromCharCode(65 + oi) }}</label>
             <input :id="`${id}-qo${oi}`" v-model="question.options[oi]" type="text" maxlength="200" :aria-invalid="!!fields.options" />
           </div>
         </fieldset>
         <p v-if="fields.options" class="field-error">{{ fields.options }}</p>
         <p v-if="fields.answer" class="field-error">{{ fields.answer }}</p>
-        <label :for="`${id}-qe`">Penjelasan (opsional, tampil setelah kuis selesai)</label>
-        <textarea :id="`${id}-qe`" v-model="question.explanation" maxlength="500" rows="2" />
+        <details class="feedback"><summary>Penjelasan jawaban (opsional)</summary>
+          <label :for="`${id}-qe`">Tampil setelah kuis selesai</label>
+          <textarea :id="`${id}-qe`" v-model="question.explanation" maxlength="500" rows="2" />
+        </details>
         <p v-if="fields.questions" class="field-error">{{ fields.questions }}</p>
         <div class="actions">
           <button type="submit" class="btn-primary" :disabled="busy">Simpan soal</button>
           <button type="button" class="btn-secondary" :disabled="busy" @click="questionFor = null">Batal</button>
         </div>
       </form>
-      <button v-else type="button" class="btn-secondary add" :disabled="busy" @click="editQuestion(z)">+ Soal<span class="sr"> di {{ z.title }}</span></button>
+      <button v-else-if="!preview" type="button" class="btn-primary add" :disabled="busy" @click="editQuestion(z)">+ Soal<span class="sr"> di {{ z.title }}</span></button>
     </article>
   </section>
 </template>
@@ -410,3 +484,5 @@ onMounted(async () => {
   }
 }
 </style>
+
+<style scoped src="../styles/authoring.css"></style>

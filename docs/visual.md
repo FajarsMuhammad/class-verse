@@ -178,6 +178,26 @@ Ukuran proporsional ala Gather. Token di `tokens.css`; komponen baru wajib memak
 | Kartu | Putih, radius 24 (20 di HP), padding 14–28 |
 | Input chat | Di dalam composer bergaris 1 px radius 12, tinggi 36, label tersembunyi untuk screen reader |
 
+### Penyusunan modul dan kuis — pola LMS
+
+- Daftar awal berupa baris judul, gedung, jenjang, jumlah isi, status Draf/Terbit, dan **Buka**.
+  Filter **Jenjang** berisi Semua jenjang dan level yang sudah didukung. Filter tetap saat kembali
+  dari penyusun; membuat item baru mengikuti jenjang filter (default SD bila Semua jenjang).
+- **Buka** menampilkan satu item saja. **Kembali ke daftar** keluar dari penyusun; jika form masih
+  terbuka, minta konfirmasi sebelum membuang perubahan. Daftar tidak memuat seluruh soal/langkah.
+- Item baru selalu draf. Setelah menyimpan identitas, langsung buka form soal/materi pertama jika
+  isinya kosong. Satu form isi aktif; daftar isi disembunyikan selama mengisi form.
+- Kuis: pertanyaan, pilihan A–D, radio jawaban benar, penjelasan opsional yang bisa dibuka.
+  Daftar soal hanya ringkasan, tanpa membentangkan semua opsi. Modul: daftar urut materi dengan
+  jenis dan durasi; form hanya memperlihatkan field sesuai jenis materi.
+- **Pengaturan** menyunting identitas (dan nilai lulus untuk kuis). **Terbitkan** terpisah dari simpan
+  form, tidak tersedia untuk item kosong. Validasi server tetap berlaku. **Jadikan draf** menyembunyikan
+  item terbit dari katalog peserta; riwayat hasil tidak dihapus.
+- **Pratinjau isi** adalah ringkasan baca-saja isi tersimpan, bukan simulasi attempt: soal beserta
+  kunci untuk guru, atau teks materi modul. Pemutar berkas/video dan pengerjaan kuis tetap di alur peserta.
+- Gaya bersama penyusun berada di `src/styles/authoring.css`; gunakan ulang pola daftar → satu item →
+  satu form. Jangan kembali ke kartu bersarang yang membuka semua isi sekaligus.
+
 ## Aturan aksesibilitas
 
 - Layar sentuh: semua yang bisa diketuk minimal 44×44 px. Mouse/trackpad: 36 px (lihat Kontrol ringkas), minimal 24 px.
