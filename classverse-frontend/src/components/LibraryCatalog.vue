@@ -142,7 +142,7 @@ const shelfLabel = (key: string) => shelves.find((s) => s.key === key)?.label ??
   min-height: 0;
 }
 .search {
-  min-height: 44px;
+  min-height: var(--touch-min);
   padding: 0 var(--space-3);
   border: 2px solid var(--color-input-border);
   border-radius: var(--radius-lg);
@@ -154,7 +154,7 @@ const shelfLabel = (key: string) => shelves.find((s) => s.key === key)?.label ??
   gap: var(--space-2);
 }
 .shelf {
-  min-height: 44px;
+  min-height: var(--touch-min);
   padding: 0 var(--space-3);
   border: none;
   border-radius: var(--radius-pill);
@@ -194,7 +194,7 @@ const shelfLabel = (key: string) => shelves.find((s) => s.key === key)?.label ??
   color: var(--color-ink-muted);
 }
 .act {
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .results {
   display: flex;

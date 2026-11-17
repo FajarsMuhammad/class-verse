@@ -144,21 +144,34 @@ status terpilih memakai radio/border selain warna. Phaser memakai aset yang sama
 
 ## Komponen dasar
 
+### Kontrol ringkas (berlaku untuk semua UI, mulai 2026-11, referensi `reff-design-4.png`)
+
+Ukuran proporsional ala Gather. Token di `tokens.css`; komponen baru wajib memakainya, tanpa angka tinggi tetap.
+
+- `--touch-min` = tinggi kontrol. Pointer non-sentuh (mouse/trackpad): **36 px** (`--control-h`);
+  layar sentuh (`pointer: coarse`): tetap **44 px**. Jangan tulis `44px`/`48px` langsung.
+- `--control-sm` 32 px: tombol tutup/ghost, tab segmen, aksi baris sekunder. `--control-radius` 10 px.
+- Tombol `.btn-primary`/`.btn-secondary`: teks 13 px semibold, padding 16, garis 1 px `--kv-line`, hover lembut.
+- Tab = segmented control (track `--color-surface-alt`, tab aktif chip putih). Composer = satu field bergaris
+  dengan tombol kirim 36 px di dalamnya. Kartu mengambang: `--kv-shadow-float`, ikon badge 28 px.
+- Info orang online **hanya di Chat** (bagian "n orang online" yang bisa dibuka), tidak di peta/panel lain.
+- Target tetap ≥24 px (WCAG 2.2 AA 2.5.8); fokus terlihat wajib.
+
 | Komponen | Spesifikasi |
 | --- | --- |
-| Tombol utama | Tinggi 48, radius 16, latar Nila, teks putih Nunito 700 15–16 px |
-| Tombol sekunder | Tinggi 44–48, border 2 px `--color-border`, latar putih, teks Tinta |
-| Tombol ikon (mic, kirim) | 44×44 (52 di toolbar ruang), wajib `aria-label`; mic bulat Tinta, ikon garis |
+| Tombol utama | Tinggi `--touch-min` (36 desktop/44 sentuh), radius 10, latar Nila, teks putih 13 px 600 |
+| Tombol sekunder | Tinggi `--touch-min`, border 1 px `--kv-line`, latar putih, teks Tinta |
+| Tombol ikon (mic, kirim) | Persegi `--touch-min`, wajib `aria-label`; mic bulat Tinta, ikon garis |
 | Chip zona | Pill tinggi 36–44, aktif: latar `--color-accent-soft`, border Mangga, teks `--color-accent-ink` |
 | Badge | Pill kecil 12–13 px: live (hijau), jadwal (Mangga), info (Nila lembut) |
 | Bubble chat | Orang lain: `--color-surface-alt`, sudut kiri-bawah 6 px; sendiri: Nila, teks putih, sudut kanan-bawah 6 px; nama pengirim 13 px di atasnya |
 | Banner broadcast | Latar `--color-primary-soft`, teks `--color-primary-strong` 600, di atas chat |
 | Kartu | Putih, radius 24 (20 di HP), padding 14–28 |
-| Input chat | Tinggi 44, border 2 px `--color-input-border`, radius 14, label tersembunyi untuk screen reader |
+| Input chat | Di dalam composer bergaris 1 px radius 12, tinggi 36, label tersembunyi untuk screen reader |
 
 ## Aturan aksesibilitas
 
-- Semua yang bisa diketuk minimal 44×44 px.
+- Layar sentuh: semua yang bisa diketuk minimal 44×44 px. Mouse/trackpad: 36 px (lihat Kontrol ringkas), minimal 24 px.
 - Kontras teks minimal 4.5:1, termasuk label abu-abu kecil (`--color-ink-muted` sudah lolos di atas putih dan Kabut).
 - Pakai elemen asli (`<button>`, `<a>`, `<input>` + `<label>`), bukan `div` yang diberi click handler.
 - Warna yang harus dibedakan juga berbeda terang-gelapnya, bukan hanya hue.
@@ -204,10 +217,11 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   Kuis, Kelas, Tugas, Ruang (termasuk undangan), Buku perpustakaan, Berkas. Kontrol sesi juga di Kelola.
   Modul berisi pengelola modul (dibatasi `perpus` di Perpustakaan), dan kartu **Sematkan di ruang ini**
   pada interior. Tidak ada bilah sematan di atas peta.
-- Header aplikasi dan header peta guru desktop dihapus. Peta memenuhi tinggi viewport dengan sela 4 px;
+- Header aplikasi dan header peta desktop dihapus **untuk guru dan peserta** (workspace sama). Peta memenuhi tinggi viewport dengan sela 4 px;
   menu awal ciut jika belum ada preferensi. Akun di bawah rel menyimpan Profil, Ganti sekolah, Moderasi,
-  Keluar akun. Identitas Kelasverse di atas rel kembali ke peta. Daftar gedung dan daftar orang ada di panel Peta.
-  Header halaman non-peta, peserta dan mode HP tetap.
+  Keluar akun (peserta: + Rapor; Moderasi hanya staf). Identitas Kelasverse di atas rel kembali ke peta.
+  Daftar gedung di panel Peta/Belajar; daftar orang online di Chat. "Keluar ruang" ada di panel Peta/Belajar.
+  Header halaman non-peta dan mode HP tetap.
 - Bingkai hitam luar interior dihapus; warna dinding luar memakai `--kv-map-ground` agar menyatu dengan
   viewport. Lantai, furnitur, pintu dan collision tidak berubah.
 - Avatar keluar otomatis saat kembali ke pintu interior: setelah berjarak >56 px dari pintu, masuk radius

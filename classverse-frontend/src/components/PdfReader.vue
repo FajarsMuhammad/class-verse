@@ -163,7 +163,7 @@ onBeforeUnmount(() => {
 }
 .bar button,
 .jump input {
-  min-height: 44px;
+  min-height: var(--touch-min);
   min-width: 44px;
 }
 .jump input {

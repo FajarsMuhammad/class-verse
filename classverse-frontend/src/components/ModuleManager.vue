@@ -332,7 +332,7 @@ small {
 }
 .actions button,
 .add {
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .icon {
   min-width: 44px;
@@ -365,14 +365,14 @@ small {
 .grid input,
 .grid select,
 .grid textarea {
-  min-height: 44px;
+  min-height: var(--touch-min);
   font: inherit;
 }
 .check {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .check input {
   width: 22px;

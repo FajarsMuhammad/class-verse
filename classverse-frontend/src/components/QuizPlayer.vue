@@ -231,7 +231,7 @@ h3 {
   justify-content: flex-end;
   margin-top: var(--space-5);
 }
-.controls button { min-height: 44px; }
+.controls button { min-height: var(--touch-min); }
 .finish { margin-left: auto; }
 .result .score { margin-top: var(--space-4); font-size: var(--text-2xl); color: var(--kv-star-text); }
 .result .score.passed { color: var(--kv-subject-ipa); }

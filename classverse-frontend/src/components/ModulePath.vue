@@ -172,7 +172,7 @@ function closed(position: number) {
   gap: var(--space-2);
 }
 .level {
-  min-height: 44px;
+  min-height: var(--touch-min);
   padding: 0 var(--space-3);
   border: none;
   border-radius: var(--radius-pill);
@@ -231,7 +231,7 @@ function closed(position: number) {
   gap: var(--space-2);
 }
 .complete {
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .complete[aria-pressed='true'] {
   background: var(--color-primary-soft);
@@ -285,7 +285,7 @@ function closed(position: number) {
 }
 .open {
   flex: none;
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .auto {
   margin: 0;
@@ -322,7 +322,7 @@ function closed(position: number) {
   color: var(--kv-surface);
   font-weight: var(--weight-bold);
 }
-.quiz-card .btn-primary { flex: none; min-height: 44px; }
+.quiz-card .btn-primary { flex: none; min-height: var(--touch-min); }
 .sr {
   position: absolute;
   width: 1px;

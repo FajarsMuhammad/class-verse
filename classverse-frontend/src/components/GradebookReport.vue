@@ -137,7 +137,7 @@ h1, h2, h3 { font-family: var(--font-display); }
 .muted { color: var(--color-ink-muted); }
 .filters { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: end; margin-block: var(--space-4); }
 label { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-width: min(100%, 180px); }
-input, select, button { font: inherit; min-height: 44px; max-width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-surface); box-sizing: border-box; }
+input, select, button { font: inherit; min-height: var(--touch-min); max-width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-ink); background: var(--color-surface); box-sizing: border-box; }
 button { cursor: pointer; } button:disabled { opacity: .6; cursor: not-allowed; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }

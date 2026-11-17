@@ -240,14 +240,14 @@ onMounted(() => load())
 }
 .grid input,
 .grid select {
-  min-height: 44px;
+  min-height: var(--touch-min);
   font: inherit;
 }
 .check {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .check input {
   width: 22px;

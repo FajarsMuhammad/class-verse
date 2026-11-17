@@ -316,7 +316,7 @@ onMounted(async () => {
 }
 .actions button,
 .add {
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .icon {
   min-width: 44px;
@@ -353,7 +353,7 @@ onMounted(async () => {
 .form input,
 .form select,
 .form textarea {
-  min-height: 44px;
+  min-height: var(--touch-min);
   font: inherit;
 }
 .options-edit {
@@ -381,7 +381,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .check input {
   width: 22px;

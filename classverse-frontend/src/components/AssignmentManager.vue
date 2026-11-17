@@ -120,7 +120,7 @@ onMounted(() => {
 h2, h3 { font-family: var(--font-display); }
 fieldset { display: flex; flex-wrap: wrap; gap: var(--space-4); border: 0; padding: 0; min-width: 0; }
 label { display: flex; flex: 1; flex-direction: column; gap: var(--space-2); min-width: min(100%, 200px); }
-input, select, button { min-height: 44px; font: inherit; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2); max-width: 100%; color: var(--color-ink); background: var(--color-surface); box-sizing: border-box; }
+input, select, button { min-height: var(--touch-min); font: inherit; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2); max-width: 100%; color: var(--color-ink); background: var(--color-surface); box-sizing: border-box; }
 button { cursor: pointer; } button:disabled { opacity: .6; cursor: not-allowed; }
 li { margin-block: var(--space-4); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }

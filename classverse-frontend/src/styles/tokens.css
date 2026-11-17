@@ -183,6 +183,13 @@
   --control-radius: 10px;
 }
 
+/* Proportional UI everywhere (docs/visual.md "Kontrol ringkas"): with anything but a touch pointer (mouse/trackpad)
+   every control that sizes itself with --touch-min shrinks to the compact height. Touch screens keep 44px.
+   WCAG 2.2 AA target size (24px) is still met. */
+@media not all and (pointer: coarse) {
+  :root { --touch-min: var(--control-h); }
+}
+
 html {
   font-family: var(--font-body);
   color: var(--color-ink);

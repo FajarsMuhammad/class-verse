@@ -89,7 +89,7 @@ onMounted(load)
 .tasks { padding: var(--space-4); background: var(--color-surface); border: 2px solid var(--color-border); border-radius: var(--radius-lg); min-width: 0; }
 header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 h3, h4 { font-family: var(--font-display); margin-block: var(--space-2); }
-button { min-height: 44px; font: inherit; color: var(--color-ink); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2); cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+button { min-height: var(--touch-min); font: inherit; color: var(--color-ink); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2); cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
 button:disabled { opacity: .6; cursor: not-allowed; }
 .task-list { padding: 0; list-style: none; }
 .task-list button { display: flex; flex-direction: column; gap: var(--space-2); text-align: left; width: 100%; margin-block: var(--space-2); }

@@ -14,5 +14,8 @@ describe('MVP 2 design tokens', () => {
     expect(css).toContain('--font-body: var(--kv-font-ui)')
     expect(css).toContain('--color-primary: var(--kv-primary)')
     expect(css).toContain('--touch-min: 44px')
+    // Proportional controls with a mouse; touch keeps 44px.
+    expect(css).toContain('--control-h: 36px')
+    expect(css).toMatch(/@media not all and \(pointer: coarse\) \{\s*:root \{ --touch-min: var\(--control-h\); \}/)
   })
 })

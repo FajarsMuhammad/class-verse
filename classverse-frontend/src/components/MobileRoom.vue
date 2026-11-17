@@ -465,7 +465,7 @@ h2 {
 }
 .modules-btn {
   width: 100%;
-  min-height: 44px;
+  min-height: var(--touch-min);
   margin-top: var(--space-2);
 }
 .sr {

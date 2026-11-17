@@ -189,7 +189,7 @@ small {
   font-weight: var(--weight-semibold);
 }
 input {
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 progress {
   width: 100%;

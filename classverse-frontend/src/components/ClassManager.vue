@@ -190,7 +190,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 label { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .row, .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: end; }
 .row { margin-block: var(--space-4); }
-input, select, button { font: inherit; min-height: 44px; border: 1px solid var(--color-ink); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); max-width: 100%; box-sizing: border-box; }
+input, select, button { font: inherit; min-height: var(--touch-min); border: 1px solid var(--color-ink); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); max-width: 100%; box-sizing: border-box; }
 input, select { background: var(--color-surface); color: var(--color-ink); }
 button { cursor: pointer; color: var(--color-ink); background: var(--color-surface); }
 button:disabled { opacity: .6; cursor: not-allowed; }

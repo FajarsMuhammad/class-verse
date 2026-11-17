@@ -122,7 +122,7 @@ const status = computed(() => {
   color: var(--color-live-ink);
 }
 .act {
-  min-height: 44px;
+  min-height: var(--touch-min);
 }
 .sr {
   position: absolute;
