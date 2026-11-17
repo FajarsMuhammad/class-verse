@@ -117,5 +117,5 @@ li {
 }
 li > strong, li > span { grid-column: 1; }
 li > span { margin: 0; }
-li > button { grid-column: 2; grid-row: 1 / span 3; padding-inline: var(--space-3); font-size: var(--text-sm); }
+li > button { grid-column: 2; grid-row: 1 / span 3; min-height: 0; height: 32px; padding: 0 var(--space-3); border-radius: 10px; font-size: var(--text-xs); font-weight: var(--weight-semibold); }
 </style>

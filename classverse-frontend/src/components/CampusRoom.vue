@@ -843,7 +843,9 @@ h1 {
 .dropdown-head { margin-bottom: var(--space-2); }
 /* The header already names the building; DoorRooms keeps its heading for screen readers. */
 .buildings :deep(#door-title) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.dropdown-head .close { flex: none; min-width: var(--touch-min); padding: 0; }
+.dropdown-head .close { flex: none; min-width: 32px; min-height: 32px; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; color: var(--color-ink-muted); }
+.dropdown-head .close:hover { background: var(--color-primary-soft); }
+.dropdown-head h2 { font-size: var(--text-sm); }
 .buildings {
   background: var(--color-surface);
   border-radius: var(--kv-radius-card);

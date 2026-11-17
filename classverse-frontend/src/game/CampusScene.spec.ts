@@ -4,7 +4,15 @@ import { CampusScene, clampCentre } from './CampusScene'
 import { findPath } from '@/realtime/pathfind'
 
 vi.mock('phaser', () => ({ default: { Scene: class {} } }))
-vi.mock('@/realtime/pathfind', () => ({ findPath: vi.fn<() => { x: number; y: number }[]>(() => [{ x: 90, y: 90 }]) }))
+vi.mock('./roomLayout', () => ({
+  roomLayout: () => null,
+  stationAt: (_k: string, x: number) => (x > 500 ? { id: 'st-1' } : undefined),
+  shelfAt: () => undefined,
+}))
+vi.mock('@/realtime/pathfind', () => ({
+  findPath: vi.fn<() => { x: number; y: number }[]>(() => [{ x: 90, y: 90 }]),
+  nearestOpen: (_m: unknown, to: { x: number; y: number }) => to,
+}))
 
 type InputScene = {
   deps: unknown
@@ -84,8 +92,30 @@ it('double-clicking a building walks to its door; slow second click only selects
   click(pointer(1000, 210, 210))
   click(pointer(1600, 212, 210))
   expect(walkToBuilding).not.toHaveBeenCalled()
-  click(pointer(1800, 214, 212))
+  // The second click reuses the first target even if the map moved under the pointer.
+  click({ ...pointer(1800, 214, 212), worldX: 5, worldY: 5 } as Phaser.Input.Pointer)
   expect(walkToBuilding).toHaveBeenCalledWith('sains')
-  expect(selectBuilding).toHaveBeenCalledTimes(3)
+  expect(selectBuilding).toHaveBeenCalledTimes(2)
   expect(findPath).not.toHaveBeenCalled()
+})
+
+it('double-clicking a station in a room selects it and walks next to it', () => {
+  const selectStation = vi.fn<(id: string) => void>()
+  scene.deps = { ...(scene.deps as object), world: { self: { x: 10, y: 10 }, mapKey: 'sains' }, selectStation }
+  click(pointer(1000, 600, 90))
+  expect(selectStation).not.toHaveBeenCalled() // waits: a panel opening would move the map
+  click(pointer(1200, 602, 90))
+  expect(selectStation).toHaveBeenCalledTimes(1)
+  expect(findPath).toHaveBeenCalledTimes(1)
+})
+
+it('a single station click selects after the double-click window', () => {
+  vi.useFakeTimers()
+  const selectStation = vi.fn<(id: string) => void>()
+  scene.deps = { ...(scene.deps as object), world: { self: { x: 10, y: 10 }, mapKey: 'sains' }, selectStation }
+  click(pointer(1000, 600, 90))
+  vi.advanceTimersByTime(400)
+  expect(selectStation).toHaveBeenCalledWith('st-1')
+  expect(findPath).not.toHaveBeenCalled()
+  vi.useRealTimers()
 })

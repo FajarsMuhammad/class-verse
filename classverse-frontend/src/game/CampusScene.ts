@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 import type { MapData } from '@/realtime/mapdata'
 import { directionOf, moveToward, SEND_INTERVAL_MS, step, type Vec } from '@/realtime/movement'
 import type { Direction, MoveMsg } from '@/realtime/messages'
-import { findPath } from '@/realtime/pathfind'
+import { findPath, nearestOpen } from '@/realtime/pathfind'
 import { roomLayout, shelfAt, stationAt } from './roomLayout'
 import { drawStations } from './stationArt'
 import type { World } from '@/realtime/world'
@@ -72,7 +72,8 @@ export class CampusScene extends Phaser.Scene {
     Phaser.Input.Keyboard.Key
   >
   private path: Vec[] = []
-  private lastClick: { time: number; x: number; y: number; building?: string } | null = null
+  private lastClick: { time: number; x: number; y: number; world: Vec; building?: string } | null = null
+  private pendingSelect: { run: () => void; timer: ReturnType<typeof setTimeout> } | null = null
   // Campus camera: fixed (no follow); the user pans it by dragging.
   private centre: Vec | null = null
   private press: { x: number; y: number; centre: Vec; dragged: boolean } | null = null
@@ -123,7 +124,11 @@ export class CampusScene extends Phaser.Scene {
     }
     this.fitCamera()
     this.scale.on('resize', this.fitCamera, this)
-    this.events.once('shutdown', () => this.scale.off('resize', this.fitCamera, this))
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', this.fitCamera, this)
+      if (this.pendingSelect) clearTimeout(this.pendingSelect.timer)
+      this.pendingSelect = null
+    })
 
     if (!newArt) for (const b of map.buildings)
       this.labels.push(this.buildingLabel(b.name, b.x + b.w / 2, b.y, b.staffOnly))
@@ -211,41 +216,61 @@ export class CampusScene extends Phaser.Scene {
     cam.centerOn(this.centre.x, this.centre.y)
   }
 
+  // onClick: one click selects a building/station/shelf. A double click (two clicks within
+  // DOUBLE_CLICK_MS and DOUBLE_CLICK_PX on screen) walks: to the building door, next to the
+  // station/shelf, or to the floor point. The second click reuses the first click's world target
+  // because the first may open a panel that resizes the map under the pointer. Room
+  // stations/shelves open a side panel that moves the map, so their selection waits
+  // DOUBLE_CLICK_MS (or runs at once on the double click).
   private onClick(p: Phaser.Input.Pointer) {
     const self = this.deps.world.self
     if (!self) return
-    const to = { x: Math.round(p.worldX), y: Math.round(p.worldY) }
-    if (this.deps.world.mapKey === 'campus') {
-      const building = this.deps.map.buildings.find((b) =>
-        to.x >= b.x && to.x < b.x+b.w && to.y >= b.y && to.y < b.y+b.h)
-      if (building && this.deps.selectBuilding) {
-        const last = this.lastClick
-        const double = last?.building === building.key && p.downTime - last.time <= DOUBLE_CLICK_MS
-        this.lastClick = double ? null : { time: p.downTime, x: p.x, y: p.y, building: building.key }
-        this.path = []
-        this.deps.selectBuilding(building.key)
-        if (double) this.deps.walkToBuilding?.(building.key)
-        return
-      }
-    }
-    const station = this.deps.selectStation && stationAt(this.deps.world.mapKey ?? '', to.x, to.y)
-    if (station) {
-      this.lastClick = null
-      this.deps.selectStation!(station.id)
-      return
-    }
-    const cat = this.deps.selectShelf && shelfAt(this.deps.world.mapKey ?? '', to.x, to.y)
-    if (cat) {
-      this.lastClick = null
-      this.deps.selectShelf!(cat)
-      return
-    }
     const last = this.lastClick
-    this.lastClick = { time: p.downTime, x: p.x, y: p.y }
-    if (!last || last.building || p.downTime - last.time > DOUBLE_CLICK_MS ||
-      Math.hypot(p.x - last.x, p.y - last.y) > DOUBLE_CLICK_PX) return
-    this.lastClick = null
-    this.path = findPath(this.deps.map, self, to, this.tablePenalty(self, to))
+    if (last && p.downTime - last.time <= DOUBLE_CLICK_MS && Math.hypot(p.x - last.x, p.y - last.y) <= DOUBLE_CLICK_PX) {
+      this.lastClick = null
+      this.flushSelect()
+      if (last.building) this.deps.walkToBuilding?.(last.building)
+      else this.walkNear(self, last.world)
+      return
+    }
+    const to = { x: Math.round(p.worldX), y: Math.round(p.worldY) }
+    this.lastClick = { time: p.downTime, x: p.x, y: p.y, world: to }
+    const mapKey = this.deps.world.mapKey ?? ''
+    const building = mapKey === 'campus' && this.deps.selectBuilding
+      ? this.deps.map.buildings.find((b) => to.x >= b.x && to.x < b.x+b.w && to.y >= b.y && to.y < b.y+b.h)
+      : undefined
+    if (building) {
+      this.lastClick.building = building.key
+      this.path = []
+      this.deps.selectBuilding!(building.key)
+      return
+    }
+    const station = this.deps.selectStation && stationAt(mapKey, to.x, to.y)
+    this.flushSelect()
+    if (station) {
+      this.deferSelect(() => this.deps.selectStation!(station.id))
+      return
+    }
+    const cat = this.deps.selectShelf && shelfAt(mapKey, to.x, to.y)
+    if (cat) this.deferSelect(() => this.deps.selectShelf!(cat))
+  }
+
+  private deferSelect(run: () => void) {
+    this.pendingSelect = { run, timer: setTimeout(() => this.flushSelect(), DOUBLE_CLICK_MS) }
+  }
+
+  private flushSelect() {
+    const pending = this.pendingSelect
+    if (!pending) return
+    this.pendingSelect = null
+    clearTimeout(pending.timer)
+    pending.run()
+  }
+
+  // walkNear paths to `to`, or to the closest free tile when it is furniture.
+  private walkNear(self: Vec, to: Vec) {
+    const goal = nearestOpen(this.deps.map, to)
+    this.path = goal ? findPath(this.deps.map, self, goal, this.tablePenalty(self, goal)) : []
   }
 
   update(time: number, delta: number) {
