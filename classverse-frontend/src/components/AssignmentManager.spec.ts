@@ -14,7 +14,7 @@ beforeEach(() => {
   sessionStorage.clear()
   vi.mocked(assignmentApi.list).mockResolvedValue({ items: [] })
   vi.mocked(classApi.years).mockResolvedValue({ items: [{ id: 'y', label: '2026/2027', active: true }] })
-  vi.mocked(classApi.classes).mockResolvedValue({ items: [{ id: 'c', academic_year_id: 'y', name: 'XI', students: 1 }] })
+  vi.mocked(classApi.classes).mockResolvedValue({ items: [{ id: 'c', academic_year_id: 'y', name: 'XI', students: 1, subject_teachers: 0, homeroom: null, my_role: null }] })
   vi.mocked(moduleApi.list).mockResolvedValue({ items: [{ id: 'm', published: true, title: 'Modul', steps: [{ id: 's' }] }] } as Awaited<ReturnType<typeof moduleApi.list>>)
 })
 it('retries uncertain issuance with the same client ID and locks payload edits', async () => {

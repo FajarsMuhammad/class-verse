@@ -1258,10 +1258,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa. */
+        /** @description Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa, wali kelas, jumlah guru mapel dan peran pemanggil; kelas yang diajar pemanggil lebih dulu. */
         get: operations["listClasses"];
         put?: never;
-        /** @description Pengajar/admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu. */
+        /** @description Admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu. */
         post: operations["createClass"];
         delete?: never;
         options?: never;
@@ -1279,7 +1279,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description Pengajar/admin. Semua anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan). */
+        /** @description Pengajar/admin. Satu halaman anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan). */
         get: operations["listRoster"];
         put?: never;
         post?: never;
@@ -1302,12 +1302,147 @@ export interface paths {
         };
         get?: never;
         /**
-         * @description Pengajar/admin. Menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
+         * @description Admin menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
          *     ditutup, riwayat tetap). `class_id: null` mengeluarkan dari kelas. Hanya anggota berperan peserta.
+         *     Wali kelas hanya menambah siswa tanpa kelas ke kelasnya (409 `has_class` bila sudah punya kelas) dan
+         *     mengeluarkan siswa kelasnya; selain itu 403.
          */
         put: operations["placeStudent"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Pindah massal 1–50 peserta ke satu kelas (`class_id: null` = keluarkan), satu transaksi; hak sama dengan
+         *     placeStudent. Siswa yang gagal dilaporkan per item (`not_student`, `has_class`), sisanya tetap dipindah.
+         */
+        post: operations["moveStudents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Admin. Menyalin kelas aktif tahun sumber ke tahun ini; nama yang sudah ada dilewati dan dilaporkan.
+         *     `teachers: true` ikut menyalin wali kelas/guru mapel yang masih pengajar sekolah. Siswa tidak ikut.
+         */
+        post: operations["copyYearClasses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Admin. Naik kelas: siswa aktif tiap kelas sumber (tahun `from_year_id`) ditempatkan ke kelas tujuan di tahun
+         *     ini sesuai pemetaan eksplisit. Siswa yang sudah punya kelas di tahun ini dilewati dan dilaporkan.
+         */
+        post: operations["promoteStudents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Pengajar dan admin sekolah, calon wali kelas/guru mapel. */
+        get: operations["listStaff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/classes/{class_id}/teachers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Wali kelas dan guru mapel aktif. */
+        get: operations["listClassTeachers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/classes/{class_id}/teachers/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description Admin. Menjadikan pengajar/admin sekolah wali kelas (menggantikan wali lama) atau guru mapel dengan mapel
+         *     opsional. Satu peran per orang per kelas; riwayat tetap.
+         */
+        put: operations["setClassTeacher"];
+        post?: never;
+        /** @description Admin. Mengakhiri peran orang di kelas. */
+        delete: operations["removeClassTeacher"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1324,10 +1459,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Pengajar/admin. */
+        /** @description Admin. */
         put: operations["renameClass"];
         post?: never;
-        /** @description Pengajar/admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); riwayat tetap. */
+        /** @description Admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); pengajar kelas dilepas; riwayat tetap. */
         delete: operations["archiveClass"];
         options?: never;
         head?: never;
@@ -1631,6 +1766,28 @@ export interface components {
             name: string;
             /** @description Jumlah siswa aktif */
             students: number;
+            /** @description Jumlah guru mapel aktif */
+            subject_teachers: number;
+            /** @description Null = belum ada wali kelas */
+            homeroom: components["schemas"]["Person"] | null;
+            /**
+             * @description Peran pemanggil di kelas ini
+             * @enum {string|null}
+             */
+            my_role: "homeroom" | "subject" | null;
+        };
+        Person: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        ClassTeacher: {
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            /** @enum {string} */
+            role: "homeroom" | "subject";
+            subject: string | null;
         };
         RosterEntry: {
             /** Format: uuid */
@@ -4325,7 +4482,14 @@ export interface operations {
     };
     listRoster: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description UUID kelas, atau `none` = belum punya kelas */
+                class_id?: string;
+                /** @description Cari nama */
+                q?: string;
+                offset?: number;
+                limit?: number;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -4343,9 +4507,12 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["RosterEntry"][];
+                        /** @description Jumlah sesuai filter */
+                        total: number;
                     };
                 };
             };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
@@ -4372,6 +4539,253 @@ export interface operations {
         };
         responses: {
             /** @description Disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    moveStudents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    user_ids: string[];
+                    /** Format: uuid */
+                    class_id: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Hasil per siswa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            /** @enum {string|null} */
+                            error: "not_student" | "has_class" | null;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    copyYearClasses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    from_year_id: string;
+                    /** @default false */
+                    teachers?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Hasil salin */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                        /** @description Nama kelas yang sudah ada */
+                        skipped: string[];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    promoteStudents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    from_year_id: string;
+                    mappings: {
+                        /** Format: uuid */
+                        from_class_id: string;
+                        /** Format: uuid */
+                        to_class_id: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Hasil naik kelas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        moved: number;
+                        skipped: components["schemas"]["Person"][];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staf */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            display_name: string;
+                            /** @enum {string} */
+                            role: "teacher" | "admin";
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listClassTeachers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pengajar kelas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ClassTeacher"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setClassTeacher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "homeroom" | "subject";
+                    /** @description Hanya untuk guru mapel */
+                    subject?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeClassTeacher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dilepas */
             204: {
                 headers: {
                     [name: string]: unknown;

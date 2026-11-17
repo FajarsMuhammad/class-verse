@@ -245,7 +245,10 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola adalah menu induk dengan submenu kiri
   ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Siswa, Tugas, Ruang & undangan, Buku perpustakaan,
   Berkas, Tahun ajaran (admin), dan Kontrol sesi saat berada di ruang. Kelas = daftar per tahun ajaran → satu
-  kelas dengan tab Siswa/Pengaturan; Siswa = direktori dengan filter kelas termasuk **Belum punya kelas**. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
+  kelas dengan tab Siswa/Pengajar/Pengaturan (Pengaturan hanya admin); baris kelas menampilkan wali kelas, jumlah
+  guru mapel, dan lencana peran pemanggil. Siswa = direktori per halaman 50 dari server dengan filter kelas termasuk
+  **Belum punya kelas**, centang → **Pindahkan ke kelas** (hasil per siswa). Tahun ajaran (admin) memuat **Siapkan
+  tahun ajaran**: salin struktur lalu naik kelas lewat pemetaan → pratinjau → konfirmasi. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
   dimuat. Lebar ≤1000 px submenu berbaris di atas konten. Modul belajar dibatasi `perpus` di Perpustakaan.
   Aksi **Sematkan ke [nama ruang]**
   berada pada detail modul terbit yang memiliki isi, bukan pemilih terpisah di atas daftar. Klik membuka

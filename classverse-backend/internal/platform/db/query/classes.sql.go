@@ -53,12 +53,86 @@ func (q *Queries) ArchiveClass(ctx context.Context, arg ArchiveClassParams) erro
 	return err
 }
 
+const classStudents = `-- name: ClassStudents :many
+SELECT e.user_id, u.display_name FROM class_enrollments e JOIN users u ON u.id = e.user_id
+WHERE e.class_id = $1 AND e.ended_at IS NULL ORDER BY lower(u.display_name), u.id
+`
+
+type ClassStudentsRow struct {
+	UserID      uuid.UUID
+	DisplayName string
+}
+
+// Active students of a class with names (promotion source).
+func (q *Queries) ClassStudents(ctx context.Context, classID uuid.UUID) ([]ClassStudentsRow, error) {
+	rows, err := q.db.Query(ctx, classStudents, classID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClassStudentsRow{}
+	for rows.Next() {
+		var i ClassStudentsRow
+		if err := rows.Scan(&i.UserID, &i.DisplayName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const classTeacherRole = `-- name: ClassTeacherRole :one
+SELECT role FROM class_teachers WHERE class_id = $1 AND user_id = $2 AND ended_at IS NULL
+`
+
+type ClassTeacherRoleParams struct {
+	ClassID uuid.UUID
+	UserID  uuid.UUID
+}
+
+// The caller's active role in a class (no row: not a teacher of it).
+func (q *Queries) ClassTeacherRole(ctx context.Context, arg ClassTeacherRoleParams) (ClassTeacherRole, error) {
+	row := q.db.QueryRow(ctx, classTeacherRole, arg.ClassID, arg.UserID)
+	var role ClassTeacherRole
+	err := row.Scan(&role)
+	return role, err
+}
+
 const clearActiveYear = `-- name: ClearActiveYear :exec
 UPDATE academic_years SET active = false WHERE org_id = $1 AND active
 `
 
 func (q *Queries) ClearActiveYear(ctx context.Context, orgID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, clearActiveYear, orgID)
+	return err
+}
+
+const copyClassTeachers = `-- name: CopyClassTeachers :exec
+INSERT INTO class_teachers (id, org_id, class_id, user_id, role, subject, started_at, created_by)
+SELECT gen_random_uuid(), t.org_id, $1, t.user_id, t.role, t.subject, $2, $3
+FROM class_teachers t
+JOIN memberships m ON m.org_id = t.org_id AND m.user_id = t.user_id AND m.role IN ('teacher', 'admin')
+WHERE t.class_id = $4 AND t.ended_at IS NULL
+`
+
+type CopyClassTeachersParams struct {
+	ToClassID   uuid.UUID
+	StartedAt   pgtype.Timestamptz
+	CreatedBy   uuid.UUID
+	FromClassID uuid.UUID
+}
+
+// Copies active teachers who are still staff of the school.
+func (q *Queries) CopyClassTeachers(ctx context.Context, arg CopyClassTeachersParams) error {
+	_, err := q.db.Exec(ctx, copyClassTeachers,
+		arg.ToClassID,
+		arg.StartedAt,
+		arg.CreatedBy,
+		arg.FromClassID,
+	)
 	return err
 }
 
@@ -79,6 +153,39 @@ SELECT count(*)::integer FROM class_enrollments WHERE class_id = $1 AND ended_at
 
 func (q *Queries) CountActiveEnrollments(ctx context.Context, classID uuid.UUID) (int32, error) {
 	row := q.db.QueryRow(ctx, countActiveEnrollments, classID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countRoster = `-- name: CountRoster :one
+SELECT count(*)::integer
+FROM memberships m
+JOIN users u ON u.id = m.user_id
+LEFT JOIN class_enrollments e ON e.org_id = m.org_id AND e.user_id = m.user_id
+  AND e.academic_year_id = $1 AND e.ended_at IS NULL
+WHERE m.org_id = $2 AND m.role = 'participant'
+  AND ($3::uuid IS NULL OR e.class_id = $3)
+  AND (NOT $4::boolean OR e.class_id IS NULL)
+  AND strpos(lower(u.display_name), lower($5::text)) > 0
+`
+
+type CountRosterParams struct {
+	AcademicYearID uuid.UUID
+	OrgID          uuid.UUID
+	ClassID        uuid.NullUUID
+	Unplaced       bool
+	Q              string
+}
+
+func (q *Queries) CountRoster(ctx context.Context, arg CountRosterParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countRoster,
+		arg.AcademicYearID,
+		arg.OrgID,
+		arg.ClassID,
+		arg.Unplaced,
+		arg.Q,
+	)
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -152,6 +259,66 @@ func (q *Queries) CreateClass(ctx context.Context, arg CreateClassParams) (Class
 	return i, err
 }
 
+const createClassIfFree = `-- name: CreateClassIfFree :one
+INSERT INTO classes (id, org_id, academic_year_id, name, created_by, created_at) VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (org_id, academic_year_id, lower(name)) WHERE archived_at IS NULL DO NOTHING
+RETURNING id
+`
+
+type CreateClassIfFreeParams struct {
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AcademicYearID uuid.UUID
+	Name           string
+	CreatedBy      uuid.UUID
+	CreatedAt      pgtype.Timestamptz
+}
+
+// Copy target: skips (no row) when an active class of that year already has the name.
+func (q *Queries) CreateClassIfFree(ctx context.Context, arg CreateClassIfFreeParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createClassIfFree,
+		arg.ID,
+		arg.OrgID,
+		arg.AcademicYearID,
+		arg.Name,
+		arg.CreatedBy,
+		arg.CreatedAt,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createClassTeacher = `-- name: CreateClassTeacher :exec
+INSERT INTO class_teachers (id, org_id, class_id, user_id, role, subject, started_at, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type CreateClassTeacherParams struct {
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	ClassID   uuid.UUID
+	UserID    uuid.UUID
+	Role      ClassTeacherRole
+	Subject   pgtype.Text
+	StartedAt pgtype.Timestamptz
+	CreatedBy uuid.UUID
+}
+
+func (q *Queries) CreateClassTeacher(ctx context.Context, arg CreateClassTeacherParams) error {
+	_, err := q.db.Exec(ctx, createClassTeacher,
+		arg.ID,
+		arg.OrgID,
+		arg.ClassID,
+		arg.UserID,
+		arg.Role,
+		arg.Subject,
+		arg.StartedAt,
+		arg.CreatedBy,
+	)
+	return err
+}
+
 const createEnrollment = `-- name: CreateEnrollment :one
 INSERT INTO class_enrollments (id, org_id, academic_year_id, class_id, user_id, started_at, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -192,6 +359,38 @@ func (q *Queries) CreateEnrollment(ctx context.Context, arg CreateEnrollmentPara
 	return i, err
 }
 
+const endClassTeacher = `-- name: EndClassTeacher :execrows
+UPDATE class_teachers SET ended_at = $3 WHERE class_id = $1 AND user_id = $2 AND ended_at IS NULL
+`
+
+type EndClassTeacherParams struct {
+	ClassID uuid.UUID
+	UserID  uuid.UUID
+	EndedAt pgtype.Timestamptz
+}
+
+func (q *Queries) EndClassTeacher(ctx context.Context, arg EndClassTeacherParams) (int64, error) {
+	result, err := q.db.Exec(ctx, endClassTeacher, arg.ClassID, arg.UserID, arg.EndedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const endClassTeachers = `-- name: EndClassTeachers :exec
+UPDATE class_teachers SET ended_at = $2 WHERE class_id = $1 AND ended_at IS NULL
+`
+
+type EndClassTeachersParams struct {
+	ClassID uuid.UUID
+	EndedAt pgtype.Timestamptz
+}
+
+func (q *Queries) EndClassTeachers(ctx context.Context, arg EndClassTeachersParams) error {
+	_, err := q.db.Exec(ctx, endClassTeachers, arg.ClassID, arg.EndedAt)
+	return err
+}
+
 const endEnrollment = `-- name: EndEnrollment :exec
 UPDATE class_enrollments SET ended_at = $2 WHERE id = $1 AND ended_at IS NULL
 `
@@ -203,6 +402,20 @@ type EndEnrollmentParams struct {
 
 func (q *Queries) EndEnrollment(ctx context.Context, arg EndEnrollmentParams) error {
 	_, err := q.db.Exec(ctx, endEnrollment, arg.ID, arg.EndedAt)
+	return err
+}
+
+const endHomeroom = `-- name: EndHomeroom :exec
+UPDATE class_teachers SET ended_at = $2 WHERE class_id = $1 AND role = 'homeroom' AND ended_at IS NULL
+`
+
+type EndHomeroomParams struct {
+	ClassID uuid.UUID
+	EndedAt pgtype.Timestamptz
+}
+
+func (q *Queries) EndHomeroom(ctx context.Context, arg EndHomeroomParams) error {
+	_, err := q.db.Exec(ctx, endHomeroom, arg.ClassID, arg.EndedAt)
 	return err
 }
 
@@ -287,6 +500,30 @@ func (q *Queries) GetAcademicYear(ctx context.Context, arg GetAcademicYearParams
 	return i, err
 }
 
+const getClass = `-- name: GetClass :one
+SELECT id, org_id, academic_year_id, name, created_by, created_at, archived_at FROM classes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL
+`
+
+type GetClassParams struct {
+	OrgID uuid.UUID
+	ID    uuid.UUID
+}
+
+func (q *Queries) GetClass(ctx context.Context, arg GetClassParams) (Class, error) {
+	row := q.db.QueryRow(ctx, getClass, arg.OrgID, arg.ID)
+	var i Class
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.AcademicYearID,
+		&i.Name,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const getMemberRoleForUpdate = `-- name: GetMemberRoleForUpdate :one
 SELECT role FROM memberships WHERE org_id = $1 AND user_id = $2 FOR UPDATE
 `
@@ -334,32 +571,90 @@ func (q *Queries) ListAcademicYears(ctx context.Context, orgID uuid.UUID) ([]Aca
 	return items, nil
 }
 
+const listClassTeachers = `-- name: ListClassTeachers :many
+SELECT t.user_id, u.display_name, t.role, t.subject
+FROM class_teachers t JOIN users u ON u.id = t.user_id
+WHERE t.org_id = $1 AND t.class_id = $2 AND t.ended_at IS NULL
+ORDER BY t.role, lower(u.display_name), u.id
+`
+
+type ListClassTeachersParams struct {
+	OrgID   uuid.UUID
+	ClassID uuid.UUID
+}
+
+type ListClassTeachersRow struct {
+	UserID      uuid.UUID
+	DisplayName string
+	Role        ClassTeacherRole
+	Subject     pgtype.Text
+}
+
+func (q *Queries) ListClassTeachers(ctx context.Context, arg ListClassTeachersParams) ([]ListClassTeachersRow, error) {
+	rows, err := q.db.Query(ctx, listClassTeachers, arg.OrgID, arg.ClassID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListClassTeachersRow{}
+	for rows.Next() {
+		var i ListClassTeachersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.DisplayName,
+			&i.Role,
+			&i.Subject,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listClasses = `-- name: ListClasses :many
-SELECT c.id, c.org_id, c.academic_year_id, c.name, c.created_by, c.created_at, c.archived_at, (SELECT count(*) FROM class_enrollments e WHERE e.class_id = c.id AND e.ended_at IS NULL)::integer AS students
+SELECT c.id, c.academic_year_id, c.name,
+  (SELECT count(*) FROM class_enrollments e WHERE e.class_id = c.id AND e.ended_at IS NULL)::integer AS students,
+  (SELECT count(*) FROM class_teachers t WHERE t.class_id = c.id AND t.role = 'subject' AND t.ended_at IS NULL)::integer AS subject_teachers,
+  h.user_id AS homeroom_id, hu.display_name AS homeroom_name, mine.role AS my_role
 FROM classes c
-WHERE c.org_id = $1 AND c.academic_year_id = $2 AND c.archived_at IS NULL
-ORDER BY lower(c.name), c.id
+LEFT JOIN class_teachers h ON h.class_id = c.id AND h.role = 'homeroom' AND h.ended_at IS NULL
+LEFT JOIN users hu ON hu.id = h.user_id
+LEFT JOIN class_teachers mine ON mine.class_id = c.id AND mine.user_id = $1 AND mine.ended_at IS NULL
+WHERE c.org_id = $2 AND c.academic_year_id = $3 AND c.archived_at IS NULL
+  AND ($4::uuid IS NULL OR c.id = $4)
+ORDER BY mine.role IS NULL, lower(c.name), c.id
 `
 
 type ListClassesParams struct {
+	UserID         uuid.UUID
 	OrgID          uuid.UUID
 	AcademicYearID uuid.UUID
+	ClassID        uuid.NullUUID
 }
 
 type ListClassesRow struct {
-	ID             uuid.UUID
-	OrgID          uuid.UUID
-	AcademicYearID uuid.UUID
-	Name           string
-	CreatedBy      uuid.UUID
-	CreatedAt      pgtype.Timestamptz
-	ArchivedAt     pgtype.Timestamptz
-	Students       int32
+	ID              uuid.UUID
+	AcademicYearID  uuid.UUID
+	Name            string
+	Students        int32
+	SubjectTeachers int32
+	HomeroomID      uuid.NullUUID
+	HomeroomName    pgtype.Text
+	MyRole          NullClassTeacherRole
 }
 
-// Active classes of a year with their active student count.
+// Active classes of a year with student count, wali kelas and guru mapel count. Classes the caller teaches first.
 func (q *Queries) ListClasses(ctx context.Context, arg ListClassesParams) ([]ListClassesRow, error) {
-	rows, err := q.db.Query(ctx, listClasses, arg.OrgID, arg.AcademicYearID)
+	rows, err := q.db.Query(ctx, listClasses,
+		arg.UserID,
+		arg.OrgID,
+		arg.AcademicYearID,
+		arg.ClassID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -369,13 +664,13 @@ func (q *Queries) ListClasses(ctx context.Context, arg ListClassesParams) ([]Lis
 		var i ListClassesRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.OrgID,
 			&i.AcademicYearID,
 			&i.Name,
-			&i.CreatedBy,
-			&i.CreatedAt,
-			&i.ArchivedAt,
 			&i.Students,
+			&i.SubjectTeachers,
+			&i.HomeroomID,
+			&i.HomeroomName,
+			&i.MyRole,
 		); err != nil {
 			return nil, err
 		}
@@ -394,12 +689,21 @@ JOIN users u ON u.id = m.user_id
 LEFT JOIN class_enrollments e ON e.org_id = m.org_id AND e.user_id = m.user_id
   AND e.academic_year_id = $1 AND e.ended_at IS NULL
 WHERE m.org_id = $2 AND m.role = 'participant'
+  AND ($3::uuid IS NULL OR e.class_id = $3)
+  AND (NOT $4::boolean OR e.class_id IS NULL)
+  AND strpos(lower(u.display_name), lower($5::text)) > 0
 ORDER BY lower(u.display_name), u.id
+LIMIT $7 OFFSET $6
 `
 
 type ListRosterParams struct {
 	AcademicYearID uuid.UUID
 	OrgID          uuid.UUID
+	ClassID        uuid.NullUUID
+	Unplaced       bool
+	Q              string
+	Off            int32
+	Lim            int32
 }
 
 type ListRosterRow struct {
@@ -409,9 +713,18 @@ type ListRosterRow struct {
 	ClassID     uuid.NullUUID
 }
 
-// Every participant of the school with their active class in the given year (NULL: not placed yet).
+// One page of the school's participants with their active class in the year (NULL: no class yet).
+// Filters: class_id (that class), unplaced (no class), q (case-insensitive name substring).
 func (q *Queries) ListRoster(ctx context.Context, arg ListRosterParams) ([]ListRosterRow, error) {
-	rows, err := q.db.Query(ctx, listRoster, arg.AcademicYearID, arg.OrgID)
+	rows, err := q.db.Query(ctx, listRoster,
+		arg.AcademicYearID,
+		arg.OrgID,
+		arg.ClassID,
+		arg.Unplaced,
+		arg.Q,
+		arg.Off,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -424,6 +737,78 @@ func (q *Queries) ListRoster(ctx context.Context, arg ListRosterParams) ([]ListR
 			&i.DisplayName,
 			&i.AvatarKey,
 			&i.ClassID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStaff = `-- name: ListStaff :many
+SELECT u.id AS user_id, u.display_name, m.role
+FROM memberships m JOIN users u ON u.id = m.user_id
+WHERE m.org_id = $1 AND m.role IN ('teacher', 'admin')
+ORDER BY lower(u.display_name), u.id
+`
+
+type ListStaffRow struct {
+	UserID      uuid.UUID
+	DisplayName string
+	Role        OrgRole
+}
+
+// Teachers and admins of the school: candidates for wali kelas and guru mapel.
+func (q *Queries) ListStaff(ctx context.Context, orgID uuid.UUID) ([]ListStaffRow, error) {
+	rows, err := q.db.Query(ctx, listStaff, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaffRow{}
+	for rows.Next() {
+		var i ListStaffRow
+		if err := rows.Scan(&i.UserID, &i.DisplayName, &i.Role); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listYearClasses = `-- name: ListYearClasses :many
+SELECT id, org_id, academic_year_id, name, created_by, created_at, archived_at FROM classes WHERE org_id = $1 AND academic_year_id = $2 AND archived_at IS NULL ORDER BY lower(name), id
+`
+
+type ListYearClassesParams struct {
+	OrgID          uuid.UUID
+	AcademicYearID uuid.UUID
+}
+
+// Active classes of a year (source of copy/promotion).
+func (q *Queries) ListYearClasses(ctx context.Context, arg ListYearClassesParams) ([]Class, error) {
+	rows, err := q.db.Query(ctx, listYearClasses, arg.OrgID, arg.AcademicYearID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Class{}
+	for rows.Next() {
+		var i Class
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.AcademicYearID,
+			&i.Name,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}

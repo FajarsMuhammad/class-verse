@@ -189,6 +189,24 @@ func (e BookInputLevel) Valid() bool {
 	}
 }
 
+// Defines values for ClassTeacherRole.
+const (
+	ClassTeacherRoleHomeroom ClassTeacherRole = "homeroom"
+	ClassTeacherRoleSubject  ClassTeacherRole = "subject"
+)
+
+// Valid indicates whether the value is a known member of the ClassTeacherRole enum.
+func (e ClassTeacherRole) Valid() bool {
+	switch e {
+	case ClassTeacherRoleHomeroom:
+		return true
+	case ClassTeacherRoleSubject:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FileItemContentType.
 const (
 	Applicationpdf FileItemContentType = "application/pdf"
@@ -411,6 +429,27 @@ func (e RoomMap) Valid() bool {
 	}
 }
 
+// Defines values for SchoolClassMyRole.
+const (
+	SchoolClassMyRoleHomeroom    SchoolClassMyRole = "homeroom"
+	SchoolClassMyRoleLessThannil SchoolClassMyRole = "<nil>"
+	SchoolClassMyRoleSubject     SchoolClassMyRole = "subject"
+)
+
+// Valid indicates whether the value is a known member of the SchoolClassMyRole enum.
+func (e SchoolClassMyRole) Valid() bool {
+	switch e {
+	case SchoolClassMyRoleHomeroom:
+		return true
+	case SchoolClassMyRoleLessThannil:
+		return true
+	case SchoolClassMyRoleSubject:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Shelf.
 const (
 	ShelfDongeng    Shelf = "dongeng"
@@ -504,6 +543,63 @@ func (e UploadProgressState) Valid() bool {
 	case Canceled:
 		return true
 	case Uploading:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MoveStudents200JSONResponseBodyItemsError.
+const (
+	MoveStudents200JSONResponseBodyItemsErrorHasClass    MoveStudents200JSONResponseBodyItemsError = "has_class"
+	MoveStudents200JSONResponseBodyItemsErrorLessThannil MoveStudents200JSONResponseBodyItemsError = "<nil>"
+	MoveStudents200JSONResponseBodyItemsErrorNotStudent  MoveStudents200JSONResponseBodyItemsError = "not_student"
+)
+
+// Valid indicates whether the value is a known member of the MoveStudents200JSONResponseBodyItemsError enum.
+func (e MoveStudents200JSONResponseBodyItemsError) Valid() bool {
+	switch e {
+	case MoveStudents200JSONResponseBodyItemsErrorHasClass:
+		return true
+	case MoveStudents200JSONResponseBodyItemsErrorLessThannil:
+		return true
+	case MoveStudents200JSONResponseBodyItemsErrorNotStudent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SetClassTeacherJSONBodyRole.
+const (
+	SetClassTeacherJSONBodyRoleHomeroom SetClassTeacherJSONBodyRole = "homeroom"
+	SetClassTeacherJSONBodyRoleSubject  SetClassTeacherJSONBodyRole = "subject"
+)
+
+// Valid indicates whether the value is a known member of the SetClassTeacherJSONBodyRole enum.
+func (e SetClassTeacherJSONBodyRole) Valid() bool {
+	switch e {
+	case SetClassTeacherJSONBodyRoleHomeroom:
+		return true
+	case SetClassTeacherJSONBodyRoleSubject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListStaff200JSONResponseBodyItemsRole.
+const (
+	ListStaff200JSONResponseBodyItemsRoleAdmin   ListStaff200JSONResponseBodyItemsRole = "admin"
+	ListStaff200JSONResponseBodyItemsRoleTeacher ListStaff200JSONResponseBodyItemsRole = "teacher"
+)
+
+// Valid indicates whether the value is a known member of the ListStaff200JSONResponseBodyItemsRole enum.
+func (e ListStaff200JSONResponseBodyItemsRole) Valid() bool {
+	switch e {
+	case ListStaff200JSONResponseBodyItemsRoleAdmin:
+		return true
+	case ListStaff200JSONResponseBodyItemsRoleTeacher:
 		return true
 	default:
 		return false
@@ -653,6 +749,17 @@ type BookList struct {
 type ClassInput struct {
 	Name string `json:"name"`
 }
+
+// ClassTeacher defines model for ClassTeacher.
+type ClassTeacher struct {
+	DisplayName string             `json:"display_name"`
+	Role        ClassTeacherRole   `json:"role"`
+	Subject     *string            `json:"subject"`
+	UserId      openapi_types.UUID `json:"user_id"`
+}
+
+// ClassTeacherRole defines model for ClassTeacher.Role.
+type ClassTeacherRole string
 
 // CreateInviteRequest defines model for CreateInviteRequest.
 type CreateInviteRequest struct {
@@ -965,6 +1072,12 @@ type Organization struct {
 	Slug         string             `json:"slug"`
 }
 
+// Person defines model for Person.
+type Person struct {
+	Id   openapi_types.UUID `json:"id"`
+	Name string             `json:"name"`
+}
+
 // Placement defines model for Placement.
 type Placement struct {
 	ClassName string `json:"class_name"`
@@ -1134,12 +1247,24 @@ type RosterEntry struct {
 // SchoolClass defines model for SchoolClass.
 type SchoolClass struct {
 	AcademicYearId openapi_types.UUID `json:"academic_year_id"`
-	Id             openapi_types.UUID `json:"id"`
-	Name           string             `json:"name"`
+
+	// Homeroom Null = belum ada wali kelas
+	Homeroom *Person            `json:"homeroom"`
+	Id       openapi_types.UUID `json:"id"`
+
+	// MyRole Peran pemanggil di kelas ini
+	MyRole *SchoolClassMyRole `json:"my_role"`
+	Name   string             `json:"name"`
 
 	// Students Jumlah siswa aktif
 	Students int `json:"students"`
+
+	// SubjectTeachers Jumlah guru mapel aktif
+	SubjectTeachers int `json:"subject_teachers"`
 }
+
+// SchoolClassMyRole Peran pemanggil di kelas ini
+type SchoolClassMyRole string
 
 // Shelf defines model for Shelf.
 type Shelf string
@@ -1299,10 +1424,56 @@ type CreateAcademicYearJSONBody struct {
 	Label string `json:"label"`
 }
 
+// CopyYearClassesJSONBody defines parameters for CopyYearClasses.
+type CopyYearClassesJSONBody struct {
+	FromYearId openapi_types.UUID `json:"from_year_id"`
+	Teachers   *bool              `json:"teachers,omitempty"`
+}
+
+// MoveStudentsJSONBody defines parameters for MoveStudents.
+type MoveStudentsJSONBody struct {
+	ClassId *openapi_types.UUID  `json:"class_id"`
+	UserIds []openapi_types.UUID `json:"user_ids"`
+}
+
+// MoveStudents200JSONResponseBodyItemsError defines parameters for MoveStudents.
+type MoveStudents200JSONResponseBodyItemsError string
+
+// PromoteStudentsJSONBody defines parameters for PromoteStudents.
+type PromoteStudentsJSONBody struct {
+	FromYearId openapi_types.UUID `json:"from_year_id"`
+	Mappings   []struct {
+		FromClassId openapi_types.UUID `json:"from_class_id"`
+		ToClassId   openapi_types.UUID `json:"to_class_id"`
+	} `json:"mappings"`
+}
+
+// ListRosterParams defines parameters for ListRoster.
+type ListRosterParams struct {
+	// ClassId UUID kelas, atau `none` = belum punya kelas
+	ClassId *string `form:"class_id,omitempty" json:"class_id,omitempty"`
+
+	// Q Cari nama
+	Q      *string `form:"q,omitempty" json:"q,omitempty"`
+	Offset *int    `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // PlaceStudentJSONBody defines parameters for PlaceStudent.
 type PlaceStudentJSONBody struct {
 	ClassId *openapi_types.UUID `json:"class_id"`
 }
+
+// SetClassTeacherJSONBody defines parameters for SetClassTeacher.
+type SetClassTeacherJSONBody struct {
+	Role SetClassTeacherJSONBodyRole `json:"role"`
+
+	// Subject Hanya untuk guru mapel
+	Subject *string `json:"subject,omitempty"`
+}
+
+// SetClassTeacherJSONBodyRole defines parameters for SetClassTeacher.
+type SetClassTeacherJSONBodyRole string
 
 // GetFileContentParams defines parameters for GetFileContent.
 type GetFileContentParams struct {
@@ -1424,6 +1595,9 @@ type ListRoomsParams struct {
 	Cursor   *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ListStaff200JSONResponseBodyItemsRole defines parameters for ListStaff.
+type ListStaff200JSONResponseBodyItemsRole string
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -1448,6 +1622,15 @@ type CreateAcademicYearJSONRequestBody CreateAcademicYearJSONBody
 // CreateClassJSONRequestBody defines body for CreateClass for application/json ContentType.
 type CreateClassJSONRequestBody = ClassInput
 
+// CopyYearClassesJSONRequestBody defines body for CopyYearClasses for application/json ContentType.
+type CopyYearClassesJSONRequestBody CopyYearClassesJSONBody
+
+// MoveStudentsJSONRequestBody defines body for MoveStudents for application/json ContentType.
+type MoveStudentsJSONRequestBody MoveStudentsJSONBody
+
+// PromoteStudentsJSONRequestBody defines body for PromoteStudents for application/json ContentType.
+type PromoteStudentsJSONRequestBody PromoteStudentsJSONBody
+
 // PlaceStudentJSONRequestBody defines body for PlaceStudent for application/json ContentType.
 type PlaceStudentJSONRequestBody PlaceStudentJSONBody
 
@@ -1456,6 +1639,9 @@ type IssueAssignmentJSONRequestBody = AssignmentInput
 
 // RenameClassJSONRequestBody defines body for RenameClass for application/json ContentType.
 type RenameClassJSONRequestBody = ClassInput
+
+// SetClassTeacherJSONRequestBody defines body for SetClassTeacher for application/json ContentType.
+type SetClassTeacherJSONRequestBody SetClassTeacherJSONBody
 
 // SaveFilePositionJSONRequestBody defines body for SaveFilePosition for application/json ContentType.
 type SaveFilePositionJSONRequestBody SaveFilePositionJSONBody

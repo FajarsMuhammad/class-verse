@@ -22,11 +22,18 @@ UPDATE academic_years SET active = true WHERE org_id = $1 AND id = $2;
 SELECT pg_advisory_xact_lock(hashtextextended('academic_years:' || sqlc.arg(org_id)::uuid::text, 0));
 
 -- name: ListClasses :many
--- Active classes of a year with their active student count.
-SELECT c.*, (SELECT count(*) FROM class_enrollments e WHERE e.class_id = c.id AND e.ended_at IS NULL)::integer AS students
+-- Active classes of a year with student count, wali kelas and guru mapel count. Classes the caller teaches first.
+SELECT c.id, c.academic_year_id, c.name,
+  (SELECT count(*) FROM class_enrollments e WHERE e.class_id = c.id AND e.ended_at IS NULL)::integer AS students,
+  (SELECT count(*) FROM class_teachers t WHERE t.class_id = c.id AND t.role = 'subject' AND t.ended_at IS NULL)::integer AS subject_teachers,
+  h.user_id AS homeroom_id, hu.display_name AS homeroom_name, mine.role AS my_role
 FROM classes c
-WHERE c.org_id = $1 AND c.academic_year_id = $2 AND c.archived_at IS NULL
-ORDER BY lower(c.name), c.id;
+LEFT JOIN class_teachers h ON h.class_id = c.id AND h.role = 'homeroom' AND h.ended_at IS NULL
+LEFT JOIN users hu ON hu.id = h.user_id
+LEFT JOIN class_teachers mine ON mine.class_id = c.id AND mine.user_id = sqlc.arg(user_id) AND mine.ended_at IS NULL
+WHERE c.org_id = sqlc.arg(org_id) AND c.academic_year_id = sqlc.arg(academic_year_id) AND c.archived_at IS NULL
+  AND (sqlc.narg(class_id)::uuid IS NULL OR c.id = sqlc.narg(class_id))
+ORDER BY mine.role IS NULL, lower(c.name), c.id;
 
 -- name: CreateClass :one
 INSERT INTO classes (id, org_id, academic_year_id, name, created_by, created_at) VALUES ($1, $2, $3, $4, $5, $6)
@@ -46,14 +53,30 @@ SELECT count(*)::integer FROM class_enrollments WHERE class_id = $1 AND ended_at
 UPDATE classes SET archived_at = $3 WHERE org_id = $1 AND id = $2;
 
 -- name: ListRoster :many
--- Every participant of the school with their active class in the given year (NULL: not placed yet).
+-- One page of the school's participants with their active class in the year (NULL: no class yet).
+-- Filters: class_id (that class), unplaced (no class), q (case-insensitive name substring).
 SELECT u.id AS user_id, u.display_name, u.avatar_key, e.class_id
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 LEFT JOIN class_enrollments e ON e.org_id = m.org_id AND e.user_id = m.user_id
   AND e.academic_year_id = sqlc.arg(academic_year_id) AND e.ended_at IS NULL
 WHERE m.org_id = sqlc.arg(org_id) AND m.role = 'participant'
-ORDER BY lower(u.display_name), u.id;
+  AND (sqlc.narg(class_id)::uuid IS NULL OR e.class_id = sqlc.narg(class_id))
+  AND (NOT sqlc.arg(unplaced)::boolean OR e.class_id IS NULL)
+  AND strpos(lower(u.display_name), lower(sqlc.arg(q)::text)) > 0
+ORDER BY lower(u.display_name), u.id
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
+
+-- name: CountRoster :one
+SELECT count(*)::integer
+FROM memberships m
+JOIN users u ON u.id = m.user_id
+LEFT JOIN class_enrollments e ON e.org_id = m.org_id AND e.user_id = m.user_id
+  AND e.academic_year_id = sqlc.arg(academic_year_id) AND e.ended_at IS NULL
+WHERE m.org_id = sqlc.arg(org_id) AND m.role = 'participant'
+  AND (sqlc.narg(class_id)::uuid IS NULL OR e.class_id = sqlc.narg(class_id))
+  AND (NOT sqlc.arg(unplaced)::boolean OR e.class_id IS NULL)
+  AND strpos(lower(u.display_name), lower(sqlc.arg(q)::text)) > 0;
 
 -- name: GetMemberRoleForUpdate :one
 -- Locks the membership row so concurrent placements of one student are serialized.
@@ -78,3 +101,59 @@ JOIN classes c ON c.id = e.class_id
 JOIN academic_years y ON y.id = e.academic_year_id
 WHERE e.org_id = $1 AND e.user_id = $2
 ORDER BY e.started_at DESC, e.id;
+
+-- name: ListStaff :many
+-- Teachers and admins of the school: candidates for wali kelas and guru mapel.
+SELECT u.id AS user_id, u.display_name, m.role
+FROM memberships m JOIN users u ON u.id = m.user_id
+WHERE m.org_id = $1 AND m.role IN ('teacher', 'admin')
+ORDER BY lower(u.display_name), u.id;
+
+-- name: ListClassTeachers :many
+SELECT t.user_id, u.display_name, t.role, t.subject
+FROM class_teachers t JOIN users u ON u.id = t.user_id
+WHERE t.org_id = $1 AND t.class_id = $2 AND t.ended_at IS NULL
+ORDER BY t.role, lower(u.display_name), u.id;
+
+-- name: ClassTeacherRole :one
+-- The caller's active role in a class (no row: not a teacher of it).
+SELECT role FROM class_teachers WHERE class_id = $1 AND user_id = $2 AND ended_at IS NULL;
+
+-- name: EndHomeroom :exec
+UPDATE class_teachers SET ended_at = $2 WHERE class_id = $1 AND role = 'homeroom' AND ended_at IS NULL;
+
+-- name: EndClassTeacher :execrows
+UPDATE class_teachers SET ended_at = $3 WHERE class_id = $1 AND user_id = $2 AND ended_at IS NULL;
+
+-- name: EndClassTeachers :exec
+UPDATE class_teachers SET ended_at = $2 WHERE class_id = $1 AND ended_at IS NULL;
+
+-- name: CreateClassTeacher :exec
+INSERT INTO class_teachers (id, org_id, class_id, user_id, role, subject, started_at, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+
+-- name: ListYearClasses :many
+-- Active classes of a year (source of copy/promotion).
+SELECT * FROM classes WHERE org_id = $1 AND academic_year_id = $2 AND archived_at IS NULL ORDER BY lower(name), id;
+
+-- name: CreateClassIfFree :one
+-- Copy target: skips (no row) when an active class of that year already has the name.
+INSERT INTO classes (id, org_id, academic_year_id, name, created_by, created_at) VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (org_id, academic_year_id, lower(name)) WHERE archived_at IS NULL DO NOTHING
+RETURNING id;
+
+-- name: CopyClassTeachers :exec
+-- Copies active teachers who are still staff of the school.
+INSERT INTO class_teachers (id, org_id, class_id, user_id, role, subject, started_at, created_by)
+SELECT gen_random_uuid(), t.org_id, sqlc.arg(to_class_id), t.user_id, t.role, t.subject, sqlc.arg(started_at), sqlc.arg(created_by)
+FROM class_teachers t
+JOIN memberships m ON m.org_id = t.org_id AND m.user_id = t.user_id AND m.role IN ('teacher', 'admin')
+WHERE t.class_id = sqlc.arg(from_class_id) AND t.ended_at IS NULL;
+
+-- name: ClassStudents :many
+-- Active students of a class with names (promotion source).
+SELECT e.user_id, u.display_name FROM class_enrollments e JOIN users u ON u.id = e.user_id
+WHERE e.class_id = $1 AND e.ended_at IS NULL ORDER BY lower(u.display_name), u.id;
+
+-- name: GetClass :one
+SELECT * FROM classes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL;

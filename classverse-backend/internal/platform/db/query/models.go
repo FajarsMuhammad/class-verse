@@ -56,6 +56,48 @@ func (ns NullChatScope) Value() (driver.Value, error) {
 	return string(ns.ChatScope), nil
 }
 
+type ClassTeacherRole string
+
+const (
+	ClassTeacherRoleHomeroom ClassTeacherRole = "homeroom"
+	ClassTeacherRoleSubject  ClassTeacherRole = "subject"
+)
+
+func (e *ClassTeacherRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ClassTeacherRole(s)
+	case string:
+		*e = ClassTeacherRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ClassTeacherRole: %T", src)
+	}
+	return nil
+}
+
+type NullClassTeacherRole struct {
+	ClassTeacherRole ClassTeacherRole
+	Valid            bool // Valid is true if ClassTeacherRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullClassTeacherRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.ClassTeacherRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ClassTeacherRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullClassTeacherRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ClassTeacherRole), nil
+}
+
 type ModAction string
 
 const (
@@ -269,6 +311,18 @@ type ClassEnrollment struct {
 	StartedAt      pgtype.Timestamptz
 	EndedAt        pgtype.Timestamptz
 	CreatedBy      uuid.UUID
+}
+
+type ClassTeacher struct {
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	ClassID   uuid.UUID
+	UserID    uuid.UUID
+	Role      ClassTeacherRole
+	Subject   pgtype.Text
+	StartedAt pgtype.Timestamptz
+	EndedAt   pgtype.Timestamptz
+	CreatedBy uuid.UUID
 }
 
 type EmailOtp struct {

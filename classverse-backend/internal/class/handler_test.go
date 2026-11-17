@@ -67,23 +67,23 @@ func TestHTTP(t *testing.T) {
 	if code, _ := call(f.out, http.MethodGet, base+"/academic-years", ""); code != http.StatusNotFound {
 		t.Fatalf("outsider years=%d", code)
 	}
-	code, body = call(f.teacher, http.MethodPost, year+"/classes", `{"name":"  XI   IPA 2 "}`)
+	code, body = call(f.admin, http.MethodPost, year+"/classes", `{"name":"  XI   IPA 2 "}`)
 	if code != http.StatusCreated || !strings.Contains(body, `"name":"XI IPA 2"`) {
 		t.Fatalf("create class=%d %s", code, body)
 	}
 	cls := id(body)
-	if code, body := call(f.teacher, http.MethodPost, year+"/classes", `{"name":"xi ipa 2"}`); code != http.StatusBadRequest || !strings.Contains(body, "sudah dipakai") {
+	if code, body := call(f.admin, http.MethodPost, year+"/classes", `{"name":"xi ipa 2"}`); code != http.StatusBadRequest || !strings.Contains(body, "sudah dipakai") {
 		t.Fatalf("duplicate class=%d %s", code, body)
 	}
-	if code, _ := call(f.teacher, http.MethodPut, year+"/roster/"+f.ani.String(), `{"class_id":"`+cls+`"}`); code != http.StatusNoContent {
+	if code, _ := call(f.admin, http.MethodPut, year+"/roster/"+f.ani.String(), `{"class_id":"`+cls+`"}`); code != http.StatusNoContent {
 		t.Fatalf("place=%d", code)
 	}
 	for _, invalid := range []string{`{}`, `{"class_id":"invalid"}`, `{"class_id":42}`} {
-		if code, _ := call(f.teacher, http.MethodPut, year+"/roster/"+f.ani.String(), invalid); code != http.StatusBadRequest {
+		if code, _ := call(f.admin, http.MethodPut, year+"/roster/"+f.ani.String(), invalid); code != http.StatusBadRequest {
 			t.Fatalf("invalid placement body %s: %d", invalid, code)
 		}
 	}
-	if code, _ := call(f.teacher, http.MethodPut, year+"/roster/"+f.teacher.String(), `{"class_id":"`+cls+`"}`); code != http.StatusNotFound {
+	if code, _ := call(f.admin, http.MethodPut, year+"/roster/"+f.admin.String(), `{"class_id":"`+cls+`"}`); code != http.StatusNotFound {
 		t.Fatalf("place teacher=%d", code)
 	}
 	if code, _ := call(f.ani, http.MethodPut, year+"/roster/"+f.ani.String(), `{"class_id":null}`); code != http.StatusForbidden {
@@ -93,22 +93,22 @@ func TestHTTP(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"class_id":"`+cls+`"`) || !strings.Contains(body, `"class_id":null`) || strings.Contains(body, "teacher@class.test") {
 		t.Fatalf("roster=%d %s", code, body)
 	}
-	if code, body := call(f.teacher, http.MethodDelete, base+"/classes/"+cls, ""); code != http.StatusConflict || !strings.Contains(body, "class_not_empty") {
+	if code, body := call(f.admin, http.MethodDelete, base+"/classes/"+cls, ""); code != http.StatusConflict || !strings.Contains(body, "class_not_empty") {
 		t.Fatalf("archive non-empty=%d %s", code, body)
 	}
 	if code, body := call(f.teacher, http.MethodGet, base+"/members/"+f.ani.String()+"/placements", ""); code != http.StatusOK || !strings.Contains(body, `"year_label":"2026/2027"`) || !strings.Contains(body, `"ended_at":null`) {
 		t.Fatalf("history=%d %s", code, body)
 	}
-	if code, _ := call(f.teacher, http.MethodPut, year+"/roster/"+f.ani.String(), `{"class_id":null}`); code != http.StatusNoContent {
+	if code, _ := call(f.admin, http.MethodPut, year+"/roster/"+f.ani.String(), `{"class_id":null}`); code != http.StatusNoContent {
 		t.Fatalf("remove=%d", code)
 	}
-	if code, body := call(f.teacher, http.MethodPut, base+"/classes/"+cls, `{"name":"XI IPA Dua"}`); code != http.StatusOK || !strings.Contains(body, "XI IPA Dua") {
+	if code, body := call(f.admin, http.MethodPut, base+"/classes/"+cls, `{"name":"XI IPA Dua"}`); code != http.StatusOK || !strings.Contains(body, "XI IPA Dua") {
 		t.Fatalf("rename=%d %s", code, body)
 	}
-	if code, _ := call(f.teacher, http.MethodDelete, base+"/classes/"+cls, ""); code != http.StatusNoContent {
+	if code, _ := call(f.admin, http.MethodDelete, base+"/classes/"+cls, ""); code != http.StatusNoContent {
 		t.Fatalf("archive=%d", code)
 	}
-	if code, _ := call(f.teacher, http.MethodDelete, base+"/classes/"+cls, ""); code != http.StatusNotFound {
+	if code, _ := call(f.admin, http.MethodDelete, base+"/classes/"+cls, ""); code != http.StatusNotFound {
 		t.Fatalf("archive twice=%d", code)
 	}
 	// Another school's admin cannot touch this year, even with a valid id.

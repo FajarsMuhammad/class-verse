@@ -1333,7 +1333,7 @@ paths:
       - $ref: "#/components/parameters/YearID"
     get:
       operationId: listClasses
-      description: Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa.
+      description: Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa, wali kelas, jumlah guru mapel dan peran pemanggil; kelas yang diajar pemanggil lebih dulu.
       responses:
         "200":
           description: Daftar kelas
@@ -1349,7 +1349,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createClass
-      description: Pengajar/admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu.
+      description: Admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu.
       requestBody:
         required: true
         content:
@@ -1371,7 +1371,12 @@ paths:
       - $ref: "#/components/parameters/YearID"
     get:
       operationId: listRoster
-      description: Pengajar/admin. Semua anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan).
+      description: Pengajar/admin. Satu halaman anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan).
+      parameters:
+        - { name: class_id, in: query, schema: { type: string }, description: "UUID kelas, atau `none` = belum punya kelas" }
+        - { name: q, in: query, schema: { type: string, maxLength: 80 }, description: Cari nama }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 50 } }
       responses:
         "200":
           description: Roster
@@ -1379,9 +1384,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/RosterEntry" } }
+                  total: { type: integer, description: Jumlah sesuai filter }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1393,8 +1400,10 @@ paths:
     put:
       operationId: placeStudent
       description: |
-        Pengajar/admin. Menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
+        Admin menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
         ditutup, riwayat tetap). `class_id: null` mengeluarkan dari kelas. Hanya anggota berperan peserta.
+        Wali kelas hanya menambah siswa tanpa kelas ke kelasnya (409 `has_class` bila sudah punya kelas) dan
+        mengeluarkan siswa kelasnya; selain itu 403.
       requestBody:
         required: true
         content:
@@ -1409,13 +1418,212 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/academic-years/{year_id}/moves:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    post:
+      operationId: moveStudents
+      description: |
+        Pindah massal 1–50 peserta ke satu kelas (`class_id: null` = keluarkan), satu transaksi; hak sama dengan
+        placeStudent. Siswa yang gagal dilaporkan per item (`not_student`, `has_class`), sisanya tetap dipindah.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids, class_id]
+              properties:
+                user_ids: { type: array, minItems: 1, maxItems: 50, items: { type: string, format: uuid } }
+                class_id: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: Hasil per siswa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, error]
+                      properties:
+                        user_id: { type: string, format: uuid }
+                        error: { type: string, nullable: true, enum: [not_student, has_class, null] }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/copy:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    post:
+      operationId: copyYearClasses
+      description: |
+        Admin. Menyalin kelas aktif tahun sumber ke tahun ini; nama yang sudah ada dilewati dan dilaporkan.
+        `teachers: true` ikut menyalin wali kelas/guru mapel yang masih pengajar sekolah. Siswa tidak ikut.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_year_id]
+              properties:
+                from_year_id: { type: string, format: uuid }
+                teachers: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Hasil salin
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, skipped]
+                properties:
+                  created: { type: integer }
+                  skipped: { type: array, items: { type: string }, description: Nama kelas yang sudah ada }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/promotions:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    post:
+      operationId: promoteStudents
+      description: |
+        Admin. Naik kelas: siswa aktif tiap kelas sumber (tahun `from_year_id`) ditempatkan ke kelas tujuan di tahun
+        ini sesuai pemetaan eksplisit. Siswa yang sudah punya kelas di tahun ini dilewati dan dilaporkan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_year_id, mappings]
+              properties:
+                from_year_id: { type: string, format: uuid }
+                mappings:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [from_class_id, to_class_id]
+                    properties:
+                      from_class_id: { type: string, format: uuid }
+                      to_class_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Hasil naik kelas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [moved, skipped]
+                properties:
+                  moved: { type: integer }
+                  skipped: { type: array, items: { $ref: "#/components/schemas/Person" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/staff:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listStaff
+      description: Pengajar/admin. Pengajar dan admin sekolah, calon wali kelas/guru mapel.
+      responses:
+        "200":
+          description: Staf
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, display_name, role]
+                      properties:
+                        user_id: { type: string, format: uuid }
+                        display_name: { type: string }
+                        role: { type: string, enum: [teacher, admin] }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/classes/{class_id}/teachers:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: class_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listClassTeachers
+      description: Pengajar/admin. Wali kelas dan guru mapel aktif.
+      responses:
+        "200":
+          description: Pengajar kelas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ClassTeacher" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/classes/{class_id}/teachers/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: class_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: user_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: setClassTeacher
+      description: |
+        Admin. Menjadikan pengajar/admin sekolah wali kelas (menggantikan wali lama) atau guru mapel dengan mapel
+        opsional. Satu peran per orang per kelas; riwayat tetap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [homeroom, subject] }
+                subject: { type: string, maxLength: 40, description: Hanya untuk guru mapel }
+      responses:
+        "204": { description: Disimpan }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: removeClassTeacher
+      description: Admin. Mengakhiri peran orang di kelas.
+      responses:
+        "204": { description: Dilepas }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/orgs/{org_id}/classes/{class_id}:
     parameters:
       - $ref: "#/components/parameters/OrgID"
       - { name: class_id, in: path, required: true, schema: { type: string, format: uuid } }
     put:
       operationId: renameClass
-      description: Pengajar/admin.
+      description: Admin.
       requestBody:
         required: true
         content:
@@ -1433,7 +1641,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: archiveClass
-      description: Pengajar/admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); riwayat tetap.
+      description: Admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); pengajar kelas dilepas; riwayat tetap.
       responses:
         "204": { description: Diarsipkan }
         "401": { $ref: "#/components/responses/Unauthenticated" }
@@ -1816,12 +2024,29 @@ components:
         name: { type: string, minLength: 1, maxLength: 40 }
     SchoolClass:
       type: object
-      required: [id, academic_year_id, name, students]
+      required: [id, academic_year_id, name, students, subject_teachers, homeroom, my_role]
       properties:
         id: { type: string, format: uuid }
         academic_year_id: { type: string, format: uuid }
         name: { type: string }
         students: { type: integer, description: "Jumlah siswa aktif" }
+        subject_teachers: { type: integer, description: "Jumlah guru mapel aktif" }
+        homeroom: { allOf: [{ $ref: "#/components/schemas/Person" }], nullable: true, description: "Null = belum ada wali kelas" }
+        my_role: { type: string, nullable: true, enum: [homeroom, subject, null], description: "Peran pemanggil di kelas ini" }
+    Person:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    ClassTeacher:
+      type: object
+      required: [user_id, display_name, role, subject]
+      properties:
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+        role: { type: string, enum: [homeroom, subject] }
+        subject: { type: string, nullable: true }
     RosterEntry:
       type: object
       required: [user_id, display_name, avatar_key, class_id]

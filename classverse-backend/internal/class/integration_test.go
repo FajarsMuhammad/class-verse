@@ -116,13 +116,13 @@ func TestClassesAndPlacement(t *testing.T) {
 	ctx := t.Context()
 	year, _ := f.svc.CreateYear(ctx, f.admin, f.school, "2026/2027")
 	next, _ := f.svc.CreateYear(ctx, f.admin, f.school, "2027/2028")
-	a, err := f.svc.CreateClass(ctx, f.teacher, f.school, year.ID, "XI IPA 1")
+	a, err := f.svc.CreateClass(ctx, f.admin, f.school, year.ID, "XI IPA 1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, _ := f.svc.CreateClass(ctx, f.teacher, f.school, year.ID, "XI IPA 2")
+	b, _ := f.svc.CreateClass(ctx, f.admin, f.school, year.ID, "XI IPA 2")
 	var v *class.ValidationError
-	if _, err := f.svc.CreateClass(ctx, f.teacher, f.school, year.ID, " xi ipa 1 "); !errors.As(err, &v) {
+	if _, err := f.svc.CreateClass(ctx, f.admin, f.school, year.ID, " xi ipa 1 "); !errors.As(err, &v) {
 		t.Fatalf("duplicate class name (case-insensitive): %v", err)
 	}
 	if _, err := f.svc.CreateClass(ctx, f.ani, f.school, year.ID, "X"); !errors.Is(err, org.ErrForbidden) {
@@ -132,19 +132,25 @@ func TestClassesAndPlacement(t *testing.T) {
 		t.Fatalf("class in another school's year: %v", err)
 	}
 	// Only participants can be placed; teachers and outsiders cannot.
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.teacher, &a.ID); !errors.Is(err, class.ErrNotStudent) {
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.admin, &a.ID); !errors.Is(err, class.ErrNotStudent) {
 		t.Fatalf("place teacher: %v", err)
 	}
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.out, &a.ID); !errors.Is(err, class.ErrNotStudent) {
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.out, &a.ID); !errors.Is(err, class.ErrNotStudent) {
 		t.Fatalf("place outsider: %v", err)
 	}
 	if err := f.svc.Place(ctx, f.ani, f.school, year.ID, f.ani, &a.ID); !errors.Is(err, org.ErrForbidden) {
 		t.Fatalf("student places self: %v", err)
 	}
-	if err := f.svc.Place(ctx, f.teacher, f.school, next.ID, f.ani, &a.ID); !errors.Is(err, class.ErrNotFound) {
+	if err := f.svc.Place(ctx, f.admin, f.school, next.ID, f.ani, &a.ID); !errors.Is(err, class.ErrNotFound) {
 		t.Fatalf("class from another year: %v", err)
 	}
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, &a.ID); err != nil {
+	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, &a.ID); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("teacher without class role places: %v", err)
+	}
+	if _, err := f.svc.CreateClass(ctx, f.teacher, f.school, year.ID, "X"); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("teacher creates class: %v", err)
+	}
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.ani, &a.ID); err != nil {
 		t.Fatal(err)
 	}
 	// Final DB guards remain correct even when service locks/validation are bypassed.
@@ -166,18 +172,19 @@ func TestClassesAndPlacement(t *testing.T) {
 			t.Fatalf("DB constraint: want %s, got %v", tc.code, err)
 		}
 	}
-	if renamed, err := f.svc.RenameClass(ctx, f.teacher, f.school, a.ID, a.Name); err != nil || renamed.Students != 1 {
+	if renamed, err := f.svc.RenameClass(ctx, f.admin, f.school, a.ID, a.Name); err != nil || renamed.Students != 1 {
 		t.Fatalf("rename must return real student count: %+v %v", renamed, err)
 	}
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, &a.ID); err != nil {
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.ani, &a.ID); err != nil {
 		t.Fatalf("same class again is a no-op: %v", err)
 	}
 	// Move: one active row, history kept.
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, &b.ID); err != nil {
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.ani, &b.ID); err != nil {
 		t.Fatal(err)
 	}
-	roster, err := f.svc.Roster(ctx, f.teacher, f.school, year.ID)
-	if err != nil || len(roster) != 2 {
+	page, err := f.svc.Roster(ctx, f.teacher, f.school, year.ID, class.RosterFilter{Limit: 50})
+	roster := page.Items
+	if err != nil || len(roster) != 2 || page.Total != 2 {
 		t.Fatalf("roster=%+v err=%v", roster, err)
 	}
 	for _, r := range roster {
@@ -199,8 +206,8 @@ func TestClassesAndPlacement(t *testing.T) {
 		t.Fatalf("history=%+v err=%v", hist, err)
 	}
 	// A different year is independent; a non-empty class cannot be archived.
-	c, _ := f.svc.CreateClass(ctx, f.teacher, f.school, next.ID, "XII IPA 1")
-	if err := f.svc.Place(ctx, f.teacher, f.school, next.ID, f.ani, &c.ID); err != nil {
+	c, _ := f.svc.CreateClass(ctx, f.admin, f.school, next.ID, "XII IPA 1")
+	if err := f.svc.Place(ctx, f.admin, f.school, next.ID, f.ani, &c.ID); err != nil {
 		t.Fatalf("second year placement: %v", err)
 	}
 	otherYear, err := f.svc.CreateYear(ctx, f.stray, f.other, "2026/2027")
@@ -214,29 +221,29 @@ func TestClassesAndPlacement(t *testing.T) {
 	if err := f.svc.Place(ctx, f.stray, f.other, otherYear.ID, f.ani, &otherClass.ID); err != nil {
 		t.Fatalf("same student/year in another school: %v", err)
 	}
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, &otherClass.ID); !errors.Is(err, class.ErrNotFound) {
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.ani, &otherClass.ID); !errors.Is(err, class.ErrNotFound) {
 		t.Fatalf("cross-school class: %v", err)
 	}
-	if err := f.svc.ArchiveClass(ctx, f.teacher, f.school, b.ID); !errors.Is(err, class.ErrClassNotEmpty) {
+	if err := f.svc.ArchiveClass(ctx, f.admin, f.school, b.ID); !errors.Is(err, class.ErrClassNotEmpty) {
 		t.Fatalf("archive non-empty: %v", err)
 	}
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, nil); err != nil {
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.ani, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.svc.ArchiveClass(ctx, f.teacher, f.school, b.ID); err != nil {
+	if err := f.svc.ArchiveClass(ctx, f.admin, f.school, b.ID); err != nil {
 		t.Fatal(err)
 	}
 	classes, _ := f.svc.Classes(ctx, f.teacher, f.school, year.ID)
 	if len(classes) != 1 || classes[0].ID != a.ID || classes[0].Students != 0 {
 		t.Fatalf("classes after archive=%+v", classes)
 	}
-	if _, err := f.svc.CreateClass(ctx, f.teacher, f.school, year.ID, "XI IPA 2"); err != nil {
+	if _, err := f.svc.CreateClass(ctx, f.admin, f.school, year.ID, "XI IPA 2"); err != nil {
 		t.Fatalf("name of archived class is free again: %v", err)
 	}
-	if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, &b.ID); !errors.Is(err, class.ErrNotFound) {
+	if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.ani, &b.ID); !errors.Is(err, class.ErrNotFound) {
 		t.Fatalf("place into archived class: %v", err)
 	}
-	if _, err := f.svc.RenameClass(ctx, f.teacher, f.school, a.ID, "XI IPA Satu"); err != nil {
+	if _, err := f.svc.RenameClass(ctx, f.admin, f.school, a.ID, "XI IPA Satu"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -248,7 +255,7 @@ func TestConcurrentPlacement(t *testing.T) {
 	year, _ := f.svc.CreateYear(ctx, f.admin, f.school, "2026/2027")
 	ids := make([]uuid.UUID, 6)
 	for i := range ids {
-		c, err := f.svc.CreateClass(ctx, f.teacher, f.school, year.ID, "Kelas "+string(rune('A'+i)))
+		c, err := f.svc.CreateClass(ctx, f.admin, f.school, year.ID, "Kelas "+string(rune('A'+i)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -258,7 +265,7 @@ func TestConcurrentPlacement(t *testing.T) {
 	for i := range 24 {
 		wg.Go(func() {
 			id := ids[i%len(ids)]
-			if err := f.svc.Place(ctx, f.teacher, f.school, year.ID, f.ani, &id); err != nil {
+			if err := f.svc.Place(ctx, f.admin, f.school, year.ID, f.ani, &id); err != nil {
 				t.Error(err)
 			}
 		})

@@ -1,6 +1,6 @@
 # C2 — Kelola kelas, siswa, dan pengajar kelas
 
-Lanjutan C1. Status: **C2a selesai; C2b–C2d belum.** Branch per slice, bertumpuk dari `teacher-workspace-fixes`.
+Lanjutan C1. Status: **C2a–C2d selesai** (migration 00017 `class_teachers`); berikutnya undangan berkelas wali kelas. Branch per slice, bertumpuk dari `teacher-workspace-fixes`.
 
 ## Keputusan (disetujui pengguna)
 
@@ -53,7 +53,11 @@ Lanjutan C1. Status: **C2a selesai; C2b–C2d belum.** Branch per slice, bertump
 ### C2d — Tahun ajaran baru
 
 - Salin struktur kelas (dan opsional pengajarnya) dari tahun sebelumnya; konflik nama dilewati dan dilaporkan.
-- Wizard naik kelas (pemetaan kelas lama → baru, pratinjau, konfirmasi) — dirancang setelah C2c dipakai.
+- Wizard naik kelas (pemetaan kelas lama → baru, pratinjau, konfirmasi); siswa yang sudah punya kelas di tahun
+  tujuan atau bukan peserta lagi dilewati dan dilaporkan.
+- Implementasi: `ClassTeachers.vue`, `StudentRoster.vue`, `YearSetup.vue`, gaya bersama `src/styles/classes.css`;
+  API `/staff`, `/classes/{id}/teachers[/{user}]`, `/academic-years/{id}/moves|copy|promotions`; bukti
+  `internal/class/c2_test.go` (real Postgres, termasuk wali ganda serentak) dan e2e `/tmp/kv-e2e/c2.mjs`.
 
 ## Lanjutan disetujui
 
