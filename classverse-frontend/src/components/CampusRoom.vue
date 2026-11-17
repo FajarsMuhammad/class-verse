@@ -377,8 +377,6 @@ onBeforeUnmount(() => {
         <template #[mapPanelKey]>
           <RoomLearningPin v-if="!org.isTeacher && !campus && !kicked && org.active && room.pin?.value" :key="current?.room_id"
             :room="room" :org-id="org.active.id" :staff="false" />
-          <PlaceList v-if="campus && map" :places="map.buildings" :selected="panelBuilding?.key" :counts="buildings"
-            @select="selectBuilding" />
           <button v-if="org.isTeacher && !campus && !kicked" type="button" class="btn-secondary leave-link" :aria-busy="leaving"
             :disabled="traveling || status !== 'open'" @click="leaveRoom">
             {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
@@ -392,6 +390,8 @@ onBeforeUnmount(() => {
             :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
             :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
             :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
+          <PlaceList v-if="campus && map" :places="map.buildings" :selected="panelBuilding?.key" :counts="buildings"
+            @select="selectBuilding" />
         </template>
         <template #chat>
           <p class="panel-note">{{ campus ? schoolName : current?.room_name }} · {{ chat.zone.name || 'Area umum' }}</p>

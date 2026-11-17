@@ -9,6 +9,19 @@ const places: Building[] = [
   { ...base, key: 'ruang-guru', name: 'Ruang Guru', description: 'Pengajar', staffOnly: true },
 ]
 
+it('is a collapsible section that remembers being closed', async () => {
+  localStorage.removeItem('kv-places-open')
+  const w = mount(PlaceList, { props: { places, counts: [] } })
+  const details = w.get('details').element as HTMLDetailsElement
+  expect(details.open).toBe(true)
+  expect(w.get('summary').text()).toContain('Gedung (2)')
+  details.open = false
+  await w.get('details').trigger('toggle')
+  expect(localStorage.getItem('kv-places-open')).toBe('0')
+  expect((mount(PlaceList, { props: { places, counts: [] } }).get('details').element as HTMLDetailsElement).open).toBe(false)
+  localStorage.removeItem('kv-places-open')
+})
+
 it('lists every place with live counts, marks the selection and emits the key', async () => {
   const w = mount(PlaceList, { props: { places, selected: 'sains', counts: [{ building_key: 'sains', people: 3, live_rooms: 1 }] } })
   const rows = w.findAll('button')

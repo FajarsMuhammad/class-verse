@@ -45,6 +45,8 @@ HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
 - Daftar **Gedung** ada di panel Peta (guru) / Belajar (peserta) saat di peta sekolah: tiap gedung + deskripsi +
   jumlah orang/live. Ini jalan keyboard & pembaca layar (peta = canvas). Memilih membuka kartu tempat yang sama
   dengan klik peta (pojok kanan atas), tanpa teleport. Tidak ada tombol/dropdown "Daftar gedung" terpisah.
+  Bagian **Gedung (n)** menempel di bawah panel (sticky), bisa diciutkan; status buka/tutup diingat
+  (`kv-places-open`). Daftar bergulir sendiri (maks 40vh).
 - Dekat pintu: kartu nama gedung + **Pilih ruang**. Pemilihan ruang tidak menutup chat.
 - Layar sempit: pilihan tampilan **Peta / Chat**; mode HP tanpa movement tetap slice 8.
 
