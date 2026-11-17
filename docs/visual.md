@@ -42,8 +42,9 @@ HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
 
 - Desktop: workspace selebar viewport dengan margin ringkas; peta mengisi area kiri dan chat tetap di kanan
   (320–360 px). Tinggi mengikuti viewport, daftar pesan scroll sendiri. Overview peta tetap, tanpa kamera follow.
-- Daftar gedung bukan sidebar permanen: tombol **Daftar gedung** membuka panel sementara di area peta;
-  memilih gedung membuka preview ruang dan petunjuk tujuan, tanpa teleport.
+- Daftar **Gedung** ada di panel Peta (guru) / Belajar (peserta) saat di peta sekolah: tiap gedung + deskripsi +
+  jumlah orang/live. Ini jalan keyboard & pembaca layar (peta = canvas). Memilih membuka kartu tempat yang sama
+  dengan klik peta (pojok kanan atas), tanpa teleport. Tidak ada tombol/dropdown "Daftar gedung" terpisah.
 - Dekat pintu: kartu nama gedung + **Pilih ruang**. Pemilihan ruang tidak menutup chat.
 - Layar sempit: pilihan tampilan **Peta / Chat**; mode HP tanpa movement tetap slice 8.
 
@@ -63,7 +64,7 @@ Sidebar kanan hanya berisi chat sehingga input chat selalu terlihat. Menggantika
 ```
 
 - Baris atas: tombol kembali (ikon + `aria-label`), nama ruang, jumlah online; pengajar menambah Kumpulkan peserta,
-  Kunci ruang, Chat semua ruangan, dan Peserta (popover moderasi). Peta sekolah: nama sekolah + Daftar gedung.
+  Kunci ruang, Chat semua ruangan, dan Peserta (popover moderasi). Peta sekolah: nama sekolah.
 - Baris bawah: mic bulat 52 px, status suara, Bicara ke semua ruang (pengajar), petunjuk gerak.
 - Kedua rail melayang di atas peta, satu baris dengan tinggi tetap 60 px; kamera di-fit di pita antara keduanya.
   Chip kanal suara berlebar tetap; pesan/error melayang di atas rail, tidak menambah tinggi. Status sambungan
@@ -203,7 +204,7 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   pada interior. Tidak ada bilah sematan di atas peta.
 - Header aplikasi dan header peta guru desktop dihapus. Peta memenuhi tinggi viewport dengan sela 4 px;
   menu awal ciut jika belum ada preferensi. Akun di bawah rel menyimpan Profil, Ganti sekolah, Moderasi,
-  Keluar akun. Identitas Kelasverse di atas rel kembali ke peta. Daftar gedung dan daftar orang ada di Belajar.
+  Keluar akun. Identitas Kelasverse di atas rel kembali ke peta. Daftar gedung dan daftar orang ada di panel Peta.
   Header halaman non-peta, peserta dan mode HP tetap.
 - Bingkai hitam luar interior dihapus; warna dinding luar memakai `--kv-map-ground` agar menyatu dengan
   viewport. Lantai, furnitur, pintu dan collision tidak berubah.

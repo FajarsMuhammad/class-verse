@@ -15,6 +15,7 @@ import DoorRooms from '@/components/DoorRooms.vue'
 import MapZoom from '@/components/MapZoom.vue'
 import MapMinimap from '@/components/MapMinimap.vue'
 import PlaceCard from '@/components/PlaceCard.vue'
+import PlaceList from '@/components/PlaceList.vue'
 import BuildingModules from '@/components/BuildingModules.vue'
 import LearningPanel from '@/components/LearningPanel.vue'
 import RoomLearningPin from '@/components/RoomLearningPin.vue'
@@ -183,24 +184,18 @@ const muted = computed(() => {
 })
 const selectedKey = ref('')
 const dismissedPlace = ref('')
-const directoryButton = ref<HTMLButtonElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
-const directoryOpen = ref(false)
 const roomsOpen = ref(false)
 const modulesOf = ref<Building | null>(null)
 const progressKey = ref(0)
-function toggleDirectory() {
-  directoryOpen.value = !directoryOpen.value
-  roomsOpen.value = false
-}
-async function closeDirectory() {
-  directoryOpen.value = false
+// Closing the room list brings the place card back; focus returns to its action.
+async function closeRooms() {
   roomsOpen.value = false
   await nextTick()
-  directoryButton.value?.focus()
+  document.querySelector<HTMLElement>('[data-testid="place-action"]')?.focus()
 }
 watch(
-  () => directoryOpen.value || roomsOpen.value,
+  roomsOpen,
   async (open) => {
     if (open) {
       await nextTick()
@@ -211,7 +206,6 @@ watch(
 function selectBuilding(key: string) {
   selectedKey.value = key
   dismissedPlace.value = ''
-  directoryOpen.value = false
   roomsOpen.value = false
 }
 function showPlaceRooms() {
@@ -233,7 +227,6 @@ function walkToPlace() {
   walkTarget = { x: building.doorX, y: building.doorY, id: (walkTarget?.id ?? 0) + 1 }
 }
 watch(campus, () => {
-  directoryOpen.value = false
   roomsOpen.value = false
   selectedKey.value = ''
 })
@@ -384,7 +377,8 @@ onBeforeUnmount(() => {
         <template #[mapPanelKey]>
           <RoomLearningPin v-if="!org.isTeacher && !campus && !kicked && org.active && room.pin?.value" :key="current?.room_id"
             :room="room" :org-id="org.active.id" :staff="false" />
-          <button v-if="org.isTeacher && campus" class="btn-secondary" @click="toggleDirectory">Daftar gedung</button>
+          <PlaceList v-if="campus && map" :places="map.buildings" :selected="panelBuilding?.key" :counts="buildings"
+            @select="selectBuilding" />
           <button v-if="org.isTeacher && !campus && !kicked" type="button" class="btn-secondary leave-link" :aria-busy="leaving"
             :disabled="traveling || status !== 'open'" @click="leaveRoom">
             {{ traveling ? 'Keluar…' : leaving ? 'Menuju pintu…' : 'Keluar ruang' }}
@@ -457,29 +451,18 @@ onBeforeUnmount(() => {
             <h1 id="map-title">{{ campus ? schoolName : current?.room_name }}</h1>
             <p role="status" data-testid="connection-status">{{ statusText }}</p>
           </div>
-          <button
-            v-if="campus"
-            ref="directoryButton"
-            class="btn-secondary"
-            :aria-expanded="directoryOpen"
-            aria-controls="building-directory"
-            @click="toggleDirectory"
-          >
-            Daftar gedung
-          </button>
 
         </header>
         <aside
-          v-if="campus && (directoryOpen || roomsOpen)"
+          v-if="campus && roomsOpen"
           id="building-directory"
           class="buildings"
-          aria-label="Pilihan gedung dan ruang"
-          @keydown.esc="closeDirectory"
+          aria-label="Pilihan ruang"
+          @keydown.esc="closeRooms"
         >
           <header class="dropdown-head">
-            <h2 v-if="directoryOpen">Daftar gedung</h2>
-            <h2 v-else aria-hidden="true">{{ panelBuilding?.name }}</h2>
-            <button ref="closeButton" class="btn-secondary close" aria-label="Tutup pilihan" @click="closeDirectory">×</button>
+            <h2 aria-hidden="true">{{ panelBuilding?.name }}</h2>
+            <button ref="closeButton" class="btn-secondary close" aria-label="Tutup pilihan ruang" @click="closeRooms">×</button>
           </header>
           <DoorRooms
             v-if="roomsOpen && panelBuilding && org.active"
@@ -489,26 +472,6 @@ onBeforeUnmount(() => {
             :at-door="canEnter"
             @travel="travel"
           />
-          <p v-if="directoryOpen">
-            Pilih gedung untuk melihat ruang, lalu jalan ke pintunya untuk masuk.
-          </p>
-          <ul v-if="directoryOpen">
-            <li v-for="b in map?.buildings ?? []" :key="b.key" :class="b.key">
-              <button
-                class="building-choice"
-                :aria-pressed="panelBuilding?.key === b.key"
-                @click="selectBuilding(b.key)"
-              >
-                {{ b.name }}
-              </button>
-              <span>{{ b.staffOnly ? 'Khusus pengajar dan admin' : b.description }}</span>
-              <span v-if="buildings.find((item) => item.building_key === b.key)"
-                >{{ buildings.find((item) => item.building_key === b.key)?.people }} orang ·
-                {{ buildings.find((item) => item.building_key === b.key)?.live_rooms }} ruang
-                live</span
-              >
-            </li>
-          </ul>
         </aside>
         <div v-if="map" class="stage">
           <GameCanvas
@@ -535,7 +498,7 @@ onBeforeUnmount(() => {
         <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
         <MapZoom v-if="campus && map" v-model="zoom" class="map-zoom" />
         <MapMinimap v-if="campus && map" :map="map" :position="position" class="map-minimap" />
-        <PlaceCard v-if="campus && panelBuilding && panelBuilding.key !== dismissedPlace && !directoryOpen && !roomsOpen"
+        <PlaceCard v-if="campus && panelBuilding && panelBuilding.key !== dismissedPlace && !roomsOpen"
           class="place-detail" :building="panelBuilding" :teacher="org.isTeacher" :at-door="canEnter"
           :disabled="traveling || status !== 'open'"
           :occupancy="buildings.find((item) => item.building_key === panelBuilding?.key)"
@@ -754,24 +717,6 @@ onBeforeUnmount(() => {
   height: 340px;
   box-sizing: border-box;
 }
-.building-choice {
-  width: 100%;
-  min-height: var(--touch-min);
-  border: 2px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-ink);
-  font: inherit;
-  font-weight: var(--weight-bold);
-  text-align: left;
-  cursor: pointer;
-  padding: var(--space-2);
-}
-.building-choice[aria-pressed='true'] {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary-strong);
-}
 h1 {
   margin: 0;
   font: var(--weight-semibold) var(--text-xl) / var(--line-tight) var(--font-display);
@@ -854,7 +799,7 @@ h1 {
   box-sizing: border-box;
   position: absolute;
   z-index: 4;
-  /* Dropdown under the "Daftar gedung" button at the right end of the top rail. */
+  /* Room list: same top-right corner as the place card it replaces. */
   top: calc(var(--touch-min) + var(--space-3) + var(--space-2));
   right: var(--space-3);
   width: min(280px, calc(100% - var(--space-6)));
