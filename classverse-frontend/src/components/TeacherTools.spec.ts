@@ -41,3 +41,10 @@ it('shows Kelas and Siswa separately; Tahun ajaran only for admin', async () => 
   await admin.get('[data-tool="years"]').trigger('click')
   expect(admin.emitted('update:modelValue')).toEqual([['years']])
 })
+it('groups tools like the Kelola design, shows the breadcrumb, and includes Rapor', async () => {
+  const w = mount(TeacherTools, { props: { orgId: 'o', userId: 'u', isAdmin: true, room, modelValue: 'gradebook' }, global: { stubs } })
+  expect(w.findAll('.nav-label').map((l) => l.text())).toEqual(['Konten belajar', 'Kelas & siswa', 'Ruang', 'Pengaturan'])
+  expect(w.get('[aria-current="page"]').text()).toBe('Rapor')
+  expect(w.get('.crumbs [aria-current]').text()).toBe('Rapor')
+  expect(w.get('.body').text()).toContain('gradebook')
+})

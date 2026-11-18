@@ -10,6 +10,7 @@ import ModuleManager from '@/components/ModuleManager.vue'
 import QuizManager from '@/components/QuizManager.vue'
 import ClassManager from '@/components/ClassManager.vue'
 import AssignmentManager from '@/components/AssignmentManager.vue'
+import GradebookReport from '@/components/GradebookReport.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
@@ -24,6 +25,7 @@ const sections = [
   { key: 'modul', label: 'Modul & kuis' },
   { key: 'kelas', label: 'Kelas & tugas' },
   { key: 'perpustakaan', label: 'Perpustakaan' },
+  { key: 'rapor', label: 'Rapor' },
 ] as const
 type Section = (typeof sections)[number]['key']
 const section = computed<Section>(() => sections.find((s) => s.key === route.query.bagian)?.key ?? 'ruang')
@@ -46,7 +48,7 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
         <InvitePanel :key="`invite-${org.active.id}`" :org-id="org.active.id" :my-role="org.active.role" :my-id="auth.me.id" />
       </template>
       <template v-else-if="section === 'modul'">
-        <ModuleManager :key="`modules-${org.active.id}`" :org-id="org.active.id" />
+        <ModuleManager :key="`modules-${org.active.id}`" :org-id="org.active.id" @assign="router.replace({ query: { ...route.query, bagian: 'kelas', modul: $event } })" />
         <QuizManager :key="`quizzes-${org.active.id}`" :org-id="org.active.id" />
         <FileUploadPanel :key="`upload-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me.id"
           :is-admin="org.active.role === 'admin'" />
@@ -60,8 +62,9 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
           <h2 class="section-title">Tahun ajaran</h2>
           <ClassManager :key="`years-${org.active.id}`" :org-id="org.active.id" is-admin view="years" />
         </template>
-        <AssignmentManager :key="`assignments-${org.active.id}`" :org-id="org.active.id" />
+        <AssignmentManager :key="`assignments-${org.active.id}`" :org-id="org.active.id" :module-id="typeof route.query.modul === 'string' ? route.query.modul : undefined" />
       </template>
+      <GradebookReport v-else-if="section === 'rapor'" embedded />
       <template v-else>
         <FileUploadPanel :key="`library-upload-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me.id"
           :is-admin="org.active.role === 'admin'" />

@@ -27,7 +27,6 @@ import type { Building, Seat } from '@/realtime/mapdata'
 import ChatPanel from '@/components/ChatPanel.vue'
 import LibraryCatalog from '@/components/LibraryCatalog.vue'
 import RoomStations from '@/components/RoomStations.vue'
-import RoomTools from '@/components/RoomTools.vue'
 import SideMenu, { type SideItem } from '@/components/SideMenu.vue'
 import type { Shelf } from '@/api/types'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -126,14 +125,12 @@ const icons = {
   quizzes: 'M12 3l9 5-9 5-9-5zM6 11v5l6 3 6-3v-5',
   classes: 'M8 11a3 3 0 100-6 3 3 0 000 6zM16 11a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 8 1 8 5',
   assignments: 'M9 4h6v3H9zM6 6h12v15H6zM9 12l2 2 4-4',
-  gradebook: 'M5 20V10M12 20V4M19 20v-7',
   rooms: 'M4 20V8l8-5 8 5v12M9 20v-6h6v6',
   files: 'M6 3h8l4 4v14H6zM14 3v4h4',
   moderation: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',
 } as const
 const toolItems = computed<SideItem[]>(() => org.isTeacher && !kicked.value ? [
   { key: 'tools', label: 'Kelola', icon: icons.classes, wide: true },
-  { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
 ] : [])
 // Unread dot on Chat while its panel is closed (ChatState is not reactive; chatVersion tracks it).
 const seenChat = ref(0)
@@ -405,7 +402,6 @@ onBeforeUnmount(() => {
           <TeacherTools v-if="org.active && auth.me" v-model="selectedTool" :org-id="org.active.id" :user-id="auth.me.id"
             :is-admin="org.active.role === 'admin'" :room="room" @pinned="sideItem = 'map'" />
         </template>
-        <template #gradebook><RoomTools v-if="org.active && auth.me" tool="gradebook" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" /></template>
       </SideMenu>
       <div class="map-column" :class="{ 'map-hidden': pageOpen }" :inert="pageOpen">
       <div class="map-frame">

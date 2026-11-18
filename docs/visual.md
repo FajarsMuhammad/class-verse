@@ -302,3 +302,18 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   kedaluwarsa, dan dikeluarkan menampilkan alasan nyata tanpa redirect ke login akun.
 - Bukti browser lokal: viewport 1440×1000 dan 390×844 tanpa overflow horizontal/page error.
   Safari/iOS dan perangkat fisik belum diverifikasi.
+
+
+### Content Studio — referensi modul dan kuis
+
+Referensi: `docs/modul-quiz/Kelasverse — Pembuat Modul & Quiz.html` beserta empat screenshot di folder sama.
+Editor memakai tiga panel sejajar: outline bagian/soal, form konten, dan ringkasan pengaturan.
+Pada layar sempit panel ditumpuk; kontrol, fokus, dan warna tetap memakai token aplikasi.
+Pembuatan modul menyediakan struktur bacaan, praktikum, atau kosong. Struktur tetap draf yang perlu diisi guru.
+Pratinjau kuis memakai kartu pertanyaan dan empat pilihan berwarna, dua kolom termasuk HP.
+Tidak menambahkan XP, timer, impor dokumen/CSV otomatis, mode ujian/Arena, jenis soal baru, atau akses publik.
+Aturan revisi immutable, konflik draf, nilai lulus dan percobaan tidak berubah. Lampiran memakai File belajar yang sudah ada.
+
+Bukti lokal: unit frontend 237 tes lulus sebelum tambahan tes struktur modul; tes terfokus modul/kuis/player lulus setelahnya;
+lint/build lulus; browser `content-studio.mjs` lulus; `studio-design.mjs` memeriksa editor pada 1440×1000 dan 390×844,
+tanpa overflow halaman maupun runtime error. Skrip browser sementara berada di `/tmp/kv-e2e/` (belum CI).

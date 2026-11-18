@@ -6,6 +6,7 @@ import { quizApi, shapes } from '@/api/quizzes'
 import type { Level, QuestionInput, Quiz, QuizInput, QuizQuestion } from '@/api/types'
 import { useAuthorLeave } from './useAuthorLeave'
 import QuizPlayer from './QuizPlayer.vue'
+import StatusTabs from './StatusTabs.vue'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Kuis (Q1-01): staff author four-option quizzes per building and level. Started attempts keep
@@ -26,7 +27,19 @@ const message = ref('')
 const error = ref('')
 const levelFilter = ref<Level | ''>('')
 const selected = ref<string | null>(null)
-const visible = computed(() => quizzes.value.filter((item) => !levelFilter.value || item.level === levelFilter.value))
+const statusFilter = ref('all')
+const buildingFilter = ref('')
+const search = ref('')
+const filtered = computed(() => quizzes.value.filter((item) => (!levelFilter.value || item.level === levelFilter.value) &&
+  (!buildingFilter.value || item.building_key === buildingFilter.value) && item.title.toLowerCase().includes(search.value.trim().toLowerCase())))
+const statusTabs = computed(() => [
+  { key: 'all', label: 'Semua', count: filtered.value.length },
+  { key: 'published', label: 'Terbit', count: filtered.value.filter((q) => q.published).length },
+  { key: 'draft', label: 'Draf', count: filtered.value.filter((q) => !q.published).length },
+])
+const visible = computed(() => filtered.value.filter((item) => statusFilter.value === 'all' || item.published === (statusFilter.value === 'published')))
+const unpublishable = computed(() => quizzes.value.filter((q) => !q.published && !q.question_count))
+// TODO(api): kolom "Modul" (kuis dipakai modul mana) dan "Lihat hasil" per kuis butuh endpoint baru; ditanyakan dulu (handoff §4).
 const active = computed(() => quizzes.value.find((item) => item.id === selected.value))
 const preview = ref(false)
 const history=ref<{id:string;revision:number}[]>([])
@@ -175,15 +188,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="manager authoring quiz-manager" :aria-labelledby="`${id}-title`">
-    <header v-if="!selected && !editing" class="head">
-      <h2 :id="`${id}-title`" class="title">Kuis</h2>
+  <section class="manager authoring quiz-manager studio" :class="{ 'studio-active': selected || editing }" :aria-labelledby="`${id}-title`">
+    <header v-if="!selected && !editing" class="head page-head">
+      <div>
+        <h2 :id="`${id}-title`" class="title">Kuis</h2>
+        <p class="sub">Pilihan ganda (4 opsi) atau benar/salah. Server menilai; kunci dan pembahasan terlihat setelah kuis selesai.
+          Siswa boleh mengulang, rapor memakai nilai tertinggi.</p>
+      </div>
       <button v-if="!editing" type="button" class="btn-primary" :disabled="!choices.length" @click="edit()">+ Kuis baru</button>
     </header>
-    <p v-if="!selected && !editing" class="sub">
-      Soal pilihan ganda tepat 4 pilihan. Server menilai; kunci dan penjelasan terlihat peserta setelah kuis selesai.
-      Peserta boleh mengulang; Rapor memakai nilai tertinggi.
-    </p>
+    <div v-if="!selected && !editing && unpublishable.length" class="banner warn" role="note">
+      <strong>{{ unpublishable.length }} kuis belum bisa diterbitkan</strong>
+      <span>{{ unpublishable.map((q) => `“${q.title}”`).join(', ') }} belum punya soal. Kuis butuh minimal 1 soal sebelum diterbitkan.</span>
+    </div>
     <p v-if="message" class="notice" role="status">{{ message }}</p>
     <p v-if="error" class="alert" role="alert">{{ error }} {{ !editing ? fields.questions : '' }}</p>
 
@@ -201,21 +218,38 @@ onMounted(async () => {
     </div>
     <p v-if="active && !active.published && !active.question_count" class="hint">Tambahkan minimal satu soal sebelum menerbitkan.</p>
     <div v-if="!selected && !editing" class="catalog">
-      <label :for="`${id}-filter`">Jenjang</label>
-      <select :id="`${id}-filter`" v-model="levelFilter" aria-label="Filter jenjang">
-        <option value="">Semua jenjang</option>
-        <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
-      </select>
-      <p v-if="!visible.length" class="hint">{{ quizzes.length ? 'Belum ada kuis untuk jenjang ini.' : 'Belum ada kuis. Buat kuis pertama.' }}</p>
-      <ul class="catalog-list">
-        <li v-for="item in visible" :key="item.id" class="catalog-row">
-          <div><strong>{{ item.title }}</strong>
-            <p class="meta">{{ buildingName(item.building_key) }} · {{ item.level }} · {{ item.question_count }} soal · lulus {{ item.pass_score }}</p>
-          </div>
-          <span class="chip">{{ item.published ? 'Terbit' : 'Draf' }}</span>
-          <button type="button" class="btn-secondary" :aria-label="`Buka ${item.title}`" @click="openItem(item)">Buka</button>
-        </li>
-      </ul>
+      <div class="toolbar">
+        <StatusTabs v-model="statusFilter" :items="statusTabs" label="Status kuis" :controls="`${id}-table`" />
+        <div class="filters">
+          <label :for="`${id}-building`">Gedung</label>
+          <select :id="`${id}-building`" v-model="buildingFilter"><option value="">Semua gedung</option><option v-for="b in choices" :key="b.key" :value="b.key">{{ b.name }}</option></select>
+          <label :for="`${id}-filter`">Jenjang</label>
+          <select :id="`${id}-filter`" v-model="levelFilter" aria-label="Filter jenjang">
+            <option value="">Semua jenjang</option>
+            <option v-for="level in levels" :key="level" :value="level">{{ level }}</option>
+          </select>
+        </div>
+      </div>
+      <label :for="`${id}-search`" class="sr">Cari kuis</label>
+      <input :id="`${id}-search`" v-model="search" type="search" class="search" placeholder="Cari kuis…" />
+      <p v-if="!visible.length" class="empty">{{ quizzes.length ? 'Tidak ada kuis yang cocok dengan filter ini.' : 'Belum ada kuis. Buat kuis pertama.' }}</p>
+      <div v-else class="table-wrap">
+        <table :id="`${id}-table`" class="data-table">
+          <thead><tr><th scope="col">Kuis</th><th scope="col">Soal</th><th scope="col">Nilai lulus</th><th scope="col">Status</th><th scope="col"><span class="sr">Aksi</span></th></tr></thead>
+          <tbody>
+            <tr v-for="item in visible" :key="item.id" class="catalog-row">
+              <th scope="row"><strong>{{ item.title }}</strong><small>{{ buildingName(item.building_key) }} · {{ item.level }}</small></th>
+              <td :class="{ danger: !item.question_count }">{{ item.question_count }} soal</td>
+              <td>{{ item.pass_score }}</td>
+              <td><span :class="['chip', item.published ? 'ok' : 'draft']">{{ item.published ? 'Terbit' : 'Draf' }}</span></td>
+              <td class="row-actions">
+                <button type="button" :class="item.published || item.question_count ? 'btn-secondary' : 'btn-primary'" :aria-label="`${item.published ? 'Buka' : item.question_count ? 'Edit soal' : 'Tambah soal'} ${item.title}`" @click="openItem(item)">{{ item.published ? 'Buka' : item.question_count ? 'Edit soal' : '+ Tambah soal' }}</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">Kuis dengan 1–2 soal kurang akurat untuk rapor. Disarankan minimal 5 soal.</p>
     </div>
     <form v-if="editing" class="form" novalidate @submit.prevent="save">
       <h3 class="form-title">{{ editing === 'new' ? 'Kuis baru' : 'Ubah kuis' }}</h3>
@@ -260,6 +294,13 @@ onMounted(async () => {
           <button type="button" class="btn-secondary" :disabled="busy" @click="archive(z)">Arsipkan<span class="sr"> {{ z.title }}</span></button>
         </div>
       </div>
+      <div class="studio-workspace" :class="{ 'is-editing': !!questionFor }">
+      <nav v-if="!preview" class="studio-outline" aria-label="Daftar soal">
+        <h4>Soal</h4>
+        <button v-for="(q, i) in z.questions ?? []" :key="q.id" type="button" :aria-current="questionEditing === q.id && questionFor ? 'step' : undefined" :disabled="busy" @click="mayLeave() && editQuestion(z, q)"><span class="outline-number">{{ i + 1 }}</span><span><small>{{ q.options.length === 2 ? 'Benar / Salah' : 'Pilihan ganda' }}</small>{{ q.prompt }}</span></button>
+        <button type="button" class="outline-add" :disabled="busy" @click="mayLeave() && editQuestion(z)">+ Tambah soal</button>
+      </nav>
+      <div class="studio-content">
       <ol v-if="!questionFor" class="questions">
         <li v-for="(q, i) in z.questions ?? []" :key="q.id">
           <div class="question-text">
@@ -289,7 +330,7 @@ onMounted(async () => {
         </select>
         <fieldset class="options-edit">
           <legend>Pilihan (tandai jawaban benar)</legend>
-          <div v-for="(_, oi) in question.options" :key="oi" class="option-row">
+          <div v-for="(_, oi) in question.options" :key="oi" :class="['option-row', `answer-${oi}`, { 'is-correct': question.answer === oi }]">
             <input :id="`${id}-qa${oi}`" v-model="question.answer" type="radio" :name="`${id}-answer`" :value="oi"
               :aria-label="`Jawaban benar: pilihan ${String.fromCharCode(65 + oi)}`" />
             <label :for="`${id}-qo${oi}`" class="shape-label"><span aria-hidden="true">{{ shapes[oi]!.symbol }}</span> {{ String.fromCharCode(65 + oi) }}</label>
@@ -309,6 +350,13 @@ onMounted(async () => {
         </div>
       </form>
       <button v-else-if="!preview" type="button" class="btn-primary add" :disabled="busy" @click="editQuestion(z)">+ Soal<span class="sr"> di {{ z.title }}</span></button>
+      </div>
+      <aside v-if="!preview" class="studio-settings" aria-label="Aturan kuis">
+        <h4>Mode kuis</h4><div class="studio-mode"><strong>Latihan</strong><p>Boleh diulang. Pembahasan muncul setelah kuis selesai.</p></div>
+        <h4>Aturan</h4><dl><dt>Nilai lulus</dt><dd>{{ z.pass_score }}</dd><dt>Percobaan</dt><dd>Tak terbatas</dd><dt>Penilaian</dt><dd>Bobot soal sama</dd></dl>
+        <p class="hint">Rapor memakai nilai tertinggi. Pratinjau tidak menyimpan hasil belajar.</p>
+      </aside>
+      </div>
     </article>
     <QuizPlayer v-if="preview && active" :org-id="orgId" :quiz-id="active.id" :title="active.title" :preview-questions="active.questions ?? []" :pass-score="active.pass_score" @close="preview=false" />
   </section>

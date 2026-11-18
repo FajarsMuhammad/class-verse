@@ -101,7 +101,7 @@ onMounted(() => {
           :class="{ answered: a >= 0, current: i === current }" @click="current = i" />
       </div>
       <p class="counter" role="status">Soal {{ current + 1 }} dari {{ attempt.questions.length }}</p>
-      <h3 class="prompt">{{ question.prompt }}</h3>
+      <div class="question-card"><p class="question-label">{{ title }} · Soal {{ current + 1 }}</p><h3 class="prompt">{{ question.prompt }}</h3></div>
       <div class="options" role="group" :aria-label="`Pilihan jawaban soal ${current + 1}`">
         <button v-for="(text, i) in question.options" :key="i" type="button" :class="['option', `shape-${i}`]"
           :aria-pressed="attempt.answers[current] === i" :aria-label="`${shapes[i]!.name}: ${text}`" :disabled="busy"
@@ -148,7 +148,7 @@ onMounted(() => {
   border: 1px solid var(--kv-line);
   border-radius: var(--radius-2xl);
   box-shadow: var(--kv-shadow-card);
-  background: var(--kv-learning-surface);
+  background: var(--color-live-soft);
   color: var(--color-ink);
 }
 .quiz::backdrop {
@@ -193,11 +193,13 @@ h3 {
   color: var(--color-ink-muted);
 }
 .prompt {
-  margin: var(--space-2) 0 var(--space-4);
-  font-size: var(--text-xl);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-2xl);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.question-card { padding: var(--space-6); margin: var(--space-4) 0; border-radius: var(--radius-2xl); background: var(--kv-surface); }
+.question-label { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--kv-subject-diskusi); }
 .options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -205,9 +207,11 @@ h3 {
 }
 .option {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: space-between;
   gap: var(--space-3);
-  min-height: 64px;
+  min-height: 132px;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--kv-line);
   border-radius: var(--radius-lg);
@@ -218,10 +222,10 @@ h3 {
   text-align: left;
   cursor: pointer;
 }
-.shape-0 { background: var(--kv-subject-arena); }
-.shape-1 { background: var(--kv-subject-matematika); }
-.shape-2 { background: var(--kv-subject-ipa); }
-.shape-3 { background: var(--kv-subject-kreatif); }
+.shape-0 { background: var(--kv-primary-soft-text); }
+.shape-1 { background: var(--kv-subject-diskusi); }
+.shape-2 { background: var(--kv-subject-arena); }
+.shape-3 { background: var(--kv-subject-ipa); }
 .option[aria-pressed='true'] {
   outline: 4px solid var(--kv-star);
   outline-offset: 2px;
@@ -266,7 +270,10 @@ h3 {
   white-space: pre-wrap;
 }
 @media (max-width: 560px) {
-  .options { grid-template-columns: minmax(0, 1fr); }
+  .quiz { width: 100%; max-height: 100dvh; min-height: 100dvh; margin: 0; padding: var(--space-4); border-radius: 0; }
+  .option { min-height: 112px; padding: var(--space-4); }
+  .question-card { padding: var(--space-5); }
+  .prompt { font-size: var(--text-xl); }
   .finish { margin-left: 0; }
 }
 </style>

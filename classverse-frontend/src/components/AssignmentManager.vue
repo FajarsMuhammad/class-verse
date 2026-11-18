@@ -5,14 +5,14 @@ import { classApi, type AcademicYear, type SchoolClass } from '@/api/classes'
 import { moduleApi } from '@/api/modules'
 import type { Module } from '@/api/types'
 import { ApiError, errorMessage } from '@/api/client'
-const props = defineProps<{ orgId: string }>()
+const props = defineProps<{ orgId: string; moduleId?: string }>()
 const years = ref<AcademicYear[]>([])
 const year = ref('')
 const classes = ref<SchoolClass[]>([])
 const modules = ref<Module[]>([])
 const tasks = ref<Assignment[]>([])
 const classID = ref('')
-const moduleID = ref('')
+const moduleID = ref(props.moduleId ?? '')
 const due = ref('')
 const roster = ref<AssignmentRecipient[]>([])
 const rosterTitle = ref('')
