@@ -17,7 +17,7 @@ const level = ref<Level>(props.initialLevel ?? 'SD')
 const modules = ref<Module[]>([])
 const quizzes = ref<Quiz[]>([])
 // The quiz being played; stepID is set when it was opened from a module quiz step.
-const playing = ref<{ id: string; title: string; stepID?: string } | null>(null)
+const playing = ref<{ id: string; title: string; stepID?: string; moduleID?: string } | null>(null)
 const loading = ref(false)
 const error = ref('')
 const viewing = ref<ModuleStep | null>(null)
@@ -77,7 +77,7 @@ async function setDone(m: Module, step: ModuleStep) {
 function open(step: ModuleStep) {
   if (step.kind === 'kuis' && step.quiz_id) {
     viewing.value = null
-    playing.value = { id: step.quiz_id, title: step.title, stepID: step.id }
+    playing.value = { id: step.quiz_id, title: step.title, stepID: step.id, moduleID: modules.value.find(m => m.steps.some(s => s.id === step.id))?.id }
   } else if (step.kind === 'berkas' && step.file_id) {
     viewing.value = null
     reading.value = { id: step.file_id, name: step.title, kind: step.file_kind ?? 'pdf', position: step.reader_position }
@@ -152,7 +152,7 @@ function closed(position: number) {
         </button>
       </article>
     </section>
-    <QuizPlayer v-if="playing" :key="playing.id" :org-id="orgId" :quiz-id="playing.id" :title="playing.title"
+    <QuizPlayer v-if="playing" :key="playing.id" :org-id="orgId" :quiz-id="playing.id" :title="playing.title" :module-id="playing.moduleID" :step-id="playing.stepID"
       @finished="quizFinished" @close="playing = null" />
     <StepViewer v-if="viewing" :step="viewing" :steps="viewingModule?.steps" :module-title="viewingModule?.title"
       :saving="saving" @select="open" @done="viewingModule && setDone(viewingModule, $event)" @close="viewing = null" />

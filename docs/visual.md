@@ -198,6 +198,10 @@ Ukuran proporsional ala Gather. Token di `tokens.css`; komponen baru wajib memak
 - Gaya bersama penyusun berada di `src/styles/authoring.css`; gunakan ulang pola daftar → satu item →
   satu form. Jangan kembali ke kartu bersarang yang membuka semua isi sekaligus.
 
+### Content Studio (CS, 2026-11-18)
+
+Editor rich text memakai toolbar berlabel, status simpan live, konflik dengan aksi salin lokal/muat server, retry, dan pratinjau memakai renderer siswa. Kuis benar/salah memakai dua opsi; simulasi diberi label tidak disimpan. Tata letak HP tanpa overflow horizontal.
+
 ## Aturan aksesibilitas
 
 - Layar sentuh: semua yang bisa diketuk minimal 44×44 px. Mouse/trackpad: 36 px (lihat Kontrol ringkas), minimal 24 px.

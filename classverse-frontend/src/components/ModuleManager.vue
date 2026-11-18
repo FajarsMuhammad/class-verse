@@ -6,6 +6,11 @@ import { fileApi } from '@/api/files'
 import { kindLabel, levels, moduleApi } from '@/api/modules'
 import { quizApi } from '@/api/quizzes'
 import type { FileItem, Level, Module, ModuleInput, ModuleStep, Quiz, StepInput } from '@/api/types'
+import RichEditor from './RichEditor.vue'
+import RichContent from './RichContent.vue'
+import { templateRich } from './richtext'
+import { useAuthorLeave } from './useAuthorLeave'
+import { useDraftSave } from './useDraftSave'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Modul (M1-01): staff author paths per building and level. Steps are archived, never deleted.
@@ -32,6 +37,35 @@ const selected = ref<string | null>(null)
 const visible = computed(() => modules.value.filter((item) => !levelFilter.value || item.level === levelFilter.value))
 const active = computed(() => modules.value.find((item) => item.id === selected.value))
 const preview = ref(false)
+const history = ref<{id: string; revision: number}[]>([])
+const stepVersion = ref(0)
+const stepSave = useDraftSave(step, async () => {
+ const mid=stepFor.value
+ if (!mid) return
+ const body={...step.value,expected_version:stepVersion.value}
+ let saved: ModuleStep
+ try { saved=stepEditing.value==='new' ? await moduleApi.addStep(props.orgId,mid,body) : await moduleApi.updateStep(props.orgId,mid,stepEditing.value!,body) } catch(err){if(err instanceof ApiError)fields.value=err.fields;throw err}
+ stepEditing.value=saved.id
+ stepVersion.value++
+ await load()
+})
+async function reloadDraft() {
+ if (!window.confirm('Buang perubahan lokal dan muat draf server?')) return
+ stepSave.discard(); await load()
+ const m=active.value,s=m?.steps.find(s=>s.id===stepEditing.value)
+ if(m) editStep(m,s)
+}
+async function copyDraft() {
+ try {await navigator.clipboard.writeText(JSON.stringify(step.value));message.value='Perubahan lokal disalin.'}
+ catch {error.value='Gagal menyalin. Pilih dan salin isi editor sebelum memuat ulang.'}
+}
+const formBaseline=ref('')
+const formDirty=computed(()=>!!editing.value && JSON.stringify(form.value)!==formBaseline.value)
+const mayLeave=useAuthorLeave(computed(()=>stepSave.dirty.value || formDirty.value))
+const formConflict=ref(false)
+async function copyLocal(){try{await navigator.clipboard.writeText(JSON.stringify(editing.value?form.value:step.value));message.value='Perubahan lokal disalin.'}catch{error.value='Gagal menyalin; salin isi form sebelum memuat versi server.'}}
+async function reloadForm(){if(!window.confirm('Buang perubahan lokal dan muat draf server?'))return;await load();if(active.value)edit(active.value);formConflict.value=false}
+
 const pinChoosing = ref(false)
 const pinStep = ref('')
 const pinRoom = computed(() => props.room?.current.value)
@@ -53,16 +87,19 @@ async function focusEditor() {
   editorHeading.value?.focus()
 }
 function openItem(item: Module) {
+  stepSave.discard()
   selected.value = item.id
   preview.value = false
   editing.value = null
   stepFor.value = null
   fields.value = {}
   error.value = ''
+  moduleApi.history(props.orgId,item.id).then(r=>history.value=r.items).catch(err=>error.value=errorMessage(err))
   void focusEditor()
 }
 function back() {
-  if ((editing.value || stepFor.value) && !window.confirm('Tutup form tanpa menyimpan perubahan?')) return
+  if (!mayLeave()) return
+  stepSave.discard()
   selected.value = null
   editing.value = null
   stepFor.value = null
@@ -99,7 +136,7 @@ async function run(fn: () => Promise<unknown>, done: string) {
     message.value = done
     return true
   } catch (err) {
-    if (err instanceof ApiError) fields.value = err.fields
+    if (err instanceof ApiError) {fields.value = err.fields;formConflict.value=err.code==='draft_conflict'}
     error.value = errorMessage(err)
     return false
   } finally {
@@ -114,8 +151,9 @@ function edit(m?: Module) {
   editing.value = m?.id ?? 'new'
   fields.value = {}
   form.value = m
-    ? { building_key: m.building_key, level: m.level, title: m.title, description: m.description, published: m.published }
+    ? { building_key: m.building_key, level: m.level, title: m.title, description: m.description, published: false, expected_version:m.draft_version }
     : { ...blank(), level: levelFilter.value || 'SD', building_key: choices.value[0]?.key ?? '' }
+  formBaseline.value=JSON.stringify(form.value);formConflict.value=false
 }
 async function save() {
   const body = form.value
@@ -136,10 +174,9 @@ async function save() {
   }
 }
 async function setPublished(item: Module) {
-  const { building_key, level, title, description } = item
-  await run(() => moduleApi.update(props.orgId, item.id, {
-    building_key, level, title, description, published: !item.published,
-  }), item.published ? 'Kembali menjadi draf.' : 'Modul diterbitkan.')
+ if(!window.confirm('Terbitkan revisi baru? Siswa lama tetap memakai revisinya. Kuis memakai revisi terbit, bukan draf bersama.')) return
+ await run(()=>moduleApi.publish(props.orgId,item.id,item.draft_version!), 'Revisi modul diterbitkan.')
+ try{history.value=(await moduleApi.history(props.orgId,item.id)).items}catch(err){error.value=errorMessage(err)}
 }
 async function archive(m: Module) {
   if (!window.confirm(`Arsipkan modul ${m.title}? Peserta tidak bisa membukanya lagi; file tetap ada.`)) return
@@ -147,13 +184,16 @@ async function archive(m: Module) {
 }
 
 function editStep(m: Module, s?: ModuleStep) {
+  stepSave.discard()
+  stepVersion.value=m.draft_version!
   editing.value = null
   stepFor.value = m.id
   stepEditing.value = s?.id ?? 'new'
   fields.value = {}
   step.value = s
-    ? { kind: s.kind, title: s.title, body: s.body, file_id: s.file_id, video_id: s.video_id ?? '', quiz_id: s.quiz_id, minutes: s.minutes }
+    ? { kind: s.kind, title: s.title, body: s.body, file_id: s.file_id, video_id: s.video_id ?? '', quiz_id: s.quiz_id, minutes: s.minutes, rich_content:s.rich_content }
     : blankStep()
+  stepSave.reset()
   if (!files.value.length) {
     fileApi.list(props.orgId).then((r) => (files.value = r.items)).catch((err) => { error.value = errorMessage(err) })
   }
@@ -161,29 +201,33 @@ function editStep(m: Module, s?: ModuleStep) {
   quizApi.list(props.orgId, { building_key: m.building_key }).then((r) => (quizzes.value = r.items)).catch((err) => { error.value = errorMessage(err) })
 }
 async function saveStep() {
-  const mid = stepFor.value!
-  const body = {
-    ...step.value,
-    file_id: step.value.kind === 'berkas' ? step.value.file_id : null,
-    quiz_id: step.value.kind === 'kuis' ? step.value.quiz_id : null,
+ await stepSave.flush(true)
+ if(stepSave.state.value==='saved' && !stepSave.dirty.value){stepSave.discard();stepFor.value=null;message.value='Langkah disimpan.'}
+}
+function cancelStep(){if(stepSave.dirty.value && !window.confirm('Buang perubahan belum tersimpan?'))return;stepSave.discard();stepFor.value=null}
+async function applyTemplate(kind: 'article'|'steps'|'code') {
+ if(stepSave.dirty.value && !window.confirm('Ganti isi dengan struktur template?'))return
+ step.value={...step.value,rich_content:templateRich(kind),body:kind==='article'?'Judul artikel':kind==='code'?'Penjelasan':'Tujuan'}
+}
+async function addStepTemplate(){
+ const m=active.value;if(!m)return
+ if(!window.confirm('Tambahkan struktur awal dua langkah? Isi materi masih harus ditulis.'))return
+ await run(async()=>{
+  let version=m.draft_version!
+  for(const title of ['Tujuan belajar','Langkah pertama']){
+   await moduleApi.addStep(props.orgId,m.id,{...blankStep(),title,body:'Tulis materi di sini.',rich_content:templateRich('article'),expected_version:version++})
   }
-  const ok = await run(
-    () => (stepEditing.value === 'new'
-      ? moduleApi.addStep(props.orgId, mid, body)
-      : moduleApi.updateStep(props.orgId, mid, stepEditing.value!, body)),
-    `Langkah ${body.title.trim()} disimpan.`,
-  )
-  if (ok) stepFor.value = null
+ },'Struktur awal ditambahkan. Isi materi sebelum terbit.')
 }
 async function archiveStep(m: Module, s: ModuleStep) {
   if (!window.confirm(`Arsipkan langkah ${s.title}?`)) return
-  await run(() => moduleApi.archiveStep(props.orgId, m.id, s.id), `Langkah ${s.title} diarsipkan.`)
+  await run(() => moduleApi.archiveStep(props.orgId, m.id, s.id,m.draft_version), `Langkah ${s.title} diarsipkan.`)
 }
 async function move(m: Module, index: number, delta: -1 | 1) {
   const order = m.steps.map((s) => s.id)
   const [moved] = order.splice(index, 1)
   order.splice(index + delta, 0, moved!)
-  await run(() => moduleApi.reorder(props.orgId, m.id, order), `Urutan ${m.title} disimpan.`)
+  await run(() => moduleApi.reorder(props.orgId, m.id, order,m.draft_version), `Urutan ${m.title} disimpan.`)
 }
 
 onMounted(async () => {
@@ -212,7 +256,7 @@ onMounted(async () => {
     <div v-if="active && !editing && !stepFor" class="editor-actions actions">
       <button type="button" class="btn-secondary" :aria-pressed="preview" @click="preview = !preview">{{ preview ? 'Kembali menyusun' : 'Pratinjau isi' }}</button>
       <button type="button" class="btn-secondary" :disabled="busy" @click="edit(active)">Pengaturan</button>
-      <button type="button" class="btn-primary" :disabled="busy || (!active.published && !active.steps.length)" @click="setPublished(active)">{{ active.published ? 'Jadikan draf' : 'Terbitkan' }}</button>
+      <button type="button" class="btn-primary" :disabled="busy || (!active.published && !active.steps.length)" @click="setPublished(active)">{{ active.published ? 'Terbitkan revisi baru' : 'Terbitkan' }}</button>
     </div>
     <template v-if="active && room && !editing && !stepFor">
       <p v-if="pinRoom?.map_key === 'campus'" class="hint">Masuk ruang untuk menyematkan modul.</p>
@@ -236,6 +280,8 @@ onMounted(async () => {
       </template>
       <p v-else class="hint">Terbitkan modul berisi materi sebelum menyematkan.</p>
     </template>
+    <details v-if="active && history.length"><summary>Riwayat revisi terbit (hanya baca)</summary><ol><li v-for="r in history" :key="r.id">Revisi {{ r.revision }}</li></ol></details>
+    <p v-if="preview" role="status">Pratinjau — belum diterbitkan</p>
     <p v-if="active && !active.published && !active.steps.length" class="hint">Tambahkan minimal satu materi sebelum menerbitkan.</p>
     <div v-if="!selected && !editing" class="catalog">
       <label :for="`${id}-filter`">Jenjang</label>
@@ -273,10 +319,11 @@ onMounted(async () => {
         <label :for="`${id}-d`">Deskripsi</label>
         <textarea :id="`${id}-d`" v-model="form.description" maxlength="500" rows="2" />
       </div>
+      <div v-if="formConflict" class="actions"><button type="button" class="btn-secondary" @click="copyLocal">Salin perubahan lokal</button><button type="button" class="btn-secondary" @click="reloadForm">Muat versi server</button></div>
       <p v-if="editing === 'new'" class="hint">Disimpan sebagai draf. Tambahkan isi, lalu terbitkan.</p>
       <div class="actions">
         <button type="submit" class="btn-primary" :disabled="busy">Simpan</button>
-        <button type="button" class="btn-secondary" :disabled="busy" @click="editing = null">Batal</button>
+        <button type="button" class="btn-secondary" :disabled="busy" @click="mayLeave() && (editing = null)">Batal</button>
       </div>
     </form>
 
@@ -295,7 +342,7 @@ onMounted(async () => {
       </div>
       <ol v-if="!stepFor" class="steps">
         <li v-for="(s, i) in m.steps" :key="s.id">
-          <span class="step-title"><strong>{{ i + 1 }}. {{ s.title }}</strong> <small>{{ kindLabel[s.kind] }} · {{ s.minutes }} mnt</small><p v-if="preview" class="preview-body">{{ s.body }}</p></span>
+          <span class="step-title"><strong>{{ i + 1 }}. {{ s.title }}</strong> <small>{{ kindLabel[s.kind] }} · {{ s.minutes }} mnt</small><RichContent v-if="preview && s.rich_content" :content="s.rich_content" /><p v-else-if="preview" class="preview-body">{{ s.body }}</p></span>
           <span v-if="!preview" class="actions">
             <button type="button" class="btn-secondary icon" :disabled="busy || i === 0" :aria-label="`Naikkan ${s.title}`" @click="move(m, i, -1)">↑</button>
             <button type="button" class="btn-secondary icon" :disabled="busy || i === m.steps.length - 1" :aria-label="`Turunkan ${s.title}`" @click="move(m, i, 1)">↓</button>
@@ -341,21 +388,36 @@ onMounted(async () => {
             <p :class="fields.video_id ? 'field-error' : 'hint'">{{ fields.video_id || 'Diputar di dalam aplikasi lewat youtube-nocookie.com.' }}</p>
           </template>
           <label :for="`${id}-sb`">{{ step.kind === 'materi' ? 'Isi materi' : 'Catatan (opsional)' }}</label>
-          <textarea :id="`${id}-sb`" v-model="step.body" maxlength="5000" :rows="step.kind === 'materi' ? 6 : 2"
-            :aria-invalid="!!fields.body" />
+          <div v-if="step.kind==='materi'" class="rich-form">
+            <div class="actions" aria-label="Template awal">
+              <button type="button" class="btn-secondary" @click="applyTemplate('article')">Artikel</button>
+              <button type="button" class="btn-secondary" @click="applyTemplate('steps')">Langkah demi langkah</button>
+              <button type="button" class="btn-secondary" @click="applyTemplate('code')">Tutorial kode</button>
+            </div>
+            <RichEditor v-model="step.rich_content" v-model:text="step.body!" />
+          </div>
+          <textarea v-else :id="`${id}-sb`" v-model="step.body" maxlength="5000" rows="2" :aria-invalid="!!fields.body" />
           <p v-if="fields.body" class="field-error">{{ fields.body }}</p>
           <label :for="`${id}-sm`">Durasi (menit)</label>
           <input :id="`${id}-sm`" v-model.number="step.minutes" type="number" min="1" max="240" inputmode="numeric"
             :aria-invalid="!!fields.minutes" />
           <p v-if="fields.minutes" class="field-error">{{ fields.minutes }}</p>
         </div>
+        <p role="status">{{ stepSave.label.value }}</p>
+        <p v-if="stepSave.error.value" role="alert">{{ stepSave.error.value }}</p>
+        <div v-if="stepSave.state.value==='conflict'" class="actions">
+          <button type="button" class="btn-secondary" @click="copyDraft">Salin perubahan lokal</button>
+          <button type="button" class="btn-secondary" @click="reloadDraft">Muat versi server</button>
+        </div>
+        <button v-if="stepSave.state.value==='failed'" type="button" class="btn-secondary" @click="stepSave.flush()">Coba simpan lagi</button>
         <p v-if="fields.steps" class="field-error">{{ fields.steps }}</p>
         <div class="actions">
           <button type="submit" class="btn-primary" :disabled="busy">Simpan langkah</button>
-          <button type="button" class="btn-secondary" :disabled="busy" @click="stepFor = null">Batal</button>
+          <button type="button" class="btn-secondary" :disabled="busy" @click="cancelStep">Batal</button>
         </div>
       </form>
-      <button v-else-if="!preview" type="button" class="btn-primary add" :disabled="busy" @click="editStep(m)">+ Langkah<span class="sr"> di {{ m.title }}</span></button>
+      <button v-if="!preview && !stepFor" type="button" class="btn-secondary" :disabled="busy" @click="addStepTemplate">Template beberapa langkah</button>
+      <button v-if="!preview && !stepFor" type="button" class="btn-primary add" :disabled="busy" @click="editStep(m)">+ Langkah<span class="sr"> di {{ m.title }}</span></button>
     </article>
 
   </section>

@@ -31,7 +31,7 @@ Jika port 5432, 1025, atau 8025 sudah dipakai di mesinmu, ubah `POSTGRES_PORT`, 
 | --- | --- |
 | `make up` | Jalankan Postgres + Mailpit, tunggu sampai sehat |
 | `make down` | Hentikan service (volume data tetap) |
-| `make migrate` | Terapkan semua migration (goose up) |
+| `make migrate` | Terapkan migration lewat `scripts/migrate.sh` (goose sampai 00020, preflight Content Studio, lalu sisanya). Butuh `psql`. Jangan pakai `goose up` langsung melewati 00020→00021 |
 | `make migrate-down` | Rollback satu migration |
 | `make migrate-new name=...` | Buat file migration SQL baru |
 | `make api` | Generate model Go dari `api/openapi.yaml` ke `internal/platform/api` |

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, useTemplateRef } from 'vue'
+import RichContent from './RichContent.vue'
 import { embedURL, kindLabel } from '@/api/modules'
 import type { ModuleStep } from '@/api/types'
 
@@ -40,7 +41,8 @@ onMounted(() => dialog.value?.showModal())
         allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"
         sandbox="allow-scripts allow-same-origin allow-presentation" />
     </div>
-    <p v-if="step.body" class="body">{{ step.body }}</p>
+    <RichContent v-if="step.rich_content" :content="step.rich_content" />
+    <p v-else-if="step.body" class="body">{{ step.body }}</p>
     <footer v-if="steps?.length" class="controls">
       <button type="button" class="btn-secondary" :disabled="index <= 0" @click="select(-1)">Sebelumnya</button>
       <button v-if="step.kind !== 'kuis'" type="button" class="btn-secondary" :disabled="saving" :aria-pressed="step.done" @click="emit('done', step)">{{ step.done ? 'Batal selesai' : 'Selesai' }}</button>

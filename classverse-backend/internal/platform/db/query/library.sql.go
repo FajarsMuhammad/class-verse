@@ -188,6 +188,7 @@ SELECT (EXISTS (SELECT 1 FROM library_books b
     WHERE b.org_id = $1 AND b.file_id = $2 AND b.archived_at IS NULL)
   OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
     WHERE s.org_id = $1 AND s.file_id = $2 AND s.archived_at IS NULL AND m.archived_at IS NULL)
+  OR EXISTS (SELECT 1 FROM module_revision_steps s WHERE s.org_id=$1 AND s.file_id=$2)
   OR EXISTS (SELECT 1 FROM assignment_steps s WHERE s.org_id=$1 AND s.file_id=$2))::boolean
 `
 
@@ -207,9 +208,7 @@ func (q *Queries) FileInUse(ctx context.Context, arg FileInUseParams) (bool, err
 const filePublished = `-- name: FilePublished :one
 SELECT (EXISTS (SELECT 1 FROM library_books b
     WHERE b.org_id = $1 AND b.file_id = $2 AND b.archived_at IS NULL AND b.published_at IS NOT NULL)
-  OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
-    WHERE s.org_id = $1 AND s.file_id = $2 AND s.archived_at IS NULL
-      AND m.archived_at IS NULL AND m.published_at IS NOT NULL))::boolean
+)::boolean
 `
 
 type FilePublishedParams struct {

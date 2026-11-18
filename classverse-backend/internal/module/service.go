@@ -1,12 +1,12 @@
 // Package module manages learning paths (M1): a module per campus building and level, made of
 // ordered steps (short text, an F1 file read in-app, or a YouTube video).
 //
-// Revision rule (approved 2026-11-13): published modules are edited in place; steps are never
-// deleted, only archived, so M2 progress keeps pointing at real rows.
+// Working rows are drafts; published revisions preserve stable step IDs and academic history.
 package module
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -37,6 +37,7 @@ var videoID = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
 
 // Domain errors.
 var (
+	ErrConflict    = errors.New("draft version conflict")
 	ErrNotFound    = errors.New("module not found")
 	ErrStepLimit   = errors.New("too many steps")
 	ErrBadOrdering = errors.New("order must list every active step once")
@@ -74,22 +75,25 @@ type Buildings interface {
 
 // Input is the editable part of a module.
 type Input struct {
-	BuildingKey string
-	Level       string
-	Title       string
-	Description string
-	Published   bool
+	ExpectedVersion int64
+	BuildingKey     string
+	Level           string
+	Title           string
+	Description     string
+	Published       bool
 }
 
 // StepInput is the editable part of a step.
 type StepInput struct {
-	Kind    string
-	Title   string
-	Body    string
-	FileID  *uuid.UUID
-	VideoID string
-	QuizID  *uuid.UUID
-	Minutes int
+	ExpectedVersion int64
+	RichContent     json.RawMessage
+	Kind            string
+	Title           string
+	Body            string
+	FileID          *uuid.UUID
+	VideoID         string
+	QuizID          *uuid.UUID
+	Minutes         int
 }
 
 // Step is a step with its file kind (pdf/audio) and the caller's reader position for that file.
@@ -156,6 +160,12 @@ func (s *Service) validate(in Input) (Input, error) {
 
 func validateStep(in StepInput) (StepInput, error) {
 	var v ValidationError
+	rich, err := validateRichContent(in.RichContent)
+	if err != nil {
+		v.add("rich_content", "Dokumen rich text tidak valid: "+err.Error())
+	} else {
+		in.RichContent = rich
+	}
 	var ok bool
 	if in.Title, ok = text(in.Title, 1, 120, false); !ok {
 		v.add("title", "Judul 1–120 karakter")
@@ -238,7 +248,8 @@ func checkFile(ctx context.Context, q *query.Queries, orgID uuid.UUID, id *uuid.
 	if id == nil {
 		return nil
 	}
-	if _, err := q.GetReadyFile(ctx, query.GetReadyFileParams{OrgID: orgID, ID: *id}); errors.Is(err, pgx.ErrNoRows) {
+	f, err := q.LockFile(ctx, query.LockFileParams{OrgID: orgID, ID: *id})
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && f.Status != "ready" {
 		return &ValidationError{Fields: map[string]string{"file_id": "File tidak ditemukan atau belum siap"}}
 	} else if err != nil {
 		return fmt.Errorf("get step file: %w", err)
@@ -289,7 +300,7 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Input)
 	now := s.now()
 	published := pgtype.Timestamptz{}
 	if in.Published {
-		published = pgTime(now)
+		return query.Module{}, &ValidationError{Fields: map[string]string{"steps": "Buat draf dan tambahkan langkah sebelum terbit"}}
 	}
 	m, err := query.New(s.pool).CreateModule(ctx, query.CreateModuleParams{
 		ID: uuid.New(), OrgID: orgID, BuildingKey: in.BuildingKey, Level: in.Level, Title: in.Title,
@@ -316,19 +327,19 @@ func (s *Service) Update(ctx context.Context, userID, orgID, id uuid.UUID, in In
 		if err != nil {
 			return err
 		}
-		published := pgtype.Timestamptz{}
-		if in.Published {
-			published = cur.PublishedAt
-			if !published.Valid {
-				published = pgTime(s.now())
-			}
+		if err := s.bumpDraft(ctx, q, cur, in.ExpectedVersion); err != nil {
+			return err
 		}
 		m, err = q.UpdateModule(ctx, query.UpdateModuleParams{
 			OrgID: orgID, ID: id, BuildingKey: in.BuildingKey, Level: in.Level, Title: in.Title,
-			Description: in.Description, PublishedAt: published, UpdatedAt: pgTime(s.now()),
+			Description: in.Description, UpdatedAt: pgTime(s.now()),
 		})
 		if err != nil {
 			return fmt.Errorf("update module: %w", err)
+		}
+		if in.Published {
+			m, err = s.publishLocked(ctx, q, orgID, id)
+			return err
 		}
 		return nil
 	})
@@ -373,7 +384,11 @@ func (s *Service) AddStep(ctx context.Context, userID, orgID, moduleID uuid.UUID
 	var step query.ModuleStep
 	err = s.inTx(ctx, func(q *query.Queries) error {
 		// The module lock serializes appends, so positions stay unique.
-		if _, err := s.lock(ctx, q, orgID, moduleID); err != nil {
+		cur, err := s.lock(ctx, q, orgID, moduleID)
+		if err != nil {
+			return err
+		}
+		if err := s.bumpDraft(ctx, q, cur, in.ExpectedVersion); err != nil {
 			return err
 		}
 		if err := checkFile(ctx, q, orgID, in.FileID); err != nil {
@@ -397,6 +412,10 @@ func (s *Service) AddStep(ctx context.Context, userID, orgID, moduleID uuid.UUID
 		if err != nil {
 			return fmt.Errorf("create step: %w", err)
 		}
+		if err := q.SetStepRichContent(ctx, query.SetStepRichContentParams{OrgID: orgID, ModuleID: moduleID, ID: step.ID, RichContent: in.RichContent}); err != nil {
+			return fmt.Errorf("save rich content: %w", err)
+		}
+		step.RichContent = in.RichContent
 		return nil
 	})
 	return step, err
@@ -413,7 +432,11 @@ func (s *Service) UpdateStep(ctx context.Context, userID, orgID, moduleID, stepI
 	}
 	var step query.ModuleStep
 	err = s.inTx(ctx, func(q *query.Queries) error {
-		if _, err := s.lock(ctx, q, orgID, moduleID); err != nil {
+		cur, err := s.lock(ctx, q, orgID, moduleID)
+		if err != nil {
+			return err
+		}
+		if err := s.bumpDraft(ctx, q, cur, in.ExpectedVersion); err != nil {
 			return err
 		}
 		if err := checkFile(ctx, q, orgID, in.FileID); err != nil {
@@ -432,18 +455,30 @@ func (s *Service) UpdateStep(ctx context.Context, userID, orgID, moduleID, stepI
 		if err != nil {
 			return fmt.Errorf("update step: %w", err)
 		}
+		if err := q.SetStepRichContent(ctx, query.SetStepRichContentParams{OrgID: orgID, ModuleID: moduleID, ID: step.ID, RichContent: in.RichContent}); err != nil {
+			return fmt.Errorf("save rich content: %w", err)
+		}
+		step.RichContent = in.RichContent
 		return nil
 	})
 	return step, err
 }
 
 // ArchiveStep hides a step; the row stays for progress history (teacher/admin).
-func (s *Service) ArchiveStep(ctx context.Context, userID, orgID, moduleID, stepID uuid.UUID) error {
+func (s *Service) ArchiveStep(ctx context.Context, userID, orgID, moduleID, stepID uuid.UUID, expected ...int64) error {
 	if err := s.staff(ctx, userID, orgID); err != nil {
 		return err
 	}
 	return s.inTx(ctx, func(q *query.Queries) error {
-		if _, err := s.lock(ctx, q, orgID, moduleID); err != nil {
+		cur, err := s.lock(ctx, q, orgID, moduleID)
+		if err != nil {
+			return err
+		}
+		version := int64(0)
+		if len(expected) > 0 {
+			version = expected[0]
+		}
+		if err := s.bumpDraft(ctx, q, cur, version); err != nil {
 			return err
 		}
 		n, err := q.ArchiveStep(ctx, query.ArchiveStepParams{OrgID: orgID, ModuleID: moduleID, ID: stepID, ArchivedAt: pgTime(s.now())})
@@ -458,15 +493,23 @@ func (s *Service) ArchiveStep(ctx context.Context, userID, orgID, moduleID, step
 }
 
 // Reorder sets the step order; ids must list every active step exactly once (teacher/admin).
-func (s *Service) Reorder(ctx context.Context, userID, orgID, moduleID uuid.UUID, ids []uuid.UUID) error {
+func (s *Service) Reorder(ctx context.Context, userID, orgID, moduleID uuid.UUID, ids []uuid.UUID, expected ...int64) error {
 	if err := s.staff(ctx, userID, orgID); err != nil {
 		return err
 	}
 	return s.inTx(ctx, func(q *query.Queries) error {
-		if _, err := s.lock(ctx, q, orgID, moduleID); err != nil {
+		cur, err := s.lock(ctx, q, orgID, moduleID)
+		if err != nil {
 			return err
 		}
-		cur, err := q.ActiveStepIDs(ctx, query.ActiveStepIDsParams{OrgID: orgID, ModuleID: moduleID})
+		version := int64(0)
+		if len(expected) > 0 {
+			version = expected[0]
+		}
+		if err := s.bumpDraft(ctx, q, cur, version); err != nil {
+			return err
+		}
+		currentIDs, err := q.ActiveStepIDs(ctx, query.ActiveStepIDsParams{OrgID: orgID, ModuleID: moduleID})
 		if err != nil {
 			return fmt.Errorf("list step ids: %w", err)
 		}
@@ -475,7 +518,7 @@ func (s *Service) Reorder(ctx context.Context, userID, orgID, moduleID uuid.UUID
 			slices.SortFunc(b, func(x, y uuid.UUID) int { return strings.Compare(x.String(), y.String()) })
 			return b
 		}
-		if !slices.Equal(sortIDs(cur), sortIDs(ids)) {
+		if !slices.Equal(sortIDs(currentIDs), sortIDs(ids)) {
 			return ErrBadOrdering
 		}
 		for i, id := range ids {
@@ -497,7 +540,7 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 		return nil, &ValidationError{Fields: map[string]string{"level": "Jenjang tidak dikenal"}}
 	}
 	q := query.New(s.pool)
-	params := query.ListModulesParams{OrgID: orgID, IncludeDrafts: f.Drafts && role.AtLeast(org.RoleTeacher)}
+	params := query.ListModulesParams{UserID: userID, OrgID: orgID, IncludeDrafts: f.Drafts && role.AtLeast(org.RoleTeacher)}
 	if f.BuildingKey != "" {
 		params.BuildingKey = pgtype.Text{String: f.BuildingKey, Valid: true}
 	}
@@ -525,5 +568,39 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 		i := byID[st.ModuleStep.ModuleID]
 		out[i].Steps = append(out[i].Steps, Step{ModuleStep: st.ModuleStep, FileKind: st.FileKind, ReaderPosition: st.ReaderPosition, Done: st.Done})
 	}
+	if !params.IncludeDrafts {
+		if err := s.readPublished(ctx, q, userID, orgID, ids, byID, out); err != nil {
+			return nil, err
+		}
+	}
 	return out, nil
+}
+
+// readPublished swaps learner rows for the pinned (or current published) immutable revision.
+// Read-only: pins are created by learning activity, so unstarted learners keep receiving new revisions.
+func (s *Service) readPublished(ctx context.Context, q *query.Queries, userID, orgID uuid.UUID, ids []uuid.UUID, byID map[uuid.UUID]int, out []Module) error {
+	revs, err := q.ListReadRevisions(ctx, query.ListReadRevisionsParams{UserID: userID, OrgID: orgID, ModuleIds: ids})
+	if err != nil {
+		return fmt.Errorf("read module revisions: %w", err)
+	}
+	if len(revs) != len(out) {
+		// Never fall back to working-draft rows for learners.
+		return fmt.Errorf("read module revisions: %d of %d published modules lack a revision", len(out)-len(revs), len(out))
+	}
+	revIDs := make([]uuid.UUID, len(revs))
+	for k, r := range revs {
+		i := byID[r.ModuleID]
+		revIDs[k] = r.ID
+		out[i].Title, out[i].Description, out[i].Level, out[i].BuildingKey = r.Title, r.Description, r.Level, r.BuildingKey
+		out[i].Steps = []Step{}
+	}
+	steps, err := q.ListRevisionSteps(ctx, query.ListRevisionStepsParams{UserID: userID, OrgID: orgID, RevisionIds: revIDs})
+	if err != nil {
+		return fmt.Errorf("read revision steps: %w", err)
+	}
+	for _, st := range steps {
+		i := byID[st.ModuleID]
+		out[i].Steps = append(out[i].Steps, Step{ModuleStep: query.ModuleStep{ID: st.ID, OrgID: st.OrgID, ModuleID: st.ModuleID, Position: st.Position, Kind: st.Kind, Title: st.Title, Body: st.Body, RichContent: st.RichContent, FileID: st.FileID, VideoID: st.VideoID, QuizID: st.QuizID, Minutes: st.Minutes}, FileKind: st.FileKind, ReaderPosition: st.ReaderPosition, Done: st.Done})
+	}
+	return nil
 }

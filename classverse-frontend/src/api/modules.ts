@@ -21,18 +21,20 @@ export const moduleApi = {
   },
   create: (orgID: string, body: ModuleInput) => api<Module>(base(orgID), { method: 'POST', body }),
   update: (orgID: string, id: string, body: ModuleInput) => api<Module>(one(orgID, id), { method: 'PUT', body }),
+  publish: (orgID: string, id: string, expected_version: number) => api<Module>(`${one(orgID, id)}/publish`, { method: 'POST', body: { expected_version } }),
+  history: (orgID: string, id: string) => api<{items: {id: string; revision: number}[]}>(`${one(orgID,id)}/revisions`),
   archive: (orgID: string, id: string) => api<void>(one(orgID, id), { method: 'DELETE' }),
   addStep: (orgID: string, id: string, body: StepInput) =>
     api<ModuleStep>(`${one(orgID, id)}/steps`, { method: 'POST', body }),
   updateStep: (orgID: string, id: string, stepID: string, body: StepInput) =>
     api<ModuleStep>(`${one(orgID, id)}/steps/${encodeURIComponent(stepID)}`, { method: 'PUT', body }),
-  archiveStep: (orgID: string, id: string, stepID: string) =>
-    api<void>(`${one(orgID, id)}/steps/${encodeURIComponent(stepID)}`, { method: 'DELETE' }),
+  archiveStep: (orgID: string, id: string, stepID: string, expected_version?: number) =>
+    api<void>(`${one(orgID, id)}/steps/${encodeURIComponent(stepID)}?expected_version=${expected_version ?? 0}`, { method: 'DELETE' }),
   setDone: (orgID: string, id: string, stepID: string, done: boolean) =>
     api<void>(`${one(orgID, id)}/steps/${encodeURIComponent(stepID)}/done`, { method: done ? 'PUT' : 'DELETE' }),
   resume: (orgID: string) => api<{ resume: ModuleResume | null }>(`${base(orgID)}/resume`),
-  reorder: (orgID: string, id: string, stepIDs: string[]) =>
-    api<void>(`${one(orgID, id)}/order`, { method: 'PUT', body: { step_ids: stepIDs } }),
+  reorder: (orgID: string, id: string, stepIDs: string[], expected_version?: number) =>
+    api<void>(`${one(orgID, id)}/order`, { method: 'PUT', body: { step_ids: stepIDs, expected_version } }),
 }
 
 export const levels: Level[] = ['SD', 'SMP', 'SMA', 'Umum']

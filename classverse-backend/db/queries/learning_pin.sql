@@ -5,11 +5,12 @@ WHERE rs.room_id=r.id AND r.id=sqlc.arg(room_id) AND rs.ended_at IS NULL
  AND r.map_key<>'campus' AND r.archived_at IS NULL AND actor.role IN('teacher','admin')
  AND (sqlc.narg(module_id)::uuid IS NOT NULL OR sqlc.narg(step_id)::uuid IS NULL)
  AND (sqlc.narg(module_id)::uuid IS NULL OR EXISTS(SELECT 1 FROM modules m WHERE m.org_id=r.org_id AND m.id=sqlc.narg(module_id)::uuid AND m.published_at IS NOT NULL AND m.archived_at IS NULL
-  AND (sqlc.narg(step_id)::uuid IS NULL OR EXISTS(SELECT 1 FROM module_steps s WHERE s.org_id=m.org_id AND s.module_id=m.id AND s.id=sqlc.narg(step_id)::uuid AND s.archived_at IS NULL))));
+  AND (sqlc.narg(step_id)::uuid IS NULL OR EXISTS(SELECT 1 FROM module_revision_steps s WHERE s.revision_id=m.published_revision_id AND s.org_id=m.org_id AND s.module_id=m.id AND s.id=sqlc.narg(step_id)::uuid))));
 
 -- name: GetLearningPin :one
-SELECT rs.pin_module_id,rs.pin_step_id,m.title,m.building_key,m.level
+SELECT rs.pin_module_id,rs.pin_step_id,rev.title,rev.building_key,rev.level
 FROM room_sessions rs JOIN rooms r ON r.id=rs.room_id
 JOIN modules m ON m.org_id=r.org_id AND m.id=rs.pin_module_id AND m.published_at IS NOT NULL AND m.archived_at IS NULL
+JOIN module_revisions rev ON rev.org_id=m.org_id AND rev.module_id=m.id AND rev.id=m.published_revision_id
 WHERE rs.room_id=$1 AND rs.ended_at IS NULL
- AND (rs.pin_step_id IS NULL OR EXISTS(SELECT 1 FROM module_steps s WHERE s.org_id=m.org_id AND s.module_id=m.id AND s.id=rs.pin_step_id AND s.archived_at IS NULL));
+ AND (rs.pin_step_id IS NULL OR EXISTS(SELECT 1 FROM module_revision_steps s WHERE s.org_id=m.org_id AND s.module_id=m.id AND s.id=rs.pin_step_id));

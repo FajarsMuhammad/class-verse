@@ -22,6 +22,7 @@ func TestSnapshotFileRetentionAndOrderedAccess(t *testing.T) {
 	if _, err := f.pool.Exec(ctx, `UPDATE module_steps SET kind='berkas',body='',file_id=$1 WHERE id=$2`, id, f.second); err != nil {
 		t.Fatal(err)
 	}
+	f.publish(t)
 	a, err := f.svc.Issue(ctx, f.admin, f.org, assignment.Input{ID: uuid.New(), ClassID: f.class, ModuleID: f.module})
 	if err != nil {
 		t.Fatal(err)

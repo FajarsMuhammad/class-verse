@@ -7,7 +7,7 @@ RETURNING *;
 SELECT * FROM modules WHERE org_id = $1 AND id = $2 AND archived_at IS NULL FOR UPDATE;
 
 -- name: UpdateModule :one
-UPDATE modules SET building_key = $3, level = $4, title = $5, description = $6, published_at = $7, updated_at = $8
+UPDATE modules SET building_key = $3, level = $4, title = $5, description = $6, updated_at = $7
 WHERE org_id = $1 AND id = $2 AND archived_at IS NULL
 RETURNING *;
 
@@ -16,12 +16,14 @@ UPDATE modules SET archived_at = $3, updated_at = $3 WHERE org_id = $1 AND id = 
 
 -- name: ListModules :many
 -- Staff may include drafts; archived modules never show.
-SELECT * FROM modules
-WHERE org_id = sqlc.arg(org_id) AND archived_at IS NULL
-  AND (sqlc.arg(include_drafts)::boolean OR published_at IS NOT NULL)
-  AND (sqlc.narg(building_key)::text IS NULL OR building_key = sqlc.narg(building_key))
-  AND (sqlc.narg(level)::text IS NULL OR level = sqlc.narg(level))
-ORDER BY created_at, id
+SELECT m.* FROM modules m
+LEFT JOIN module_revision_pins pin ON pin.org_id=m.org_id AND pin.module_id=m.id AND pin.user_id=sqlc.arg(user_id)
+LEFT JOIN module_revisions r ON r.id=COALESCE(pin.revision_id,m.published_revision_id)
+WHERE m.org_id = sqlc.arg(org_id) AND m.archived_at IS NULL
+  AND (sqlc.arg(include_drafts)::boolean OR m.published_at IS NOT NULL)
+  AND (sqlc.narg(building_key)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.building_key ELSE r.building_key END = sqlc.narg(building_key))
+  AND (sqlc.narg(level)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.level ELSE r.level END = sqlc.narg(level))
+ORDER BY m.created_at, m.id
 LIMIT 100;
 
 -- name: ListModuleSteps :many
@@ -59,10 +61,10 @@ SELECT id FROM module_steps WHERE org_id = $1 AND module_id = $2 AND archived_at
 UPDATE module_steps SET position = $3 WHERE module_id = $1 AND id = $2;
 
 -- name: ReadableStep :one
--- A participant can complete only an active step of a published, non-archived module.
-SELECT s.kind FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
-WHERE s.org_id = $1 AND s.module_id = $2 AND s.id = $3 AND s.archived_at IS NULL AND m.archived_at IS NULL
-  AND (sqlc.arg(staff)::boolean OR m.published_at IS NOT NULL);
+SELECT s.kind FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id
+JOIN module_revision_pins p ON p.org_id=s.org_id AND p.module_id=s.module_id AND p.revision_id=s.revision_id AND p.user_id=sqlc.arg(user_id)
+WHERE s.org_id=sqlc.arg(org_id) AND s.module_id=sqlc.arg(module_id) AND s.id=sqlc.arg(id)
+ AND m.archived_at IS NULL AND m.published_at IS NOT NULL;
 
 -- name: CompleteStep :exec
 -- Idempotent: completing again keeps the first completion time.
@@ -73,25 +75,18 @@ ON CONFLICT DO NOTHING;
 DELETE FROM module_progress WHERE org_id = $1 AND user_id = $2 AND step_id = $3;
 
 -- name: ResumeModule :one
--- "Lanjutkan belajar": the published module the member touched last that still has an unfinished active step.
-SELECT m.id, m.building_key, m.title,
-  (SELECT count(*) FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS total,
-  (SELECT count(*) FROM module_steps x JOIN module_progress y ON y.org_id = x.org_id AND y.step_id = x.id
-     AND y.user_id = sqlc.arg(user_id) WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS done,
-  (SELECT x.title FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
-     AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = sqlc.arg(user_id))
-     ORDER BY x.position, x.id LIMIT 1)::text AS next_title,
-  m.level
-FROM modules m
-JOIN module_steps s ON s.org_id = m.org_id AND s.module_id = m.id
-JOIN module_progress p ON p.org_id = s.org_id AND p.step_id = s.id AND p.user_id = sqlc.arg(user_id)
-WHERE m.org_id = sqlc.arg(org_id) AND m.archived_at IS NULL AND m.published_at IS NOT NULL
-  AND EXISTS (SELECT 1 FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
-    AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = sqlc.arg(user_id)))
-GROUP BY m.id
-ORDER BY max(p.completed_at) DESC, m.id
-LIMIT 1;
+SELECT m.id,r.building_key,r.title,r.level,
+ (SELECT count(*)::integer FROM module_revision_steps x WHERE x.revision_id=r.id) AS total,
+ (SELECT count(*)::integer FROM module_revision_steps x JOIN module_progress y ON y.org_id=x.org_id AND y.step_id=x.id AND y.user_id=sqlc.arg(user_id) WHERE x.revision_id=r.id) AS done,
+ (SELECT x.title FROM module_revision_steps x WHERE x.revision_id=r.id AND NOT EXISTS(SELECT 1 FROM module_progress y WHERE y.org_id=x.org_id AND y.step_id=x.id AND y.user_id=sqlc.arg(user_id)) ORDER BY x.position,x.id LIMIT 1)::text AS next_title
+FROM modules m JOIN module_revision_pins pin ON pin.org_id=m.org_id AND pin.module_id=m.id AND pin.user_id=sqlc.arg(user_id)
+JOIN module_revisions r ON r.org_id=pin.org_id AND r.module_id=pin.module_id AND r.id=pin.revision_id
+JOIN module_revision_steps s ON s.revision_id=r.id
+JOIN module_progress p ON p.org_id=s.org_id AND p.step_id=s.id AND p.user_id=sqlc.arg(user_id)
+WHERE m.org_id=sqlc.arg(org_id) AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+AND EXISTS(SELECT 1 FROM module_revision_steps x WHERE x.revision_id=r.id AND NOT EXISTS(SELECT 1 FROM module_progress y WHERE y.org_id=x.org_id AND y.step_id=x.id AND y.user_id=sqlc.arg(user_id)))
+GROUP BY m.id,r.id ORDER BY max(p.completed_at) DESC,m.id LIMIT 1;
 
 -- name: GetLinkableQuiz :one
 -- A quiz step may point only at a published, non-archived quiz of the same school.
-SELECT id FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL AND published_at IS NOT NULL;
+SELECT id FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL AND published_at IS NOT NULL AND published_revision_id IS NOT NULL;

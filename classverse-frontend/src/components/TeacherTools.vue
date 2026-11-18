@@ -26,6 +26,10 @@ const tool = computed(() => active.value === 'modules' && props.room.current.val
 watch(visible, (list) => {
   if (!list.some((item) => item.key === active.value)) active.value = 'modules'
 })
+function selectTool(key: string) {
+ if (!window.dispatchEvent(new Event('kv-before-panel-change', { cancelable: true }))) return
+ active.value=key
+}
 </script>
 
 <template>
@@ -33,7 +37,7 @@ watch(visible, (list) => {
     <nav class="manage-nav" aria-label="Submenu Kelola">
       <p class="nav-label">Alat pengajar</p>
       <button v-for="item in visible" :key="item.key" type="button" :data-tool="item.key"
-        :aria-current="current.key === item.key ? 'page' : undefined" @click="active = item.key">
+        :aria-current="current.key === item.key ? 'page' : undefined" @click="selectTool(item.key)">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path :d="item.icon" /></svg>
         <span>{{ item.label }}</span>
       </button>

@@ -96,11 +96,13 @@ func (q *Queries) GradebookContentFilter(ctx context.Context, arg GradebookConte
 }
 
 const gradebookModules = `-- name: GradebookModules :many
-SELECT m.id,m.title,m.building_key,m.level,(m.archived_at IS NOT NULL)::boolean AS archived,
- (SELECT count(*)::integer FROM module_steps s WHERE s.org_id=m.org_id AND s.module_id=m.id AND s.archived_at IS NULL) AS total,
- (SELECT count(*)::integer FROM module_steps s JOIN module_progress p ON p.org_id=s.org_id AND p.step_id=s.id AND p.user_id=$1
- WHERE s.org_id=m.org_id AND s.module_id=m.id AND s.archived_at IS NULL) AS done
-FROM modules m WHERE m.org_id=$2
+SELECT m.id,COALESCE(r.title,m.title)::text AS title,COALESCE(r.building_key,m.building_key)::text AS building_key,COALESCE(r.level,m.level)::text AS level,(m.archived_at IS NOT NULL)::boolean AS archived,
+ (SELECT count(*)::integer FROM module_revision_steps s WHERE s.revision_id=r.id) AS total,
+ (SELECT count(*)::integer FROM module_revision_steps s JOIN module_progress p ON p.org_id=s.org_id AND p.step_id=s.id AND p.user_id=$1
+ WHERE s.revision_id=r.id) AS done
+FROM modules m LEFT JOIN module_revision_pins pin ON pin.org_id=m.org_id AND pin.module_id=m.id AND pin.user_id=$1
+LEFT JOIN module_revisions r ON r.id=COALESCE(pin.revision_id,m.published_revision_id)
+WHERE m.org_id=$2
  AND ($3::text='' OR m.building_key=$3)
  AND ($4::uuid IS NULL OR m.id=$4::uuid)
  AND ((m.published_at IS NOT NULL AND m.archived_at IS NULL) OR EXISTS(SELECT 1 FROM module_steps s JOIN module_progress p ON p.org_id=s.org_id AND p.step_id=s.id

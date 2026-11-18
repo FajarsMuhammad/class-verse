@@ -2,11 +2,11 @@
 import { computed, onMounted, ref, useTemplateRef } from 'vue'
 import { errorMessage } from '@/api/client'
 import { quizApi, shapes } from '@/api/quizzes'
-import type { QuizAttempt } from '@/api/types'
+import type { QuizAttempt, QuizQuestion } from '@/api/types'
 
 // Q1 self-paced quiz. The server grades; the key and explanations arrive only after finishing
 // (approved rule 3). Questions are plain text, never HTML.
-const props = defineProps<{ orgId: string; quizId: string; title: string; assignmentStepId?: string }>()
+const props = defineProps<{ orgId: string; quizId: string; title: string; assignmentStepId?: string; moduleId?: string; stepId?: string; previewQuestions?: QuizQuestion[]; passScore?: number }>()
 const emit = defineEmits<{ close: []; finished: [attempt: QuizAttempt] }>()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
@@ -22,9 +22,13 @@ async function start() {
   busy.value = true
   error.value = ''
   try {
+    if (props.previewQuestions) {
+      attempt.value = { id: 'preview', quiz_id: props.quizId, questions: props.previewQuestions.map(q => ({ prompt: q.prompt, options: q.options, answer: null, explanation: null })), answers: props.previewQuestions.map(() => -1), pass_score: props.passScore ?? 60, finished: false, correct: null, score: null, passed: null }
+      return
+    }
     attempt.value = props.assignmentStepId
       ? await quizApi.start(props.orgId, props.quizId, props.assignmentStepId)
-      : await quizApi.start(props.orgId, props.quizId)
+      : await quizApi.start(props.orgId, props.quizId, undefined, props.moduleId, props.stepId)
     current.value = Math.max(0, attempt.value.answers.findIndex((a) => a < 0))
   } catch (err) {
     error.value = errorMessage(err)
@@ -40,7 +44,7 @@ async function choose(choice: number) {
   error.value = ''
   const index = current.value
   try {
-    await quizApi.answer(props.orgId, props.quizId, a.id, index, choice)
+    if (!props.previewQuestions) await quizApi.answer(props.orgId, props.quizId, a.id, index, choice)
     attempt.value = { ...a, answers: a.answers.map((v, i) => (i === index ? choice : v)) }
   } catch (err) {
     error.value = errorMessage(err)
@@ -56,9 +60,13 @@ async function finish() {
   busy.value = true
   error.value = ''
   try {
-    attempt.value = await quizApi.finish(props.orgId, props.quizId, a.id)
+    if (props.previewQuestions) {
+      const correct = props.previewQuestions.filter((q, i) => q.answer === a.answers[i]).length
+      const score = Math.floor(correct * 100 / Math.max(1, props.previewQuestions.length))
+      attempt.value = { ...a, questions: props.previewQuestions, finished: true, correct, score, passed: score >= a.pass_score }
+    } else attempt.value = await quizApi.finish(props.orgId, props.quizId, a.id)
     current.value = 0
-    emit('finished', attempt.value)
+    if (!props.previewQuestions) emit('finished', attempt.value)
   } catch (err) {
     error.value = errorMessage(err)
   } finally {
@@ -79,6 +87,7 @@ onMounted(() => {
 
 <template>
   <dialog ref="dialog" class="quiz" aria-labelledby="quiz-title" @close="emit('close')">
+    <p v-if="previewQuestions" role="status">Simulasi kuis — Hasil tidak disimpan</p>
     <header class="head">
       <h2 id="quiz-title">{{ title }}</h2>
       <button type="button" class="btn-secondary close" aria-label="Tutup kuis" @click="dialog?.close()">×</button>

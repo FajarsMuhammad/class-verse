@@ -738,17 +738,18 @@ type AssignmentRecipient struct {
 
 // AssignmentStep defines model for AssignmentStep.
 type AssignmentStep struct {
-	Body     string                  `json:"body"`
-	Done     bool                    `json:"done"`
-	FileId   *openapi_types.UUID     `json:"file_id"`
-	FileKind *AssignmentStepFileKind `json:"file_kind"`
-	Id       openapi_types.UUID      `json:"id"`
-	Kind     StepKind                `json:"kind"`
-	Minutes  int                     `json:"minutes"`
-	QuizId   *openapi_types.UUID     `json:"quiz_id"`
-	Title    string                  `json:"title"`
-	Unlocked bool                    `json:"unlocked"`
-	VideoId  *string                 `json:"video_id"`
+	Body        string                  `json:"body"`
+	Done        bool                    `json:"done"`
+	FileId      *openapi_types.UUID     `json:"file_id"`
+	FileKind    *AssignmentStepFileKind `json:"file_kind"`
+	Id          openapi_types.UUID      `json:"id"`
+	Kind        StepKind                `json:"kind"`
+	Minutes     int                     `json:"minutes"`
+	QuizId      *openapi_types.UUID     `json:"quiz_id"`
+	RichContent *RichContent            `json:"rich_content,omitempty"`
+	Title       string                  `json:"title"`
+	Unlocked    bool                    `json:"unlocked"`
+	VideoId     *string                 `json:"video_id"`
 }
 
 // AssignmentStepFileKind defines model for AssignmentStep.FileKind.
@@ -845,6 +846,14 @@ type ClassTeacher struct {
 // ClassTeacherRole defines model for ClassTeacher.Role.
 type ClassTeacherRole string
 
+// ContentRevision defines model for ContentRevision.
+type ContentRevision struct {
+	DraftVersion int64              `json:"draft_version"`
+	Id           openapi_types.UUID `json:"id"`
+	PublishedAt  time.Time          `json:"published_at"`
+	Revision     int                `json:"revision"`
+}
+
 // CreateGuestLinkRequest defines model for CreateGuestLinkRequest.
 type CreateGuestLinkRequest struct {
 	ExpiresInHours *int `json:"expires_in_hours,omitempty"`
@@ -882,6 +891,12 @@ type CreateRoomRequest struct {
 	MapKey      RoomMap    `json:"map_key"`
 	Name        string     `json:"name"`
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
+}
+
+// DraftVersionInput defines model for DraftVersionInput.
+type DraftVersionInput struct {
+	// ExpectedVersion Required for existing resource writes; stale values return draft_conflict (409)
+	ExpectedVersion int64 `json:"expected_version"`
 }
 
 // EmailRequest defines model for EmailRequest.
@@ -1132,14 +1147,19 @@ type ModerationLog struct {
 // Module defines model for Module.
 type Module struct {
 	// BuildingKey Kunci gedung di peta kampus
-	BuildingKey string             `json:"building_key"`
-	Description string             `json:"description"`
-	Id          openapi_types.UUID `json:"id"`
-	Level       Level              `json:"level"`
-	Published   bool               `json:"published"`
-	Steps       []ModuleStep       `json:"steps"`
-	Title       string             `json:"title"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	BuildingKey  string `json:"building_key"`
+	Description  string `json:"description"`
+	DraftVersion *int64 `json:"draft_version,omitempty"`
+
+	// ExpectedVersion Required for existing resource writes; stale values return draft_conflict (409)
+	ExpectedVersion     *int64              `json:"expected_version,omitempty"`
+	Id                  openapi_types.UUID  `json:"id"`
+	Level               Level               `json:"level"`
+	Published           bool                `json:"published"`
+	PublishedRevisionId *openapi_types.UUID `json:"published_revision_id,omitempty"`
+	Steps               []ModuleStep        `json:"steps"`
+	Title               string              `json:"title"`
+	UpdatedAt           time.Time           `json:"updated_at"`
 }
 
 // ModuleInput defines model for ModuleInput.
@@ -1147,9 +1167,12 @@ type ModuleInput struct {
 	// BuildingKey Kunci gedung di peta kampus
 	BuildingKey string `json:"building_key"`
 	Description string `json:"description"`
-	Level       Level  `json:"level"`
-	Published   bool   `json:"published"`
-	Title       string `json:"title"`
+
+	// ExpectedVersion Required for existing resource writes; stale values return draft_conflict (409)
+	ExpectedVersion *int64 `json:"expected_version,omitempty"`
+	Level           Level  `json:"level"`
+	Published       bool   `json:"published"`
+	Title           string `json:"title"`
 }
 
 // ModuleList defines model for ModuleList.
@@ -1186,8 +1209,9 @@ type ModuleStep struct {
 	QuizId *openapi_types.UUID `json:"quiz_id"`
 
 	// ReaderPosition Posisi baca pemanggil untuk file langkah `berkas`
-	ReaderPosition int    `json:"reader_position"`
-	Title          string `json:"title"`
+	ReaderPosition int          `json:"reader_position"`
+	RichContent    *RichContent `json:"rich_content,omitempty"`
+	Title          string       `json:"title"`
 
 	// VideoId ID video YouTube 11 karakter
 	VideoId *string `json:"video_id"`
@@ -1241,10 +1265,13 @@ type Placement struct {
 // QuestionInput defines model for QuestionInput.
 type QuestionInput struct {
 	// Answer Indeks pilihan benar
-	Answer      int      `json:"answer"`
-	Explanation *string  `json:"explanation,omitempty"`
-	Options     []string `json:"options"`
-	Prompt      string   `json:"prompt"`
+	Answer int `json:"answer"`
+
+	// ExpectedVersion Required for existing resource writes; stale values return draft_conflict (409)
+	ExpectedVersion *int64   `json:"expected_version,omitempty"`
+	Explanation     *string  `json:"explanation,omitempty"`
+	Options         []string `json:"options"`
+	Prompt          string   `json:"prompt"`
 }
 
 // Quiz defines model for Quiz.
@@ -1253,14 +1280,16 @@ type Quiz struct {
 	Attempts int `json:"attempts"`
 
 	// BestScore Nilai tertinggi pemanggil; null jika belum pernah selesai
-	BestScore     *int               `json:"best_score"`
-	BuildingKey   string             `json:"building_key"`
-	Description   string             `json:"description"`
-	Id            openapi_types.UUID `json:"id"`
-	Level         Level              `json:"level"`
-	PassScore     int                `json:"pass_score"`
-	Published     bool               `json:"published"`
-	QuestionCount int                `json:"question_count"`
+	BestScore           *int                `json:"best_score"`
+	BuildingKey         string              `json:"building_key"`
+	Description         string              `json:"description"`
+	DraftVersion        *int64              `json:"draft_version,omitempty"`
+	Id                  openapi_types.UUID  `json:"id"`
+	Level               Level               `json:"level"`
+	PassScore           int                 `json:"pass_score"`
+	Published           bool                `json:"published"`
+	PublishedRevisionId *openapi_types.UUID `json:"published_revision_id,omitempty"`
+	QuestionCount       int                 `json:"question_count"`
 
 	// Questions Hanya untuk pengajar/admin dengan drafts=true
 	Questions *[]QuizQuestion `json:"questions,omitempty"`
@@ -1289,10 +1318,13 @@ type QuizInput struct {
 	// BuildingKey Kunci gedung di peta kampus
 	BuildingKey string `json:"building_key"`
 	Description string `json:"description"`
-	Level       Level  `json:"level"`
-	PassScore   *int   `json:"pass_score,omitempty"`
-	Published   bool   `json:"published"`
-	Title       string `json:"title"`
+
+	// ExpectedVersion Required for existing resource writes; stale values return draft_conflict (409)
+	ExpectedVersion *int64 `json:"expected_version,omitempty"`
+	Level           Level  `json:"level"`
+	PassScore       *int   `json:"pass_score,omitempty"`
+	Published       bool   `json:"published"`
+	Title           string `json:"title"`
 }
 
 // QuizList defines model for QuizList.
@@ -1352,6 +1384,18 @@ type ReviewReportRequest struct {
 
 // ReviewReportRequestStatus defines model for ReviewReportRequest.Status.
 type ReviewReportRequestStatus string
+
+// RichContent defines model for RichContent.
+type RichContent struct {
+	Attrs   *map[string]interface{} `json:"attrs,omitempty"`
+	Content *[]RichContent          `json:"content,omitempty"`
+	Marks   *[]struct {
+		Attrs *map[string]interface{} `json:"attrs,omitempty"`
+		Type  string                  `json:"type"`
+	} `json:"marks,omitempty"`
+	Text *string `json:"text,omitempty"`
+	Type *string `json:"type,omitempty"`
+}
 
 // Role defines model for Role.
 type Role string
@@ -1436,14 +1480,18 @@ type StepInput struct {
 	// Body Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa.
 	Body *string `json:"body,omitempty"`
 
+	// ExpectedVersion Required for existing resource writes; stale values return draft_conflict (409)
+	ExpectedVersion *int64 `json:"expected_version,omitempty"`
+
 	// FileId Wajib untuk `berkas`: PDF/audio siap milik sekolah
 	FileId  *openapi_types.UUID `json:"file_id,omitempty"`
 	Kind    StepKind            `json:"kind"`
 	Minutes int                 `json:"minutes"`
 
 	// QuizId Wajib untuk `kuis`: kuis terbit milik sekolah
-	QuizId *openapi_types.UUID `json:"quiz_id,omitempty"`
-	Title  string              `json:"title"`
+	QuizId      *openapi_types.UUID `json:"quiz_id,omitempty"`
+	RichContent *RichContent        `json:"rich_content,omitempty"`
+	Title       string              `json:"title"`
 
 	// VideoId Wajib untuk `video`: ID atau tautan YouTube (https)
 	VideoId *string `json:"video_id,omitempty"`
@@ -1834,6 +1882,9 @@ type UpdateModuleJSONRequestBody = ModuleInput
 // ReorderModuleStepsJSONRequestBody defines body for ReorderModuleSteps for application/json ContentType.
 type ReorderModuleStepsJSONRequestBody ReorderModuleStepsJSONBody
 
+// PublishModuleRevisionJSONRequestBody defines body for PublishModuleRevision for application/json ContentType.
+type PublishModuleRevisionJSONRequestBody = DraftVersionInput
+
 // AddModuleStepJSONRequestBody defines body for AddModuleStep for application/json ContentType.
 type AddModuleStepJSONRequestBody = StepInput
 
@@ -1851,6 +1902,9 @@ type AnswerQuizQuestionJSONRequestBody AnswerQuizQuestionJSONBody
 
 // ReorderQuizQuestionsJSONRequestBody defines body for ReorderQuizQuestions for application/json ContentType.
 type ReorderQuizQuestionsJSONRequestBody ReorderQuizQuestionsJSONBody
+
+// PublishQuizRevisionJSONRequestBody defines body for PublishQuizRevision for application/json ContentType.
+type PublishQuizRevisionJSONRequestBody = DraftVersionInput
 
 // AddQuizQuestionJSONRequestBody defines body for AddQuizQuestion for application/json ContentType.
 type AddQuizQuestionJSONRequestBody = QuestionInput

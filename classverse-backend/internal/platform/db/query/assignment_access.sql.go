@@ -33,7 +33,7 @@ func (q *Queries) AssignmentFileReadable(ctx context.Context, arg AssignmentFile
 }
 
 const assignmentQuizContext = `-- name: AssignmentQuizContext :one
-SELECT s.id, s.org_id, s.assignment_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.quiz_id, s.minutes FROM assignment_steps s JOIN assignments a ON a.org_id=s.org_id AND a.id=s.assignment_id
+SELECT s.id, s.org_id, s.assignment_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.quiz_id, s.minutes, s.rich_content, s.quiz_revision_id FROM assignment_steps s JOIN assignments a ON a.org_id=s.org_id AND a.id=s.assignment_id
 JOIN assignment_recipients r ON r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=$1
 WHERE s.org_id=$2 AND s.id=$3 AND s.kind='kuis' AND a.cancelled_at IS NULL
  AND NOT EXISTS(SELECT 1 FROM assignment_steps prev WHERE prev.assignment_id=s.assignment_id AND prev.position<s.position
@@ -61,13 +61,15 @@ func (q *Queries) AssignmentQuizContext(ctx context.Context, arg AssignmentQuizC
 		&i.VideoID,
 		&i.QuizID,
 		&i.Minutes,
+		&i.RichContent,
+		&i.QuizRevisionID,
 	)
 	return i, err
 }
 
 const lockAssignmentFileReferences = `-- name: LockAssignmentFileReferences :many
 SELECT f.id FROM files f WHERE f.org_id=$1
- AND f.id IN (SELECT s.file_id FROM module_steps s WHERE s.org_id=f.org_id AND s.module_id=$2 AND s.archived_at IS NULL)
+ AND f.id IN (SELECT s.file_id FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id AND m.published_revision_id=s.revision_id WHERE s.org_id=f.org_id AND s.module_id=$2)
  ORDER BY f.id FOR UPDATE
 `
 

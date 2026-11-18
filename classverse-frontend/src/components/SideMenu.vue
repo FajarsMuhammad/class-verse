@@ -26,10 +26,12 @@ const rail = useTemplateRef<HTMLElement>('rail')
 // Only user actions move focus; the room opening a panel on entry must not steal it from the map.
 let userAction = false
 function toggle(key: string) {
+  if (!window.dispatchEvent(new Event('kv-before-panel-change', { cancelable: true }))) return
   userAction = true
   active.value = active.value === key ? null : key
 }
 function close() {
+  if (!window.dispatchEvent(new Event('kv-before-panel-change', { cancelable: true }))) return
   userAction = true
   active.value = pageOpen.value && current.value && hasMapPanel.value ? 'map' : null
 }

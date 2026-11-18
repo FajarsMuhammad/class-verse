@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/gradebook"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/module"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/dbtest"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
@@ -55,6 +56,9 @@ func TestReportsOwnershipMetricsAndFilters(t *testing.T) {
 		exec(`INSERT INTO quiz_attempts(id,org_id,quiz_id,user_id,questions,answers,pass_score,started_at,finished_at,correct,score) VALUES($1,$2,$3,$4,'[]','{}',60,now(),now()+$5*interval '1 second',0,$6)`, uuid.New(), school.ID, quizID, ani, i, score)
 	}
 	auth := org.NewService(org.NewStore(p), time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if _, err := module.NewService(p, auth, buildings{}, time.Now).Publish(ctx, admin, school.ID, m, 1); err != nil {
+		t.Fatal(err)
+	}
 	s := gradebook.NewService(p, auth, buildings{})
 	report, err := s.Student(ctx, ani, school.ID, ani, gradebook.Filter{})
 	if err != nil {

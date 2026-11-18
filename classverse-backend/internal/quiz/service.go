@@ -7,6 +7,7 @@ package quiz
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -35,6 +36,7 @@ const (
 
 // Domain errors.
 var (
+	ErrConflict      = errors.New("draft version conflict")
 	ErrNotFound      = errors.New("quiz not found")
 	ErrQuestionLimit = errors.New("too many questions")
 	ErrNoQuestions   = errors.New("quiz has no questions")
@@ -73,20 +75,22 @@ type Buildings interface {
 
 // Input is the editable part of a quiz. PassScore 0 means the default (60).
 type Input struct {
-	BuildingKey string
-	Level       string
-	Title       string
-	Description string
-	PassScore   int
-	Published   bool
+	ExpectedVersion int64
+	BuildingKey     string
+	Level           string
+	Title           string
+	Description     string
+	PassScore       int
+	Published       bool
 }
 
 // QuestionInput is one question: exactly four options, Answer is the index of the correct one.
 type QuestionInput struct {
-	Prompt      string
-	Options     []string
-	Answer      int
-	Explanation string
+	ExpectedVersion int64
+	Prompt          string
+	Options         []string
+	Answer          int
+	Explanation     string
 }
 
 // Quiz is a quiz with the caller's history and, for staff, its questions with answers.
@@ -158,11 +162,11 @@ func validateQuestion(in QuestionInput) (QuestionInput, error) {
 	if in.Explanation, ok = text(in.Explanation, 0, 500, true); !ok {
 		v.add("explanation", "Penjelasan maksimal 500 karakter")
 	}
-	if len(in.Options) != optionCount {
-		v.add("options", "Isi tepat 4 pilihan")
+	if len(in.Options) != optionCount && len(in.Options) != 2 {
+		v.add("options", "Isi tepat 4 pilihan atau 2 pilihan benar/salah")
 	} else {
 		seen := map[string]bool{}
-		opts := make([]string, optionCount)
+		opts := make([]string, len(in.Options))
 		for i, o := range in.Options {
 			o, ok = text(o, 1, 200, false)
 			key := strings.ToLower(o)
@@ -174,7 +178,7 @@ func validateQuestion(in QuestionInput) (QuestionInput, error) {
 		}
 		in.Options = opts
 	}
-	if in.Answer < 0 || in.Answer >= optionCount {
+	if in.Answer < 0 || in.Answer >= len(in.Options) {
 		v.add("answer", "Pilih jawaban benar")
 	}
 	return in, v.err()
@@ -259,26 +263,19 @@ func (s *Service) Update(ctx context.Context, userID, orgID, id uuid.UUID, in In
 		if err != nil {
 			return err
 		}
-		published := pgtype.Timestamptz{}
-		if in.Published {
-			n, err := q.NextQuestionPosition(ctx, id)
-			if err != nil {
-				return fmt.Errorf("count questions: %w", err)
-			}
-			if n == 0 {
-				return ErrNoQuestions
-			}
-			published = cur.PublishedAt
-			if !published.Valid {
-				published = pgTime(s.now())
-			}
+		if err := s.bumpDraft(ctx, q, cur, in.ExpectedVersion); err != nil {
+			return err
 		}
 		z, err = q.UpdateQuiz(ctx, query.UpdateQuizParams{
 			OrgID: orgID, ID: id, BuildingKey: in.BuildingKey, Level: in.Level, Title: in.Title,
-			Description: in.Description, PassScore: int16(in.PassScore), PublishedAt: published, UpdatedAt: pgTime(s.now()),
+			Description: in.Description, PassScore: int16(in.PassScore), PublishedAt: cur.PublishedAt, UpdatedAt: pgTime(s.now()),
 		})
 		if err != nil {
 			return fmt.Errorf("update quiz: %w", err)
+		}
+		if in.Published {
+			z, err = s.publishLocked(ctx, q, orgID, id)
+			return err
 		}
 		return nil
 	})
@@ -312,7 +309,11 @@ func (s *Service) AddQuestion(ctx context.Context, userID, orgID, quizID uuid.UU
 	var out query.QuizQuestion
 	err = s.inTx(ctx, func(q *query.Queries) error {
 		// The quiz lock serializes appends, so positions stay unique.
-		if _, err := s.lock(ctx, q, orgID, quizID); err != nil {
+		cur, err := s.lock(ctx, q, orgID, quizID)
+		if err != nil {
+			return err
+		}
+		if err := s.bumpDraft(ctx, q, cur, in.ExpectedVersion); err != nil {
 			return err
 		}
 		pos, err := q.NextQuestionPosition(ctx, quizID)
@@ -345,7 +346,11 @@ func (s *Service) UpdateQuestion(ctx context.Context, userID, orgID, quizID, id 
 	}
 	var out query.QuizQuestion
 	err = s.inTx(ctx, func(q *query.Queries) error {
-		if _, err := s.lock(ctx, q, orgID, quizID); err != nil {
+		cur, err := s.lock(ctx, q, orgID, quizID)
+		if err != nil {
+			return err
+		}
+		if err := s.bumpDraft(ctx, q, cur, in.ExpectedVersion); err != nil {
 			return err
 		}
 		out, err = q.UpdateQuestion(ctx, query.UpdateQuestionParams{
@@ -364,13 +369,20 @@ func (s *Service) UpdateQuestion(ctx context.Context, userID, orgID, quizID, id 
 }
 
 // DeleteQuestion removes a question (teacher/admin). A published quiz keeps at least one question.
-func (s *Service) DeleteQuestion(ctx context.Context, userID, orgID, quizID, id uuid.UUID) error {
+func (s *Service) DeleteQuestion(ctx context.Context, userID, orgID, quizID, id uuid.UUID, expected ...int64) error {
 	if err := s.staff(ctx, userID, orgID); err != nil {
 		return err
 	}
 	return s.inTx(ctx, func(q *query.Queries) error {
 		z, err := s.lock(ctx, q, orgID, quizID)
 		if err != nil {
+			return err
+		}
+		version := int64(0)
+		if len(expected) > 0 {
+			version = expected[0]
+		}
+		if err := s.bumpDraft(ctx, q, z, version); err != nil {
 			return err
 		}
 		n, err := q.DeleteQuestion(ctx, query.DeleteQuestionParams{OrgID: orgID, QuizID: quizID, ID: id})
@@ -394,12 +406,20 @@ func (s *Service) DeleteQuestion(ctx context.Context, userID, orgID, quizID, id 
 }
 
 // Reorder sets the question order; ids must list every question exactly once (teacher/admin).
-func (s *Service) Reorder(ctx context.Context, userID, orgID, quizID uuid.UUID, ids []uuid.UUID) error {
+func (s *Service) Reorder(ctx context.Context, userID, orgID, quizID uuid.UUID, ids []uuid.UUID, expected ...int64) error {
 	if err := s.staff(ctx, userID, orgID); err != nil {
 		return err
 	}
 	return s.inTx(ctx, func(q *query.Queries) error {
-		if _, err := s.lock(ctx, q, orgID, quizID); err != nil {
+		z, err := s.lock(ctx, q, orgID, quizID)
+		if err != nil {
+			return err
+		}
+		version := int64(0)
+		if len(expected) > 0 {
+			version = expected[0]
+		}
+		if err := s.bumpDraft(ctx, q, z, version); err != nil {
 			return err
 		}
 		cur, err := q.QuestionIDs(ctx, query.QuestionIDsParams{OrgID: orgID, QuizID: quizID})
@@ -449,6 +469,22 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	out := make([]Quiz, len(rows))
 	for i, r := range rows {
 		out[i] = Quiz{Quiz: r.Quiz, QuestionCount: r.QuestionCount, BestScore: r.BestScore, Attempts: r.Attempts}
+		if !authoring && r.Quiz.PublishedRevisionID.Valid {
+			rev, err := q.PublishedQuizRevision(ctx, query.PublishedQuizRevisionParams{OrgID: orgID, QuizID: r.Quiz.ID})
+			if err != nil {
+				return nil, fmt.Errorf("published quiz: %w", err)
+			}
+			out[i].Title = rev.Title
+			out[i].Description = rev.Description
+			out[i].PassScore = rev.PassScore
+			out[i].BuildingKey = rev.BuildingKey
+			out[i].Level = rev.Level
+			var questions []Snapshot
+			if err := json.Unmarshal(rev.Questions, &questions); err != nil {
+				return nil, fmt.Errorf("published questions: %w", err)
+			}
+			out[i].QuestionCount = int32(len(questions))
+		}
 		if authoring {
 			if out[i].Questions, err = q.ListQuizQuestions(ctx, r.Quiz.ID); err != nil {
 				return nil, fmt.Errorf("list questions: %w", err)

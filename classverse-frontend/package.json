@@ -18,6 +18,13 @@
     "api": "openapi-typescript ../classverse-backend/api/openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@tiptap/core": "^3.34.0",
+    "@tiptap/extension-task-item": "^3.34.0",
+    "@tiptap/extension-task-list": "^3.34.0",
+    "@tiptap/extension-unique-id": "^3.34.0",
+    "@tiptap/pm": "^3.34.0",
+    "@tiptap/starter-kit": "^3.34.0",
+    "@tiptap/vue-3": "^3.34.0",
     "livekit-client": "^2.23.0",
     "pdfjs-dist": "6.5.438",
     "phaser": "^3.90.0",

@@ -210,7 +210,7 @@ func TestAttemptHidesKeyGradesAndSnapshots(t *testing.T) {
 	}
 	// Unlimited retries; the list reports the best score and the finished count.
 	retry, err := f.svc.Start(ctx, f.student, f.school, id)
-	if err != nil || retry.ID == a.ID || retry.Questions[0].Prompt != "Diganti" {
+	if err != nil || retry.ID == a.ID || retry.Questions[0].Prompt != "Soal 1" {
 		t.Fatalf("retry=%+v err=%v", retry, err)
 	}
 	if low, err := f.svc.Finish(ctx, f.student, f.school, id, retry.ID); err != nil || low.Score != 0 || low.Passed() {
@@ -235,7 +235,7 @@ func TestQuizStepCompletesOnPass(t *testing.T) {
 	ctx := t.Context()
 	id := f.published(t, 0, 0)
 	mods := module.NewService(f.pool, f.orgs, buildings{"sains": false}, time.Now)
-	m, err := mods.Create(ctx, f.admin, f.school, module.Input{BuildingKey: "sains", Level: "SD", Title: "Tata Surya", Published: true})
+	m, err := mods.Create(ctx, f.admin, f.school, module.Input{BuildingKey: "sains", Level: "SD", Title: "Tata Surya"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,6 +247,9 @@ func TestQuizStepCompletesOnPass(t *testing.T) {
 	step, err := mods.AddStep(ctx, f.admin, f.school, m.ID, module.StepInput{Kind: "kuis", Title: "Kuis kecil", Minutes: 5, QuizID: &id})
 	if err != nil || !step.QuizID.Valid {
 		t.Fatalf("quiz step=%+v err=%v", step, err)
+	}
+	if _, err := mods.Publish(ctx, f.admin, f.school, m.ID, 2); err != nil {
+		t.Fatal(err)
 	}
 	if err := mods.SetDone(ctx, f.student, f.school, m.ID, step.ID, true); !errors.Is(err, module.ErrQuizStep) {
 		t.Fatalf("manual completion of quiz step: %v", err)

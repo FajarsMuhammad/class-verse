@@ -312,17 +312,19 @@ type AssignmentRecipient struct {
 }
 
 type AssignmentStep struct {
-	ID           uuid.UUID
-	OrgID        uuid.UUID
-	AssignmentID uuid.UUID
-	Position     int32
-	Kind         string
-	Title        string
-	Body         string
-	FileID       uuid.NullUUID
-	VideoID      pgtype.Text
-	QuizID       uuid.NullUUID
-	Minutes      int32
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AssignmentID   uuid.UUID
+	Position       int32
+	Kind           string
+	Title          string
+	Body           string
+	FileID         uuid.NullUUID
+	VideoID        pgtype.Text
+	QuizID         uuid.NullUUID
+	Minutes        int32
+	RichContent    []byte
+	QuizRevisionID uuid.NullUUID
 }
 
 type ChatMessage struct {
@@ -504,17 +506,19 @@ type ModerationAction struct {
 }
 
 type Module struct {
-	ID          uuid.UUID
-	OrgID       uuid.UUID
-	BuildingKey string
-	Level       string
-	Title       string
-	Description string
-	CreatedBy   uuid.UUID
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	PublishedAt pgtype.Timestamptz
-	ArchivedAt  pgtype.Timestamptz
+	ID                  uuid.UUID
+	OrgID               uuid.UUID
+	BuildingKey         string
+	Level               string
+	Title               string
+	Description         string
+	CreatedBy           uuid.UUID
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	PublishedAt         pgtype.Timestamptz
+	ArchivedAt          pgtype.Timestamptz
+	DraftVersion        int64
+	PublishedRevisionID uuid.NullUUID
 }
 
 type ModuleProgress struct {
@@ -524,21 +528,59 @@ type ModuleProgress struct {
 	CompletedAt pgtype.Timestamptz
 }
 
-type ModuleStep struct {
-	ID         uuid.UUID
+type ModuleRevision struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	ModuleID     uuid.UUID
+	Revision     int32
+	DraftVersion int64
+	BuildingKey  string
+	Level        string
+	Title        string
+	Description  string
+	PublishedAt  pgtype.Timestamptz
+}
+
+type ModuleRevisionPin struct {
 	OrgID      uuid.UUID
 	ModuleID   uuid.UUID
-	Position   int32
-	Kind       string
-	Title      string
-	Body       string
-	FileID     uuid.NullUUID
-	VideoID    pgtype.Text
-	Minutes    int32
-	CreatedAt  pgtype.Timestamptz
-	UpdatedAt  pgtype.Timestamptz
-	ArchivedAt pgtype.Timestamptz
-	QuizID     uuid.NullUUID
+	UserID     uuid.UUID
+	RevisionID uuid.UUID
+}
+
+type ModuleRevisionStep struct {
+	OrgID          uuid.UUID
+	ModuleID       uuid.UUID
+	RevisionID     uuid.UUID
+	ID             uuid.UUID
+	Position       int32
+	Kind           string
+	Title          string
+	Body           string
+	RichContent    []byte
+	FileID         uuid.NullUUID
+	VideoID        pgtype.Text
+	QuizID         uuid.NullUUID
+	QuizRevisionID uuid.NullUUID
+	Minutes        int32
+}
+
+type ModuleStep struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	ModuleID    uuid.UUID
+	Position    int32
+	Kind        string
+	Title       string
+	Body        string
+	FileID      uuid.NullUUID
+	VideoID     pgtype.Text
+	Minutes     int32
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+	QuizID      uuid.NullUUID
+	RichContent []byte
 }
 
 type Organization struct {
@@ -551,18 +593,20 @@ type Organization struct {
 }
 
 type Quiz struct {
-	ID          uuid.UUID
-	OrgID       uuid.UUID
-	BuildingKey string
-	Level       string
-	Title       string
-	Description string
-	PassScore   int16
-	CreatedBy   uuid.UUID
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	PublishedAt pgtype.Timestamptz
-	ArchivedAt  pgtype.Timestamptz
+	ID                  uuid.UUID
+	OrgID               uuid.UUID
+	BuildingKey         string
+	Level               string
+	Title               string
+	Description         string
+	PassScore           int16
+	CreatedBy           uuid.UUID
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	PublishedAt         pgtype.Timestamptz
+	ArchivedAt          pgtype.Timestamptz
+	DraftVersion        int64
+	PublishedRevisionID uuid.NullUUID
 }
 
 type QuizAttempt struct {
@@ -579,6 +623,9 @@ type QuizAttempt struct {
 	Score            pgtype.Int2
 	AssignmentID     uuid.NullUUID
 	AssignmentStepID uuid.NullUUID
+	QuizRevisionID   uuid.NullUUID
+	ModuleID         uuid.NullUUID
+	ModuleRevisionID uuid.NullUUID
 }
 
 type QuizQuestion struct {
@@ -592,6 +639,21 @@ type QuizQuestion struct {
 	Explanation string
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+}
+
+type QuizRevision struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	QuizID       uuid.UUID
+	Revision     int32
+	DraftVersion int64
+	BuildingKey  string
+	Level        string
+	Title        string
+	Description  string
+	PassScore    int16
+	Questions    []byte
+	PublishedAt  pgtype.Timestamptz
 }
 
 type ReaderPosition struct {

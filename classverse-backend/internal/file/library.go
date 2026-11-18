@@ -52,6 +52,12 @@ func (s *Service) readable(ctx context.Context, userID, orgID, id uuid.UUID) (qu
 			return fmt.Errorf("check published file: %w", err)
 		}
 		if !published {
+			published, err = q.SnapshotFileReadable(ctx, query.SnapshotFileReadableParams{OrgID: orgID, UserID: userID, FileID: uuid.NullUUID{UUID: id, Valid: true}})
+			if err != nil {
+				return fmt.Errorf("check revision file: %w", err)
+			}
+		}
+		if !published {
 			published, err = q.AssignmentFileReadable(ctx, query.AssignmentFileReadableParams{OrgID: orgID, UserID: userID, FileID: uuid.NullUUID{UUID: id, Valid: true}})
 			if err != nil {
 				return fmt.Errorf("check assignment file: %w", err)

@@ -10,17 +10,19 @@ WITH students AS (
  SELECT *,count(*) OVER()::integer AS total_students FROM students ORDER BY lower(display_name),id
  LIMIT sqlc.arg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer
 ), modules AS (
- SELECT m.id,count(s.id)::integer AS total FROM modules m
- LEFT JOIN module_steps s ON s.org_id=m.org_id AND s.module_id=m.id AND s.archived_at IS NULL
+ SELECT m.id,m.published_revision_id FROM modules m
  WHERE m.org_id=sqlc.arg(org_id) AND m.published_at IS NOT NULL AND m.archived_at IS NULL
   AND (sqlc.arg(building_key)::text='' OR m.building_key=sqlc.arg(building_key))
   AND (sqlc.narg(module_id)::uuid IS NULL OR m.id=sqlc.narg(module_id)::uuid)
- GROUP BY m.id
+
 )
 SELECT p.id,p.display_name,p.class_name,p.total_students,
  (SELECT count(*)::integer FROM modules) AS modules_total,
- (SELECT count(*)::integer FROM modules m WHERE m.total>0 AND m.total=(SELECT count(*) FROM module_progress mp JOIN module_steps s ON s.org_id=mp.org_id AND s.id=mp.step_id
-  WHERE mp.org_id=sqlc.arg(org_id) AND mp.user_id=p.id AND s.module_id=m.id AND s.archived_at IS NULL)) AS modules_done,
+ (SELECT count(*)::integer FROM modules m
+ LEFT JOIN module_revision_pins pin ON pin.org_id=sqlc.arg(org_id) AND pin.module_id=m.id AND pin.user_id=p.id
+ WHERE EXISTS(SELECT 1 FROM module_revision_steps s WHERE s.revision_id=COALESCE(pin.revision_id,m.published_revision_id))
+ AND NOT EXISTS(SELECT 1 FROM module_revision_steps s WHERE s.revision_id=COALESCE(pin.revision_id,m.published_revision_id)
+ AND NOT EXISTS(SELECT 1 FROM module_progress mp WHERE mp.org_id=sqlc.arg(org_id) AND mp.user_id=p.id AND mp.step_id=s.id))) AS modules_done,
  (SELECT count(*)::integer FROM quizzes z WHERE z.org_id=sqlc.arg(org_id) AND z.published_at IS NOT NULL AND z.archived_at IS NULL
   AND (sqlc.arg(building_key)::text='' OR z.building_key=sqlc.arg(building_key))
   AND (sqlc.narg(quiz_id)::uuid IS NULL OR z.id=sqlc.narg(quiz_id)::uuid)) AS quizzes_total,

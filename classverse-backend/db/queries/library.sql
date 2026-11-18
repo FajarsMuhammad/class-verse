@@ -46,9 +46,7 @@ SELECT user_id FROM memberships WHERE org_id = $1 AND role = 'admin' ORDER BY jo
 -- A participant may read a file only through a published, non-archived book or module step.
 SELECT (EXISTS (SELECT 1 FROM library_books b
     WHERE b.org_id = sqlc.arg(org_id) AND b.file_id = sqlc.arg(file_id) AND b.archived_at IS NULL AND b.published_at IS NOT NULL)
-  OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
-    WHERE s.org_id = sqlc.arg(org_id) AND s.file_id = sqlc.arg(file_id) AND s.archived_at IS NULL
-      AND m.archived_at IS NULL AND m.published_at IS NOT NULL))::boolean;
+)::boolean;
 
 -- name: FileInUse :one
 -- Books and module steps that are not archived keep their file from being deleted.
@@ -56,6 +54,7 @@ SELECT (EXISTS (SELECT 1 FROM library_books b
     WHERE b.org_id = sqlc.arg(org_id) AND b.file_id = sqlc.arg(file_id) AND b.archived_at IS NULL)
   OR EXISTS (SELECT 1 FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
     WHERE s.org_id = sqlc.arg(org_id) AND s.file_id = sqlc.arg(file_id) AND s.archived_at IS NULL AND m.archived_at IS NULL)
+  OR EXISTS (SELECT 1 FROM module_revision_steps s WHERE s.org_id=sqlc.arg(org_id) AND s.file_id=sqlc.arg(file_id))
   OR EXISTS (SELECT 1 FROM assignment_steps s WHERE s.org_id=sqlc.arg(org_id) AND s.file_id=sqlc.arg(file_id)))::boolean;
 
 -- name: LockMembership :one

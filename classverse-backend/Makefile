@@ -30,8 +30,8 @@ storage-up: ## Provision optional private AIStor and verify signed upload/read/r
 down: ## Stop the dev services (data volume is kept)
 	docker compose down
 
-migrate: ## Apply all migrations
-	$(GOOSE) postgres "$(DATABASE_URL)" up
+migrate: ## Apply migrations through canonical Content Studio preflight
+	bash scripts/migrate.sh
 
 migrate-down: ## Roll back the last migration
 	$(GOOSE) postgres "$(DATABASE_URL)" down

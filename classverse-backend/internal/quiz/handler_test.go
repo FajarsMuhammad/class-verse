@@ -3,6 +3,7 @@ package quiz_test
 import (
 	"crypto/ed25519"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -33,6 +34,22 @@ func TestHTTP(t *testing.T) {
 		tok, err := tokens.Issue(user)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if strings.Contains(path, "/quizzes/") && !strings.Contains(path, "/attempts") {
+			parts := strings.Split(path, "/quizzes/")
+			qid := strings.Split(parts[1], "/")[0]
+			var version int64
+			if err := f.pool.QueryRow(t.Context(), "SELECT draft_version FROM quizzes WHERE id=$1", qid).Scan(&version); err == nil {
+				if method == "DELETE" && strings.Contains(path, "/questions/") {
+					path += fmt.Sprintf("?expected_version=%d", version)
+				}
+				var payload map[string]any
+				if json.Unmarshal([]byte(body), &payload) == nil {
+					payload["expected_version"] = version
+					raw, _ := json.Marshal(payload)
+					body = string(raw)
+				}
+			}
 		}
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+tok)

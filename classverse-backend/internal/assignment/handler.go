@@ -1,6 +1,7 @@
 package assignment
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -99,17 +100,18 @@ type Response struct {
 
 // StepResponse hides locked content and retains only navigational metadata.
 type StepResponse struct {
-	ID       uuid.UUID  `json:"id"`
-	Kind     string     `json:"kind"`
-	Title    string     `json:"title"`
-	Body     string     `json:"body"`
-	FileID   *uuid.UUID `json:"file_id"`
-	FileKind *string    `json:"file_kind"`
-	VideoID  *string    `json:"video_id"`
-	QuizID   *uuid.UUID `json:"quiz_id"`
-	Minutes  int32      `json:"minutes"`
-	Done     bool       `json:"done"`
-	Unlocked bool       `json:"unlocked"`
+	RichContent json.RawMessage `json:"rich_content"`
+	ID          uuid.UUID       `json:"id"`
+	Kind        string          `json:"kind"`
+	Title       string          `json:"title"`
+	Body        string          `json:"body"`
+	FileID      *uuid.UUID      `json:"file_id"`
+	FileKind    *string         `json:"file_kind"`
+	VideoID     *string         `json:"video_id"`
+	QuizID      *uuid.UUID      `json:"quiz_id"`
+	Minutes     int32           `json:"minutes"`
+	Done        bool            `json:"done"`
+	Unlocked    bool            `json:"unlocked"`
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
@@ -164,7 +166,7 @@ func (h *Handler) steps(w http.ResponseWriter, r *http.Request) error {
 	}
 	items := make([]StepResponse, len(rows))
 	for i, s := range rows {
-		items[i] = StepResponse{ID: s.ID, Kind: s.Kind, Title: s.Title, Body: s.Body, Minutes: s.Minutes, Done: s.Done, Unlocked: s.Unlocked}
+		items[i] = StepResponse{RichContent: s.RichContent, ID: s.ID, Kind: s.Kind, Title: s.Title, Body: s.Body, Minutes: s.Minutes, Done: s.Done, Unlocked: s.Unlocked}
 		if s.FileID.Valid {
 			id := s.FileID.UUID
 			items[i].FileID = &id

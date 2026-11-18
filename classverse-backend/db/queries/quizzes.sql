@@ -21,11 +21,11 @@ SELECT sqlc.embed(z),
   -- -1 when the caller has no finished attempt yet.
   COALESCE((SELECT max(a.score) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = sqlc.arg(user_id)), -1)::smallint AS best_score,
   (SELECT count(*) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = sqlc.arg(user_id) AND a.finished_at IS NOT NULL)::integer AS attempts
-FROM quizzes z
+FROM quizzes z LEFT JOIN quiz_revisions r ON r.org_id=z.org_id AND r.quiz_id=z.id AND r.id=z.published_revision_id
 WHERE z.org_id = sqlc.arg(org_id) AND z.archived_at IS NULL
   AND (sqlc.arg(include_drafts)::boolean OR z.published_at IS NOT NULL)
-  AND (sqlc.narg(building_key)::text IS NULL OR z.building_key = sqlc.narg(building_key))
-  AND (sqlc.narg(level)::text IS NULL OR z.level = sqlc.narg(level))
+  AND (sqlc.narg(building_key)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN z.building_key ELSE r.building_key END = sqlc.narg(building_key))
+  AND (sqlc.narg(level)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN z.level ELSE r.level END = sqlc.narg(level))
 ORDER BY z.created_at, z.id
 LIMIT 100;
 
@@ -56,11 +56,12 @@ UPDATE quiz_questions SET position = $3 WHERE quiz_id = $1 AND id = $2;
 
 -- name: OpenAttempt :one
 SELECT * FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 AND finished_at IS NULL
- AND assignment_step_id IS NOT DISTINCT FROM sqlc.narg(assignment_step_id)::uuid;
+ AND assignment_step_id IS NOT DISTINCT FROM sqlc.narg(assignment_step_id)::uuid
+ AND module_revision_id IS NOT DISTINCT FROM sqlc.narg(module_revision_id)::uuid;
 
 -- name: CreateAttempt :one
-INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, assignment_id, assignment_step_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, sqlc.narg(assignment_id)::uuid, sqlc.narg(assignment_step_id)::uuid)
+INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, assignment_id, assignment_step_id,quiz_revision_id,module_id,module_revision_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, sqlc.narg(assignment_id)::uuid, sqlc.narg(assignment_step_id)::uuid,sqlc.narg(quiz_revision_id)::uuid,sqlc.narg(module_id)::uuid,sqlc.narg(module_revision_id)::uuid)
 RETURNING *;
 
 -- name: LockAttempt :one
@@ -74,11 +75,22 @@ UPDATE quiz_attempts SET answers = $2 WHERE id = $1 AND finished_at IS NULL;
 UPDATE quiz_attempts SET finished_at = $2, correct = $3, score = $4 WHERE id = $1 AND finished_at IS NULL
 RETURNING *;
 
+-- name: PinQuizModules :exec
+-- Standalone pass is learning activity: pin unpinned learners to current revisions bound to this quiz revision.
+INSERT INTO module_revision_pins(org_id,module_id,user_id,revision_id)
+SELECT m.org_id,m.id,sqlc.arg(user_id),m.published_revision_id FROM modules m
+JOIN module_revision_steps s ON s.org_id=m.org_id AND s.revision_id=m.published_revision_id
+WHERE m.org_id=sqlc.arg(org_id) AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+ AND s.quiz_id=sqlc.arg(quiz_id) AND s.quiz_revision_id=sqlc.arg(quiz_revision_id)
+ON CONFLICT DO NOTHING;
+
 -- name: CompleteQuizSteps :exec
--- Passing a quiz completes every active step pointing at it in published modules. Idempotent.
-INSERT INTO module_progress (org_id, user_id, step_id, completed_at)
-SELECT s.org_id, sqlc.arg(user_id), s.id, sqlc.arg(completed_at)
-FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
-WHERE s.org_id = sqlc.arg(org_id) AND s.quiz_id = sqlc.arg(quiz_id) AND s.archived_at IS NULL
-  AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+-- Complete only steps bound to this attempt's revision, never unrelated shared drafts.
+INSERT INTO module_progress(org_id,user_id,step_id,completed_at)
+SELECT s.org_id,sqlc.arg(user_id),s.id,sqlc.arg(completed_at)
+FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id
+JOIN module_revision_pins p ON p.org_id=s.org_id AND p.module_id=s.module_id AND p.revision_id=s.revision_id AND p.user_id=sqlc.arg(user_id)
+WHERE s.org_id=sqlc.arg(org_id) AND s.quiz_id=sqlc.arg(quiz_id) AND s.quiz_revision_id=sqlc.narg(quiz_revision_id)::uuid
+ AND (sqlc.narg(module_revision_id)::uuid IS NULL OR s.revision_id=sqlc.narg(module_revision_id)::uuid)
+ AND m.archived_at IS NULL AND m.published_at IS NOT NULL
 ON CONFLICT DO NOTHING;

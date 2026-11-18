@@ -20,11 +20,12 @@ const step = (id: string): ModuleStep => ({
   id, kind: 'materi', title: `Langkah ${id}`, body: 'x', file_id: null, file_kind: null, video_id: null, quiz_id: null, minutes: 5, reader_position: 0, done: false,
 })
 const draft: Module = {
-  id: 'm1', building_key: 'sains', level: 'SD', title: 'Tata Surya', description: '', published: false,
+  id: 'm1', draft_version:1, building_key: 'sains', level: 'SD', title: 'Tata Surya', description: '', published: false,
   updated_at: '2026-01-01T00:00:00Z', steps: [step('a'), step('b'), step('c')],
 }
 
 beforeEach(() => {
+  vi.spyOn(moduleApi, 'history').mockResolvedValue({items:[]})
   vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft] })
   vi.spyOn(fileApi, 'list').mockResolvedValue({ items: [], used_bytes: 0, quota_bytes: 1 })
 })
@@ -55,7 +56,7 @@ it('moves a step with the full new order and blocks moving past the ends', async
   expect(w.get('[aria-label="Turunkan Langkah c"]').attributes('disabled')).toBeDefined()
   await w.get('[aria-label="Turunkan Langkah a"]').trigger('click')
   await flushPromises()
-  expect(reorder).toHaveBeenCalledWith('o', 'm1', ['b', 'a', 'c'])
+  expect(reorder).toHaveBeenCalledWith('o', 'm1', ['b', 'a', 'c'],1)
 })
 
 it('adds a video step and shows server field errors next to the field', async () => {
@@ -123,7 +124,7 @@ it('starts the first content form after creating a filtered draft', async () => 
   await w.get('form').trigger('submit')
   await flushPromises()
   expect(create).toHaveBeenCalledWith('o', expect.objectContaining({ level: 'SMA', published: false }))
-  expect(w.find('textarea[maxlength="5000"]').exists()).toBe(true)
+  expect(w.find('[aria-label="Isi materi rich text"]').exists()).toBe(true)
   expect(w.find('.catalog').exists()).toBe(false)
 })
 

@@ -35,6 +35,8 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/orgs/{org_id}/quizzes", h.handle(h.list))
 	r.Post("/orgs/{org_id}/quizzes", h.handle(h.create))
+	r.Post("/orgs/{org_id}/quizzes/{quiz_id}/publish", h.handle(h.publish))
+	r.Get("/orgs/{org_id}/quizzes/{quiz_id}/revisions", h.handle(h.history))
 	r.Put("/orgs/{org_id}/quizzes/{quiz_id}", h.handle(h.update))
 	r.Delete("/orgs/{org_id}/quizzes/{quiz_id}", h.handle(h.archive))
 	r.Post("/orgs/{org_id}/quizzes/{quiz_id}/questions", h.handle(h.addQuestion))
@@ -67,6 +69,8 @@ func (h *Handler) handle(fn func(http.ResponseWriter, *http.Request) error) http
 			return nil
 		case errors.As(err, &verr):
 			return httpx.ValidationFailed(verr.Fields)
+		case errors.Is(err, ErrConflict):
+			return &httpx.Error{Status: 409, Code: "draft_conflict", Message: "Draf berubah di tab lain. Muat versi server atau salin perubahan lokal."}
 		case errors.Is(err, ErrNotFound):
 			return &httpx.Error{Status: http.StatusNotFound, Code: "not_found", Message: "Kuis atau soal tidak ditemukan"}
 		case errors.Is(err, ErrQuestionLimit):
@@ -97,18 +101,20 @@ type QuestionResponse struct {
 
 // Response is the public view of a quiz. Questions is present only for staff with drafts=true.
 type Response struct {
-	ID            uuid.UUID          `json:"id"`
-	BuildingKey   string             `json:"building_key"`
-	Level         string             `json:"level"`
-	Title         string             `json:"title"`
-	Description   string             `json:"description"`
-	PassScore     int16              `json:"pass_score"`
-	Published     bool               `json:"published"`
-	UpdatedAt     time.Time          `json:"updated_at"`
-	QuestionCount int32              `json:"question_count"`
-	BestScore     *int16             `json:"best_score"`
-	Attempts      int32              `json:"attempts"`
-	Questions     []QuestionResponse `json:"questions,omitempty"`
+	DraftVersion        int64              `json:"draft_version"`
+	PublishedRevisionID *uuid.UUID         `json:"published_revision_id"`
+	ID                  uuid.UUID          `json:"id"`
+	BuildingKey         string             `json:"building_key"`
+	Level               string             `json:"level"`
+	Title               string             `json:"title"`
+	Description         string             `json:"description"`
+	PassScore           int16              `json:"pass_score"`
+	Published           bool               `json:"published"`
+	UpdatedAt           time.Time          `json:"updated_at"`
+	QuestionCount       int32              `json:"question_count"`
+	BestScore           *int16             `json:"best_score"`
+	Attempts            int32              `json:"attempts"`
+	Questions           []QuestionResponse `json:"questions,omitempty"`
 }
 
 func toQuestion(q query.QuizQuestion) QuestionResponse {
@@ -117,7 +123,12 @@ func toQuestion(q query.QuizQuestion) QuestionResponse {
 
 func toQuiz(z Quiz) Response {
 	out := Response{
-		ID: z.ID, BuildingKey: z.BuildingKey, Level: z.Level, Title: z.Title, Description: z.Description,
+		DraftVersion: z.DraftVersion, PublishedRevisionID: func() *uuid.UUID {
+			if z.PublishedRevisionID.Valid {
+				return &z.PublishedRevisionID.UUID
+			}
+			return nil
+		}(), ID: z.ID, BuildingKey: z.BuildingKey, Level: z.Level, Title: z.Title, Description: z.Description,
 		PassScore: z.PassScore, Published: z.PublishedAt.Valid, UpdatedAt: z.UpdatedAt.Time,
 		QuestionCount: z.QuestionCount, Attempts: z.Attempts,
 	}
@@ -168,19 +179,21 @@ func toAttemptResponse(a Attempt) AttemptResponse {
 }
 
 type quizRequest struct {
-	BuildingKey string `json:"building_key"`
-	Level       string `json:"level"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	PassScore   int    `json:"pass_score"`
-	Published   bool   `json:"published"`
+	ExpectedVersion int64  `json:"expected_version"`
+	BuildingKey     string `json:"building_key"`
+	Level           string `json:"level"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	PassScore       int    `json:"pass_score"`
+	Published       bool   `json:"published"`
 }
 
 type questionRequest struct {
-	Prompt      string   `json:"prompt"`
-	Options     []string `json:"options"`
-	Answer      int      `json:"answer"`
-	Explanation string   `json:"explanation"`
+	ExpectedVersion int64    `json:"expected_version"`
+	Prompt          string   `json:"prompt"`
+	Options         []string `json:"options"`
+	Answer          int      `json:"answer"`
+	Explanation     string   `json:"explanation"`
 }
 
 // ids reads path UUIDs in order; malformed IDs are treated as not found (org.PathUUID).
@@ -241,6 +254,9 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) error {
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		return err
 	}
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
 	z, err := h.svc.Update(r.Context(), user, p[0], p[1], Input(req))
 	if err != nil {
 		return err
@@ -270,6 +286,9 @@ func (h *Handler) addQuestion(w http.ResponseWriter, r *http.Request) error {
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		return err
 	}
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
 	q, err := h.svc.AddQuestion(r.Context(), user, p[0], p[1], QuestionInput(req))
 	if err != nil {
 		return err
@@ -287,6 +306,9 @@ func (h *Handler) updateQuestion(w http.ResponseWriter, r *http.Request) error {
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		return err
 	}
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
 	q, err := h.svc.UpdateQuestion(r.Context(), user, p[0], p[1], p[2], QuestionInput(req))
 	if err != nil {
 		return err
@@ -300,7 +322,11 @@ func (h *Handler) deleteQuestion(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := h.svc.DeleteQuestion(r.Context(), user, p[0], p[1], p[2]); err != nil {
+	version, err := strconv.ParseInt(r.URL.Query().Get("expected_version"), 10, 64)
+	if err != nil || version < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
+	if err := h.svc.DeleteQuestion(r.Context(), user, p[0], p[1], p[2], version); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -313,12 +339,16 @@ func (h *Handler) reorder(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var req struct {
-		QuestionIDs []uuid.UUID `json:"question_ids"`
+		QuestionIDs     []uuid.UUID `json:"question_ids"`
+		ExpectedVersion int64       `json:"expected_version"`
 	}
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		return err
 	}
-	if err := h.svc.Reorder(r.Context(), user, p[0], p[1], req.QuestionIDs); err != nil {
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
+	if err := h.svc.Reorder(r.Context(), user, p[0], p[1], req.QuestionIDs, req.ExpectedVersion); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -337,6 +367,16 @@ func (h *Handler) start(w http.ResponseWriter, r *http.Request) error {
 			return ErrNotFound
 		}
 		a, err = h.svc.StartAssignment(r.Context(), user, p[0], p[1], stepID)
+	} else if raw := r.URL.Query().Get("module_id"); raw != "" {
+		moduleID, e := uuid.Parse(raw)
+		if e != nil {
+			return ErrNotFound
+		}
+		stepID, e := uuid.Parse(r.URL.Query().Get("step_id"))
+		if e != nil {
+			return ErrNotFound
+		}
+		a, err = h.svc.StartModule(r.Context(), user, p[0], p[1], moduleID, stepID)
 	} else {
 		a, err = h.svc.Start(r.Context(), user, p[0], p[1])
 	}
@@ -382,5 +422,40 @@ func (h *Handler) finish(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	httpx.JSON(w, http.StatusOK, toAttemptResponse(a))
+	return nil
+}
+
+func (h *Handler) publish(w http.ResponseWriter, r *http.Request) error {
+	user, p, err := ids(r, "org_id", "quiz_id")
+	if err != nil {
+		return err
+	}
+	var req struct {
+		ExpectedVersion int64 `json:"expected_version"`
+	}
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		return err
+	}
+	m, err := h.svc.Publish(r.Context(), user, p[0], p[1], req.ExpectedVersion)
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, 200, toQuiz(Quiz{Quiz: m}))
+	return nil
+}
+func (h *Handler) history(w http.ResponseWriter, r *http.Request) error {
+	user, p, err := ids(r, "org_id", "quiz_id")
+	if err != nil {
+		return err
+	}
+	rows, err := h.svc.History(r.Context(), user, p[0], p[1])
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, map[string]any{"id": row.ID, "revision": row.Revision, "draft_version": row.DraftVersion, "published_at": row.PublishedAt.Time})
+	}
+	httpx.JSON(w, 200, map[string]any{"items": items})
 	return nil
 }

@@ -10,13 +10,13 @@ vi.mock('@/realtime/mapdata', () => ({
 }))
 
 const quiz = (extra: Partial<Quiz> = {}): Quiz => ({
-  id: 'q1', building_key: 'sains', level: 'SD', title: 'Kuis Planet', description: '', pass_score: 60, published: false,
+  id: 'q1', draft_version:1, building_key: 'sains', level: 'SD', title: 'Kuis Planet', description: '', pass_score: 60, published: false,
   updated_at: '2026-01-01T00:00:00Z', question_count: 1, best_score: null, attempts: 0,
   questions: [{ id: 'x1', prompt: 'Planet terbesar?', options: ['Bumi', 'Jupiter', 'Mars', 'Venus'], answer: 1, explanation: '' }],
   ...extra,
 })
 
-beforeEach(() => vi.spyOn(window, 'confirm').mockReturnValue(true))
+beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); HTMLDialogElement.prototype.showModal=vi.fn<() => void>() })
 afterEach(() => vi.restoreAllMocks())
 
 it('lists drafts compactly and only shows options in preview', async () => {
@@ -68,7 +68,7 @@ it('adds a question with four options and the chosen answer, and shows field err
   expect(w.text()).toContain('tidak boleh sama')
   await w.find('.question-form').trigger('submit')
   await flushPromises()
-  expect(add).toHaveBeenLastCalledWith('o', 'q1', { prompt: 'Planet merah?', options: ['Bumi', 'Jupiter', 'Mars', 'Venus'], answer: 2, explanation: '' })
+  expect(add).toHaveBeenLastCalledWith('o', 'q1', { expected_version:1,prompt: 'Planet merah?', options: ['Bumi', 'Jupiter', 'Mars', 'Venus'], answer: 2, explanation: '' })
 })
 
 it('keeps empty quizzes as drafts until questions exist', async () => {
@@ -84,13 +84,13 @@ it('keeps empty quizzes as drafts until questions exist', async () => {
 
 it('publishes from the editor and preserves server validation errors', async () => {
   vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [quiz()] })
-  const update = vi.spyOn(quizApi, 'update').mockRejectedValue(new ApiError(400, { code: 'validation_failed', message: 'Kuis belum valid' }))
+  const update = vi.spyOn(quizApi, 'publish').mockRejectedValue(new ApiError(400, { code: 'validation_failed', message: 'Kuis belum valid' }))
   const w = mount(QuizManager, { props: { orgId: 'o' } })
   await flushPromises()
   await w.get('.catalog-row button').trigger('click')
   await w.get('.editor-actions .btn-primary').trigger('click')
   await flushPromises()
-  expect(update).toHaveBeenCalledWith('o', 'q1', expect.objectContaining({ published: true }))
+  expect(update).toHaveBeenCalledWith('o', 'q1', 1)
   expect(w.get('[role=alert]').text()).toContain('Periksa kembali isian')
 })
 
@@ -107,10 +107,10 @@ it('deletes and reorders questions after confirmation', async () => {
   await w.get('.catalog-row button').trigger('click')
   await w.find('[aria-label="Turunkan Satu"]').trigger('click')
   await flushPromises()
-  expect(reorder).toHaveBeenCalledWith('o', 'q1', ['x2', 'x1'])
+  expect(reorder).toHaveBeenCalledWith('o', 'q1', ['x2', 'x1'],1)
   await w.find('[aria-label="Hapus soal Dua"]').trigger('click')
   await flushPromises()
-  expect(del).toHaveBeenCalledWith('o', 'q1', 'x2')
+  expect(del).toHaveBeenCalledWith('o', 'q1', 'x2',1)
 })
 
  it('keeps the catalog compact and filters by level before opening one item', async () => {
@@ -145,6 +145,7 @@ it('opens the first question form after creating a draft at the filtered level',
   expect(w.get('.editor-title').text()).toBe('Baru')
   expect(w.find('.question-form').exists()).toBe(true)
   expect(w.find('.catalog').exists()).toBe(false)
+  await w.find('.question-form textarea').setValue('Unsaved question')
   vi.mocked(window.confirm).mockReturnValue(false)
   await w.get('[data-action="back"]').trigger('click')
   expect(w.find('.question-form').exists()).toBe(true)

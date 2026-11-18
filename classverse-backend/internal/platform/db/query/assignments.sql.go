@@ -58,7 +58,7 @@ func (q *Queries) AssignmentRoster(ctx context.Context, arg AssignmentRosterPara
 }
 
 const assignmentSteps = `-- name: AssignmentSteps :many
-SELECT s.id, s.org_id, s.assignment_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.quiz_id, s.minutes, f.kind AS file_kind,
+SELECT s.id, s.org_id, s.assignment_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.quiz_id, s.minutes, s.rich_content, s.quiz_revision_id, f.kind AS file_kind,
  EXISTS(SELECT 1 FROM assignment_progress p WHERE p.org_id=s.org_id AND p.assignment_id=s.assignment_id AND p.step_id=s.id AND p.user_id=$1) AS done,
  NOT EXISTS(SELECT 1 FROM assignment_steps prev WHERE prev.assignment_id=s.assignment_id AND prev.position<s.position
    AND NOT EXISTS(SELECT 1 FROM assignment_progress p WHERE p.assignment_id=prev.assignment_id AND p.step_id=prev.id AND p.user_id=$1)) AS unlocked
@@ -73,20 +73,22 @@ type AssignmentStepsParams struct {
 }
 
 type AssignmentStepsRow struct {
-	ID           uuid.UUID
-	OrgID        uuid.UUID
-	AssignmentID uuid.UUID
-	Position     int32
-	Kind         string
-	Title        string
-	Body         string
-	FileID       uuid.NullUUID
-	VideoID      pgtype.Text
-	QuizID       uuid.NullUUID
-	Minutes      int32
-	FileKind     pgtype.Text
-	Done         bool
-	Unlocked     bool
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AssignmentID   uuid.UUID
+	Position       int32
+	Kind           string
+	Title          string
+	Body           string
+	FileID         uuid.NullUUID
+	VideoID        pgtype.Text
+	QuizID         uuid.NullUUID
+	Minutes        int32
+	RichContent    []byte
+	QuizRevisionID uuid.NullUUID
+	FileKind       pgtype.Text
+	Done           bool
+	Unlocked       bool
 }
 
 func (q *Queries) AssignmentSteps(ctx context.Context, arg AssignmentStepsParams) ([]AssignmentStepsRow, error) {
@@ -110,6 +112,8 @@ func (q *Queries) AssignmentSteps(ctx context.Context, arg AssignmentStepsParams
 			&i.VideoID,
 			&i.QuizID,
 			&i.Minutes,
+			&i.RichContent,
+			&i.QuizRevisionID,
 			&i.FileKind,
 			&i.Done,
 			&i.Unlocked,
@@ -165,10 +169,11 @@ func (q *Queries) CompleteAssignmentStep(ctx context.Context, arg CompleteAssign
 
 const createAssignment = `-- name: CreateAssignment :one
 INSERT INTO assignments(id,org_id,class_id,module_id,title,class_name,year_label,building_key,level,due_at,created_by,created_at)
-SELECT $1, c.org_id, c.id, m.id, m.title, c.name, y.label, m.building_key,m.level,
+SELECT $1, c.org_id, c.id, m.id, rev.title, c.name, y.label, rev.building_key,rev.level,
  $2::timestamptz,$3,$4
 FROM classes c JOIN academic_years y ON y.org_id=c.org_id AND y.id=c.academic_year_id
 JOIN modules m ON m.org_id=c.org_id AND m.id=$5
+JOIN module_revisions rev ON rev.org_id=m.org_id AND rev.module_id=m.id AND rev.id=m.published_revision_id
 WHERE c.org_id=$6 AND c.id=$7 AND c.archived_at IS NULL
  AND m.archived_at IS NULL AND m.published_at IS NOT NULL
 RETURNING id, org_id, class_id, module_id, title, class_name, year_label, building_key, level, due_at, created_by, created_at, cancelled_at
@@ -420,10 +425,11 @@ func (q *Queries) SnapshotAssignmentRecipients(ctx context.Context, arg Snapshot
 }
 
 const snapshotAssignmentSteps = `-- name: SnapshotAssignmentSteps :execrows
-INSERT INTO assignment_steps(id,org_id,assignment_id,position,kind,title,body,file_id,video_id,quiz_id,minutes)
+INSERT INTO assignment_steps(id,org_id,assignment_id,position,kind,title,body,file_id,video_id,quiz_id,minutes,rich_content,quiz_revision_id)
 SELECT gen_random_uuid(),s.org_id,$1,row_number() OVER(ORDER BY s.position,s.id)-1,
- s.kind,s.title,s.body,s.file_id,s.video_id,s.quiz_id,s.minutes
-FROM module_steps s WHERE s.org_id=$2 AND s.module_id=$3 AND s.archived_at IS NULL
+ s.kind,s.title,s.body,s.file_id,s.video_id,s.quiz_id,s.minutes,s.rich_content,s.quiz_revision_id
+FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id AND m.published_revision_id=s.revision_id
+WHERE s.org_id=$2 AND s.module_id=$3
 `
 
 type SnapshotAssignmentStepsParams struct {

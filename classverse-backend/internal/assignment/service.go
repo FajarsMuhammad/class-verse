@@ -178,6 +178,8 @@ func (s *Service) Steps(ctx context.Context, user, orgID, id uuid.UUID) ([]query
 	for i, r := range rows {
 		if !r.Unlocked && !role.AtLeast(org.RoleTeacher) {
 			rows[i].Body = ""
+			rows[i].RichContent = nil
+			rows[i].QuizRevisionID = uuid.NullUUID{}
 			rows[i].FileID = uuid.NullUUID{}
 			rows[i].VideoID = pgtype.Text{}
 			rows[i].QuizID = uuid.NullUUID{}

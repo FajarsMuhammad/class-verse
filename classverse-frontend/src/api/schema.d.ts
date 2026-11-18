@@ -838,6 +838,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/modules/{module_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only. */
+        post: operations["publishModuleRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Staff-only read-only revision metadata; no learner answer-key access. */
+        get: operations["listModuleRevisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only. */
+        post: operations["publishQuizRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Staff-only read-only revision metadata; no learner answer-key access. */
+        get: operations["listQuizRevisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/modules": {
         parameters: {
             query?: never;
@@ -1648,9 +1728,44 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        DraftVersionInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version: number;
+        };
+        ContentRevision: {
+            /** Format: uuid */
+            id: string;
+            revision: number;
+            /** Format: int64 */
+            draft_version: number;
+            /** Format: date-time */
+            published_at: string;
+        };
+        RichContent: {
+            type?: string;
+            text?: string;
+            attrs?: {
+                [key: string]: unknown;
+            };
+            marks?: {
+                type: string;
+                attrs?: {
+                    [key: string]: unknown;
+                };
+            }[];
+            content?: components["schemas"]["RichContent"][];
+        };
         /** @enum {string} */
         Level: "SD" | "SMP" | "SMA" | "Umum";
         ModuleInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             /** @description Kunci gedung di peta kampus */
             building_key: string;
             level: components["schemas"]["Level"];
@@ -1659,6 +1774,10 @@ export interface components {
             published: boolean;
         };
         Module: components["schemas"]["ModuleInput"] & {
+            /** Format: int64 */
+            draft_version?: number;
+            /** Format: uuid */
+            published_revision_id?: string | null;
             /** Format: uuid */
             id: string;
             /** Format: date-time */
@@ -1671,6 +1790,12 @@ export interface components {
         /** @enum {string} */
         StepKind: "materi" | "berkas" | "video" | "kuis";
         StepInput: {
+            rich_content?: components["schemas"]["RichContent"];
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             kind: components["schemas"]["StepKind"];
             title: string;
             /** @description Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa. */
@@ -1690,6 +1815,7 @@ export interface components {
             minutes: number;
         };
         ModuleStep: {
+            rich_content?: components["schemas"]["RichContent"];
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["StepKind"];
@@ -1726,6 +1852,11 @@ export interface components {
             next_title: string;
         };
         QuizInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             /** @description Kunci gedung di peta kampus */
             building_key: string;
             level: components["schemas"]["Level"];
@@ -1736,6 +1867,10 @@ export interface components {
             published: boolean;
         };
         Quiz: {
+            /** Format: int64 */
+            draft_version?: number;
+            /** Format: uuid */
+            published_revision_id?: string | null;
             /** Format: uuid */
             id: string;
             building_key: string;
@@ -1758,6 +1893,11 @@ export interface components {
             items: components["schemas"]["Quiz"][];
         };
         QuestionInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             prompt: string;
             options: string[];
             /** @description Indeks pilihan benar */
@@ -1880,6 +2020,7 @@ export interface components {
             total: number;
         };
         AssignmentStep: {
+            rich_content?: components["schemas"]["RichContent"];
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["StepKind"];
@@ -3909,6 +4050,114 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    publishModuleRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftVersionInput"];
+            };
+        };
+        responses: {
+            /** @description Immutable revision published */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Module"];
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listModuleRevisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published revision history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ContentRevision"][];
+                    };
+                };
+            };
+        };
+    };
+    publishQuizRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftVersionInput"];
+            };
+        };
+        responses: {
+            /** @description Immutable revision published */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quiz"];
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listQuizRevisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published revision history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ContentRevision"][];
+                    };
+                };
+            };
         };
     };
     listModules: {

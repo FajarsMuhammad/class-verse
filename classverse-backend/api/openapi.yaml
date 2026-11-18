@@ -883,6 +883,92 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/modules/{module_id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: module_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: publishModuleRevision
+      description: "Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftVersionInput" }
+      responses:
+        "200":
+          description: Immutable revision published
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Module" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/orgs/{org_id}/modules/{module_id}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: module_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listModuleRevisions
+      description: "Staff-only read-only revision metadata; no learner answer-key access."
+      responses:
+        "200":
+          description: Published revision history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ContentRevision" } }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: quiz_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: publishQuizRevision
+      description: "Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftVersionInput" }
+      responses:
+        "200":
+          description: Immutable revision published
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quiz" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: quiz_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listQuizRevisions
+      description: "Staff-only read-only revision metadata; no learner answer-key access."
+      responses:
+        "200":
+          description: Published revision history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ContentRevision" } }
   /api/orgs/{org_id}/modules:
     parameters:
       - $ref: "#/components/parameters/OrgID"
@@ -1945,6 +2031,27 @@ components:
           schema: { $ref: "#/components/schemas/AccessTokenResponse" }
 
   schemas:
+    DraftVersionInput:
+      type: object
+      required: [expected_version]
+      properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
+    ContentRevision:
+      type: object
+      required: [id, revision, draft_version, published_at]
+      properties:
+        id: { type: string, format: uuid }
+        revision: { type: integer }
+        draft_version: { type: integer, format: int64 }
+        published_at: { type: string, format: date-time }
+    RichContent:
+      type: object
+      properties:
+        type: { type: string }
+        text: { type: string }
+        attrs: { type: object, additionalProperties: true }
+        marks: { type: array, items: { type: object, required: [type], properties: { type: { type: string }, attrs: { type: object, additionalProperties: true } } } }
+        content: { type: array, items: { $ref: "#/components/schemas/RichContent" } }
     Level:
       type: string
       enum: [SD, SMP, SMA, Umum]
@@ -1952,6 +2059,7 @@ components:
       type: object
       required: [building_key, level, title, description, published]
       properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         building_key: { type: string, description: "Kunci gedung di peta kampus" }
         level: { $ref: "#/components/schemas/Level" }
         title: { type: string, minLength: 1, maxLength: 120 }
@@ -1963,6 +2071,8 @@ components:
         - type: object
           required: [id, updated_at, steps]
           properties:
+            draft_version: { type: integer, format: int64 }
+            published_revision_id: { type: string, format: uuid, nullable: true }
             id: { type: string, format: uuid }
             updated_at: { type: string, format: date-time }
             steps: { type: array, items: { $ref: "#/components/schemas/ModuleStep" } }
@@ -1978,6 +2088,8 @@ components:
       type: object
       required: [kind, title, minutes]
       properties:
+        rich_content: { $ref: "#/components/schemas/RichContent" }
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         kind: { $ref: "#/components/schemas/StepKind" }
         title: { type: string, minLength: 1, maxLength: 120 }
         body: { type: string, maxLength: 5000, description: "Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa." }
@@ -1989,6 +2101,7 @@ components:
       type: object
       required: [id, kind, title, body, file_id, file_kind, video_id, quiz_id, minutes, reader_position, done]
       properties:
+        rich_content: { $ref: "#/components/schemas/RichContent" }
         id: { type: string, format: uuid }
         kind: { $ref: "#/components/schemas/StepKind" }
         title: { type: string }
@@ -2015,6 +2128,7 @@ components:
       type: object
       required: [building_key, level, title, description, published]
       properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         building_key: { type: string, description: "Kunci gedung di peta kampus" }
         level: { $ref: "#/components/schemas/Level" }
         title: { type: string, minLength: 1, maxLength: 120 }
@@ -2025,6 +2139,8 @@ components:
       type: object
       required: [id, building_key, level, title, description, pass_score, published, updated_at, question_count, best_score, attempts]
       properties:
+        draft_version: { type: integer, format: int64 }
+        published_revision_id: { type: string, format: uuid, nullable: true }
         id: { type: string, format: uuid }
         building_key: { type: string }
         level: { $ref: "#/components/schemas/Level" }
@@ -2046,8 +2162,9 @@ components:
       type: object
       required: [prompt, options, answer]
       properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         prompt: { type: string, minLength: 1, maxLength: 500 }
-        options: { type: array, minItems: 4, maxItems: 4, items: { type: string, minLength: 1, maxLength: 200 } }
+        options: { type: array, minItems: 2, maxItems: 4, items: { type: string, minLength: 1, maxLength: 200 } }
         answer: { type: integer, minimum: 0, maximum: 3, description: "Indeks pilihan benar" }
         explanation: { type: string, maxLength: 500 }
     QuizQuestion:
@@ -2169,6 +2286,7 @@ components:
       type: object
       required: [id, kind, title, body, file_id, file_kind, video_id, quiz_id, minutes, done, unlocked]
       properties:
+        rich_content: { $ref: "#/components/schemas/RichContent" }
         id: { type: string, format: uuid }
         kind: { $ref: "#/components/schemas/StepKind" }
         title: { type: string }

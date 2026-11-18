@@ -4,6 +4,8 @@ import { ApiError, errorMessage } from '@/api/client'
 import { levels } from '@/api/modules'
 import { quizApi, shapes } from '@/api/quizzes'
 import type { Level, QuestionInput, Quiz, QuizInput, QuizQuestion } from '@/api/types'
+import { useAuthorLeave } from './useAuthorLeave'
+import QuizPlayer from './QuizPlayer.vue'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 
 // Kelola → Kuis (Q1-01): staff author four-option quizzes per building and level. Started attempts keep
@@ -27,6 +29,13 @@ const selected = ref<string | null>(null)
 const visible = computed(() => quizzes.value.filter((item) => !levelFilter.value || item.level === levelFilter.value))
 const active = computed(() => quizzes.value.find((item) => item.id === selected.value))
 const preview = ref(false)
+const history=ref<{id:string;revision:number}[]>([])
+const formBaseline=ref(''),questionBaseline=ref('')
+const conflict=ref(false)
+const mayLeave=useAuthorLeave(computed(()=>(!!editing.value && JSON.stringify(form.value)!==formBaseline.value) || (!!questionFor.value && JSON.stringify(question.value)!==questionBaseline.value)))
+async function copyLocal(){try{await navigator.clipboard.writeText(JSON.stringify(editing.value?form.value:question.value));message.value='Perubahan lokal disalin.'}catch{error.value='Gagal menyalin. Salin isi form sebelum memuat ulang.'}}
+async function reloadDraft(){if(!window.confirm('Buang perubahan lokal dan muat draf server?'))return;await load();const z=active.value;if(z){if(editing.value)edit(z);else editQuestion(z,z.questions?.find(q=>q.id===questionEditing.value))}conflict.value=false}
+
 const editorHeading = ref<HTMLElement | null>(null)
 async function focusEditor() {
   await nextTick()
@@ -39,10 +48,11 @@ function openItem(item: Quiz) {
   questionFor.value = null
   fields.value = {}
   error.value = ''
+  quizApi.history(props.orgId,item.id).then(r=>history.value=r.items).catch(err=>error.value=errorMessage(err))
   void focusEditor()
 }
 function back() {
-  if ((editing.value || questionFor.value) && !window.confirm('Tutup form tanpa menyimpan perubahan?')) return
+  if(!mayLeave())return
   selected.value = null
   editing.value = null
   questionFor.value = null
@@ -78,7 +88,7 @@ async function run(fn: () => Promise<unknown>, done: string) {
     message.value = done
     return true
   } catch (err) {
-    if (err instanceof ApiError) fields.value = err.fields
+    if (err instanceof ApiError) {fields.value = err.fields;conflict.value=err.code==='draft_conflict'}
     error.value = errorMessage(err)
     return false
   } finally {
@@ -93,8 +103,9 @@ function edit(z?: Quiz) {
   editing.value = z?.id ?? 'new'
   fields.value = {}
   form.value = z
-    ? { building_key: z.building_key, level: z.level, title: z.title, description: z.description, pass_score: z.pass_score, published: z.published }
+    ? { building_key: z.building_key, level: z.level, title: z.title, description: z.description, pass_score: z.pass_score, published: false, expected_version:z.draft_version }
     : { ...blank(), level: levelFilter.value || 'SD', building_key: choices.value[0]?.key ?? '' }
+ formBaseline.value=JSON.stringify(form.value);conflict.value=false
 }
 async function save() {
   const body = form.value
@@ -115,10 +126,8 @@ async function save() {
   }
 }
 async function setPublished(item: Quiz) {
-  const { building_key, level, title, description } = item
-  await run(() => quizApi.update(props.orgId, item.id, {
-    building_key, level, title, description, pass_score: item.pass_score, published: !item.published,
-  }), item.published ? 'Kembali menjadi draf.' : 'Kuis diterbitkan.')
+ if(!window.confirm('Terbitkan revisi kuis baru? Modul yang sudah terbit tetap memakai revisi kuis sebelumnya.'))return
+ await run(()=>quizApi.publish(props.orgId,item.id,item.draft_version!), 'Revisi kuis diterbitkan.')
 }
 async function archive(z: Quiz) {
   if (!window.confirm(`Arsipkan kuis ${z.title}? Peserta tidak bisa memainkannya lagi; riwayat nilai tetap tersimpan.`)) return
@@ -133,10 +142,11 @@ function editQuestion(z: Quiz, q?: QuizQuestion) {
   question.value = q
     ? { prompt: q.prompt, options: [...q.options], answer: q.answer, explanation: q.explanation }
     : blankQuestion()
+ questionBaseline.value=JSON.stringify(question.value);conflict.value=false
 }
 async function saveQuestion() {
   const qid = questionFor.value!
-  const body = { ...question.value, options: [...question.value.options] }
+  const body = { ...question.value, options: [...question.value.options], expected_version:active.value?.draft_version }
   const ok = await run(
     () => (questionEditing.value === 'new'
       ? quizApi.addQuestion(props.orgId, qid, body)
@@ -147,13 +157,13 @@ async function saveQuestion() {
 }
 async function removeQuestion(z: Quiz, q: QuizQuestion) {
   if (!window.confirm(`Hapus soal "${q.prompt}"? Nilai yang sudah ada tidak berubah.`)) return
-  await run(() => quizApi.deleteQuestion(props.orgId, z.id, q.id), 'Soal dihapus.')
+  await run(() => quizApi.deleteQuestion(props.orgId, z.id, q.id,z.draft_version), 'Soal dihapus.')
 }
 async function move(z: Quiz, index: number, delta: -1 | 1) {
   const order = (z.questions ?? []).map((q) => q.id)
   const [moved] = order.splice(index, 1)
   order.splice(index + delta, 0, moved!)
-  await run(() => quizApi.reorder(props.orgId, z.id, order), `Urutan ${z.title} disimpan.`)
+  await run(() => quizApi.reorder(props.orgId, z.id, order,z.draft_version), `Urutan ${z.title} disimpan.`)
 }
 
 onMounted(async () => {
@@ -165,7 +175,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="manager authoring" :aria-labelledby="`${id}-title`">
+  <section class="manager authoring quiz-manager" :aria-labelledby="`${id}-title`">
     <header v-if="!selected && !editing" class="head">
       <h2 :id="`${id}-title`" class="title">Kuis</h2>
       <button v-if="!editing" type="button" class="btn-primary" :disabled="!choices.length" @click="edit()">+ Kuis baru</button>
@@ -177,6 +187,8 @@ onMounted(async () => {
     <p v-if="message" class="notice" role="status">{{ message }}</p>
     <p v-if="error" class="alert" role="alert">{{ error }} {{ !editing ? fields.questions : '' }}</p>
 
+    <div v-if="conflict" class="actions"><button type="button" class="btn-secondary" @click="copyLocal">Salin perubahan lokal</button><button type="button" class="btn-secondary" @click="reloadDraft">Muat versi server</button></div>
+    <details v-if="active && history.length"><summary>Riwayat revisi terbit (hanya baca)</summary><ol><li v-for="r in history" :key="r.id">Revisi {{ r.revision }}</li></ol></details>
     <header v-if="selected || editing" class="editor-head">
       <button type="button" class="btn-secondary" data-action="back" :disabled="busy" @click="back">Kembali ke daftar</button>
       <h3 ref="editorHeading" class="editor-title" tabindex="-1">{{ active?.title || 'Kuis baru' }}</h3>
@@ -185,7 +197,7 @@ onMounted(async () => {
     <div v-if="active && !editing && !questionFor" class="editor-actions actions">
       <button type="button" class="btn-secondary" :aria-pressed="preview" @click="preview = !preview">{{ preview ? 'Kembali menyusun' : 'Pratinjau isi' }}</button>
       <button type="button" class="btn-secondary" :disabled="busy" @click="edit(active)">Pengaturan</button>
-      <button type="button" class="btn-primary" :disabled="busy || (!active.published && !active.question_count)" @click="setPublished(active)">{{ active.published ? 'Jadikan draf' : 'Terbitkan' }}</button>
+      <button type="button" class="btn-primary" :disabled="busy || (!active.published && !active.question_count)" @click="setPublished(active)">{{ active.published ? 'Terbitkan revisi baru' : 'Terbitkan' }}</button>
     </div>
     <p v-if="active && !active.published && !active.question_count" class="hint">Tambahkan minimal satu soal sebelum menerbitkan.</p>
     <div v-if="!selected && !editing" class="catalog">
@@ -231,7 +243,7 @@ onMounted(async () => {
       <p v-if="fields.questions" class="field-error">{{ fields.questions }}</p>
       <div class="actions">
         <button type="submit" class="btn-primary" :disabled="busy">Simpan</button>
-        <button type="button" class="btn-secondary" :disabled="busy" @click="editing = null">Batal</button>
+        <button type="button" class="btn-secondary" :disabled="busy" @click="mayLeave() && (editing = null)">Batal</button>
       </div>
     </form>
 
@@ -271,6 +283,10 @@ onMounted(async () => {
         <label :for="`${id}-qp`">Pertanyaan</label>
         <textarea :id="`${id}-qp`" v-model="question.prompt" maxlength="500" rows="2" :aria-invalid="!!fields.prompt" />
         <p v-if="fields.prompt" class="field-error">{{ fields.prompt }}</p>
+        <label :for="`${id}-type`">Jenis soal</label>
+        <select :id="`${id}-type`" :value="question.options.length" @change="question={...question,answer:0,options:($event.target as HTMLSelectElement).value==='2'?['Benar','Salah']:['','','','']}">
+          <option value="4">Pilihan tunggal (4 opsi)</option><option value="2">Benar / salah</option>
+        </select>
         <fieldset class="options-edit">
           <legend>Pilihan (tandai jawaban benar)</legend>
           <div v-for="(_, oi) in question.options" :key="oi" class="option-row">
@@ -289,11 +305,12 @@ onMounted(async () => {
         <p v-if="fields.questions" class="field-error">{{ fields.questions }}</p>
         <div class="actions">
           <button type="submit" class="btn-primary" :disabled="busy">Simpan soal</button>
-          <button type="button" class="btn-secondary" :disabled="busy" @click="questionFor = null">Batal</button>
+          <button type="button" class="btn-secondary" :disabled="busy" @click="mayLeave() && (questionFor = null)">Batal</button>
         </div>
       </form>
       <button v-else-if="!preview" type="button" class="btn-primary add" :disabled="busy" @click="editQuestion(z)">+ Soal<span class="sr"> di {{ z.title }}</span></button>
     </article>
+    <QuizPlayer v-if="preview && active" :org-id="orgId" :quiz-id="active.id" :title="active.title" :preview-questions="active.questions ?? []" :pass-score="active.pass_score" @close="preview=false" />
   </section>
 </template>
 

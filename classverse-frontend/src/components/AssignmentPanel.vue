@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { assignmentApi, deadline, type Assignment, type AssignmentStep } from '@/api/assignments'
 import { errorMessage } from '@/api/client'
 import { embedURL, kindLabel } from '@/api/modules'
+import RichContent from './RichContent.vue'
 import FileReader, { type ReadableFile } from './FileReader.vue'
 import QuizPlayer from './QuizPlayer.vue'
 const props = defineProps<{ orgId: string }>()
@@ -74,7 +75,8 @@ onMounted(load)
       </li></ol>
       <div v-if="current" class="content">
         <h4>{{ current.title }}</h4>
-        <p v-if="current.body" class="body">{{ current.body }}</p>
+        <RichContent v-if="current.rich_content" :content="current.rich_content" />
+        <p v-else-if="current.body" class="body">{{ current.body }}</p>
         <iframe v-if="current.kind === 'video' && current.video_id" :src="embedURL(current.video_id)" :title="current.title"
           sandbox="allow-scripts allow-same-origin allow-presentation" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" />
         <p v-if="current.kind === 'kuis'">Lulus kuis melalui tugas ini. Hasil kuis katalog tidak menyelesaikan tugas.</p>

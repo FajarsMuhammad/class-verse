@@ -32,6 +32,10 @@ func TestAssignmentQuizCannotReuseCatalogPass(t *testing.T) {
 	}
 	auth := org.NewService(org.NewStore(f.pool), time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	qs := quiz.NewService(f.pool, auth, buildings{}, time.Now)
+	if _, err := qs.Publish(ctx, f.admin, f.org, qid, 1); err != nil {
+		t.Fatal(err)
+	}
+	f.publish(t)
 	a, err := f.svc.Issue(ctx, f.admin, f.org, assignment.Input{ID: uuid.New(), ClassID: f.class, ModuleID: f.module})
 	if err != nil {
 		t.Fatal(err)

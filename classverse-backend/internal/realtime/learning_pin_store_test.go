@@ -36,6 +36,13 @@ func TestLearningPinPersistsOnlyForSession(t *testing.T) {
 	if _, err := p.Exec(ctx, `INSERT INTO modules(id,org_id,building_key,level,title,created_by,created_at,updated_at,published_at) VALUES($1,$2,'sains','SMA','Belajar',$3,now(),now(),now())`, m, o.ID, u.ID); err != nil {
 		t.Fatal(err)
 	}
+	rev, err := q.InsertModuleRevision(ctx, query.InsertModuleRevisionParams{OrgID: o.ID, ID: m, PublishedAt: ts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := q.PublishModulePointer(ctx, query.PublishModulePointerParams{OrgID: o.ID, ID: m, PublishedRevisionID: uuid.NullUUID{UUID: rev.ID, Valid: true}, PublishedAt: ts}); err != nil {
+		t.Fatal(err)
+	}
 	s := NewStore(p)
 	if _, err := s.OpenSession(ctx, room.ID, at); err != nil {
 		t.Fatal(err)

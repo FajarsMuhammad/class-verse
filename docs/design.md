@@ -243,6 +243,23 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
 | ADR-011 | Redis hanya untuk leaderboard mingguan (sorted set per organisasi per minggu WIB); Postgres `point_events` tetap sumber kebenaran | Top-N dan peringkat per user O(log n) tanpa agregasi `SUM` tiap request; reset mingguan lewat kunci berganti tanpa job; bisa dibangun ulang dari Postgres | Redis dipakai untuk state room (ADR-002) atau data yang tidak bisa dibangun ulang |
 
+## ADR-013 — Draft dan revisi materi immutable (CS, disetujui)
+
+Menggantikan keputusan M1/M2 2026-11-13 tentang edit modul terbit langsung. Content Studio tetap
+memakai modul/langkah/kuis existing, bukan course/lesson/enrollment baru. Rich text terstruktur wajib;
+plain text, berkas, video, dan kuis lama tetap terbaca. Template hanya struktur awal satu editor/renderer.
+
+Target implementasi: working draft berversi optimistik terpisah dari snapshot terbit immutable. Modul
+mengikat revisi kuis terbit yang dipilih; publish modul tidak menerbitkan draft kuis bersama secara implisit.
+Progres memin revisi modul, attempt tetap memakai snapshot, tugas tetap memakai konteks issuance sendiri.
+Backfill additive mempertahankan ID langkah, riwayat, hasil, Rapor dan akses file. Revisi bukan bypass
+membership/resource authorization. Tidak menghitung ulang nilai lama atau mereset completion.
+
+Kebijakan Q1 tetap default lulus 60, unlimited attempts, bobot sama/floor, reveal setelah finish. Batas
+attempt, bobot berbeda dan perubahan reveal bukan bagian persetujuan ini. Implementasi CS lokal selesai, belum deploy;
+upgrade wajib `make migrate` (preflight antara migration 20 dan 21). Rencana dan gate ada di
+[`class-verse_content_studio_implementation_plan.md`](tasks/class-verse_content_studio_implementation_plan.md).
+
 ## ADR-012 — Prinsipal tamu pertemuan (G1)
 
 **Disetujui:** tamu mengikuti satu ruang lewat tautan dan persetujuan guru/admin sekolah ruang itu,
@@ -311,8 +328,8 @@ state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
   Belum ada tooltip kelas, assignment, auto-promosi, atau pembatasan room/katalog berdasarkan kelas.
   Tidak mengubah izin masuk ruang atau membuat leaderboard per kelas secara otomatis.
 - **Modul (M1/M2):** katalog terbit per gedung/jenjang terbuka bagi anggota sekolah dari mana saja;
-  bukan dibatasi rombel atau lokasi avatar (disetujui 2026-11-13). Modul terbit diedit langsung; langkah hanya
-  diarsip, tanpa revisi immutable. `module_progress(org_id,user_id,step_id,completed_at)` menyimpan tanda selesai
+  bukan dibatasi rombel atau lokasi avatar (disetujui 2026-11-13). Runtime sebelum CS: modul terbit diedit langsung;
+  langkah hanya diarsip. ADR-013: draft/revisi immutable terimplementasi lokal; belum deployed. `module_progress(org_id,user_id,step_id,completed_at)` menyimpan tanda selesai
   pemanggil; FK komposit ke membership dan langkah satu organisasi. Selesai idempotent mempertahankan waktu pertama,
   batal selesai menghapus tanda; server memeriksa akses dan mengunci modul dalam transaksi yang sama.
   Semua langkah bebas dibuka, termasuk yang belum selesai. Total menghitung langkah aktif saja. Lanjutkan belajar

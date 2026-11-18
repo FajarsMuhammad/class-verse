@@ -12,8 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/assignment"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/module"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/dbtest"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
 type fixture struct {
@@ -57,6 +59,7 @@ func setup(t *testing.T) fixture {
 	}
 	auth := org.NewService(org.NewStore(p), time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	f.svc = assignment.NewService(p, auth, time.Now)
+	f.publish(t)
 	return f
 }
 func TestIssueFrozenRecipientsAndContent(t *testing.T) {
@@ -158,5 +161,23 @@ func TestIssuePermissionsRetriesAndConcurrency(t *testing.T) {
 	in.ID = uuid.New()
 	if _, err := f.svc.Issue(ctx, f.admin, f.org, in); !errors.Is(err, assignment.ErrNotFound) {
 		t.Fatalf("missing module=%v", err)
+	}
+}
+
+// Direct SQL fixtures explicitly publish after mutation, like the author API does in CS.
+func (f fixture) publish(t *testing.T) {
+	t.Helper()
+	ctx := t.Context()
+	auth := org.NewService(org.NewStore(f.pool), time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	svc := module.NewService(f.pool, auth, buildings{}, time.Now)
+	if _, err := f.pool.Exec(ctx, "UPDATE modules SET draft_version=draft_version+1 WHERE id=$1", f.module); err != nil {
+		t.Fatal(err)
+	}
+	m, err := query.New(f.pool).LockModule(ctx, query.LockModuleParams{OrgID: f.org, ID: f.module})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Publish(ctx, f.admin, f.org, f.module, m.DraftVersion); err != nil {
+		t.Fatal(err)
 	}
 }
