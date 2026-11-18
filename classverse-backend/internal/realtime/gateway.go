@@ -39,6 +39,12 @@ type Admitter interface {
 	Admit(ctx context.Context, roomID, userID uuid.UUID) (Admission, error)
 }
 
+// GuestGate verifies guest tokens and admits guests to their one room (G1).
+type GuestGate interface {
+	VerifyGuest(raw string) (uuid.UUID, error)
+	AdmitGuest(ctx context.Context, roomID, guestID uuid.UUID) (Admission, error)
+}
+
 // ErrNoAccess means the room is missing or not visible to the user.
 var ErrNoAccess = errors.New("no access to room")
 
@@ -48,6 +54,7 @@ type Gateway struct {
 	hub      *Hub
 	tokens   TokenVerifier
 	admit    Admitter
+	guests   GuestGate
 	patterns []string
 	log      *slog.Logger
 }
@@ -95,6 +102,9 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request) {
 	g.session(ctx, ws, roomID)
 }
 
+// SetGuests enables guest connections (G1); call before serving.
+func (g *Gateway) SetGuests(gate GuestGate) { g.guests = gate }
+
 // session runs one connection until it closes.
 func (g *Gateway) session(ctx context.Context, ws *websocket.Conn, roomID uuid.UUID) {
 	userID, adm, list, err := g.authenticate(ctx, ws, roomID)
@@ -103,6 +113,7 @@ func (g *Gateway) session(ctx context.Context, ws *websocket.Conn, roomID uuid.U
 	}
 	c := newConn(userID)
 	c.list = list
+	c.guest = adm.Role == RoleGuest
 	g.hub.claim(c)
 	defer g.hub.release(c)
 
@@ -123,6 +134,18 @@ func (g *Gateway) session(ctx context.Context, ws *websocket.Conn, roomID uuid.U
 		writeNow(ctx, ws, newOut(TypeError, ErrorMsg{Code: code, Message: msg}), 1)
 		_ = ws.Close(status, code)
 		return
+	}
+	if c.guest {
+		// Recheck after joining: revocation may have committed between admission
+		// and the actor join. Revoke's EndGuest handles the inverse ordering.
+		fresh, checkErr := g.guests.AdmitGuest(ctx, roomID, userID)
+		if checkErr != nil || fresh.Banned {
+			g.hub.EndGuest(userID)
+			// Do not start writeLoop: its close drain would disclose the
+			// welcome/roster queued by join using the stale admission.
+			_ = ws.Close(closeForbidden, CodeForbidden)
+			return
+		}
 	}
 	g.log.InfoContext(ctx, "ws connected", slog.String("user_id", userID.String()), slog.String("room_id", rm.id.String()))
 
@@ -146,6 +169,16 @@ func (g *Gateway) session(ctx context.Context, ws *websocket.Conn, roomID uuid.U
 // otherwise only the campus can be joined directly, so the URL is never a way
 // around doors, schedules, or Ruang Guru.
 func (g *Gateway) entry(ctx context.Context, userID uuid.UUID, requested Admission) (Admission, error) {
+	if requested.Role == RoleGuest {
+		// A guest's admission is already limited to their link's room.
+		if requested.Banned {
+			return Admission{}, errKicked
+		}
+		if requested.ScheduledAt != nil && g.hub.now().Before(*requested.ScheduledAt) {
+			return Admission{}, &roomError{code: CodeScheduled, msg: "Ruang belum dibuka. Tunggu jadwalnya."}
+		}
+		return requested, nil
+	}
 	if last := g.hub.resume(userID); last != uuid.Nil {
 		if last == requested.RoomID && !requested.Banned {
 			return requested, nil
@@ -205,11 +238,17 @@ func (g *Gateway) authenticate(ctx context.Context, ws *websocket.Conn, roomID u
 		(am.Mode != "" && am.Mode != ModeMap && am.Mode != ModeList) {
 		return fail(closeUnauthenticated, CodeUnauthenticated, "Pesan pertama harus auth")
 	}
+	admit := g.admit.Admit
 	userID, err := g.tokens.Verify(am.Token)
+	if err != nil && g.guests != nil {
+		if userID, err = g.guests.VerifyGuest(am.Token); err == nil {
+			admit = g.guests.AdmitGuest
+		}
+	}
 	if err != nil {
 		return fail(closeUnauthenticated, CodeUnauthenticated, "Sesi berakhir. Silakan masuk lagi.")
 	}
-	adm, err := g.admit.Admit(actx, roomID, userID)
+	adm, err := admit(actx, roomID, userID)
 	switch {
 	case errors.Is(err, ErrNoAccess):
 		return fail(closeNotFound, CodeNotFound, "Ruang tidak ditemukan")
@@ -307,6 +346,9 @@ func (g *Gateway) readLoop(ctx context.Context, ws *websocket.Conn, c *conn, cur
 
 // travel admits the user to roomID and asks the hub to move them there.
 func (g *Gateway) travel(ctx context.Context, c *conn, from *room, roomID uuid.UUID) (*room, error) {
+	if c.guest {
+		return nil, &roomError{code: CodeForbidden, msg: "Tamu hanya bisa berada di ruang ini"}
+	}
 	actx, cancel := context.WithTimeout(ctx, authTimeout)
 	defer cancel()
 	dest, err := g.admit.Admit(actx, roomID, c.userID)

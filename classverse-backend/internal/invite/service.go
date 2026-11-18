@@ -141,7 +141,7 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 
 	now := s.now()
 	for range codeAttempts {
-		code, err := newCode()
+		code, err := NewCode()
 		if err != nil {
 			return Invite{}, err
 		}
@@ -237,7 +237,7 @@ func (s *Service) Revoke(ctx context.Context, userID, orgID, inviteID uuid.UUID)
 
 // Preview shows which organization and role a code grants.
 func (s *Service) Preview(ctx context.Context, rawCode string) (Preview, error) {
-	code, ok := normalizeCode(rawCode)
+	code, ok := NormalizeCode(rawCode)
 	if !ok {
 		return Preview{}, ErrNotFound
 	}
@@ -257,7 +257,7 @@ func (s *Service) Preview(ctx context.Context, rawCode string) (Preview, error) 
 // Accept joins the organization of the code. The invite row is locked so
 // concurrent accepts cannot exceed max_uses.
 func (s *Service) Accept(ctx context.Context, userID uuid.UUID, rawCode string) (Membership, error) {
-	code, ok := normalizeCode(rawCode)
+	code, ok := NormalizeCode(rawCode)
 	if !ok {
 		return Membership{}, ErrNotFound
 	}
@@ -355,7 +355,7 @@ func usable(revokedAt, expiresAt pgtype.Timestamptz, maxUses pgtype.Int4, used i
 
 func toInvite(r query.Invite) Invite {
 	inv := Invite{
-		ID: r.ID, Code: displayCode(r.Code), Role: org.Role(r.Role), UsedCount: int(r.UsedCount),
+		ID: r.ID, Code: DisplayCode(r.Code), Role: org.Role(r.Role), UsedCount: int(r.UsedCount),
 		ExpiresAt: r.ExpiresAt.Time, CreatedBy: r.CreatedBy, CreatedAt: r.CreatedAt.Time,
 	}
 	if r.ClassID.Valid {

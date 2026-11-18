@@ -66,6 +66,14 @@ func validateDisplayName(v *ValidationError, name string) string {
 	return name
 }
 
+// NormalizeDisplayName validates a display name with the account rules and
+// returns the normalized name, or a user-facing message when invalid.
+func NormalizeDisplayName(name string) (string, string) {
+	var v ValidationError
+	name = validateDisplayName(&v, name)
+	return name, v.Fields["display_name"]
+}
+
 // prohibitedName uses the project's whole-word list shared with chat.
 func prohibitedName(name string) bool { return moderation.ContainsProfanity(name) }
 

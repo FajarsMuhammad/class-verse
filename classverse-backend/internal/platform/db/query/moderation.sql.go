@@ -57,10 +57,13 @@ WITH target AS (
   FROM room_sessions s
   JOIN rooms r ON r.id = s.room_id AND r.archived_at IS NULL
   JOIN memberships actor ON actor.org_id = r.org_id AND actor.user_id = $1
-  JOIN memberships t ON t.org_id = r.org_id AND t.user_id = $2::uuid
   WHERE s.room_id = $4 AND s.ended_at IS NULL
-    AND actor.role IN ('teacher', 'admin') AND t.role = 'participant'
-    AND actor.user_id <> t.user_id
+    AND actor.role IN ('teacher', 'admin')
+    AND actor.user_id <> $2::uuid
+    AND (EXISTS (SELECT 1 FROM memberships t
+                 WHERE t.org_id = r.org_id AND t.user_id = $2::uuid AND t.role = 'participant')
+      OR EXISTS (SELECT 1 FROM guest_requests g JOIN guest_links l ON l.id = g.link_id
+                 WHERE g.user_id = $2::uuid AND l.room_id = r.id))
 ), banned AS (
   INSERT INTO session_bans (session_id, user_id, created_at)
   SELECT session_id, $2::uuid, $3 FROM target
@@ -82,7 +85,7 @@ type KickFromOpenSessionParams struct {
 // Bans a participant from the room's open session and writes the audit row in
 // one statement, so neither can exist without the other. Zero rows when the
 // room has no open session, the actor is not staff, or the target is not a
-// participant of the same organization.
+// participant of the same organization or a guest of this room (G1).
 func (q *Queries) KickFromOpenSession(ctx context.Context, arg KickFromOpenSessionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, kickFromOpenSession,
 		arg.ActorID,
@@ -140,9 +143,11 @@ WHERE r.id = $5 AND r.archived_at IS NULL
   AND actor.role IN ('teacher', 'admin')
   AND (
     ($3::mod_action IN ('lock', 'unlock') AND $2::uuid IS NULL)
-    OR ($3::mod_action IN ('mute', 'unmute') AND EXISTS (
+    OR ($3::mod_action IN ('mute', 'unmute') AND (EXISTS (
       SELECT 1 FROM memberships t
-      WHERE t.org_id = r.org_id AND t.user_id = $2::uuid AND t.role = 'participant'))
+      WHERE t.org_id = r.org_id AND t.user_id = $2::uuid AND t.role = 'participant')
+      OR EXISTS (SELECT 1 FROM guest_requests g JOIN guest_links l ON l.id = g.link_id
+                 WHERE g.user_id = $2::uuid AND l.room_id = r.id)))
   )
 `
 
@@ -156,7 +161,7 @@ type RecordRoomActionParams struct {
 
 // Audits mute/unmute/lock/unlock. Zero rows unless the room's session is open,
 // the actor is teacher/admin of its organization and, for mute/unmute, the
-// target is a participant of the same organization.
+// target is a participant of the same organization or a guest of this room.
 func (q *Queries) RecordRoomAction(ctx context.Context, arg RecordRoomActionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, recordRoomAction,
 		arg.ActorID,

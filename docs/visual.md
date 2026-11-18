@@ -283,3 +283,18 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   HP lewat halaman **Kelola sekolah** (`/kelola-ruang?bagian=ruang|modul|kelas|perpustakaan`).
 - Pustakawan non-guru belum menjadi peran sendiri; tambahkan peran khusus katalog bila sekolah memakai petugas
   perpustakaan yang tidak boleh melihat nilai.
+
+## G1 — Pertemuan tamu
+
+- Host membuka **Undang tamu** dalam kontrol pengajar ruang. Form ringkas masa berlaku/batas tamu,
+  daftar tautan dengan Salin/Cabut, serta antrean nama dengan Izinkan/Tolak. Status menunggu terlihat
+  pada judul kontrol. Daftar datar, garis 1 px `--kv-line`, kontrol `--touch-min`, feedback `role=status/alert`.
+- `/guest/{code}` menampilkan sekolah, ruang, form nama, dan tanggung jawab izin wali tanpa meminta
+  tanggal lahir. Sebelum disetujui tidak ada peta, peserta, chat, atau suara.
+- Setelah disetujui: header ruang/sekolah/nama dengan label **Tamu** dan **Tinggalkan pertemuan**.
+  Desktop memakai peta ruang + Chat dan kontrol suara. HP tetap daftar tempat + Chat, tanpa canvas/voice.
+  Tidak ada menu akun/Kelola/Rapor/Belajar, perpustakaan, atau pintu menuju ruang lain.
+- Badge **Tamu** di peserta dan pengirim chat; jumlah online hanya di Chat. Ditolak, dicabut,
+  kedaluwarsa, dan dikeluarkan menampilkan alasan nyata tanpa redirect ke login akun.
+- Bukti browser lokal: viewport 1440×1000 dan 390×844 tanpa overflow horizontal/page error.
+  Safari/iOS dan perangkat fisik belum diverifikasi.

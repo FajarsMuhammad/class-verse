@@ -98,6 +98,49 @@ func (ns NullClassTeacherRole) Value() (driver.Value, error) {
 	return string(ns.ClassTeacherRole), nil
 }
 
+type GuestStatus string
+
+const (
+	GuestStatusPending  GuestStatus = "pending"
+	GuestStatusApproved GuestStatus = "approved"
+	GuestStatusDenied   GuestStatus = "denied"
+)
+
+func (e *GuestStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GuestStatus(s)
+	case string:
+		*e = GuestStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GuestStatus: %T", src)
+	}
+	return nil
+}
+
+type NullGuestStatus struct {
+	GuestStatus GuestStatus
+	Valid       bool // Valid is true if GuestStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGuestStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.GuestStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GuestStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGuestStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GuestStatus), nil
+}
+
 type ModAction string
 
 const (
@@ -365,6 +408,41 @@ type FileUpload struct {
 	ExpiresAt      pgtype.Timestamptz
 }
 
+type GuestDecision struct {
+	ID        uuid.UUID
+	RoomID    uuid.UUID
+	LinkID    uuid.UUID
+	ActorID   uuid.UUID
+	TargetID  uuid.NullUUID
+	Action    string
+	CreatedAt pgtype.Timestamptz
+}
+
+type GuestLink struct {
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	RoomID    uuid.UUID
+	Code      string
+	MaxGuests int32
+	UsedCount int32
+	ExpiresAt pgtype.Timestamptz
+	RevokedAt pgtype.Timestamptz
+	CreatedBy uuid.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
+type GuestRequest struct {
+	ID         uuid.UUID
+	LinkID     uuid.UUID
+	RequestKey []byte
+	UserID     uuid.UUID
+	IsGuest    bool
+	Status     GuestStatus
+	DecidedBy  uuid.NullUUID
+	DecidedAt  pgtype.Timestamptz
+	CreatedAt  pgtype.Timestamptz
+}
+
 type Invite struct {
 	ID        uuid.UUID
 	OrgID     uuid.UUID
@@ -593,7 +671,7 @@ type SessionBan struct {
 
 type User struct {
 	ID              uuid.UUID
-	Email           string
+	Email           pgtype.Text
 	EmailVerifiedAt pgtype.Timestamptz
 	PasswordHash    pgtype.Text
 	GoogleSub       pgtype.Text
@@ -602,4 +680,5 @@ type User struct {
 	AvatarKey       string
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	IsGuest         bool
 }

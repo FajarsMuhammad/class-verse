@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GuestPanel from './GuestPanel.vue'
 import { computed, ref } from 'vue'
 
 import { errorMessage } from '@/api/client'
@@ -46,7 +47,7 @@ async function toggleAllChat() {
     toggling.value = false
   }
 }
-const participants = computed(() => people.value.filter((p) => p.role === 'participant'))
+const participants = computed(() => people.value.filter((p) => p.role === 'participant' || p.role === 'guest'))
 const confirmKick = ref<{ id: string; name: string } | null>(null)
 function doKick() {
   if (confirmKick.value) kick(confirmKick.value.id)
@@ -56,6 +57,7 @@ function doKick() {
 
 <template>
   <div class="teacher" :class="{ floating }" aria-label="Kontrol pengajar" role="group">
+    <GuestPanel v-if="current" :key="current.room_id" :room-id="current.room_id" />
     <button
       class="btn-secondary"
       :disabled="status !== 'open' || traveling"
@@ -98,7 +100,7 @@ function doKick() {
         <ul class="people">
           <li v-for="p in participants" :key="p.id">
             <span
-              >{{ p.name }}<template v-if="mutedIds.includes(p.id)"> (dibisukan)</template></span
+              >{{ p.name }}<span v-if="p.role === 'guest'"> · Tamu</span><template v-if="mutedIds.includes(p.id)"> (dibisukan)</template></span
             >
             <button
               type="button"

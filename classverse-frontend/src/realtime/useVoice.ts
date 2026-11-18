@@ -14,6 +14,7 @@ export function useVoice(opts: {
   current: Ref<WelcomeMsg | null>
   chat: ChatState
   chatVersion: Ref<number>
+  voiceToken?: typeof roomApi.voiceToken
 }) {
   const status = ref<VoiceStatus>('off')
   const error = ref('')
@@ -50,7 +51,7 @@ export function useVoice(opts: {
     try {
       const [{ Room, RoomEvent, Track }, token] = await Promise.all([
         import('livekit-client'),
-        roomApi.voiceToken(roomId),
+        (opts.voiceToken ?? roomApi.voiceToken)(roomId),
       ])
       if (gen !== generation) return
       if (token.identity !== identity) {

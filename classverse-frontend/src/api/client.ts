@@ -124,7 +124,7 @@ function send(path: string, opts: RequestOptions, auth: boolean): Promise<Respon
   })
 }
 
-async function toError(res: Response): Promise<ApiError> {
+export async function toError(res: Response): Promise<ApiError> {
   try {
     const body = (await res.json()) as { error?: ApiErrorBody }
     if (body.error?.code) return new ApiError(res.status, body.error)
@@ -163,6 +163,7 @@ export function errorMessage(err: unknown): string {
     case 'not_loanable':
     case 'conflict':
     case 'invite_expired':
+    case 'guest_expired':
       return err.message
     case 'profile_incomplete':
       return 'Lengkapi profil terlebih dahulu.'

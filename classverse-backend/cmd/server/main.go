@@ -23,6 +23,7 @@ import (
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/class"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/file"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/gradebook"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/guest"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/invite"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/library"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/module"
@@ -183,6 +184,7 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 		return nil, fmt.Errorf("load maps: %w", err)
 	}
 	rtStore := realtime.NewStore(pool)
+	rtStore.SetClock(now)
 	// Sessions left open by a crash cannot be resumed; end them before serving.
 	recovered, err := rtStore.RecoverSessions(ctx, now())
 	if err != nil {
@@ -199,6 +201,10 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 	if err != nil {
 		return nil, err
 	}
+	guestSvc := guest.NewService(pool, orgSvc, tokens, now, log)
+	guestSvc.SetEnder(hub)
+	guestHandler := guest.NewHandler(guestSvc, cfg.FrontendURL, now, log)
+	gateway.SetGuests(guestGate{Tokens: tokens, Store: rtStore})
 	roomSvc := room.NewService(room.NewStore(pool), orgSvc, campusBuildings{mapData["campus"]}, roomOccupancy{hub}, now, log)
 	roomHandler := room.NewHandler(roomSvc, log)
 	libraryHandler := library.NewHandler(library.NewService(pool, orgSvc, now), log)
@@ -235,8 +241,15 @@ func newApp(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, log *slo
 		api: func(r chi.Router) {
 			authHandler.Routes(r)
 			mapHandler.Routes(r)
+			guestHandler.PublicRoutes(r)
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireGuest(tokens, log))
+				guestHandler.GuestRoutes(r)
+				voiceHandler.GuestRoutes(r)
+			})
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireUser(tokens, log))
+				guestHandler.HostRoutes(r)
 				orgHandler.Routes(r)
 				inviteHandler.Routes(r)
 				roomHandler.Routes(r)
@@ -313,4 +326,10 @@ func runCommand(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, args
 	}
 	fmt.Printf("sample book ready: %s (%s)\n", b.Title, b.ID)
 	return nil
+}
+
+// guestGate keeps guest audience and admission separate from account middleware.
+type guestGate struct {
+	*auth.Tokens
+	*realtime.Store
 }

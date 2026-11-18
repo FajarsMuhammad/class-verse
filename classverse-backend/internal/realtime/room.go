@@ -40,8 +40,12 @@ type Admission struct {
 	Avatar      string
 	Role        string
 	// Banned is true when the user was kicked from the room's open session.
-	Banned bool
+	Banned         bool
+	GuestExpiresAt time.Time
 }
+
+// RoleGuest marks a meeting guest (G1): no account, one room, no travel.
+const RoleGuest = "guest"
 
 func (a Admission) staff() bool { return a.Role == "teacher" || a.Role == "admin" }
 
@@ -52,6 +56,10 @@ type joinCmd struct {
 }
 
 type leaveCmd struct{ c *conn }
+type endGuestCmd struct {
+	userID uuid.UUID
+	done   chan struct{}
+}
 
 type profileCmd struct {
 	p    ProfileUpdatedMsg
@@ -109,20 +117,21 @@ type arriveCmd struct {
 }
 
 type member struct {
-	p             Participant
-	conn          *conn // nil while held after a disconnect
-	heldUntil     time.Time
-	stride        stride
-	moves         moveBudget
-	dirty         bool
-	viewReady     bool               // visibility has been synchronized since join/reconnect
-	seen          map[uuid.UUID]bool // ids the client currently shows (area of interest)
-	zone          Zone               // zone the avatar stands in, zero when none
-	chat          chatBudget
-	emoteAt       time.Time
-	seatAt        time.Time // last accepted seat (mode HP), 1 per second
-	voiceIdentity string
-	voiceChannel  string
+	p              Participant
+	conn           *conn // nil while held after a disconnect
+	heldUntil      time.Time
+	guestExpiresAt time.Time
+	stride         stride
+	moves          moveBudget
+	dirty          bool
+	viewReady      bool               // visibility has been synchronized since join/reconnect
+	seen           map[uuid.UUID]bool // ids the client currently shows (area of interest)
+	zone           Zone               // zone the avatar stands in, zero when none
+	chat           chatBudget
+	emoteAt        time.Time
+	seatAt         time.Time // last accepted seat (mode HP), 1 per second
+	voiceIdentity  string
+	voiceChannel   string
 }
 
 // chatBudget is a token bucket: chatRate per second, at most chatBurst.
@@ -235,6 +244,11 @@ func (r *room) handle(cmd any) {
 	case joinCmd:
 		r.pending.Add(-1)
 		c.result <- r.join(c.c, c.adm)
+	case endGuestCmd:
+		r.endGuest(c.userID)
+		if c.done != nil {
+			close(c.done)
+		}
 	case leaveCmd:
 		r.leave(c.c)
 	case emoteCmd:
@@ -320,6 +334,7 @@ func (r *room) join(c *conn, adm Admission) error {
 			m.conn.close(closeReplaced, "replaced")
 		}
 		m.conn, m.heldUntil = c, time.Time{}
+		m.guestExpiresAt = adm.GuestExpiresAt
 		m.p.Name, m.p.Avatar, m.p.Role = adm.Name, adm.Avatar, adm.Role
 		m.seen = map[uuid.UUID]bool{}
 		m.viewReady = false
@@ -347,10 +362,11 @@ func (r *room) add(c *conn, adm Admission, x, y int, typ string) error {
 	// A committed travel must retain its destination even if the socket
 	// disconnects after departure. Keep the avatar for normal reconnect grace.
 	m := &member{
-		p:      Participant{ID: c.userID, Name: adm.Name, Avatar: adm.Avatar, Role: adm.Role, X: x, Y: y, Dir: DirDown},
-		conn:   c,
-		stride: newStride(r.mapd.WalkSpeed, r.now()),
-		seen:   map[uuid.UUID]bool{},
+		p:              Participant{ID: c.userID, Name: adm.Name, Avatar: adm.Avatar, Role: adm.Role, X: x, Y: y, Dir: DirDown},
+		conn:           c,
+		guestExpiresAt: adm.GuestExpiresAt,
+		stride:         newStride(r.mapd.WalkSpeed, r.now()),
+		seen:           map[uuid.UUID]bool{},
 	}
 	r.initVoice(m)
 	r.members[c.userID] = m
@@ -515,6 +531,10 @@ func (r *room) move(c *conn, seq uint64, mv MoveMsg) {
 // reports whether the room stopped because it stayed empty.
 func (r *room) tick(now time.Time) (stopped bool) {
 	for id, m := range r.members {
+		if m.p.Role == RoleGuest && !m.guestExpiresAt.IsZero() && !now.Before(m.guestExpiresAt) {
+			r.endGuest(id)
+			continue
+		}
 		if m.conn == nil && !now.Before(m.heldUntil) {
 			r.remove(id)
 		}
@@ -748,4 +768,16 @@ func nearPoint(x, y int, radius float64) func(Participant) error {
 		}
 		return nil
 	}
+}
+
+func (r *room) endGuest(id uuid.UUID) {
+	m := r.members[id]
+	if m == nil || m.p.Role != RoleGuest {
+		return
+	}
+	if m.conn != nil {
+		m.conn.sendError(ErrorMsg{Code: CodeForbidden, Message: "Akses tamu sudah berakhir"})
+		m.conn.close(closeForbidden, CodeForbidden)
+	}
+	r.remove(id)
 }

@@ -333,6 +333,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rooms/{room_id}/guest-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Link tamu aktif ruang ini (G1). Guru dan admin sekolah ruang. */
+        get: operations["listGuestLinks"];
+        put?: never;
+        /** @description Buat link tamu untuk satu ruang (bukan kampus). Berlaku maks 24 jam, maks 40 tamu. */
+        post: operations["createGuestLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/{room_id}/guest-links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Cabut link; tamu yang sudah masuk lewat link ini langsung diputus. */
+        delete: operations["revokeGuestLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/{room_id}/guest-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Tamu yang menunggu persetujuan, terlama dulu (maks 50). */
+        get: operations["listGuestRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/{room_id}/guest-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Izinkan atau tolak tamu. Permintaan yang sudah diputuskan menjawab 404. */
+        post: operations["decideGuestRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/links/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        /** @description Pratinjau link tamu tanpa akun. Dibatasi per IP. */
+        get: operations["previewGuestLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/links/{code}/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Minta masuk sebagai tamu dengan nama. Membuat identitas tamu (tanpa akun) dan mengembalikan token tamu berumur pendek. Token ini hanya diterima endpoint /api/guest, WebSocket ruang tujuan, dan token suaranya. */
+        post: operations["requestGuestAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Status permintaan tamu (token tamu). Selalu mengembalikan token tamu baru, jadi polling sekaligus memperpanjang sesi selama link aktif. */
+        get: operations["getGuestStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/rooms/{room_id}/voice-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sama dengan createVoiceToken, untuk token tamu di ruang tujuannya. */
+        post: operations["createGuestVoiceToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports": {
         parameters: {
             query?: never;
@@ -2029,6 +2184,53 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        GuestLink: {
+            /** Format: uuid */
+            id: string;
+            /** @description Bentuk tampilan ABCD-EFGH */
+            code: string;
+            /** @description URL frontend /guest/{code} */
+            link: string;
+            max_guests: number;
+            used_count: number;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        CreateGuestLinkRequest: {
+            /** @default 2 */
+            expires_in_hours: number;
+            /** @default 40 */
+            max_guests: number;
+        };
+        GuestRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "denied";
+            /** Format: date-time */
+            created_at: string;
+        };
+        GuestLinkPreview: {
+            org_name: string;
+            room_name: string;
+        };
+        GuestSession: {
+            /** @description Token tamu (15 menit) */
+            token: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "denied";
+            display_name: string;
+            /** Format: uuid */
+            room_id: string;
+            room_name: string;
+            map_key: components["schemas"]["RoomMap"];
+            org_name: string;
+        };
         /** @enum {string} */
         RoomMap: "classroom" | "garden" | "lab" | "baca" | "library" | "science" | "staff";
         CreateRoomRequest: {
@@ -2858,6 +3060,269 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
             /** @description voice_pending; pemutusan admission sebelumnya belum terkonfirmasi */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            503: components["responses"]["VoiceUnavailable"];
+        };
+    };
+    listGuestLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Link aktif, terbaru dulu (maks 20) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GuestLink"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createGuestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGuestLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Link dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestLink"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeGuestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dicabut */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listGuestRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Antrean tamu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GuestRequest"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    decideGuestRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approve" | "deny";
+                };
+            };
+        };
+        responses: {
+            /** @description Keputusan tersimpan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestRequest"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    previewGuestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nama sekolah dan ruang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestLinkPreview"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            410: components["responses"]["InviteExpired"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    requestGuestAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Secret UUID v4 retry key. Keep out of logs and URLs; same link/key resumes unchanged request.
+                     */
+                    request_key: string;
+                    display_name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Permintaan dibuat, status pending */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestSession"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["NotFound"];
+            410: components["responses"]["InviteExpired"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getGuestStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status tamu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestSession"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            410: components["responses"]["InviteExpired"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    createGuestVoiceToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token voice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceToken"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            /** @description voice_pending */
             409: {
                 headers: {
                     [name: string]: unknown;

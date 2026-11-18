@@ -198,6 +198,11 @@ func (h *Hub) VoiceMember(ctx context.Context, roomID, userID uuid.UUID) (VoiceM
 	res := make(chan VoiceMember, 1)
 	probe := probeCmd{fn: func(r *room) {
 		m := r.members[userID]
+		if m != nil && m.p.Role == RoleGuest && !m.guestExpiresAt.IsZero() && !r.now().Before(m.guestExpiresAt) {
+			r.endGuest(userID)
+			close(res)
+			return
+		}
 		if m == nil || m.conn == nil {
 			close(res)
 			return
@@ -255,6 +260,26 @@ func (h *Hub) claim(c *conn) {
 	h.mu.Unlock()
 	if old != nil && old != c {
 		old.close(closeReplaced, "replaced")
+	}
+}
+
+// EndGuest disconnects a guest whose access ended (link revoked). A reconnect
+// is refused because admission is checked again.
+func (h *Hub) EndGuest(userID uuid.UUID) {
+	h.mu.Lock()
+	rooms := make([]*room, 0, len(h.rooms))
+	for _, r := range h.rooms {
+		rooms = append(rooms, r)
+	}
+	h.mu.Unlock()
+	for _, r := range rooms {
+		done := make(chan struct{})
+		if r.post(endGuestCmd{userID: userID, done: done}) {
+			select {
+			case <-done:
+			case <-r.done:
+			}
+		}
 	}
 }
 

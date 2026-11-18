@@ -124,7 +124,7 @@ func (r *room) moderate(m *member, c commandCmd, reject func(code, message strin
 			reject(CodeNotFoundTarget, "Peserta tidak ada di ruang ini")
 			return
 		}
-		if t.p.Role != "participant" {
+		if t.p.Role != "participant" && t.p.Role != RoleGuest {
 			reject(CodeForbidden, "Pengajar dan admin tidak bisa dimoderasi")
 			return
 		}
@@ -212,6 +212,9 @@ func (r *room) moderated(c moderatedCmd) {
 func (r *room) state(id uuid.UUID) RoomStateMsg {
 	s := RoomStateMsg{Pin: r.pin, AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id], VoiceBroadcast: r.broadcasters()}
 	if m := r.members[id]; m != nil {
+		if m.p.Role == RoleGuest {
+			s.Pin = nil
+		}
 		s.VoiceIdentity = m.voiceIdentity
 		s.VoiceChannel = m.voiceChannel
 	}

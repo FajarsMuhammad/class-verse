@@ -243,6 +243,40 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
 | ADR-011 | Redis hanya untuk leaderboard mingguan (sorted set per organisasi per minggu WIB); Postgres `point_events` tetap sumber kebenaran | Top-N dan peringkat per user O(log n) tanpa agregasi `SUM` tiap request; reset mingguan lewat kunci berganti tanpa job; bisa dibangun ulang dari Postgres | Redis dipakai untuk state room (ADR-002) atau data yang tidak bisa dibangun ulang |
 
+## ADR-012 — Prinsipal tamu pertemuan (G1)
+
+**Disetujui:** tamu mengikuti satu ruang lewat tautan dan persetujuan guru/admin sekolah ruang itu,
+terpisah dari akun anggota dan kelas/rombel. Implementasi memakai `users.is_guest` agar attendance,
+chat, moderation, dan voice tetap memakai satu `user_id`. Email tamu `NULL`; CHECK dan trigger database
+menolak kredensial login, tanggal lahir, membership, OTP, serta refresh token untuk tamu. Lookup akun
+mengecualikan tamu. Tidak ada konversi tamu menjadi akun pada G1.
+
+`guest_links` mengikat organisasi dan ruang dengan FK komposit; bukan kampus atau Ruang Guru.
+Link maksimal 24 jam dan 40 identitas tamu, tetap dibatasi kapasitas ruang bersama anggota.
+Slot terpakai saat permintaan pertama dibuat; penolakan tidak mengembalikan slot. Retry dengan
+UUID v4 rahasia yang sama memakai identitas lama tanpa slot tambahan. Server menyimpan hash kunci;
+kunci tidak masuk URL/log, dan tidak bisa dipakai untuk link lain. Browser menyimpan kredensial hanya
+in-memory; reload memulai permintaan baru. Usia tidak diminta atau disimpan; host/sekolah tetap
+bertanggung jawab atas persetujuan wali dan kelayakan undangan.
+
+Approval/deny dan revoke diserialkan lewat lock baris link. Keputusan dan audit ditulis satu transaksi.
+`guest_decisions` terpisah karena audit admission merujuk link dan target opsional (revoke link),
+sedangkan `moderation_actions` tetap memegang kick/mute sesi. Bukan perubahan enum moderasi lama.
+
+JWT tamu memakai audience `kelasverse-guest`, paling lama 15 menit atau sisa usia link. Hanya endpoint
+`/api/guest`, socket ruang tujuan, dan voice ruang itu menerimanya; API akun menolak audience tamu.
+Polling status memperbarui token selama grant aktif. Admission diperiksa setiap koneksi/reconnect;
+`travel` ditolak. Ruang mengakhiri presence live maupun yang ditahan saat link habis/dicabut,
+sekaligus mencabut voice. Kick memakai ban sesi yang sama dengan anggota.
+
+Frontend `/guest/{code}` berada di luar guard akun, dengan shell ruang minimal tanpa data belajar,
+menu sekolah, atau navigasi antar-ruang. Desktop memiliki peta/chat/voice; HP tetap daftar tempat/chat,
+tanpa peta, movement, atau voice. Route lama belum dimigrasi.
+
+Migration `00019` mengubah email nullable tanpa mengubah data anggota. Rollback menolak berjalan
+bila identitas tamu sudah ada: penghapusan/export/retensi data memerlukan persetujuan terpisah.
+Sebelum pilot, tinjauan PDP/persetujuan wali dan pengujian perangkat fisik tetap wajib.
+
 ## MVP 2 fitur belajar — keputusan dan batas perencanaan
 
 Status: F1, L1, L2, M1 selesai; M2 progres modul diimplementasikan. Rencana dan checklist tunggal:

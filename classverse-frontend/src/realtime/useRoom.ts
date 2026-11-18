@@ -58,7 +58,7 @@ export interface RoomHandle {
 
 // useRoom connects to one room over WebSocket and keeps a World in sync.
 // The connection closes when the component unmounts.
-export function useRoom(): RoomHandle {
+export function useRoom(getToken: () => Promise<string | null> = freshToken): RoomHandle {
   const pin = ref<LearningPin | null>(null)
   const status = ref<ConnectionStatus>('connecting')
   const map = shallowRef<MapData | null>(null)
@@ -99,7 +99,7 @@ export function useRoom(): RoomHandle {
     client = new RealtimeClient({
       url: roomSocketURL(roomId),
       mode,
-      getToken: freshToken,
+      getToken,
       onStatus: (s) => {
         status.value = s
         if (s !== 'open') traveling.value = false

@@ -600,7 +600,7 @@ func googleDisplayName(name, email string) string {
 func toProfile(u query.User) Profile {
 	p := Profile{
 		ID:           u.ID,
-		Email:        u.Email,
+		Email:        u.Email.String,
 		DisplayName:  u.DisplayName,
 		AvatarKey:    u.AvatarKey,
 		NeedsProfile: !u.BirthDate.Valid,

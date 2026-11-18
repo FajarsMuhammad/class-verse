@@ -246,6 +246,48 @@ func (e FileItemKind) Valid() bool {
 	}
 }
 
+// Defines values for GuestRequestStatus.
+const (
+	GuestRequestStatusApproved GuestRequestStatus = "approved"
+	GuestRequestStatusDenied   GuestRequestStatus = "denied"
+	GuestRequestStatusPending  GuestRequestStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the GuestRequestStatus enum.
+func (e GuestRequestStatus) Valid() bool {
+	switch e {
+	case GuestRequestStatusApproved:
+		return true
+	case GuestRequestStatusDenied:
+		return true
+	case GuestRequestStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GuestSessionStatus.
+const (
+	GuestSessionStatusApproved GuestSessionStatus = "approved"
+	GuestSessionStatusDenied   GuestSessionStatus = "denied"
+	GuestSessionStatusPending  GuestSessionStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the GuestSessionStatus enum.
+func (e GuestSessionStatus) Valid() bool {
+	switch e {
+	case GuestSessionStatusApproved:
+		return true
+	case GuestSessionStatusDenied:
+		return true
+	case GuestSessionStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InviteRole.
 const (
 	InviteRoleParticipant InviteRole = "participant"
@@ -630,6 +672,24 @@ func (e ListStaff200JSONResponseBodyItemsRole) Valid() bool {
 	}
 }
 
+// Defines values for DecideGuestRequestJSONBodyDecision.
+const (
+	Approve DecideGuestRequestJSONBodyDecision = "approve"
+	Deny    DecideGuestRequestJSONBodyDecision = "deny"
+)
+
+// Valid indicates whether the value is a known member of the DecideGuestRequestJSONBodyDecision enum.
+func (e DecideGuestRequestJSONBodyDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Deny:
+		return true
+	default:
+		return false
+	}
+}
+
 // AcademicYear defines model for AcademicYear.
 type AcademicYear struct {
 	Active bool               `json:"active"`
@@ -785,6 +845,12 @@ type ClassTeacher struct {
 // ClassTeacherRole defines model for ClassTeacher.Role.
 type ClassTeacherRole string
 
+// CreateGuestLinkRequest defines model for CreateGuestLinkRequest.
+type CreateGuestLinkRequest struct {
+	ExpiresInHours *int `json:"expires_in_hours,omitempty"`
+	MaxGuests      *int `json:"max_guests,omitempty"`
+}
+
 // CreateInviteRequest defines model for CreateInviteRequest.
 type CreateInviteRequest struct {
 	// ClassId Opsional, kelas aktif sekolah ini. Admin atau wali kelas aktif; role wajib participant.
@@ -909,6 +975,54 @@ type GradebookTask struct {
 	Total       int                `json:"total"`
 	YearLabel   string             `json:"year_label"`
 }
+
+// GuestLink defines model for GuestLink.
+type GuestLink struct {
+	// Code Bentuk tampilan ABCD-EFGH
+	Code      string             `json:"code"`
+	CreatedAt time.Time          `json:"created_at"`
+	ExpiresAt time.Time          `json:"expires_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// Link URL frontend /guest/{code}
+	Link      string `json:"link"`
+	MaxGuests int    `json:"max_guests"`
+	UsedCount int    `json:"used_count"`
+}
+
+// GuestLinkPreview defines model for GuestLinkPreview.
+type GuestLinkPreview struct {
+	OrgName  string `json:"org_name"`
+	RoomName string `json:"room_name"`
+}
+
+// GuestRequest defines model for GuestRequest.
+type GuestRequest struct {
+	CreatedAt   time.Time          `json:"created_at"`
+	DisplayName string             `json:"display_name"`
+	Id          openapi_types.UUID `json:"id"`
+	Status      GuestRequestStatus `json:"status"`
+	UserId      openapi_types.UUID `json:"user_id"`
+}
+
+// GuestRequestStatus defines model for GuestRequest.Status.
+type GuestRequestStatus string
+
+// GuestSession defines model for GuestSession.
+type GuestSession struct {
+	DisplayName string             `json:"display_name"`
+	MapKey      RoomMap            `json:"map_key"`
+	OrgName     string             `json:"org_name"`
+	RoomId      openapi_types.UUID `json:"room_id"`
+	RoomName    string             `json:"room_name"`
+	Status      GuestSessionStatus `json:"status"`
+
+	// Token Token tamu (15 menit)
+	Token string `json:"token"`
+}
+
+// GuestSessionStatus defines model for GuestSession.Status.
+type GuestSessionStatus string
 
 // Invite defines model for Invite.
 type Invite struct {
@@ -1454,6 +1568,14 @@ type ValidationFailed = ErrorResponse
 // VoiceUnavailable defines model for VoiceUnavailable.
 type VoiceUnavailable = ErrorResponse
 
+// RequestGuestAccessJSONBody defines parameters for RequestGuestAccess.
+type RequestGuestAccessJSONBody struct {
+	DisplayName string `json:"display_name"`
+
+	// RequestKey Secret UUID v4 retry key. Keep out of logs and URLs; same link/key resumes unchanged request.
+	RequestKey openapi_types.UUID `json:"request_key"`
+}
+
 // CreateAcademicYearJSONBody defines parameters for CreateAcademicYear.
 type CreateAcademicYearJSONBody struct {
 	// Label Example: 2026/2027
@@ -1635,6 +1757,14 @@ type ListRoomsParams struct {
 // ListStaff200JSONResponseBodyItemsRole defines parameters for ListStaff.
 type ListStaff200JSONResponseBodyItemsRole string
 
+// DecideGuestRequestJSONBody defines parameters for DecideGuestRequest.
+type DecideGuestRequestJSONBody struct {
+	Decision DecideGuestRequestJSONBodyDecision `json:"decision"`
+}
+
+// DecideGuestRequestJSONBodyDecision defines parameters for DecideGuestRequest.
+type DecideGuestRequestJSONBodyDecision string
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -1646,6 +1776,9 @@ type ResendOtpJSONRequestBody = EmailRequest
 
 // VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
 type VerifyEmailJSONRequestBody = VerifyEmailRequest
+
+// RequestGuestAccessJSONRequestBody defines body for RequestGuestAccess for application/json ContentType.
+type RequestGuestAccessJSONRequestBody RequestGuestAccessJSONBody
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
@@ -1739,3 +1872,9 @@ type ReviewReportJSONRequestBody = ReviewReportRequest
 
 // UpdateRoomJSONRequestBody defines body for UpdateRoom for application/json ContentType.
 type UpdateRoomJSONRequestBody = UpdateRoomRequest
+
+// CreateGuestLinkJSONRequestBody defines body for CreateGuestLink for application/json ContentType.
+type CreateGuestLinkJSONRequestBody = CreateGuestLinkRequest
+
+// DecideGuestRequestJSONRequestBody defines body for DecideGuestRequest for application/json ContentType.
+type DecideGuestRequestJSONRequestBody DecideGuestRequestJSONBody

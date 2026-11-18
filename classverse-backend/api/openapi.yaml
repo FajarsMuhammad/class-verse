@@ -346,6 +346,183 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "503": { $ref: "#/components/responses/VoiceUnavailable" }
 
+  /api/rooms/{room_id}/guest-links:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listGuestLinks
+      description: Link tamu aktif ruang ini (G1). Guru dan admin sekolah ruang.
+      responses:
+        "200":
+          description: Link aktif, terbaru dulu (maks 20)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/GuestLink" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createGuestLink
+      description: Buat link tamu untuk satu ruang (bukan kampus). Berlaku maks 24 jam, maks 40 tamu.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateGuestLinkRequest" }
+      responses:
+        "201":
+          description: Link dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestLink" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{room_id}/guest-links/{link_id}:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: link_id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      operationId: revokeGuestLink
+      description: Cabut link; tamu yang sudah masuk lewat link ini langsung diputus.
+      responses:
+        "204": { description: Dicabut }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{room_id}/guest-requests:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listGuestRequests
+      description: Tamu yang menunggu persetujuan, terlama dulu (maks 50).
+      responses:
+        "200":
+          description: Antrean tamu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/GuestRequest" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{room_id}/guest-requests/{request_id}:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: request_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: decideGuestRequest
+      description: Izinkan atau tolak tamu. Permintaan yang sudah diputuskan menjawab 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, deny] }
+      responses:
+        "200":
+          description: Keputusan tersimpan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestRequest" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/guest/links/{code}:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    get:
+      operationId: previewGuestLink
+      security: []
+      description: Pratinjau link tamu tanpa akun. Dibatasi per IP.
+      responses:
+        "200":
+          description: Nama sekolah dan ruang
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestLinkPreview" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/guest/links/{code}/requests:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    post:
+      operationId: requestGuestAccess
+      security: []
+      description: >-
+        Minta masuk sebagai tamu dengan nama. Membuat identitas tamu (tanpa akun) dan mengembalikan token tamu
+        berumur pendek. Token ini hanya diterima endpoint /api/guest, WebSocket ruang tujuan, dan token suaranya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [display_name, request_key]
+              properties:
+                request_key: { type: string, format: uuid, description: "Secret UUID v4 retry key. Keep out of logs and URLs; same link/key resumes unchanged request." }
+                display_name: { type: string, minLength: 3, maxLength: 24 }
+      responses:
+        "201":
+          description: Permintaan dibuat, status pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestSession" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/guest/me:
+    get:
+      operationId: getGuestStatus
+      description: >-
+        Status permintaan tamu (token tamu). Selalu mengembalikan token tamu baru, jadi polling
+        sekaligus memperpanjang sesi selama link aktif.
+      responses:
+        "200":
+          description: Status tamu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestSession" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/guest/rooms/{room_id}/voice-token:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: createGuestVoiceToken
+      description: Sama dengan createVoiceToken, untuk token tamu di ruang tujuannya.
+      responses:
+        "200":
+          description: Token voice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VoiceToken" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: voice_pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "503": { $ref: "#/components/responses/VoiceUnavailable" }
+
   /api/reports:
     post:
       operationId: createReport
@@ -2289,6 +2466,49 @@ components:
         expires_at: { type: string, format: date-time }
         created_by: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
+    GuestLink:
+      type: object
+      required: [id, code, link, max_guests, used_count, expires_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, description: Bentuk tampilan ABCD-EFGH }
+        link: { type: string, description: "URL frontend /guest/{code}" }
+        max_guests: { type: integer }
+        used_count: { type: integer }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    CreateGuestLinkRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        expires_in_hours: { type: integer, minimum: 1, maximum: 24, default: 2 }
+        max_guests: { type: integer, minimum: 1, maximum: 40, default: 40 }
+    GuestRequest:
+      type: object
+      required: [id, user_id, display_name, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+        status: { type: string, enum: [pending, approved, denied] }
+        created_at: { type: string, format: date-time }
+    GuestLinkPreview:
+      type: object
+      required: [org_name, room_name]
+      properties:
+        org_name: { type: string }
+        room_name: { type: string }
+    GuestSession:
+      type: object
+      required: [token, status, display_name, room_id, room_name, map_key, org_name]
+      properties:
+        token: { type: string, description: Token tamu (15 menit), kirim sebagai Bearer }
+        status: { type: string, enum: [pending, approved, denied] }
+        display_name: { type: string }
+        room_id: { type: string, format: uuid }
+        room_name: { type: string }
+        map_key: { $ref: "#/components/schemas/RoomMap" }
+        org_name: { type: string }
     RoomMap:
       type: string
       enum: [classroom, garden, lab, baca, library, science, staff]

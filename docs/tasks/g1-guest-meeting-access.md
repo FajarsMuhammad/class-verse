@@ -1,6 +1,6 @@
 # G1 — Akses tamu pertemuan lewat tautan
 
-Status: rencana disetujui. Belum diimplementasikan.
+Status: G1a–G1d selesai dan terverifikasi lokal. Belum deploy/push; batas pilot tercatat di bawah.
 
 ## Tujuan
 
@@ -30,7 +30,7 @@ perpustakaan, keanggotaan sekolah, dan kelas/rombel.
 
 ### Tamu
 
-1. Tamu membuka `/tamu/{code}` dan melihat nama sekolah serta nama ruang.
+1. Tamu membuka `/guest/{code}` dan melihat nama sekolah serta nama ruang.
 2. Tamu mengisi nama tampilan. Usia tidak wajib diisi dan bukan syarat masuk.
 3. Tamu menunggu persetujuan tanpa melihat isi ruang, chat, atau daftar peserta.
 4. Setelah disetujui, tamu masuk ke ruang tujuan dalam mode yang sesuai perangkat.
@@ -104,7 +104,7 @@ orang tua/wali dengan konsultan hukum sebelum pilot.
 
 ### G1d — Pengalaman tamu
 
-- Tambah halaman `/tamu/{code}` di luar alur login.
+- Tambah halaman `/guest/{code}` di luar alur login.
 - Form nama, pernyataan usia, status menunggu, ditolak, habis, dan dikeluarkan.
 - Ruang tamu memakai shell minimal: Peta/Chat atau mode HP tanpa menu Kelola, Rapor, Belajar,
   Perpustakaan, berkas, atau navigasi ke ruang lain.
@@ -118,3 +118,35 @@ orang tua/wali dengan konsultan hukum sebelum pilot.
 - Akun dan alur sekolah yang sudah ada tidak berubah.
 - Pencabutan tautan, kedaluwarsa, penolakan, dan pengeluaran bekerja di HTTP, WebSocket, dan suara.
 - Backend race test, frontend test, lint, build, e2e desktop, dan e2e lebar HP lulus.
+
+## Implementasi dan bukti
+
+G1a–G1d selesai. Review keamanan independen menemukan race queued welcome setelah revoke;
+fix menutup socket langsung sebelum write loop bila admission akhir gagal. Tes RED membuktikan
+kebocoran welcome, lalu GREEN dengan race detector; re-review tidak menemukan blocker.
+
+- Migration `00019_guest_access.sql`: identitas tamu tanpa email/kredensial, link/grant dan audit
+  `guest_decisions`. Constraint/FK/trigger menjaga pemisahan akun; rollback menolak menghapus tamu.
+- Retry permintaan memakai hash UUID v4 rahasia, tidak memakai slot baru. Keputusan dan pencabutan
+  atomik dengan audit. Guru/admin lintas sekolah tidak mendapat akses.
+- JWT audience terpisah, maksimal 15 menit; polling memperbarui token. Admission cek grant setiap
+  koneksi; `travel`, sematan materi, data belajar, dan API akun tidak tersedia bagi tamu.
+- Host: **Kontrol pengajar → Undang tamu**. Buat/salin/cabut tautan dan antrean Izinkan/Tolak.
+  Batas default 2 jam/40 tamu; slot adalah total identitas yang meminta, bukan jumlah online.
+- Tamu: `/guest/{code}`, nama saja, menunggu/ditolak/habis/dikeluarkan, shell ruang minimal.
+  Desktop peta/chat/voice; HP daftar tempat/chat. Kredensial hanya in-memory; reload membuat
+  permintaan baru. Tidak ada pemulihan lintas reload atau konversi akun pada G1.
+- Tes PostgreSQL: replay serentak, kuota, keputusan serentak, grant pending/approved/denied,
+  revoke/expiry, audit, kredensial akun ditolak, serta approval bersamaan dengan revoke.
+  Unit gateway membuktikan admission akhir gagal tidak mengirim welcome/roster. Unit realtime menguji expiry/revoke termasuk
+  held presence dan voice, moderasi dan isolasi travel/materi.
+- Verifikasi: `go test -race -count=1 ./...` dengan PostgreSQL, `make lint`, frontend
+  `npm run test:unit -- --run`, `npm run lint`, `npm run build` lulus. Package `guest` mencapai
+  83,2% statement coverage dengan lifecycle service dan HTTP.
+- E2E `/tmp/kv-e2e/g1-guest.mjs`: desktop 1440×1000 dan HP 390×844 lulus. Host buat link,
+  tamu menunggu tanpa isi ruang, approval, chat, badge Tamu, mute/kick, penolakan reentry,
+  API akun ditolak, voice desktop terhubung dan grant dicabut; link dicabut memberi status habis.
+  Tidak ada page error atau overflow horizontal. Skrip masih harness lokal, belum CI.
+
+Batas pilot tetap: tinjauan PDP/persetujuan wali, Safari/iOS/perangkat fisik, jaringan produksi,
+soak dan verifikasi kapasitas global. Migrasi route lama ke English dikerjakan terpisah setelah G1.

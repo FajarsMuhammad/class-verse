@@ -40,7 +40,9 @@ func newOut(t string, v any) outMsg {
 type conn struct {
 	userID uuid.UUID
 	// list is mode HP (set once before the conn is shared, read-only after).
-	list   bool
+	list bool
+	// guest is a G1 meeting guest (set once before the conn is shared).
+	guest  bool
 	out    chan outMsg
 	done   chan struct{}
 	once   sync.Once

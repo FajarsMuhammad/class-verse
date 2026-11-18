@@ -19,9 +19,9 @@ import (
 )
 
 func TestCodeHelpers(t *testing.T) {
-	c, err := newCode()
+	c, err := NewCode()
 	if err != nil || len(c) != codeLen {
-		t.Fatalf("newCode() = %q, %v", c, err)
+		t.Fatalf("NewCode() = %q, %v", c, err)
 	}
 	tests := []struct {
 		in   string
@@ -34,12 +34,12 @@ func TestCodeHelpers(t *testing.T) {
 		{"ABC", "", false},
 	}
 	for _, tt := range tests {
-		got, ok := normalizeCode(tt.in)
+		got, ok := NormalizeCode(tt.in)
 		if ok != tt.ok || (ok && got != tt.want) {
-			t.Errorf("normalizeCode(%q) = %q, %v", tt.in, got, ok)
+			t.Errorf("NormalizeCode(%q) = %q, %v", tt.in, got, ok)
 		}
 	}
-	if displayCode("ABCDEFGH") != "ABCD-EFGH" {
+	if DisplayCode("ABCDEFGH") != "ABCD-EFGH" {
 		t.Error("displayCode")
 	}
 }
