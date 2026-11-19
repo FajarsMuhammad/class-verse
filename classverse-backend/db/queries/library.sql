@@ -33,11 +33,26 @@ WHERE b.org_id = sqlc.arg(org_id)
   AND b.archived_at IS NULL
   AND (sqlc.arg(include_drafts)::boolean OR b.published_at IS NOT NULL)
   AND (sqlc.narg(shelf)::text IS NULL OR b.shelf = sqlc.narg(shelf))
+  AND (sqlc.narg(format)::text IS NULL OR b.format = sqlc.narg(format))
+  AND (sqlc.narg(level)::text IS NULL OR b.level = sqlc.narg(level))
+  AND (sqlc.narg(published)::boolean IS NULL OR (b.published_at IS NOT NULL) = sqlc.narg(published))
   AND (sqlc.narg(pattern)::text IS NULL OR b.title ILIKE sqlc.narg(pattern) OR b.author ILIKE sqlc.narg(pattern))
   AND (sqlc.narg(cursor_title)::text IS NULL
        OR (b.title, b.id) > (sqlc.narg(cursor_title)::text, sqlc.narg(cursor_id)::uuid))
 ORDER BY b.title, b.id
 LIMIT sqlc.arg(row_limit);
+
+-- name: CountBooks :one
+-- Staff tab counts for the catalog, with the list's non-status filters.
+SELECT count(*)::integer AS all_count,
+  count(*) FILTER (WHERE b.published_at IS NOT NULL)::integer AS published_count,
+  count(*) FILTER (WHERE b.published_at IS NULL)::integer AS draft_count
+FROM library_books b
+WHERE b.org_id = sqlc.arg(org_id) AND b.archived_at IS NULL
+  AND (sqlc.narg(shelf)::text IS NULL OR b.shelf = sqlc.narg(shelf))
+  AND (sqlc.narg(format)::text IS NULL OR b.format = sqlc.narg(format))
+  AND (sqlc.narg(level)::text IS NULL OR b.level = sqlc.narg(level))
+  AND (sqlc.narg(pattern)::text IS NULL OR b.title ILIKE sqlc.narg(pattern) OR b.author ILIKE sqlc.narg(pattern));
 
 -- name: OrgAdmin :one
 SELECT user_id FROM memberships WHERE org_id = $1 AND role = 'admin' ORDER BY joined_at, user_id LIMIT 1;

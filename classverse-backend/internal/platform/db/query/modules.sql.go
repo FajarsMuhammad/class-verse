@@ -107,6 +107,50 @@ func (q *Queries) CompleteStep(ctx context.Context, arg CompleteStepParams) erro
 	return err
 }
 
+const countModules = `-- name: CountModules :one
+SELECT count(*) FILTER (WHERE m.archived_at IS NULL)::integer AS all_count,
+  count(*) FILTER (WHERE m.archived_at IS NULL AND m.published_at IS NOT NULL)::integer AS published_count,
+  count(*) FILTER (WHERE m.archived_at IS NULL AND m.published_at IS NULL)::integer AS draft_count,
+  count(*) FILTER (WHERE m.archived_at IS NOT NULL)::integer AS archived_count
+FROM modules m
+WHERE m.org_id = $1
+  AND ($2::text IS NULL OR m.building_key = $2)
+  AND ($3::text IS NULL OR m.level = $3)
+  AND ($4::text = '' OR position(lower($4) in lower(m.title)) > 0)
+`
+
+type CountModulesParams struct {
+	OrgID       uuid.UUID
+	BuildingKey pgtype.Text
+	Level       pgtype.Text
+	Search      string
+}
+
+type CountModulesRow struct {
+	AllCount       int32
+	PublishedCount int32
+	DraftCount     int32
+	ArchivedCount  int32
+}
+
+// Tab counts for the authoring list, with the list's non-status filters.
+func (q *Queries) CountModules(ctx context.Context, arg CountModulesParams) (CountModulesRow, error) {
+	row := q.db.QueryRow(ctx, countModules,
+		arg.OrgID,
+		arg.BuildingKey,
+		arg.Level,
+		arg.Search,
+	)
+	var i CountModulesRow
+	err := row.Scan(
+		&i.AllCount,
+		&i.PublishedCount,
+		&i.DraftCount,
+		&i.ArchivedCount,
+	)
+	return i, err
+}
+
 const createModule = `-- name: CreateModule :one
 INSERT INTO modules (id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)

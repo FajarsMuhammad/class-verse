@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import PagedSelect from './PagedSelect.vue'
+import RemotePagination from './RemotePagination.vue'
+import { PAGE as CLASS_PAGE, hasMore } from '@/api/page'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { classApi, type MoveResult, type Placement, type RosterEntry, type SchoolClass } from '@/api/classes'
 
@@ -35,8 +37,25 @@ const targetNames = ref<Record<string, string>>({})
 async function targetOptions(offset: number) {
  const result = await classApi.classes(props.orgId, props.yearId, offset)
  targetNames.value = { ...targetNames.value, ...Object.fromEntries(result.items.map(c => [c.id, c.name])) }
- return { items: [...(props.isAdmin && offset === 0 ? [{ value: 'none', label: 'Keluarkan dari kelas' }] : []), ...result.items.filter(c => props.isAdmin || c.my_role === 'homeroom').map(c => ({ value: c.id, label: c.name }))], more: result.items.length === 20 }
+ return { items: [...(props.isAdmin && offset === 0 ? [{ value: 'none', label: 'Keluarkan dari kelas' }] : []), ...result.items.filter(c => props.isAdmin || c.my_role === 'homeroom').map(c => ({ value: c.id, label: c.name }))], more: hasMore(offset, result) }
 }
+// Class filter chips page on their own (20 per page) so a school with many classes still offers every class.
+const chipPage = ref(1)
+const chips = ref<SchoolClass[]>([])
+const moreChips = ref(false)
+let chipGeneration = 0
+async function loadChips() {
+  if (props.classId) return
+  const g = ++chipGeneration, offset = (chipPage.value - 1) * CLASS_PAGE
+  try {
+    const result = await classApi.classes(props.orgId, props.yearId, offset)
+    if (g !== chipGeneration) return
+    chips.value = result.items; moreChips.value = hasMore(offset, result)
+    targetNames.value = { ...targetNames.value, ...Object.fromEntries(result.items.map(c => [c.id, c.name])) }
+  } catch (e) { if (g === chipGeneration) error.value = message(e) }
+}
+watch(chipPage, loadChips)
+const progress = (r: RosterEntry) => r.steps_total ? `${Math.round(((r.steps_done ?? 0) / r.steps_total) * 100)}%` : 'Belum ada tugas'
 const className = (id: string | null | undefined) => props.classes.find(c => c.id === id)?.name ?? (id ? targetNames.value[id] ?? 'Kelas terpilih' : 'Belum punya kelas')
 const message = (e: unknown) => e instanceof Error ? e.message : 'Perubahan gagal disimpan. Coba lagi.'
 let generation = 0
@@ -64,12 +83,12 @@ async function load() {
 function reset() { offset.value = 0; load() }
 watch(filter, reset)
 watch([q, addQ], () => { clearTimeout(timer); timer = setTimeout(reset, 250) })
-watch(() => [props.yearId, props.classId], () => { historyUser.value = ''; selected.value = []; filter.value = ''; reset() })
+watch(() => [props.yearId, props.classId], () => { historyUser.value = ''; selected.value = []; filter.value = ''; reset(); if (chipPage.value === 1) void loadChips(); else chipPage.value = 1 })
 
 async function save(action: () => Promise<unknown>) {
   if (saving.value || loading.value) return
   saving.value = true; error.value = ''; notice.value = ''
-  try { await action(); emit('changed'); await load() }
+  try { await action(); emit('changed'); await Promise.all([load(), loadChips()]) }
   catch (e) { error.value = message(e) }
   finally { saving.value = false }
 }
@@ -112,7 +131,7 @@ async function showHistory(student: RosterEntry) {
   finally { saving.value = false }
 }
 function date(value: string) { return new Date(value).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' }) }
-onMounted(load)
+onMounted(() => { void load(); void loadChips() })
 </script>
 
 <template>
@@ -136,7 +155,8 @@ onMounted(load)
     <nav v-if="!classId" class="class-filters" aria-label="Filter kelas siswa">
       <button type="button" class="btn-secondary" :aria-pressed="filter === ''" @click="filter = ''">Semua kelas</button>
       <button type="button" class="btn-secondary" data-filter="none" :aria-pressed="filter === 'none'" @click="filter = 'none'">Belum punya kelas ({{ unplacedTotal }})</button>
-      <button v-for="c in classes" :key="c.id" type="button" class="btn-secondary" :aria-pressed="filter === c.id" @click="filter = c.id">{{ c.name }} ({{ c.students }})</button>
+      <button v-for="c in chips" :key="c.id" type="button" class="btn-secondary" :aria-pressed="filter === c.id" @click="filter = c.id">{{ c.name }} ({{ c.students }})</button>
+      <RemotePagination v-if="chipPage > 1 || moreChips" :page="chipPage" :more="moreChips" @move="chipPage += $event" />
     </nav>
     <div class="roster-content">
     <div class="filters">
@@ -159,15 +179,17 @@ onMounted(load)
     <p v-if="loading" role="status">Memuat…</p>
     <div class="student-table-wrap">
     <table class="student-table" aria-label="Daftar siswa">
-      <thead><tr><th v-if="canMove" scope="col"><span class="sr-only">Pilih siswa</span></th><th scope="col">Nama</th><th v-if="!classId" scope="col">Kelas</th><th scope="col"><span class="sr-only">Aksi</span></th></tr></thead>
+      <thead><tr><th v-if="canMove" scope="col"><span class="sr-only">Pilih siswa</span></th><th scope="col">Nama</th><th v-if="!classId" scope="col">Kelas</th><th scope="col">Progres tugas</th><th scope="col"><span class="sr-only">Aksi</span></th></tr></thead>
       <tbody><tr v-for="student in items" :key="student.user_id" :data-student="student.user_id">
         <td v-if="canMove"><label class="check"><input v-model="selected" type="checkbox" :value="student.user_id" :disabled="saving || loading" /><span class="sr-only">Pilih {{ student.display_name }}</span></label></td>
         <th scope="row"><span class="student-initial" aria-hidden="true">{{ student.display_name.slice(0, 1).toLocaleUpperCase('id') }}</span>{{ student.display_name }}</th>
+        <td v-if="classId" class="muted">{{ progress(student) }}</td>
         <td v-if="classId" class="student-actions">
           <button v-if="canManageFixed" type="button" class="btn-secondary" :disabled="saving" :aria-label="`Keluarkan ${student.display_name} dari ${fixed?.name}`" @click="placeTo(student, null)">Keluarkan</button>
         </td>
         <template v-else>
           <td><span class="badge">{{ className(student.class_id) }}</span></td>
+          <td class="muted">{{ progress(student) }}</td>
           <td class="student-actions"><button type="button" class="btn-secondary" :disabled="saving || loading" :aria-label="`Riwayat kelas ${student.display_name}`" @click="showHistory(student)">Riwayat</button></td>
         </template>
       </tr></tbody>

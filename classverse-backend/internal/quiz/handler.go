@@ -34,6 +34,7 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 // Routes mounts quiz endpoints.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/orgs/{org_id}/quizzes", h.handle(h.list))
+	r.Get("/orgs/{org_id}/quizzes/{quiz_id}/results", h.handle(h.results))
 	r.Post("/orgs/{org_id}/quizzes", h.handle(h.create))
 	r.Post("/orgs/{org_id}/quizzes/{quiz_id}/publish", h.handle(h.publish))
 	r.Get("/orgs/{org_id}/quizzes/{quiz_id}/revisions", h.handle(h.history))
@@ -114,6 +115,7 @@ type Response struct {
 	QuestionCount       int32              `json:"question_count"`
 	BestScore           *int16             `json:"best_score"`
 	Attempts            int32              `json:"attempts"`
+	ModuleTitles        []string           `json:"module_titles"`
 	Questions           []QuestionResponse `json:"questions,omitempty"`
 }
 
@@ -130,7 +132,7 @@ func toQuiz(z Quiz) Response {
 			return nil
 		}(), ID: z.ID, BuildingKey: z.BuildingKey, Level: z.Level, Title: z.Title, Description: z.Description,
 		PassScore: z.PassScore, Published: z.PublishedAt.Valid, UpdatedAt: z.UpdatedAt.Time,
-		QuestionCount: z.QuestionCount, Attempts: z.Attempts,
+		QuestionCount: z.QuestionCount, Attempts: z.Attempts, ModuleTitles: z.ModuleTitles,
 	}
 	if z.BestScore >= 0 {
 		out.BestScore = &z.BestScore
@@ -235,9 +237,18 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	if status := q.Get("status"); status != "" && status != "draft" && status != "published" {
 		return httpx.ValidationFailed(map[string]string{"status": "Status tidak valid"})
 	}
-	quizzes, err := h.svc.List(r.Context(), user, p[0], Filter{Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true"})
+	filter := Filter{Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true"}
+	quizzes, err := h.svc.List(r.Context(), user, p[0], filter)
 	if err != nil {
 		return err
+	}
+	body := map[string]any{}
+	if q.Get("counts") == "true" {
+		c, err := h.svc.Counts(r.Context(), user, p[0], filter)
+		if err != nil {
+			return err
+		}
+		body["counts"] = map[string]int32{"all": c.AllCount, "published": c.PublishedCount, "draft": c.DraftCount, "empty": c.EmptyCount}
 	}
 	items := make([]Response, 0, len(quizzes))
 	for _, z := range quizzes {
@@ -246,6 +257,37 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	total := int64(0)
 	if len(quizzes) > 0 {
 		total = quizzes[0].TotalCount
+	}
+	body["items"], body["total"] = items, total
+	httpx.JSON(w, http.StatusOK, body)
+	return nil
+}
+
+// results lists participants' best finished score for one quiz, one page at a time (teacher/admin).
+func (h *Handler) results(w http.ResponseWriter, r *http.Request) error {
+	limit, offset, err := httpx.Pagination(r)
+	if err != nil {
+		return err
+	}
+	user, p, err := ids(r, "org_id", "quiz_id")
+	if err != nil {
+		return err
+	}
+	rows, err := h.svc.Results(r.Context(), user, p[0], p[1], limit, offset)
+	if err != nil {
+		return err
+	}
+	type item struct {
+		UserID         uuid.UUID `json:"user_id"`
+		Name           string    `json:"display_name"`
+		BestScore      int16     `json:"best_score"`
+		Attempts       int32     `json:"attempts"`
+		LastFinishedAt time.Time `json:"last_finished_at"`
+	}
+	items := make([]item, len(rows))
+	total := int32(0)
+	for i, row := range rows {
+		items[i], total = item{UserID: row.UserID, Name: row.DisplayName, BestScore: row.BestScore, Attempts: row.Attempts, LastFinishedAt: row.LastFinishedAt.Time}, row.TotalCount
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
 	return nil

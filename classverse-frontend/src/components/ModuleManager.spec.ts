@@ -26,8 +26,8 @@ const draft: Module = {
 
 beforeEach(() => {
   vi.spyOn(moduleApi, 'history').mockResolvedValue({items:[]})
-  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft] })
-  vi.spyOn(fileApi, 'list').mockResolvedValue({ items: [], used_bytes: 0, quota_bytes: 1 })
+  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft], counts: { all: 1, published: 0, draft: 1, archived: 0 } })
+  vi.spyOn(fileApi, 'list').mockResolvedValue({ items: [], total: 0, used_bytes: 0, quota_bytes: 1 })
 })
 afterEach(() => vi.restoreAllMocks())
 
@@ -114,12 +114,15 @@ it('adds a quiz step pointing at a published quiz of the same building', async (
 })
 
  it('keeps the catalog compact and filters by level before opening one item', async () => {
-  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft, { ...draft, id: 'other', level: 'SMP', title: 'Jenjang lain' }] })
+  const all = [draft, { ...draft, id: 'other', level: 'SMP' as const, title: 'Jenjang lain' }]
+  const list = vi.spyOn(moduleApi, 'list').mockImplementation(async (_org, opts) => ({ items: all.filter(m => !opts?.level || m.level === opts.level) }))
   const w = mount(ModuleManager, { props: { orgId: 'o' } })
   await flushPromises()
   expect(w.findAll('.catalog-row')).toHaveLength(2)
   expect(w.find('.steps').exists()).toBe(false)
   await w.get('[aria-label="Filter jenjang"]').setValue('SMP')
+  await flushPromises()
+  expect(list).toHaveBeenLastCalledWith('o', expect.objectContaining({ level: 'SMP' }))
   expect(w.findAll('.catalog-row')).toHaveLength(1)
   expect(w.get('.catalog-row').text()).toContain('Jenjang lain')
   await w.get('.catalog-row button').trigger('click')
@@ -175,7 +178,11 @@ it('explains that a room is required on campus and never offers drafts for pinni
 })
 
 it('filters by status tab and search, and offers Tugaskan only for published modules', async () => {
-  vi.spyOn(moduleApi, 'list').mockImplementation(async (_org, query) => ({ items: query?.archived ? [] : [draft, { ...draft, id: 'p', title: 'Bilangan', published: true }] }))
+  const all = [draft, { ...draft, id: 'p', title: 'Bilangan', published: true }]
+  vi.spyOn(moduleApi, 'list').mockImplementation(async (_org, query) => ({
+    items: query?.archived ? [] : all.filter(m => (!query?.status || m.published === (query.status === 'published')) && m.title.toLowerCase().includes(query?.search ?? '')),
+    counts: { all: 2, published: 1, draft: 1, archived: 0 },
+  }))
   const w = mount(ModuleManager, { props: { orgId: 'o' } })
   await flushPromises()
   expect(w.findAll('[role=tab]').map((t) => t.text())).toEqual(['Semua 2', 'Terbit 1', 'Draf 1', 'Arsip 0'])
@@ -183,9 +190,11 @@ it('filters by status tab and search, and offers Tugaskan only for published mod
   await w.get('[aria-label="Tugaskan Bilangan"]').trigger('click')
   expect(w.emitted('assign')).toEqual([['p']])
   await w.findAll('[role=tab]')[2]!.trigger('click')
+  await flushPromises()
   expect(w.findAll('.catalog-row')).toHaveLength(1)
   expect(w.get('.catalog-row').text()).toContain('Lanjutkan edit')
   await w.findAll('[role=tab]')[0]!.trigger('click')
   await w.get('input[type=search]').setValue('bil')
+  await flushPromises()
   expect(w.findAll('.catalog-row').map((r) => r.text())).toEqual([expect.stringContaining('Bilangan')])
 })

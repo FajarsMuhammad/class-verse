@@ -95,9 +95,11 @@ func (h *Handler) handle(fn func(http.ResponseWriter, *http.Request) error) http
 
 // YearResponse is an academic year.
 type YearResponse struct {
-	ID     uuid.UUID `json:"id"`
-	Label  string    `json:"label"`
-	Active bool      `json:"active"`
+	ID           uuid.UUID `json:"id"`
+	Label        string    `json:"label"`
+	Active       bool      `json:"active"`
+	ClassCount   int32     `json:"class_count"`
+	StudentCount int32     `json:"student_count"`
 }
 
 // Response is a class with its student and teacher counts.
@@ -123,6 +125,8 @@ type RosterResponse struct {
 	DisplayName string     `json:"display_name"`
 	AvatarKey   string     `json:"avatar_key"`
 	ClassID     *uuid.UUID `json:"class_id"`
+	StepsDone   int32      `json:"steps_done"`
+	StepsTotal  int32      `json:"steps_total"`
 }
 
 // PlacementResponse is one row of class history.
@@ -133,7 +137,9 @@ type PlacementResponse struct {
 	EndedAt   *time.Time `json:"ended_at"`
 }
 
-func toYear(y Year) YearResponse { return YearResponse(y) }
+func toYear(y Year) YearResponse {
+	return YearResponse{ID: y.ID, Label: y.Label, Active: y.Active, ClassCount: y.ClassCount, StudentCount: y.StudentCount}
+}
 
 func toClass(c Class) Response {
 	out := Response{ID: c.ID, YearID: c.YearID, Name: c.Name, Students: c.Students, SubjectTeachers: c.SubjectTeachers}
@@ -182,7 +188,11 @@ func (h *Handler) years(w http.ResponseWriter, r *http.Request) error {
 	for i, y := range years {
 		items[i] = toYear(y)
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items})
+	total := int32(0)
+	if len(years) > 0 {
+		total = years[0].TotalCount
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
 	return nil
 }
 
@@ -239,7 +249,11 @@ func (h *Handler) classes(w http.ResponseWriter, r *http.Request) error {
 	for i, c := range classes {
 		items[i] = toClass(c)
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items})
+	total := int32(0)
+	if len(classes) > 0 {
+		total = classes[0].TotalCount
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
 	return nil
 }
 
@@ -482,10 +496,11 @@ func (h *Handler) staff(w http.ResponseWriter, r *http.Request) error {
 		Role   string    `json:"role"`
 	}
 	items := make([]item, len(rows))
+	total := int32(0)
 	for i, m := range rows {
-		items[i] = item(m)
+		items[i], total = item{UserID: m.UserID, Name: m.Name, Role: m.Role}, m.TotalCount
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items})
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
 	return nil
 }
 

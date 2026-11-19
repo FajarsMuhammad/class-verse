@@ -659,7 +659,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota. */
+        /** @description File siap milik sekolah (terbaru dulu, 20 per halaman), posisi baca pemanggil, dan pemakaian kuota. */
         get: operations["listFiles"];
         put?: never;
         post?: never;
@@ -878,6 +878,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Peserta yang sudah menyelesaikan kuis, nilai tertinggi (aturan Rapor), jumlah percobaan. */
+        get: operations["listQuizResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/quizzes/{quiz_id}/publish": {
         parameters: {
             query?: never;
@@ -929,7 +949,8 @@ export interface paths {
         };
         /**
          * @description Modul (jalur belajar) beserta langkah aktif berurutan. Peserta hanya melihat modul terbit; `drafts=true`
-         *     menyertakan draf untuk pengajar/admin. Arsip tidak pernah tampil. Maksimal 100 modul.
+         *     menyertakan draf untuk pengajar/admin. `archived=true` hanya untuk pengajar/admin, mengembalikan
+         *     daftar arsip terpisah (bukan gabungan dengan modul aktif). Maksimal 100 modul.
          */
         get: operations["listModules"];
         put?: never;
@@ -1443,6 +1464,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/management-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getManagementSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/academic-years": {
         parameters: {
             query?: never;
@@ -1786,6 +1823,14 @@ export interface components {
         };
         ModuleList: {
             items: components["schemas"]["Module"][];
+            total: number;
+            /** @description Hanya bila counts=true (pengajar/admin) */
+            counts?: {
+                all?: number;
+                published?: number;
+                draft?: number;
+                archived?: number;
+            };
         };
         /** @enum {string} */
         StepKind: "materi" | "berkas" | "video" | "kuis";
@@ -1886,11 +1931,22 @@ export interface components {
             best_score: number | null;
             /** @description Jumlah percobaan selesai milik pemanggil */
             attempts: number;
+            /** @description Pengajar/admin dengan drafts=true: maks 3 modul aktif yang memakai kuis ini */
+            module_titles?: string[];
             /** @description Hanya untuk pengajar/admin dengan drafts=true */
             questions?: components["schemas"]["QuizQuestion"][];
         };
         QuizList: {
             items: components["schemas"]["Quiz"][];
+            total: number;
+            /** @description Hanya bila counts=true (pengajar/admin) */
+            counts?: {
+                all?: number;
+                published?: number;
+                draft?: number;
+                /** @description Kuis tanpa soal */
+                empty?: number;
+            };
         };
         QuestionInput: {
             /**
@@ -2018,6 +2074,12 @@ export interface components {
             cancelled: boolean;
             done: number;
             total: number;
+            /** @description Staf saja (0 untuk peserta): jumlah penerima beku */
+            recipients?: number;
+            /** @description Staf saja: penerima yang menyelesaikan semua langkah */
+            finished?: number;
+            /** @description Staf saja: penerima yang menyelesaikan minimal satu langkah */
+            started?: number;
         };
         AssignmentStep: {
             rich_content?: components["schemas"]["RichContent"];
@@ -2050,6 +2112,9 @@ export interface components {
             /** @example 2026/2027 */
             label: string;
             active: boolean;
+            class_count?: number;
+            /** @description Penempatan siswa aktif di tahun ini */
+            student_count?: number;
         };
         ClassInput: {
             name: string;
@@ -2095,6 +2160,9 @@ export interface components {
              * @description Null = belum ditempatkan
              */
             class_id: string | null;
+            /** @description Langkah tugas aktif tahun ini yang selesai */
+            steps_done?: number;
+            steps_total?: number;
         };
         Placement: {
             class_name: string;
@@ -2165,6 +2233,11 @@ export interface components {
         BookList: {
             items: components["schemas"]["Book"][];
             next_cursor: string | null;
+            counts?: {
+                all: number;
+                published: number;
+                draft: number;
+            };
         };
         StartUploadRequest: {
             /** Format: uuid */
@@ -2207,8 +2280,11 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             position: number;
+            /** @description Maks 3 judul buku/modul/tugas aktif yang memakai file; tidak kosong berarti tidak bisa dihapus */
+            used_by?: string[];
         };
         FileList: {
+            total: number;
             items: components["schemas"]["FileItem"][];
             /** Format: int64 */
             used_bytes: number;
@@ -3047,6 +3123,8 @@ export interface operations {
                 building?: string;
                 limit?: number;
                 cursor?: string;
+                /** @description Cari nama ruang, teks literal */
+                q?: string;
             };
             header?: never;
             path: {
@@ -3732,7 +3810,13 @@ export interface operations {
     };
     listFiles: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+                /** @description Filter jenis sebelum pagination. */
+                kind?: "pdf" | "audio";
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -3860,6 +3944,12 @@ export interface operations {
                 /** @description Cari judul/penulis, teks literal */
                 q?: string;
                 drafts?: boolean;
+                format?: "buku" | "ebook" | "audio";
+                level?: "SD" | "SMP" | "SMA" | "Umum";
+                /** @description draft hanya berlaku untuk pengajar/admin dengan drafts=true */
+                status?: "published" | "draft";
+                /** @description Pengajar/admin: sertakan hitungan tab untuk filter non-status */
+                counts?: boolean;
                 limit?: number;
                 cursor?: string;
             };
@@ -4106,6 +4196,48 @@ export interface operations {
             };
         };
     };
+    listQuizResults: {
+        parameters: {
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hasil kuis */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            display_name: string;
+                            best_score: number;
+                            attempts: number;
+                            /** Format: date-time */
+                            last_finished_at: string;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     publishQuizRevision: {
         parameters: {
             query?: never;
@@ -4166,6 +4298,16 @@ export interface operations {
                 building_key?: string;
                 level?: components["schemas"]["Level"];
                 drafts?: boolean;
+                archived?: boolean;
+                /** @description Lewati sejumlah baris; satu respons maksimal 100 item. */
+                offset?: number;
+                limit?: number;
+                search?: string;
+                status?: "draft" | "published";
+                /** @description Ambil satu modul untuk pin/detail tanpa memuat daftar. */
+                module_id?: string;
+                /** @description Pengajar/admin: sertakan hitungan tab untuk filter non-status. */
+                counts?: boolean;
             };
             header?: never;
             path: {
@@ -4473,6 +4615,13 @@ export interface operations {
                 building_key?: string;
                 level?: components["schemas"]["Level"];
                 drafts?: boolean;
+                /** @description Lewati sejumlah baris; satu respons maksimal 100 item. */
+                offset?: number;
+                limit?: number;
+                search?: string;
+                status?: "draft" | "published";
+                /** @description Pengajar/admin: sertakan hitungan tab untuk filter non-status. */
+                counts?: boolean;
             };
             header?: never;
             path: {
@@ -4921,7 +5070,15 @@ export interface operations {
     };
     listAssignments: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+                /** @description Cari nama sebelum pagination. */
+                search?: string;
+                /** @description Kelas penerima tugas. */
+                class_id?: string;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -4938,6 +5095,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["Assignment"][];
+                        /** @description Jumlah tugas yang cocok dengan filter */
+                        total: number;
                     };
                 };
             };
@@ -5066,9 +5225,38 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
-    listAcademicYears: {
+    getManagementSummary: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description School-wide counts for staff; class attention uses active academic year. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listAcademicYears: {
+        parameters: {
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -5085,6 +5273,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["AcademicYear"][];
+                        total: number;
                     };
                 };
             };
@@ -5152,7 +5341,13 @@ export interface operations {
     };
     listClasses: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+                /** @description Cari nama sebelum pagination. */
+                search?: string;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -5170,6 +5365,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["SchoolClass"][];
+                        total: number;
                     };
                 };
             };
@@ -5407,7 +5603,11 @@ export interface operations {
     };
     listStaff: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -5423,6 +5623,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        total: number;
                         items: {
                             /** Format: uuid */
                             user_id: string;

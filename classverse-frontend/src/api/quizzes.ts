@@ -1,6 +1,8 @@
 import { api } from './client'
 import type { Level, QuestionInput, Quiz, QuizAttempt, QuizInput, QuizQuestion } from './types'
 
+export type QuizResult = { user_id: string; display_name: string; best_score: number; attempts: number; last_finished_at: string }
+
 const base = (orgID: string) => `/api/orgs/${encodeURIComponent(orgID)}/quizzes`
 const one = (orgID: string, id: string) => `${base(orgID)}/${encodeURIComponent(id)}`
 const attempt = (orgID: string, id: string, attemptID: string) => `${one(orgID, id)}/attempts/${encodeURIComponent(attemptID)}`
@@ -13,6 +15,7 @@ export interface QuizQuery {
   limit?: number
   search?: string
   status?: string
+  counts?: boolean
 }
 
 export const quizApi = {
@@ -25,13 +28,16 @@ export const quizApi = {
     if (query.limit !== undefined) p.set('limit', String(query.limit))
     if (query.search) p.set('search', query.search)
     if (query.status) p.set('status', query.status)
-    return api<{ items: Quiz[]; total?: number }>(`${base(orgID)}?${p}`)
+    if (query.counts) p.set('counts', 'true')
+    return api<{ items: Quiz[]; total?: number; counts?: { all: number; published: number; draft: number; empty: number } }>(`${base(orgID)}?${p}`)
   },
   create: (orgID: string, body: QuizInput) => api<Quiz>(base(orgID), { method: 'POST', body }),
   update: (orgID: string, id: string, body: QuizInput) => api<Quiz>(one(orgID, id), { method: 'PUT', body }),
   publish: (orgID: string, id: string, expected_version: number) => api<Quiz>(`${one(orgID,id)}/publish`, { method: 'POST', body: { expected_version } }),
   history: (orgID: string, id: string) => api<{items: {id: string; revision: number}[]}>(`${one(orgID,id)}/revisions`),
   archive: (orgID: string, id: string) => api<void>(one(orgID, id), { method: 'DELETE' }),
+  results: (orgID: string, id: string, offset = 0) =>
+    api<{ items: QuizResult[]; total: number }>(`${one(orgID, id)}/results?limit=20&offset=${offset}`),
   addQuestion: (orgID: string, id: string, body: QuestionInput) =>
     api<QuizQuestion>(`${one(orgID, id)}/questions`, { method: 'POST', body }),
   updateQuestion: (orgID: string, id: string, questionID: string, body: QuestionInput) =>

@@ -71,7 +71,7 @@ function selectTool(key: string) {
         <h3 id="manage-tool-title">{{ current.label }}</h3>
         <p>{{ current.note }}</p>
       </header>
-      <TeacherPanel v-if="current.key === 'session'" :room="room" />
+      <TeacherPanel v-if="current.key === 'session'" :room="room" page />
       <ManageOverview v-else-if="current.key === 'overview'" :org-id="orgId" @select="selectTool" />
       <RoomTools v-else :key="tool" :tool="tool" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" :room="room" :assign-module="assignModule" @pinned="emit('pinned')" @assign="assignModule = $event; active = 'assignments'" />
     </section>
@@ -97,7 +97,7 @@ function selectTool(key: string) {
 .crumbs li + li::before { content: '/'; margin-right: var(--space-2); }
 .crumbs [aria-current] { color: var(--kv-ink); font-weight: var(--weight-semibold); }
 .place { margin: 0; color: var(--kv-text-muted); }
-.manage-nav button { display: flex; align-items: center; gap: var(--space-2); min-height: var(--touch-min); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--control-radius); background: transparent; color: var(--kv-ink); font: var(--weight-semibold) var(--text-sm)/var(--line-normal) var(--font-body); cursor: pointer; text-align: left; }
+.manage-nav button { display: flex; align-items: center; gap: var(--space-2); min-height: var(--touch-min); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--kv-ink); font: var(--weight-semibold) var(--text-sm)/var(--line-normal) var(--font-body); cursor: pointer; text-align: left; }
 .manage-nav button:hover { background: var(--color-surface-alt); }
 .manage-nav button[aria-current='page'] { background: var(--color-primary-soft); color: var(--color-primary-strong); }
 .manage-nav button:focus-visible { outline: 3px solid var(--color-primary-strong); outline-offset: -3px; }

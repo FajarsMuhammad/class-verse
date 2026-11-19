@@ -35,9 +35,18 @@ WHERE org_id = sqlc.arg(org_id) AND used_bytes >= sqlc.arg(size_bytes)::bigint;
 
 -- name: ListReadyFiles :many
 SELECT f.id, f.kind, f.name, f.size_bytes, f.content_type, f.uploaded_by, f.created_at,
-  COALESCE(p.position, 0)::integer AS position
+  COALESCE(p.position, 0)::integer AS position, count(*) OVER()::integer AS total_count,
+  -- Names of the active books and modules that keep this file from being deleted.
+  ARRAY(SELECT b.title FROM library_books b WHERE b.org_id = f.org_id AND b.file_id = f.id AND b.archived_at IS NULL
+    UNION SELECT m.title FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+      WHERE s.org_id = f.org_id AND s.file_id = f.id AND s.archived_at IS NULL AND m.archived_at IS NULL
+    UNION SELECT a.title FROM assignment_steps s JOIN assignments a ON a.id = s.assignment_id
+      WHERE s.org_id = f.org_id AND s.file_id = f.id
+    UNION SELECT rm.title FROM module_revision_steps s JOIN module_revisions rm ON rm.id = s.revision_id
+      WHERE s.org_id = f.org_id AND s.file_id = f.id ORDER BY 1 LIMIT 3)::text[] AS used_by
 FROM files f LEFT JOIN reader_positions p ON p.file_id = f.id AND p.user_id = sqlc.arg(user_id)
 WHERE f.org_id = sqlc.arg(org_id) AND f.status = 'ready'
+  AND (sqlc.arg(kind)::text = '' OR f.kind = sqlc.arg(kind))
 ORDER BY f.created_at DESC, f.id LIMIT sqlc.narg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer;
 
 -- name: GetReadyFile :one

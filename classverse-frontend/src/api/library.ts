@@ -8,6 +8,10 @@ export interface BookQuery {
   q?: string
   drafts?: boolean
   cursor?: string | null
+  format?: BookInput['format'] | ''
+  level?: BookInput['level'] | ''
+  status?: 'published' | 'draft' | ''
+  counts?: boolean
 }
 
 export const libraryApi = {
@@ -17,6 +21,10 @@ export const libraryApi = {
     if (query.q?.trim()) p.set('q', query.q.trim())
     if (query.drafts) p.set('drafts', 'true')
     if (query.cursor) p.set('cursor', query.cursor)
+    if (query.format) p.set('format', query.format)
+    if (query.level) p.set('level', query.level)
+    if (query.status) p.set('status', query.status)
+    if (query.counts) p.set('counts', 'true')
     const qs = p.toString()
     return api<BookList>(qs ? `${base(orgID)}?${qs}` : base(orgID))
   },

@@ -105,6 +105,17 @@ func TestIssueFrozenRecipientsAndContent(t *testing.T) {
 	if err := f.svc.Complete(ctx, f.student, f.org, a.ID, steps[1].ID); err != nil {
 		t.Fatal(err)
 	}
+	// Staff see the class aggregate and the class filter; the student never sees peers' counts.
+	staffRows, err := f.svc.ListFiltered(ctx, f.admin, f.org, "", uuid.NullUUID{UUID: f.class, Valid: true}, 20, 0)
+	if err != nil || len(staffRows) != 1 || staffRows[0].Recipients != 1 || staffRows[0].Finished != 1 || staffRows[0].Started != 1 || staffRows[0].TotalCount != 1 {
+		t.Fatalf("staff aggregate=%+v %v", staffRows, err)
+	}
+	if other, err := f.svc.ListFiltered(ctx, f.admin, f.org, "", uuid.NullUUID{UUID: uuid.New(), Valid: true}, 20, 0); err != nil || len(other) != 0 {
+		t.Fatalf("class filter=%+v %v", other, err)
+	}
+	if own, err := f.svc.List(ctx, f.student, f.org); err != nil || own[0].Recipients != 0 || own[0].Finished != 0 {
+		t.Fatalf("student aggregate leaked=%+v %v", own, err)
+	}
 	var count int
 	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM module_progress`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("catalog progress altered: %d %v", count, err)

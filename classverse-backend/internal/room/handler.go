@@ -55,7 +55,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 			return httpx.ValidationFailed(map[string]string{"limit": "Limit 1–100"})
 		}
 	}
-	page, err := h.svc.List(r.Context(), userID, orgID, r.URL.Query().Get("building"), limit, r.URL.Query().Get("cursor"))
+	page, err := h.svc.List(r.Context(), userID, orgID, r.URL.Query().Get("building"), limit, r.URL.Query().Get("cursor"), r.URL.Query().Get("q"))
 	if err != nil {
 		return err
 	}

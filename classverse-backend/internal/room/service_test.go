@@ -113,6 +113,13 @@ func TestRoomLifecycle(t *testing.T) {
 		(page.Items[0].ID != created.ID && next.Items[0].ID != created.ID) {
 		t.Fatalf("pages=%+v %+v err=%v", page, next, err)
 	}
+	// Search is literal: "%" must not match every room.
+	if found, err := svc.List(ctx, user.ID, school.ID, "", 0, "", "%"); err != nil || len(found.Items) != 0 {
+		t.Fatalf("literal search=%+v err=%v", found, err)
+	}
+	if found, err := svc.List(ctx, user.ID, school.ID, "", 0, "", strings.ToLower(updated.Name)); err != nil || len(found.Items) == 0 {
+		t.Fatalf("name search=%+v err=%v", found, err)
+	}
 	for _, input := range []CreateInput{
 		{Name: "Menara Sains", MapKey: "science", BuildingKey: "kelas-a"},
 		{Name: "Ruang Guru", MapKey: "staff", BuildingKey: "ruang-guru"},

@@ -275,20 +275,27 @@ func (q *Queries) GetAssignmentClass(ctx context.Context, arg GetAssignmentClass
 const listAssignments = `-- name: ListAssignments :many
 SELECT a.id, a.org_id, a.class_id, a.module_id, a.title, a.class_name, a.year_label, a.building_key, a.level, a.due_at, a.created_by, a.created_at, a.cancelled_at,
  (SELECT count(*)::integer FROM assignment_steps s WHERE s.assignment_id=a.id) AS total,
- (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=$1) AS done
-FROM assignments a WHERE a.org_id=$2
- AND ($3::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=$1))
+ (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=$1) AS done,
+ count(*) OVER()::integer AS total_count,
+ -- Class aggregates are staff-only: participants never learn their peers' progress.
+ CASE WHEN $2::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id) ELSE 0 END::integer AS recipients,
+ CASE WHEN $2::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id
+   AND (SELECT count(*) FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=r.user_id)
+     >= (SELECT count(*) FROM assignment_steps s WHERE s.assignment_id=a.id)) ELSE 0 END::integer AS finished,
+ CASE WHEN $2::boolean THEN (SELECT count(DISTINCT p.user_id) FROM assignment_progress p WHERE p.assignment_id=a.id) ELSE 0 END::integer AS started
+FROM assignments a WHERE a.org_id=$3
+ AND ($2::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=$1))
  AND ($4::text = '' OR strpos(lower(a.title), lower($4)) > 0)
- AND ($5::text = '' OR a.class_name = $5)
+ AND ($5::uuid IS NULL OR a.class_id = $5)
 ORDER BY a.created_at DESC,a.id LIMIT $7::integer OFFSET $6::integer
 `
 
 type ListAssignmentsParams struct {
 	UserID     uuid.UUID
-	OrgID      uuid.UUID
 	Staff      bool
+	OrgID      uuid.UUID
 	Search     string
-	ClassName  string
+	ClassID    uuid.NullUUID
 	PageOffset int32
 	PageLimit  pgtype.Int4
 }
@@ -309,15 +316,19 @@ type ListAssignmentsRow struct {
 	CancelledAt pgtype.Timestamptz
 	Total       int32
 	Done        int32
+	TotalCount  int32
+	Recipients  int32
+	Finished    int32
+	Started     int32
 }
 
 func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams) ([]ListAssignmentsRow, error) {
 	rows, err := q.db.Query(ctx, listAssignments,
 		arg.UserID,
-		arg.OrgID,
 		arg.Staff,
+		arg.OrgID,
 		arg.Search,
-		arg.ClassName,
+		arg.ClassID,
 		arg.PageOffset,
 		arg.PageLimit,
 	)
@@ -344,6 +355,10 @@ func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams
 			&i.CancelledAt,
 			&i.Total,
 			&i.Done,
+			&i.TotalCount,
+			&i.Recipients,
+			&i.Finished,
+			&i.Started,
 		); err != nil {
 			return nil, err
 		}

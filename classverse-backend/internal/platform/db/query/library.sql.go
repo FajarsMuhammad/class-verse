@@ -66,6 +66,46 @@ func (q *Queries) CountBookLoans(ctx context.Context, bookID uuid.UUID) (int32, 
 	return column_1, err
 }
 
+const countBooks = `-- name: CountBooks :one
+SELECT count(*)::integer AS all_count,
+  count(*) FILTER (WHERE b.published_at IS NOT NULL)::integer AS published_count,
+  count(*) FILTER (WHERE b.published_at IS NULL)::integer AS draft_count
+FROM library_books b
+WHERE b.org_id = $1 AND b.archived_at IS NULL
+  AND ($2::text IS NULL OR b.shelf = $2)
+  AND ($3::text IS NULL OR b.format = $3)
+  AND ($4::text IS NULL OR b.level = $4)
+  AND ($5::text IS NULL OR b.title ILIKE $5 OR b.author ILIKE $5)
+`
+
+type CountBooksParams struct {
+	OrgID   uuid.UUID
+	Shelf   pgtype.Text
+	Format  pgtype.Text
+	Level   pgtype.Text
+	Pattern pgtype.Text
+}
+
+type CountBooksRow struct {
+	AllCount       int32
+	PublishedCount int32
+	DraftCount     int32
+}
+
+// Staff tab counts for the catalog, with the list's non-status filters.
+func (q *Queries) CountBooks(ctx context.Context, arg CountBooksParams) (CountBooksRow, error) {
+	row := q.db.QueryRow(ctx, countBooks,
+		arg.OrgID,
+		arg.Shelf,
+		arg.Format,
+		arg.Level,
+		arg.Pattern,
+	)
+	var i CountBooksRow
+	err := row.Scan(&i.AllCount, &i.PublishedCount, &i.DraftCount)
+	return i, err
+}
+
 const countMemberLoans = `-- name: CountMemberLoans :one
 SELECT count(*)::integer FROM library_loans WHERE org_id = $1 AND user_id = $2 AND returned_at IS NULL
 `
@@ -268,11 +308,14 @@ WHERE b.org_id = $2
   AND b.archived_at IS NULL
   AND ($3::boolean OR b.published_at IS NOT NULL)
   AND ($4::text IS NULL OR b.shelf = $4)
-  AND ($5::text IS NULL OR b.title ILIKE $5 OR b.author ILIKE $5)
-  AND ($6::text IS NULL
-       OR (b.title, b.id) > ($6::text, $7::uuid))
+  AND ($5::text IS NULL OR b.format = $5)
+  AND ($6::text IS NULL OR b.level = $6)
+  AND ($7::boolean IS NULL OR (b.published_at IS NOT NULL) = $7)
+  AND ($8::text IS NULL OR b.title ILIKE $8 OR b.author ILIKE $8)
+  AND ($9::text IS NULL
+       OR (b.title, b.id) > ($9::text, $10::uuid))
 ORDER BY b.title, b.id
-LIMIT $8
+LIMIT $11
 `
 
 type ListBooksParams struct {
@@ -280,6 +323,9 @@ type ListBooksParams struct {
 	OrgID         uuid.UUID
 	IncludeDrafts bool
 	Shelf         pgtype.Text
+	Format        pgtype.Text
+	Level         pgtype.Text
+	Published     pgtype.Bool
 	Pattern       pgtype.Text
 	CursorTitle   pgtype.Text
 	CursorID      uuid.NullUUID
@@ -301,6 +347,9 @@ func (q *Queries) ListBooks(ctx context.Context, arg ListBooksParams) ([]ListBoo
 		arg.OrgID,
 		arg.IncludeDrafts,
 		arg.Shelf,
+		arg.Format,
+		arg.Level,
+		arg.Published,
 		arg.Pattern,
 		arg.CursorTitle,
 		arg.CursorID,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasMore } from '@/api/page'
 import PagedSelect from './PagedSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useOrgStore } from '@/stores/org'
@@ -26,12 +27,12 @@ const score = (v: number | null | undefined) => v == null ? 'Belum dikerjakan' :
 async function classOptions(offset: number) {
  if (!filter.value.year_id) return { items: [], more: false }
  const result = await classApi.classes(orgId.value, filter.value.year_id, offset)
- return { items: result.items.map(c => ({ value: c.id, label: c.name })), more: result.items.length === 20 }
+ return { items: result.items.map(c => ({ value: c.id, label: c.name })), more: hasMore(offset, result) }
 }
 async function yearOptions(offset: number) {
  const result = await classApi.years(orgId.value, offset)
  years.value = [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
- return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: result.items.length === 20 }
+ return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: hasMore(offset, result) }
 }
 async function load() {
   if (!orgId.value) return

@@ -13,6 +13,7 @@ export interface ModuleQuery {
   module_id?: string
   search?: string
   status?: string
+  counts?: boolean
   archived?: boolean
 }
 
@@ -28,7 +29,8 @@ export const moduleApi = {
     if (query.module_id) p.set('module_id', query.module_id)
     if (query.search) p.set('search', query.search)
     if (query.status) p.set('status', query.status)
-    return api<{ items: Module[]; total?: number }>(`${base(orgID)}?${p}`)
+    if (query.counts) p.set('counts', 'true')
+    return api<{ items: Module[]; total?: number; counts?: { all: number; published: number; draft: number; archived: number } }>(`${base(orgID)}?${p}`)
   },
   create: (orgID: string, body: ModuleInput) => api<Module>(base(orgID), { method: 'POST', body }),
   update: (orgID: string, id: string, body: ModuleInput) => api<Module>(one(orgID, id), { method: 'PUT', body }),

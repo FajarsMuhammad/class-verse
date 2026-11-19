@@ -8,7 +8,8 @@ import type { RoomHandle } from '@/realtime/useRoom'
 
 // Teacher controls of a classroom/garden, shared by the map and mode HP.
 // floating: shown in the map toolbar, where the participant list opens as a popover.
-const props = defineProps<{ room: RoomHandle; floating?: boolean }>()
+// page: Kelola → Kontrol sesi, where each action is a card with one line of explanation (handoff §3.11).
+const props = defineProps<{ room: RoomHandle; floating?: boolean; page?: boolean }>()
 const {
   status,
   traveling,
@@ -56,28 +57,41 @@ function doKick() {
 </script>
 
 <template>
-  <div class="teacher" :class="{ floating }" aria-label="Kontrol pengajar" role="group">
-    <GuestPanel v-if="current" :key="current.room_id" :room-id="current.room_id" />
-    <button
-      class="btn-secondary"
-      :disabled="status !== 'open' || traveling"
-      title="Pindahkan semua peserta ke titik kumpul"
-      @click="gather"
-    >
-      Kumpulkan
-    </button>
-    <button
-      type="button"
-      class="btn-secondary switch"
-      role="switch"
-      :aria-checked="locked"
-      :disabled="status !== 'open'"
-      @click="setLocked(!locked)"
-    >
-      Kunci ruang
-      <span class="state" aria-hidden="true">{{ locked ? 'Aktif' : 'Mati' }}</span>
-    </button>
-    <details class="more">
+  <div class="teacher" :class="{ floating, page }" aria-label="Kontrol pengajar" role="group">
+    <div v-if="page && current" class="room-card">
+      <strong>{{ current.room_name ?? 'Ruang ini' }}</strong>
+      <span class="room-meta">{{ participants.length }} peserta di ruang ini</span>
+    </div>
+    <div class="action" :class="{ card: page }">
+      <GuestPanel v-if="current" :key="current.room_id" :room-id="current.room_id" />
+      <p v-if="page" class="room-meta">Link masuk sementara untuk tamu dari luar sekolah.</p>
+    </div>
+    <div class="action" :class="{ card: page }">
+      <button
+        class="btn-secondary"
+        :disabled="status !== 'open' || traveling"
+        title="Pindahkan semua peserta ke titik kumpul"
+        @click="gather"
+      >
+        Kumpulkan
+      </button>
+      <p v-if="page" class="room-meta">Pindahkan semua peserta ke dekat Anda untuk penjelasan.</p>
+    </div>
+    <div class="action" :class="{ card: page }">
+      <button
+        type="button"
+        class="btn-secondary switch"
+        role="switch"
+        :aria-checked="locked"
+        :disabled="status !== 'open'"
+        @click="setLocked(!locked)"
+      >
+        Kunci ruang
+        <span class="state" aria-hidden="true">{{ locked ? 'Aktif' : 'Mati' }}</span>
+      </button>
+      <p v-if="page" class="room-meta">Orang baru tidak bisa masuk. Yang sudah di dalam tetap tinggal.</p>
+    </div>
+    <details class="more" :open="page || undefined">
       <summary class="btn-secondary">
         Peserta &amp; chat
         <span class="state" aria-hidden="true">{{ participants.length }}</span>
@@ -262,4 +276,9 @@ h3 {
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
 }
+.action { display: contents; }
+.page { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); align-items: stretch; gap: var(--space-3); }
+.page .room-card, .page .more { grid-column: 1 / -1; }
+.room-card, .action.card, .page .more { display: grid; gap: var(--space-2); align-content: start; padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); background: var(--color-surface); }
+.room-card strong { font-size: var(--text-lg); }
 </style>

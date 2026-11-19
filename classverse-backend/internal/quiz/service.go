@@ -100,6 +100,7 @@ type Quiz struct {
 	QuestionCount int32
 	BestScore     int16 // -1: no finished attempt yet
 	Attempts      int32
+	ModuleTitles  []string             // staff authoring only: active modules with a kuis step on it
 	Questions     []query.QuizQuestion // staff only; nil for participants
 }
 
@@ -480,7 +481,7 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	}
 	out := make([]Quiz, len(rows))
 	for i, r := range rows {
-		out[i] = Quiz{Quiz: r.Quiz, TotalCount: r.TotalCount, QuestionCount: r.QuestionCount, BestScore: r.BestScore, Attempts: r.Attempts}
+		out[i] = Quiz{Quiz: r.Quiz, TotalCount: r.TotalCount, QuestionCount: r.QuestionCount, BestScore: r.BestScore, Attempts: r.Attempts, ModuleTitles: r.ModuleTitles}
 		if !authoring && r.Quiz.PublishedRevisionID.Valid {
 			rev, err := q.PublishedQuizRevision(ctx, query.PublishedQuizRevisionParams{OrgID: orgID, QuizID: r.Quiz.ID})
 			if err != nil {

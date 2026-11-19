@@ -125,12 +125,15 @@ it('deletes and reorders questions after confirmation', async () => {
 })
 
  it('keeps the catalog compact and filters by level before opening one item', async () => {
-  vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [quiz(), { ...quiz(), id: 'other', level: 'SMP', title: 'Jenjang lain' }] })
+  const all = [quiz(), { ...quiz(), id: 'other', level: 'SMP' as const, title: 'Jenjang lain' }]
+  const list = vi.spyOn(quizApi, 'list').mockImplementation(async (_o, q) => ({ items: all.filter(z => !q?.level || z.level === q.level) }))
   const w = mount(QuizManager, { props: { orgId: 'o' } })
   await flushPromises()
   expect(w.findAll('.catalog-row')).toHaveLength(2)
   expect(w.find('.questions').exists()).toBe(false)
   await w.get('[aria-label="Filter jenjang"]').setValue('SMP')
+  await flushPromises()
+  expect(list).toHaveBeenLastCalledWith('o', expect.objectContaining({ level: 'SMP', counts: true, offset: 0 }))
   expect(w.findAll('.catalog-row')).toHaveLength(1)
   expect(w.get('.catalog-row').text()).toContain('Jenjang lain')
   await w.get('.catalog-row .row-actions button').trigger('click')
@@ -163,11 +166,29 @@ it('opens the first question form after creating a draft at the filtered level',
 })
 
 it('warns about drafts without questions and filters by status', async () => {
-  vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [quiz({ published: true }), { ...quiz(), id: 'e', title: 'Kosong', published: false, question_count: 0, questions: [] }] })
+  const all = [quiz({ published: true }), { ...quiz(), id: 'e', title: 'Kosong', published: false, question_count: 0, questions: [] }]
+  // Counts come from the server for the whole school, so the warning covers quizzes on other pages too.
+  vi.spyOn(quizApi, 'list').mockImplementation(async (_o, q) => ({ items: all.filter(z => !q?.status || z.published === (q.status === 'published')), counts: { all: 30, published: 1, draft: 29, empty: 7 } }))
   const w = mount(QuizManager, { props: { orgId: 'o' } })
   await flushPromises()
-  expect(w.get('.banner').text()).toContain('“Kosong” belum punya soal')
+  expect(w.get('.banner').text()).toContain('7 kuis belum punya soal')
+  expect(w.get('.banner').text()).toContain('“Kosong”')
+  expect(w.findAll('[role=tab]').map(t => t.text())).toEqual(['Semua 30', 'Terbit 1', 'Draf 29'])
   expect(w.get('[aria-label="Tambah soal Kosong"]').classes()).toContain('btn-primary')
   await w.findAll('[role=tab]')[2]!.trigger('click')
+  await flushPromises()
   expect(w.findAll('.catalog-row').map((r) => r.text())).toEqual([expect.stringContaining('Kosong')])
+})
+
+it('shows module usage and paged best-score results for a published quiz', async () => {
+  vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [quiz({ published: true, module_titles: ['Tata Surya'] })] })
+  const results = vi.spyOn(quizApi, 'results').mockResolvedValue({ items: [{ user_id: 'u', display_name: 'Ani', best_score: 90, attempts: 3, last_finished_at: '2026-01-01T00:00:00Z' }], total: 1 })
+  const w = mount(QuizManager, { props: { orgId: 'o' } })
+  await flushPromises()
+  expect(w.get('.catalog-row').text()).toContain('Tata Surya')
+  await w.get('[aria-label^="Lihat hasil"]').trigger('click')
+  await flushPromises()
+  expect(results).toHaveBeenCalledWith('o', 'q1', 0)
+  expect(w.get('.results tbody').text()).toContain('Ani')
+  expect(w.get('.results tbody').text()).toContain('90')
 })

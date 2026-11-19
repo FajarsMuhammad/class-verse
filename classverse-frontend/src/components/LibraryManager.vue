@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import PagedSelect from './PagedSelect.vue'
 import RemotePagination from './RemotePagination.vue'
-import { onMounted, ref, useId } from 'vue'
+import { computed, onMounted, ref, useId, watch } from 'vue'
+import StatusTabs from './StatusTabs.vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
+import { hasMore } from '@/api/page'
 import { formatLabel, libraryApi, shelves } from '@/api/library'
 import type { Book, BookInput } from '@/api/types'
 import BookCard from './BookCard.vue'
@@ -31,6 +33,19 @@ async function movePage(delta: number) {
 }
 async function loadPage() { await load(true) }
 const next = ref<string | null>(null)
+const statusFilter = ref('all')
+const formatFilter = ref<BookInput['format'] | ''>('')
+const levelFilter = ref<BookInput['level'] | ''>('')
+const search = ref('')
+const counts = ref({ all: 0, published: 0, draft: 0 })
+const statusTabs = computed(() => [
+  { key: 'all', label: 'Semua', count: counts.value.all },
+  { key: 'published', label: 'Terbit', count: counts.value.published },
+  { key: 'draft', label: 'Draf', count: counts.value.draft },
+])
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch([statusFilter, formatFilter, levelFilter], () => void load())
+watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => void load(), 250) })
 const editing = ref<string | null>(null)
 const form = ref<BookInput>(blank())
 const fields = ref<Record<string, string>>({})
@@ -44,7 +59,11 @@ const reading = ref<ReadableFile | null>(null)
 async function load(more = false) {
   if (!more) { pageNumber.value = 1; cursors.value = [undefined] }
   try {
-    const page = await libraryApi.list(props.orgId, { drafts: true, cursor: more ? cursors.value[pageNumber.value - 1] : null })
+    const page = await libraryApi.list(props.orgId, {
+      drafts: true, cursor: more ? cursors.value[pageNumber.value - 1] : null, counts: true,
+      status: statusFilter.value === 'published' || statusFilter.value === 'draft' ? statusFilter.value : '', format: formatFilter.value, level: levelFilter.value, q: search.value,
+    })
+    if (page.counts) counts.value = page.counts
     books.value = page.items
     next.value = page.next_cursor
   } catch (err) {
@@ -52,8 +71,8 @@ async function load(more = false) {
   }
 }
 async function fileOptions(offset: number) {
-  const result = await fileApi.list(props.orgId, offset)
-  return { items: result.items.filter(f => f.kind === (form.value.format === 'audio' ? 'audio' : 'pdf')).map(f => ({ value: f.id, label: f.name })), more: result.items.length === 20 }
+  const result = await fileApi.list(props.orgId, offset, form.value.format === 'audio' ? 'audio' : 'pdf')
+  return { items: result.items.map(f => ({ value: f.id, label: f.name })), more: hasMore(offset, result) }
 }
 
 function edit(book?: Book) {
@@ -89,6 +108,18 @@ async function save() {
   }
 }
 
+async function publish(book: Book) {
+  error.value = ''
+  try {
+    await libraryApi.update(props.orgId, book.id, { title: book.title, author: book.author, shelf: book.shelf, level: book.level,
+      format: book.format, copies: book.copies, file_id: book.file_id ?? null, cover: book.cover, published: true })
+    await load()
+    message.value = `${book.title} terbit.`
+  } catch (err) {
+    error.value = errorMessage(err)
+  }
+}
+
 async function archive(book: Book) {
   if (!window.confirm(`Arsipkan ${book.title}? Buku hilang dari katalog; filenya tetap ada.`)) return
   error.value = ''
@@ -112,7 +143,7 @@ onMounted(() => load())
 <template>
   <section class="manager" :aria-labelledby="`${id}-title`">
     <header class="head">
-      <h2 :id="`${id}-title`" class="title">Katalog perpustakaan</h2>
+      <h2 :id="`${id}-title`" class="title">Buku perpustakaan</h2>
       <button v-if="!editing" type="button" class="btn-primary" @click="edit()">+ Tambah buku</button>
     </header>
     <p class="sub">Draf hanya terlihat oleh pengajar. Buku terbit muncul di ruang Perpustakaan.</p>
@@ -169,16 +200,31 @@ onMounted(() => load())
       </div>
     </form>
 
-    <p v-if="!books.length" class="empty">Belum ada buku. Tambahkan buku pertama.</p>
-    <div class="list">
+    <div class="toolbar">
+      <StatusTabs v-model="statusFilter" :items="statusTabs" label="Status buku" :controls="`${id}-books`" />
+      <label>Jenis
+        <select v-model="formatFilter"><option value="">Semua jenis</option><option v-for="(label, key) in formatLabel" :key="key" :value="key">{{ label }}</option></select>
+      </label>
+      <label>Jenjang
+        <select v-model="levelFilter"><option value="">Semua jenjang</option><option v-for="l in ['SD', 'SMP', 'SMA', 'Umum']" :key="l" :value="l">{{ l }}</option></select>
+      </label>
+    </div>
+    <label :for="`${id}-search`" class="sr">Cari judul atau penulis</label>
+    <input :id="`${id}-search`" v-model="search" type="search" class="search" maxlength="100" placeholder="Cari judul atau penulis…" />
+    <p v-if="!books.length && (search || formatFilter || levelFilter || statusFilter !== 'all')" class="empty">Tidak ada buku yang cocok.</p>
+    <div :id="`${id}-books`" class="list">
       <BookCard v-for="b in books" :key="b.id" :book="b" @open="open">
         <div class="row-actions">
+          <button v-if="!b.published" type="button" class="btn-primary" @click="publish(b)">Terbitkan<span class="sr"> {{ b.title }}</span></button>
           <button type="button" class="btn-secondary" @click="edit(b)">Ubah<span class="sr"> {{ b.title }}</span></button>
           <button type="button" class="btn-secondary" @click="archive(b)">Arsipkan<span class="sr"> {{ b.title }}</span></button>
         </div>
       </BookCard>
+      <button v-if="!editing" type="button" class="add-card" @click="edit()">
+        <strong>+ Tambah buku</strong><span>E-book dari PDF di Berkas, audio, atau buku fisik</span>
+      </button>
     </div>
-    <RemotePagination :page="pageNumber" :more="!!next" @move="movePage" />
+    <RemotePagination v-if="pageNumber > 1 || next" :page="pageNumber" :more="!!next" @move="movePage" />
 
     <FileReader v-if="reading" :key="reading.id" :org-id="orgId" :file="reading" @close="reading = null; load()" />
   </section>
@@ -279,4 +325,11 @@ onMounted(() => load())
     grid-column: 1;
   }
 }
+.toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); margin-bottom: var(--space-3); }
+.toolbar label { display: grid; gap: var(--space-1); font-size: var(--text-sm); }
+.toolbar select, .search { min-height: var(--touch-min); padding: var(--space-2); border: 1px solid var(--kv-line); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); font: inherit; }
+.search { width: 100%; box-sizing: border-box; margin-bottom: var(--space-4); }
+.add-card { display: grid; place-content: center; gap: var(--space-1); min-height: 180px; padding: var(--space-4); border: 1px dashed var(--kv-primary); border-radius: var(--radius-lg); background: transparent; color: var(--color-ink-muted); font: inherit; text-align: center; cursor: pointer; }
+.add-card strong { color: var(--kv-primary); }
+.add-card:focus-visible { outline: 2px solid var(--kv-primary); outline-offset: 2px; }
 </style>

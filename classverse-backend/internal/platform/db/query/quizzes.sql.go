@@ -63,6 +63,50 @@ func (q *Queries) CompleteQuizSteps(ctx context.Context, arg CompleteQuizStepsPa
 	return err
 }
 
+const countQuizzes = `-- name: CountQuizzes :one
+SELECT count(*)::integer AS all_count,
+  count(*) FILTER (WHERE z.published_at IS NOT NULL)::integer AS published_count,
+  count(*) FILTER (WHERE z.published_at IS NULL)::integer AS draft_count,
+  count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM quiz_questions q WHERE q.quiz_id = z.id))::integer AS empty_count
+FROM quizzes z
+WHERE z.org_id = $1 AND z.archived_at IS NULL
+  AND ($2::text IS NULL OR z.building_key = $2)
+  AND ($3::text IS NULL OR z.level = $3)
+  AND ($4::text = '' OR position(lower($4) in lower(z.title)) > 0)
+`
+
+type CountQuizzesParams struct {
+	OrgID       uuid.UUID
+	BuildingKey pgtype.Text
+	Level       pgtype.Text
+	Search      string
+}
+
+type CountQuizzesRow struct {
+	AllCount       int32
+	PublishedCount int32
+	DraftCount     int32
+	EmptyCount     int32
+}
+
+// Tab counts and the "0 soal" warning for the authoring list, with the list's non-status filters.
+func (q *Queries) CountQuizzes(ctx context.Context, arg CountQuizzesParams) (CountQuizzesRow, error) {
+	row := q.db.QueryRow(ctx, countQuizzes,
+		arg.OrgID,
+		arg.BuildingKey,
+		arg.Level,
+		arg.Search,
+	)
+	var i CountQuizzesRow
+	err := row.Scan(
+		&i.AllCount,
+		&i.PublishedCount,
+		&i.DraftCount,
+		&i.EmptyCount,
+	)
+	return i, err
+}
+
 const createAttempt = `-- name: CreateAttempt :one
 INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, assignment_id, assignment_step_id,quiz_revision_id,module_id,module_revision_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid, $10::uuid,$11::uuid,$12::uuid,$13::uuid)
@@ -320,13 +364,16 @@ SELECT z.id, z.org_id, z.building_key, z.level, z.title, z.description, z.pass_s
   (SELECT count(*) FROM quiz_questions q WHERE q.quiz_id = z.id)::integer AS question_count,
   -- -1 when the caller has no finished attempt yet.
   COALESCE((SELECT max(a.score) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = $1), -1)::smallint AS best_score,
-  (SELECT count(*) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = $1 AND a.finished_at IS NOT NULL)::integer AS attempts
+  (SELECT count(*) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = $1 AND a.finished_at IS NOT NULL)::integer AS attempts,
+  -- Active modules with a kuis step on this quiz (staff authoring only).
+  CASE WHEN $2::boolean THEN ARRAY(SELECT DISTINCT m.title FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+    WHERE s.org_id = z.org_id AND s.quiz_id = z.id AND s.archived_at IS NULL AND m.archived_at IS NULL ORDER BY m.title LIMIT 3) ELSE '{}' END::text[] AS module_titles
 FROM quizzes z LEFT JOIN quiz_revisions r ON r.org_id=z.org_id AND r.quiz_id=z.id AND r.id=z.published_revision_id
-WHERE z.org_id = $2 AND z.archived_at IS NULL
-  AND ($3::boolean OR z.published_at IS NOT NULL)
-  AND ($4::text IS NULL OR CASE WHEN $3::boolean THEN z.building_key ELSE r.building_key END = $4)
-  AND ($5::text IS NULL OR CASE WHEN $3::boolean THEN z.level ELSE r.level END = $5)
-  AND ($6::text = '' OR position(lower($6) in lower(CASE WHEN $3::boolean THEN z.title ELSE r.title END)) > 0)
+WHERE z.org_id = $3 AND z.archived_at IS NULL
+  AND ($2::boolean OR z.published_at IS NOT NULL)
+  AND ($4::text IS NULL OR CASE WHEN $2::boolean THEN z.building_key ELSE r.building_key END = $4)
+  AND ($5::text IS NULL OR CASE WHEN $2::boolean THEN z.level ELSE r.level END = $5)
+  AND ($6::text = '' OR position(lower($6) in lower(CASE WHEN $2::boolean THEN z.title ELSE r.title END)) > 0)
   AND ($7::text = '' OR (z.published_at IS NOT NULL) = ($7 = 'published'))
 ORDER BY z.created_at, z.id
 LIMIT $9::integer OFFSET $8::integer
@@ -334,8 +381,8 @@ LIMIT $9::integer OFFSET $8::integer
 
 type ListQuizzesParams struct {
 	UserID        uuid.UUID
-	OrgID         uuid.UUID
 	IncludeDrafts bool
+	OrgID         uuid.UUID
 	BuildingKey   pgtype.Text
 	Level         pgtype.Text
 	Search        string
@@ -350,14 +397,15 @@ type ListQuizzesRow struct {
 	QuestionCount int32
 	BestScore     int16
 	Attempts      int32
+	ModuleTitles  []string
 }
 
 // Staff may include drafts; archived quizzes never show. best_score is the caller's highest finished score.
 func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]ListQuizzesRow, error) {
 	rows, err := q.db.Query(ctx, listQuizzes,
 		arg.UserID,
-		arg.OrgID,
 		arg.IncludeDrafts,
+		arg.OrgID,
 		arg.BuildingKey,
 		arg.Level,
 		arg.Search,
@@ -391,6 +439,7 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Lis
 			&i.QuestionCount,
 			&i.BestScore,
 			&i.Attempts,
+			&i.ModuleTitles,
 		); err != nil {
 			return nil, err
 		}
@@ -576,6 +625,82 @@ func (q *Queries) QuestionIDs(ctx context.Context, arg QuestionIDsParams) ([]uui
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const quizExists = `-- name: QuizExists :one
+SELECT EXISTS(SELECT 1 FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL)::boolean
+`
+
+type QuizExistsParams struct {
+	OrgID uuid.UUID
+	ID    uuid.UUID
+}
+
+func (q *Queries) QuizExists(ctx context.Context, arg QuizExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, quizExists, arg.OrgID, arg.ID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const quizResults = `-- name: QuizResults :many
+SELECT a.user_id, u.display_name, max(a.score)::smallint AS best_score, count(*)::integer AS attempts,
+  max(a.finished_at)::timestamptz AS last_finished_at, count(*) OVER()::integer AS total_count
+FROM quiz_attempts a JOIN users u ON u.id = a.user_id
+JOIN memberships m ON m.org_id = a.org_id AND m.user_id = a.user_id AND m.role = 'participant'
+WHERE a.org_id = $1 AND a.quiz_id = $2 AND a.finished_at IS NOT NULL
+GROUP BY a.user_id, u.display_name
+ORDER BY lower(u.display_name), a.user_id
+LIMIT $4::integer OFFSET $3::integer
+`
+
+type QuizResultsParams struct {
+	OrgID      uuid.UUID
+	QuizID     uuid.UUID
+	PageOffset int32
+	PageLimit  int32
+}
+
+type QuizResultsRow struct {
+	UserID         uuid.UUID
+	DisplayName    string
+	BestScore      int16
+	Attempts       int32
+	LastFinishedAt pgtype.Timestamptz
+	TotalCount     int32
+}
+
+// One page of participants with a finished attempt: best score (Rapor rule), tries and last finish.
+func (q *Queries) QuizResults(ctx context.Context, arg QuizResultsParams) ([]QuizResultsRow, error) {
+	rows, err := q.db.Query(ctx, quizResults,
+		arg.OrgID,
+		arg.QuizID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []QuizResultsRow{}
+	for rows.Next() {
+		var i QuizResultsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.DisplayName,
+			&i.BestScore,
+			&i.Attempts,
+			&i.LastFinishedAt,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

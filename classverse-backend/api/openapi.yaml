@@ -256,6 +256,7 @@ paths:
         - { name: building, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: cursor, in: query, schema: { type: string } }
+        - { name: q, in: query, description: "Cari nama ruang, teks literal", schema: { type: string, maxLength: 100 } }
       responses:
         "200":
           description: Daftar ruang
@@ -697,10 +698,11 @@ paths:
       - $ref: "#/components/parameters/OrgID"
     get:
       operationId: listFiles
-      description: File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota.
+      description: File siap milik sekolah (terbaru dulu, 20 per halaman), posisi baca pemanggil, dan pemakaian kuota.
       parameters:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+        - { name: kind, in: query, schema: { type: string, enum: [pdf, audio] }, description: "Filter jenis sebelum pagination." }
       responses:
         "200":
           description: Daftar file
@@ -779,6 +781,10 @@ paths:
         - { name: shelf, in: query, schema: { $ref: "#/components/schemas/Shelf" } }
         - { name: q, in: query, description: "Cari judul/penulis, teks literal", schema: { type: string, maxLength: 100 } }
         - { name: drafts, in: query, schema: { type: boolean } }
+        - { name: format, in: query, schema: { type: string, enum: [buku, ebook, audio] } }
+        - { name: level, in: query, schema: { type: string, enum: [SD, SMP, SMA, Umum] } }
+        - { name: status, in: query, description: "draft hanya berlaku untuk pengajar/admin dengan drafts=true", schema: { type: string, enum: [published, draft] } }
+        - { name: counts, in: query, description: "Pengajar/admin: sertakan hitungan tab untuk filter non-status", schema: { type: boolean } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -929,6 +935,41 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/ContentRevision" } }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/results:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: quiz_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listQuizResults
+      description: Pengajar/admin. Peserta yang sudah menyelesaikan kuis, nilai tertinggi (aturan Rapor), jumlah percobaan.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+      responses:
+        "200":
+          description: Hasil kuis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, display_name, best_score, attempts, last_finished_at]
+                      properties:
+                        user_id: { type: string, format: uuid }
+                        display_name: { type: string }
+                        best_score: { type: integer }
+                        attempts: { type: integer }
+                        last_finished_at: { type: string, format: date-time }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/orgs/{org_id}/quizzes/{quiz_id}/publish:
     parameters:
       - $ref: "#/components/parameters/OrgID"
@@ -991,6 +1032,7 @@ paths:
         - { name: search, in: query, schema: { type: string } }
         - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
         - { name: module_id, in: query, schema: { type: string, format: uuid }, description: "Ambil satu modul untuk pin/detail tanpa memuat daftar." }
+        - { name: counts, in: query, schema: { type: boolean }, description: "Pengajar/admin: sertakan hitungan tab untuk filter non-status." }
       responses:
         "200":
           description: Daftar modul
@@ -1183,6 +1225,7 @@ paths:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
         - { name: search, in: query, schema: { type: string } }
         - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
+        - { name: counts, in: query, schema: { type: boolean }, description: "Pengajar/admin: sertakan hitungan tab untuk filter non-status." }
       responses:
         "200":
           description: Daftar kuis
@@ -1478,7 +1521,7 @@ paths:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
         - { name: search, in: query, schema: { type: string }, description: "Cari nama sebelum pagination." }
-        - { name: class_name, in: query, schema: { type: string }, description: "Nama kelas pada snapshot tugas." }
+        - { name: class_id, in: query, schema: { type: string, format: uuid }, description: "Kelas penerima tugas." }
       responses:
         "200":
           description: Own tasks for participants, all school tasks for staff
@@ -1486,9 +1529,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
+                  total: { type: integer, description: "Jumlah tugas yang cocok dengan filter" }
     post:
       operationId: issueAssignment
       requestBody:
@@ -1587,9 +1631,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/AcademicYear" } }
+                  total: { type: integer }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1645,9 +1690,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/SchoolClass" } }
+                  total: { type: integer }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1846,6 +1892,9 @@ paths:
     get:
       operationId: listStaff
       description: Pengajar/admin. Pengajar dan admin sekolah, calon wali kelas/guru mapel.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
           description: Staf
@@ -1853,8 +1902,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
+                  total: { type: integer }
                   items:
                     type: array
                     items:
@@ -2118,9 +2168,14 @@ components:
             steps: { type: array, items: { $ref: "#/components/schemas/ModuleStep" } }
     ModuleList:
       type: object
-      required: [items]
+      required: [items, total]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/Module" } }
+        total: { type: integer }
+        counts:
+          type: object
+          description: Hanya bila counts=true (pengajar/admin)
+          properties: { all: { type: integer }, published: { type: integer }, draft: { type: integer }, archived: { type: integer } }
     StepKind:
       type: string
       enum: [materi, berkas, video, kuis]
@@ -2192,12 +2247,18 @@ components:
         question_count: { type: integer }
         best_score: { type: integer, nullable: true, description: "Nilai tertinggi pemanggil; null jika belum pernah selesai" }
         attempts: { type: integer, description: "Jumlah percobaan selesai milik pemanggil" }
+        module_titles: { type: array, items: { type: string }, description: "Pengajar/admin dengan drafts=true: maks 3 modul aktif yang memakai kuis ini" }
         questions: { type: array, items: { $ref: "#/components/schemas/QuizQuestion" }, description: "Hanya untuk pengajar/admin dengan drafts=true" }
     QuizList:
       type: object
-      required: [items]
+      required: [items, total]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/Quiz" } }
+        total: { type: integer }
+        counts:
+          type: object
+          description: Hanya bila counts=true (pengajar/admin)
+          properties: { all: { type: integer }, published: { type: integer }, draft: { type: integer }, empty: { type: integer, description: "Kuis tanpa soal" } }
     QuestionInput:
       type: object
       required: [prompt, options, answer]
@@ -2322,6 +2383,9 @@ components:
         cancelled: { type: boolean }
         done: { type: integer }
         total: { type: integer }
+        recipients: { type: integer, description: "Staf saja (0 untuk peserta): jumlah penerima beku" }
+        finished: { type: integer, description: "Staf saja: penerima yang menyelesaikan semua langkah" }
+        started: { type: integer, description: "Staf saja: penerima yang menyelesaikan minimal satu langkah" }
     AssignmentStep:
       type: object
       required: [id, kind, title, body, file_id, file_kind, video_id, quiz_id, minutes, done, unlocked]
@@ -2353,6 +2417,8 @@ components:
         id: { type: string, format: uuid }
         label: { type: string, example: "2026/2027" }
         active: { type: boolean }
+        class_count: { type: integer }
+        student_count: { type: integer, description: "Penempatan siswa aktif di tahun ini" }
     ClassInput:
       type: object
       required: [name]
@@ -2391,6 +2457,8 @@ components:
         display_name: { type: string }
         avatar_key: { type: string }
         class_id: { type: string, format: uuid, nullable: true, description: "Null = belum ditempatkan" }
+        steps_done: { type: integer, description: "Langkah tugas aktif tahun ini yang selesai" }
+        steps_total: { type: integer }
     Placement:
       type: object
       required: [class_name, year_label, started_at, ended_at]
@@ -2459,6 +2527,13 @@ components:
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/Book" } }
         next_cursor: { type: string, nullable: true }
+        counts:
+          type: object
+          required: [all, published, draft]
+          properties:
+            all: { type: integer }
+            published: { type: integer }
+            draft: { type: integer }
     StartUploadRequest:
       type: object
       required: [id, name, size, kind, sha256]
@@ -2490,10 +2565,12 @@ components:
         uploaded_by: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
         position: { type: integer }
+        used_by: { type: array, items: { type: string }, description: "Maks 3 judul buku/modul/tugas aktif yang memakai file; tidak kosong berarti tidak bisa dihapus" }
     FileList:
       type: object
-      required: [items, used_bytes, quota_bytes]
+      required: [items, total, used_bytes, quota_bytes]
       properties:
+        total: { type: integer }
         items: { type: array, items: { $ref: "#/components/schemas/FileItem" } }
         used_bytes: { type: integer, format: int64 }
         quota_bytes: { type: integer, format: int64 }

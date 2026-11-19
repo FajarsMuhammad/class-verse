@@ -5,6 +5,7 @@ import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
 import type { RoomHandle } from '@/realtime/useRoom'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
+import { hasMore, lastPage } from '@/api/page'
 import { kindLabel, levels, moduleApi } from '@/api/modules'
 import { quizApi } from '@/api/quizzes'
 import type { Level, Module, ModuleInput, ModuleStep, StepInput } from '@/api/types'
@@ -48,7 +49,9 @@ const statusTabs = computed(() => [
  { key: 'draft', label: 'Draf', count: counts.value.draft },
  { key: 'archived', label: 'Arsip', count: counts.value.archived },
 ])
-const visible = computed(() => modules.value.filter(item => (!levelFilter.value || item.level === levelFilter.value) && (!buildingFilter.value || item.building_key === buildingFilter.value) && item.title.toLowerCase().includes(search.value.trim().toLowerCase()) && (!['draft', 'published'].includes(statusFilter.value) || item.published === (statusFilter.value === 'published'))))
+// Server already filters, searches, and pages; the table shows the page as returned.
+const visible = modules
+const filtered = computed(() => !!(levelFilter.value || buildingFilter.value || search.value.trim() || statusFilter.value !== 'all'))
 watch([statusFilter, levelFilter, buildingFilter, search], () => { page.value = 1; void load() })
 watch(page, () => { void load() })
 
@@ -139,20 +142,14 @@ let listGeneration = 0
 async function load() {
  const generation = ++listGeneration
   try {
-    const result = await moduleApi.list(props.orgId, { drafts: true, archived: statusFilter.value === 'archived', building_key: props.buildingKey || buildingFilter.value, level: levelFilter.value, search: search.value, status: ['draft', 'published'].includes(statusFilter.value) ? statusFilter.value : '', offset: (page.value - 1) * pageSize, limit: pageSize })
+    const result = await moduleApi.list(props.orgId, { drafts: true, counts: true, archived: statusFilter.value === 'archived', building_key: props.buildingKey || buildingFilter.value, level: levelFilter.value, search: search.value, status: ['draft', 'published'].includes(statusFilter.value) ? statusFilter.value : '', offset: (page.value - 1) * pageSize, limit: pageSize })
     if (generation !== listGeneration) return
+    // Removing the last item of the last page: the server cannot total an offset past the end, so step back.
+    const last = lastPage(page.value, result)
+    if (last !== page.value) { page.value = last; return }
     modules.value = result.items
     total.value = result.total ?? result.items.length
-    const query = { drafts: true, building_key: buildingFilter.value, level: levelFilter.value, search: search.value, limit: 1 }
-    const [all, published, draft, archived] = await Promise.all([
-      moduleApi.list(props.orgId, query),
-      moduleApi.list(props.orgId, { ...query, status: 'published' }),
-      moduleApi.list(props.orgId, { ...query, status: 'draft' }),
-      moduleApi.list(props.orgId, { ...query, archived: true }),
-    ])
-    if (generation !== listGeneration) return
-    counts.value = { all: all.total ?? all.items.length, published: published.total ?? published.items.filter(i => i.published).length, draft: draft.total ?? draft.items.filter(i => !i.published).length, archived: archived.total ?? archived.items.length }
-
+    if (result.counts) counts.value = result.counts
   } catch (err) {
     error.value = errorMessage(err)
   }
@@ -236,11 +233,11 @@ async function archive(m: Module) {
 
 async function fileOptions(offset: number) {
  const result = await fileApi.list(props.orgId, offset)
- return { items: result.items.map(f => ({ value: f.id, label: f.name })), more: result.items.length === 20 }
+ return { items: result.items.map(f => ({ value: f.id, label: f.name })), more: hasMore(offset, result) }
 }
 async function quizOptions(offset: number) {
  const result = await quizApi.list(props.orgId, { building_key: active.value?.building_key, offset, limit: 20 })
- return { items: result.items.map(q => ({ value: q.id, label: `${q.title} (${q.level}, ${q.question_count} soal)` })), more: offset + result.items.length < (result.total ?? (result.items.length === 20 ? offset + 21 : offset)) }
+ return { items: result.items.map(q => ({ value: q.id, label: `${q.title} (${q.level}, ${q.question_count} soal)` })), more: hasMore(offset, result) }
 }
 function editStep(m: Module, s?: ModuleStep) {
   stepSave.discard()
@@ -355,7 +352,7 @@ onMounted(async () => {
       </div>
       <label :for="`${id}-search`" class="sr">Cari judul modul</label>
       <input :id="`${id}-search`" v-model="search" type="search" class="search" placeholder="Cari judul modul…" />
-      <p v-if="!visible.length" class="empty">{{ modules.length ? 'Tidak ada modul yang cocok dengan filter ini.' : 'Belum ada modul. Mulai dari template agar siswa punya jalur belajar pertama.' }}
+      <p v-if="!visible.length" class="empty">{{ filtered ? 'Tidak ada modul yang cocok dengan filter ini.' : 'Belum ada modul. Mulai dari template agar siswa punya jalur belajar pertama.' }}
         <button v-if="!modules.length && choices.length" type="button" class="btn-secondary" @click="edit()">Buat modul pertama</button></p>
       <div v-else class="table-wrap">
         <table :id="`${id}-table`" class="data-table">

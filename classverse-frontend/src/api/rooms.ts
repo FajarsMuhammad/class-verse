@@ -4,10 +4,11 @@ import type { CreateRoomRequest, Room, RoomList, UpdateRoomRequest, VoiceToken }
 const enc = encodeURIComponent
 
 export const roomApi = {
-  list: (orgId: string, options: { building?: string; cursor?: string } = {}) => {
+  list: (orgId: string, options: { building?: string; cursor?: string; q?: string } = {}) => {
     const query = new URLSearchParams()
     if (options.building) query.set('building', options.building)
     if (options.cursor) query.set('cursor', options.cursor)
+    if (options.q?.trim()) query.set('q', options.q.trim())
     return api<RoomList>(`/api/orgs/${enc(orgId)}/rooms${query.size ? `?${query}` : ''}`)
   },
   get: (id: string) => api<Room>(`/api/rooms/${enc(id)}`),

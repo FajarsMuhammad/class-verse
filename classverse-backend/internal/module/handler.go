@@ -219,9 +219,18 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 		}
 		moduleID = uuid.NullUUID{UUID: parsed, Valid: true}
 	}
-	mods, err := h.svc.List(r.Context(), user, p[0], Filter{ModuleID: moduleID, Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true", Archived: q.Get("archived") == "true"})
+	filter := Filter{ModuleID: moduleID, Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true", Archived: q.Get("archived") == "true"}
+	mods, err := h.svc.List(r.Context(), user, p[0], filter)
 	if err != nil {
 		return err
+	}
+	body := map[string]any{}
+	if q.Get("counts") == "true" {
+		c, err := h.svc.Counts(r.Context(), user, p[0], filter)
+		if err != nil {
+			return err
+		}
+		body["counts"] = map[string]int32{"all": c.AllCount, "published": c.PublishedCount, "draft": c.DraftCount, "archived": c.ArchivedCount}
 	}
 	items := make([]Response, 0, len(mods))
 	for _, m := range mods {
@@ -231,7 +240,8 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	if len(mods) > 0 {
 		total = mods[0].TotalCount
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
+	body["items"], body["total"] = items, total
+	httpx.JSON(w, http.StatusOK, body)
 	return nil
 }
 

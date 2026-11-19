@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasMore } from '@/api/page'
 import RemotePagination from './RemotePagination.vue'
 import { computed, getCurrentInstance, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -30,7 +31,7 @@ async function load() {
   error.value = ''
   try {
     const page = await moduleApi.list(props.orgId, { drafts: true, limit: 20, offset: (pageNumber.value - 1) * 20 })
-    if (mine === generation) { modules.value = page.items; more.value = pageNumber.value * 20 < (page.total ?? (page.items.length === 20 ? pageNumber.value * 20 + 1 : 0)) }
+    if (mine === generation) { modules.value = page.items; more.value = hasMore((pageNumber.value - 1) * 20, page) }
   } catch (err) {
     if (mine === generation) error.value = errorMessage(err)
   } finally {

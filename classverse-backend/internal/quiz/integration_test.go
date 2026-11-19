@@ -227,6 +227,21 @@ func TestAttemptHidesKeyGradesAndSnapshots(t *testing.T) {
 	if _, err := f.svc.Start(ctx, f.stray, f.other, id); !errors.Is(err, quiz.ErrNotFound) {
 		t.Fatalf("cross-org start: %v", err)
 	}
+	// Staff results use the Rapor's highest score; participants and other schools are refused.
+	results, err := f.svc.Results(ctx, f.admin, f.school, id, 20, 0)
+	if err != nil || len(results) != 1 || results[0].UserID != f.student || results[0].BestScore != 66 || results[0].Attempts != 2 || results[0].TotalCount != 1 {
+		t.Fatalf("results=%+v err=%v", results, err)
+	}
+	if _, err := f.svc.Results(ctx, f.student, f.school, id, 20, 0); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("participant results: %v", err)
+	}
+	if _, err := f.svc.Results(ctx, f.stray, f.other, id, 20, 0); !errors.Is(err, quiz.ErrNotFound) {
+		t.Fatalf("cross-org results: %v", err)
+	}
+	counts, err := f.svc.Counts(ctx, f.admin, f.school, quiz.Filter{})
+	if err != nil || counts.AllCount != 1 || counts.PublishedCount != 1 || counts.EmptyCount != 0 {
+		t.Fatalf("counts=%+v err=%v", counts, err)
+	}
 }
 
 // Passing completes the quiz step of a published module; failing or a manual mark does not.

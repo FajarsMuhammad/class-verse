@@ -13,6 +13,7 @@ WHERE org_id = sqlc.arg(org_id)
   AND map_key <> 'campus'
   AND (sqlc.narg(building_key)::text IS NULL OR building_key = sqlc.narg(building_key))
   AND (sqlc.arg(include_staff)::boolean OR building_key <> 'ruang-guru')
+  AND (sqlc.narg(pattern)::text IS NULL OR name ILIKE sqlc.narg(pattern))
   AND (sqlc.narg(cursor_created_at)::timestamptz IS NULL
        OR (created_at, id) < (sqlc.narg(cursor_created_at)::timestamptz, sqlc.narg(cursor_id)::uuid))
 ORDER BY created_at DESC, id DESC

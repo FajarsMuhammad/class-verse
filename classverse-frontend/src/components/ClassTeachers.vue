@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasMore } from '@/api/page'
 import PagedSelect from './PagedSelect.vue'
 import { computed, onMounted, ref } from 'vue'
 import { classApi, type ClassTeacher, type Staff } from '@/api/classes'
@@ -21,7 +22,7 @@ const message = (e: unknown) => e instanceof Error ? e.message : 'Perubahan gaga
 async function staffOptions(offset: number) {
  const result = await classApi.staff(props.orgId, offset)
  staff.value = [...staff.value.filter(s => !result.items.some(n => n.user_id === s.user_id)), ...result.items]
- return { items: result.items.map(s => ({ value: s.user_id, label: s.display_name })), more: result.items.length === 20 }
+ return { items: result.items.map(s => ({ value: s.user_id, label: s.display_name })), more: hasMore(offset, result) }
 }
 async function load() {
   loading.value = true; error.value = ''

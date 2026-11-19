@@ -65,3 +65,8 @@ input, select { box-sizing: border-box; max-width: 100%; min-height: var(--touch
 .bulk { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); background: var(--kv-ink); color: var(--kv-surface); }
 .bulk .btn-secondary { background: var(--kv-surface); color: var(--kv-ink); }
 .section-title { margin: 0; font: var(--weight-semibold) var(--text-md)/var(--line-tight) var(--font-display); }
+.list.year-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--space-3); }
+.list.year-cards > li { padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-2xl); background: var(--kv-surface); }
+.list.year-cards > li.active { border-color: var(--kv-primary); }
+.banner { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: var(--kv-primary-soft); color: var(--kv-primary-soft-text); }
+.year-new { margin-top: var(--space-5); padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-2xl); background: var(--kv-surface); }

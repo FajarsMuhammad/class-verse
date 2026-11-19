@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasMore, lastPage } from '@/api/page'
 import PagedSelect from './PagedSelect.vue'
 import RemotePagination from './RemotePagination.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
@@ -28,14 +29,15 @@ const search = ref('')
 const title = useTemplateRef<HTMLElement>('title')
 const selectedYear = computed(() => years.value.find(y => y.id === yearID.value))
 const opened = computed(() => classes.value.find(c => c.id === openID.value))
-const needle = computed(() => search.value.trim().toLocaleLowerCase('id'))
-const visibleClasses = computed(() => classes.value.filter(c => c.name.toLocaleLowerCase('id').includes(needle.value)))
 const pageNumber = ref(1)
+const moreYears = ref(false)
+const moreClasses = ref(false)
+const classTotal = ref(0)
 function movePage(delta: number) { pageNumber.value += delta; void load() }
 watch(search, () => { pageNumber.value = 1; void load() })
 const groupedClasses = computed(() => {
   const groups = new Map<string, SchoolClass[]>()
-  for (const c of visibleClasses.value) {
+  for (const c of classes.value) {
     const prefix = c.name.match(/^(\d+|[IVX]+)(?=\s|[A-Z]|$)/i)?.[1]
     const label = prefix ? `Tingkat ${prefix}` : 'Kelas lainnya'
     groups.set(label, [...(groups.get(label) ?? []), c])
@@ -51,15 +53,21 @@ const message = (e: unknown) => e instanceof Error ? e.message : 'Perubahan gaga
 async function yearOptions(offset: number) {
  const result = await classApi.years(props.orgId, offset)
  years.value = [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
- return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: result.items.length === 20 }
+ return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: hasMore(offset, result) }
 }
 async function load() {
   const g = ++generation
   loading.value = true
   error.value = ''
   try {
-    const result = await classApi.years(props.orgId, props.view === 'years' ? (pageNumber.value - 1) * 20 : undefined)
+    const offset = props.view === 'years' ? (pageNumber.value - 1) * 20 : 0
+    const result = await classApi.years(props.orgId, offset)
     if (g !== generation) return
+    if (props.view === 'years') {
+      const last = lastPage(pageNumber.value, result)
+      if (last !== pageNumber.value) { pageNumber.value = last; return void load() }
+      moreYears.value = hasMore(offset, result)
+    }
     years.value = props.view === 'years' ? result.items : [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
     yearID.value = yearID.value || result.items.find(y => y.active)?.id || result.items[0]?.id || ''
     if (!yearID.value || props.view === 'years') {
@@ -71,9 +79,12 @@ async function load() {
   finally { if (g === generation) loading.value = false }
 }
 async function fetchYear(g: number) {
-  const c = await classApi.classes(props.orgId, yearID.value, (pageNumber.value - 1) * 20, search.value.trim())
+  const offset = (pageNumber.value - 1) * 20
+  const c = await classApi.classes(props.orgId, yearID.value, offset, search.value.trim())
   if (g !== generation) return
-  classes.value = c.items
+  const last = lastPage(pageNumber.value, c)
+  if (last !== pageNumber.value) { pageNumber.value = last; return fetchYear(g) }
+  classes.value = c.items; moreClasses.value = hasMore(offset, c); classTotal.value = c.total ?? c.items.length
   if (openID.value && !c.items.some(x => x.id === openID.value)) openID.value = ''
 }
 async function refreshClasses() {
@@ -100,7 +111,7 @@ async function save(action: () => Promise<unknown>) {
   finally { saving.value = false }
 }
 async function activate(y: AcademicYear) {
-  if (!window.confirm(`Jadikan ${y.label} tahun ajaran aktif? Siswa tidak dipindahkan otomatis.`)) return
+  if (!window.confirm(`Jadikan ${y.label} tahun ajaran aktif? Kelas, tugas, dan rapor memakai tahun ini sebagai bawaan. Siswa tidak dipindahkan otomatis; penempatan tahun lain tetap tersimpan.`)) return
   await save(() => classApi.activate(props.orgId, y.id))
 }
 async function createYear() {
@@ -142,18 +153,19 @@ onMounted(load)
 
       <template v-if="view === 'years'">
         <p class="muted">Tahun aktif dipilih admin, bukan berdasarkan kalender. Mengganti tahun aktif tidak memindahkan siswa.</p>
-        <form v-if="isAdmin" data-test="create-year" class="row" @submit.prevent="createYear">
-          <PagedSelect v-model="yearID" label="Tahun ajaran" :load="yearOptions" @update:model-value="changeYear" />
-          <button type="submit" class="btn-primary">Tambah</button>
-        </form>
-        <ul class="list">
-          <li v-for="y in years" :key="y.id" :data-year="y.id">
-            <div><strong>{{ y.label }}</strong></div>
+        <p class="banner">Naik kelas: buat tahun baru, siapkan kelasnya lewat “Siapkan tahun ajaran baru” di bawah, lalu jadikan tahun itu aktif.</p>
+        <ul class="list year-cards">
+          <li v-for="y in years" :key="y.id" :data-year="y.id" :class="{ active: y.active }">
+            <div><strong>{{ y.label }}</strong><p class="meta">{{ y.class_count ?? 0 }} kelas · {{ y.student_count ?? 0 }} siswa</p></div>
             <span v-if="y.active" class="badge">Aktif</span>
             <button v-else-if="isAdmin" type="button" class="btn-secondary" :aria-label="`Jadikan ${y.label} aktif`" @click="activate(y)">Jadikan aktif</button>
           </li>
         </ul>
-        <RemotePagination :page="pageNumber" :more="years.length === 20" @move="movePage" />
+        <RemotePagination v-if="pageNumber > 1 || moreYears" :page="pageNumber" :more="moreYears" :busy="loading" @move="movePage" />
+        <form v-if="isAdmin" data-test="create-year" class="row year-new" @submit.prevent="createYear">
+          <label>Tahun ajaran baru <input v-model="newYear" required placeholder="2027/2028" pattern="[0-9]{4}/[0-9]{4}" maxlength="9" /></label>
+          <button type="submit" class="btn-primary">Tambah</button>
+        </form>
         <p v-if="!years.length && !loading" class="muted">Belum ada tahun ajaran.</p>
       </template>
 
@@ -164,12 +176,7 @@ onMounted(load)
 
       <template v-else>
         <div class="filters">
-          <label>Tahun ajaran
-            <select data-test="year" :value="yearID" @change="changeYear">
-              <option v-for="y in years" :key="y.id" :value="y.id">{{ y.label }}{{ y.active ? ' (aktif)' : '' }}</option>
-            </select>
-          </label>
-          <RemotePagination v-if="view === 'students'" :page="pageNumber" :more="classes.length === 20" @move="movePage" />
+          <PagedSelect v-model="yearID" label="Tahun ajaran" test-id="year" :load="yearOptions" @update:model-value="changeYear" />
           <label v-if="view === 'classes'">Cari kelas <input v-model="search" type="search" /></label>
           <button v-if="view === 'classes' && isAdmin && !creating" type="button" class="btn-primary new" @click="creating = true">+ Kelas baru</button>
         </div>
@@ -196,8 +203,9 @@ onMounted(load)
             </li>
           </ul>
           </section>
-          <RemotePagination :page="pageNumber" :more="visibleClasses.length === 20" @move="movePage" />
-          <p v-if="!visibleClasses.length && !loading" class="muted">{{ classes.length ? 'Kelas tidak ditemukan.' : isAdmin ? 'Belum ada kelas pada tahun ajaran ini.' : 'Belum ada kelas pada tahun ajaran ini. Kelas dibuat admin sekolah.' }}</p>
+          <RemotePagination v-if="pageNumber > 1 || moreClasses" :page="pageNumber" :more="moreClasses" :busy="loading" @move="movePage" />
+          <p v-if="classes.length" class="muted">{{ classTotal }} kelas</p>
+          <p v-if="!classes.length && !loading" class="muted">{{ search.trim() ? 'Kelas tidak ditemukan.' : isAdmin ? 'Belum ada kelas pada tahun ajaran ini.' : 'Belum ada kelas pada tahun ajaran ini. Kelas dibuat admin sekolah.' }}</p>
           </div>
           <aside v-if="opened" class="class-detail" aria-label="Detail kelas" @keydown.esc="openID = ''">
         <div class="detail-head">

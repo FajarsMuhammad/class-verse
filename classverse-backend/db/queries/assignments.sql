@@ -31,11 +31,18 @@ WHERE e.org_id=sqlc.arg(org_id) AND e.class_id=sqlc.arg(class_id) AND e.ended_at
 -- name: ListAssignments :many
 SELECT a.*,
  (SELECT count(*)::integer FROM assignment_steps s WHERE s.assignment_id=a.id) AS total,
- (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=sqlc.arg(user_id)) AS done
+ (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=sqlc.arg(user_id)) AS done,
+ count(*) OVER()::integer AS total_count,
+ -- Class aggregates are staff-only: participants never learn their peers' progress.
+ CASE WHEN sqlc.arg(staff)::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id) ELSE 0 END::integer AS recipients,
+ CASE WHEN sqlc.arg(staff)::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id
+   AND (SELECT count(*) FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=r.user_id)
+     >= (SELECT count(*) FROM assignment_steps s WHERE s.assignment_id=a.id)) ELSE 0 END::integer AS finished,
+ CASE WHEN sqlc.arg(staff)::boolean THEN (SELECT count(DISTINCT p.user_id) FROM assignment_progress p WHERE p.assignment_id=a.id) ELSE 0 END::integer AS started
 FROM assignments a WHERE a.org_id=sqlc.arg(org_id)
  AND (sqlc.arg(staff)::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=sqlc.arg(user_id)))
  AND (sqlc.arg(search)::text = '' OR strpos(lower(a.title), lower(sqlc.arg(search))) > 0)
- AND (sqlc.arg(class_name)::text = '' OR a.class_name = sqlc.arg(class_name))
+ AND (sqlc.narg(class_id)::uuid IS NULL OR a.class_id = sqlc.narg(class_id))
 ORDER BY a.created_at DESC,a.id LIMIT sqlc.narg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer;
 
 -- name: OwnAssignmentRecipient :one

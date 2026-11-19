@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasMore } from '@/api/page'
 import PagedSelect from './PagedSelect.vue'
 import RemotePagination from './RemotePagination.vue'
 import { computed, ref, watch } from 'vue'
@@ -15,6 +16,7 @@ const fromClasses = ref<SchoolClass[]>([])
 const toClasses = ref<SchoolClass[]>([])
 const mapping = ref<Record<string, string>>({})
 const sourcePage = ref(1)
+const moreSources = ref(false)
 const selectedSources = ref<SchoolClass[]>([])
 const yearNames = ref<Record<string, string>>({})
 const destinationNames = ref<Record<string, string>>({})
@@ -39,7 +41,7 @@ watch([toID, fromID], loadClasses)
 async function yearOptions(offset: number) {
  const result = await classApi.years(props.orgId, offset)
  yearNames.value = { ...yearNames.value, ...Object.fromEntries(result.items.map(y => [y.id, y.label])) }
- return { items: result.items.map(y => ({ value: y.id, label: y.label })), more: result.items.length === 20 }
+ return { items: result.items.map(y => ({ value: y.id, label: y.label })), more: hasMore(offset, result) }
 }
 async function sourceYearOptions(offset: number) {
  const result = await yearOptions(offset)
@@ -48,13 +50,14 @@ async function sourceYearOptions(offset: number) {
 async function destinationOptions(offset: number) {
  const result = await classApi.classes(props.orgId, toID.value, offset)
  destinationNames.value = { ...destinationNames.value, ...Object.fromEntries(result.items.map(c => [c.id, c.name])) }
- return { items: result.items.map(c => ({ value: c.id, label: c.name })), more: result.items.length === 20 }
+ return { items: result.items.map(c => ({ value: c.id, label: c.name })), more: hasMore(offset, result) }
 }
 async function moveSource(delta: number) {
  selectedSources.value = [...selectedSources.value.filter(c => !fromClasses.value.some(n => n.id === c.id)), ...fromClasses.value]
  busy.value = true; error.value = ''
  try {
    const result = await classApi.classes(props.orgId, fromID.value, (sourcePage.value + delta - 1) * 20)
+   moreSources.value = hasMore((sourcePage.value + delta - 1) * 20, result)
    fromClasses.value = result.items; sourcePage.value += delta
  } catch (e) { error.value = message(e) }
  finally { busy.value = false }
@@ -68,7 +71,7 @@ async function loadClasses() {
   try {
     const [from, to] = await Promise.all([classApi.classes(props.orgId, fromID.value, 0), classApi.classes(props.orgId, toID.value, 0)])
     if (g !== generation) return
-    fromClasses.value = from.items; toClasses.value = to.items
+    fromClasses.value = from.items; toClasses.value = to.items; moreSources.value = hasMore(0, from)
   } catch (e) { if (g === generation) error.value = message(e) }
   finally { if (g === generation) busy.value = false }
 }
@@ -136,7 +139,7 @@ const nameIn = (list: SchoolClass[], id: string | undefined) => list.find(c => c
               </label>
             </li>
           </ul>
-          <RemotePagination :page="sourcePage" :more="fromClasses.length === 20" :busy="busy" @move="moveSource" />
+          <RemotePagination :page="sourcePage" :more="moreSources" :busy="busy" @move="moveSource" />
           <button v-if="toClasses.length" type="button" class="btn-primary" data-action="preview" :disabled="!chosen.length" @click="step = 'preview'">Pratinjau</button>
         </template>
         <template v-else>

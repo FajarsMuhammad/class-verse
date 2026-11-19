@@ -93,3 +93,15 @@ GROUP BY m.id,r.id ORDER BY max(p.completed_at) DESC,m.id LIMIT 1;
 -- name: GetLinkableQuiz :one
 -- A quiz step may point only at a published, non-archived quiz of the same school.
 SELECT id FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL AND published_at IS NOT NULL AND published_revision_id IS NOT NULL;
+
+-- name: CountModules :one
+-- Tab counts for the authoring list, with the list's non-status filters.
+SELECT count(*) FILTER (WHERE m.archived_at IS NULL)::integer AS all_count,
+  count(*) FILTER (WHERE m.archived_at IS NULL AND m.published_at IS NOT NULL)::integer AS published_count,
+  count(*) FILTER (WHERE m.archived_at IS NULL AND m.published_at IS NULL)::integer AS draft_count,
+  count(*) FILTER (WHERE m.archived_at IS NOT NULL)::integer AS archived_count
+FROM modules m
+WHERE m.org_id = sqlc.arg(org_id)
+  AND (sqlc.narg(building_key)::text IS NULL OR m.building_key = sqlc.narg(building_key))
+  AND (sqlc.narg(level)::text IS NULL OR m.level = sqlc.narg(level))
+  AND (sqlc.arg(search)::text = '' OR position(lower(sqlc.arg(search)) in lower(m.title)) > 0);

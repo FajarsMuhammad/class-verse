@@ -27,7 +27,7 @@ const restricted = computed(() => props.building.staffOnly && !props.teacher)
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
           <path v-if="atDoor" d="M4 21V4h11v17M15 12h0M15 4l5 2v15h-5" /><path v-else d="M5 12h14M13 6l6 6-6 6" />
         </svg>
-        {{ atDoor ? 'Pilih ruang' : 'Menuju pintu' }}
+        {{ restricted ? 'Hanya untuk pengajar' : atDoor ? 'Pilih ruang' : 'Menuju pintu' }}
       </button>
       <!-- Modules are readable from anywhere on the map; staff-only buildings have none. -->
       <button v-if="!building.staffOnly" class="icon" data-testid="place-modules" aria-label="Lihat modul"

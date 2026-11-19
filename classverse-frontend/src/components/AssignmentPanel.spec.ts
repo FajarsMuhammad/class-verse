@@ -34,3 +34,12 @@ it('keeps completion unchanged and shows saving failure', async () => {
   expect(w.get('[role="alert"]').text()).toContain('Tidak bisa terhubung ke server')
   expect(w.get('.content button').text()).toBe('Tandai selesai')
 })
+
+it('pages the task list by server total', async () => {
+  const list = vi.spyOn(assignmentApi, 'list').mockResolvedValue({ items: [task], total: 21 })
+  const w = mount(AssignmentPanel, { props: { orgId: 'o' } })
+  await flushPromises()
+  await w.findAll('.remote-pagination button')[1]!.trigger('click')
+  await flushPromises()
+  expect(list).toHaveBeenLastCalledWith('o', 20)
+})

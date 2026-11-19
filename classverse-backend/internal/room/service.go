@@ -170,7 +170,8 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 }
 
 // List returns rooms visible to userID, newest first.
-func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, building string, limit int, cursor string) (Page, error) {
+// search matches room names literally (case-insensitive); up to 100 characters.
+func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, building string, limit int, cursor string, search ...string) (Page, error) {
 	role, err := s.auth.Authorize(ctx, userID, orgID, org.RoleParticipant)
 	if err != nil {
 		return Page{}, err
@@ -182,6 +183,14 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, building st
 	params := query.ListRoomsParams{OrgID: orgID, IncludeStaff: role.AtLeast(org.RoleTeacher), RowLimit: int32(limit + 1)} //nolint:gosec // bounded by maxLimit
 	if building != "" {
 		params.BuildingKey = pgtype.Text{String: building, Valid: true}
+	}
+	if len(search) > 0 {
+		if q := strings.TrimSpace(search[0]); q != "" {
+			if utf8.RuneCountInString(q) > 100 {
+				return Page{}, &ValidationError{Fields: map[string]string{"q": "Pencarian maksimal 100 karakter"}}
+			}
+			params.Pattern = pgtype.Text{String: "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q) + "%", Valid: true}
+		}
 	}
 	if cursor != "" {
 		at, id, err := decodeCursor(cursor)

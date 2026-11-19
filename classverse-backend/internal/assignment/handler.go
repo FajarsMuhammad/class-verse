@@ -96,6 +96,10 @@ type Response struct {
 	Cancelled   bool       `json:"cancelled"`
 	Done        int32      `json:"done"`
 	Total       int32      `json:"total"`
+	// Staff only (0 for participants): recipients and how many finished or started every/any step.
+	Recipients int32 `json:"recipients"`
+	Finished   int32 `json:"finished"`
+	Started    int32 `json:"started"`
 }
 
 // StepResponse hides locked content and retains only navigational metadata.
@@ -128,19 +132,31 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	rows, err := h.svc.ListFiltered(r.Context(), user, p[0], r.URL.Query().Get("search"), r.URL.Query().Get("class_name"), pagination...)
+	var classID uuid.NullUUID
+	if raw := r.URL.Query().Get("class_id"); raw != "" {
+		id, parseErr := uuid.Parse(raw)
+		if parseErr != nil {
+			return httpx.ValidationFailed(map[string]string{"class_id": "Kelas tidak valid"})
+		}
+		classID = uuid.NullUUID{UUID: id, Valid: true}
+	}
+	rows, err := h.svc.ListFiltered(r.Context(), user, p[0], r.URL.Query().Get("search"), classID, pagination...)
 	if err != nil {
 		return err
 	}
 	items := make([]Response, len(rows))
 	for i, a := range rows {
-		items[i] = Response{ID: a.ID, Title: a.Title, ClassName: a.ClassName, YearLabel: a.YearLabel, BuildingKey: a.BuildingKey, Level: a.Level, Cancelled: a.CancelledAt.Valid, Done: a.Done, Total: a.Total}
+		items[i] = Response{ID: a.ID, Title: a.Title, ClassName: a.ClassName, YearLabel: a.YearLabel, BuildingKey: a.BuildingKey, Level: a.Level, Cancelled: a.CancelledAt.Valid, Done: a.Done, Total: a.Total, Recipients: a.Recipients, Finished: a.Finished, Started: a.Started}
 		if a.DueAt.Valid {
 			d := a.DueAt.Time
 			items[i].DueAt = &d
 		}
 	}
-	httpx.JSON(w, 200, map[string]any{"items": items})
+	total := int32(0)
+	if len(rows) > 0 {
+		total = rows[0].TotalCount
+	}
+	httpx.JSON(w, 200, map[string]any{"items": items, "total": total})
 	return nil
 }
 func (h *Handler) issue(w http.ResponseWriter, r *http.Request) error {

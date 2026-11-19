@@ -92,6 +92,59 @@ type Filter struct {
 	Limit  int
 	Cursor string
 	Drafts bool
+	Format string // "", buku, ebook, audio
+	Level  string // "", SD, SMP, SMA, Umum
+	Status string // "", published, draft (draft only for staff with Drafts)
+}
+
+// Counts are the staff catalog tab counts.
+type Counts = query.CountBooksRow
+
+// validate checks the shared catalog filters.
+func (f Filter) validate() error {
+	fields := map[string]string{}
+	if f.Shelf != "" && !slices.Contains(Shelves, f.Shelf) {
+		fields["shelf"] = "Rak tidak dikenal"
+	}
+	if f.Format != "" && !slices.Contains(Formats, f.Format) {
+		fields["format"] = "Jenis tidak dikenal"
+	}
+	if f.Level != "" && !slices.Contains(Levels, f.Level) {
+		fields["level"] = "Jenjang tidak dikenal"
+	}
+	if f.Status != "" && f.Status != "published" && f.Status != "draft" {
+		fields["status"] = "Status tidak valid"
+	}
+	if len(fields) > 0 {
+		return &ValidationError{Fields: fields}
+	}
+	return nil
+}
+
+func optText(v string) pgtype.Text { return pgtype.Text{String: v, Valid: v != ""} }
+
+func (f Filter) pattern() pgtype.Text {
+	if q, ok := text(f.Query, 1, 100); ok {
+		return pgtype.Text{String: "%" + likeEscape(q) + "%", Valid: true}
+	}
+	return pgtype.Text{}
+}
+
+// Counts returns catalog tab counts for the list's non-status filters (teacher/admin).
+func (s *Service) Counts(ctx context.Context, userID, orgID uuid.UUID, f Filter) (Counts, error) {
+	if _, err := s.auth.Authorize(ctx, userID, orgID, org.RoleTeacher); err != nil {
+		return Counts{}, err
+	}
+	if err := f.validate(); err != nil {
+		return Counts{}, err
+	}
+	c, err := query.New(s.pool).CountBooks(ctx, query.CountBooksParams{
+		OrgID: orgID, Shelf: optText(f.Shelf), Format: optText(f.Format), Level: optText(f.Level), Pattern: f.pattern(),
+	})
+	if err != nil {
+		return Counts{}, fmt.Errorf("count books: %w", err)
+	}
+	return c, nil
 }
 
 // Service implements catalog rules.
@@ -301,8 +354,8 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	if err != nil {
 		return Page{}, err
 	}
-	if f.Shelf != "" && !slices.Contains(Shelves, f.Shelf) {
-		return Page{}, &ValidationError{Fields: map[string]string{"shelf": "Rak tidak dikenal"}}
+	if err := f.validate(); err != nil {
+		return Page{}, err
 	}
 	limit := f.Limit
 	if limit < 1 || limit > maxLimit {
@@ -310,14 +363,8 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	}
 	params := query.ListBooksParams{
 		OrgID: orgID, UserID: userID, IncludeDrafts: f.Drafts && role.AtLeast(org.RoleTeacher),
-		RowLimit: int32(limit + 1),
-	}
-	if f.Shelf != "" {
-		params.Shelf = pgtype.Text{String: f.Shelf, Valid: true}
-	}
-	if q, ok := text(f.Query, 1, 100); ok {
-		pattern := "%" + likeEscape(q) + "%"
-		params.Pattern = pgtype.Text{String: pattern, Valid: true}
+		RowLimit: int32(limit + 1), Shelf: optText(f.Shelf), Format: optText(f.Format), Level: optText(f.Level),
+		Pattern: f.pattern(), Published: pgtype.Bool{Bool: f.Status == "published", Valid: f.Status != ""},
 	}
 	if f.Cursor != "" {
 		title, id, err := decodeCursor(f.Cursor)

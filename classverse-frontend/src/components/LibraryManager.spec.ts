@@ -16,20 +16,20 @@ afterEach(() => vi.restoreAllMocks())
 
 function setup() {
   const list = vi.spyOn(libraryApi, 'list').mockResolvedValue({ items: [draft], next_cursor: null })
-  vi.spyOn(fileApi, 'list').mockResolvedValue({
-    used_bytes: 0, quota_bytes: 1,
+  const files = vi.spyOn(fileApi, 'list').mockResolvedValue({
+    used_bytes: 0, quota_bytes: 1, total: 2,
     items: [
       { id: 'pdf1', name: 'tata.pdf', kind: 'pdf', content_type: 'application/pdf', size: 1, uploaded_by: 'u', created_at: '', position: 0 },
       { id: 'mp3', name: 'lagu.mp3', kind: 'audio', content_type: 'audio/mpeg', size: 1, uploaded_by: 'u', created_at: '', position: 0 },
     ],
   })
-  return { wrapper: mount(LibraryManager, { props: { orgId: 'o' } }), list }
+  return { wrapper: mount(LibraryManager, { props: { orgId: 'o' } }), list, files }
 }
 
 it('lists drafts for staff and offers only matching files for e-books', async () => {
-  const { wrapper, list } = setup()
+  const { wrapper, list, files } = setup()
   await flushPromises()
-  expect(list).toHaveBeenCalledWith('o', { drafts: true, cursor: null })
+  expect(list).toHaveBeenCalledWith('o', expect.objectContaining({ drafts: true, cursor: null, counts: true }))
   expect(wrapper.text()).toContain('Draf')
 
   await wrapper.get('.head button').trigger('click')
@@ -37,7 +37,9 @@ it('lists drafts for staff and offers only matching files for e-books', async ()
   await wrapper.get('select[id$="-f"]').setValue('ebook')
   await flushPromises()
   const options = wrapper.get('select[id$="-file"]').findAll('option').map((o) => o.text())
-  expect(options).toEqual(['Pilih file', 'tata.pdf'])
+  // The server filters by kind before paging, so every page holds only matching files.
+  expect(files).toHaveBeenLastCalledWith('o', 0, 'pdf')
+  expect(options[0]).toBe('Pilih file')
 })
 
 it('creates a published e-book without copies and shows field errors from the server', async () => {
@@ -70,7 +72,8 @@ it('edits and archives after confirmation', async () => {
   const { wrapper, list } = setup()
   await flushPromises()
   const update = vi.spyOn(libraryApi, 'update').mockResolvedValue({ ...draft, published: true })
-  await wrapper.findAll('article button')[0]!.trigger('click')
+  const button = (text: string) => wrapper.findAll('article button').find(b => b.text().startsWith(text))!
+  await button('Ubah').trigger('click')
   await flushPromises()
   expect((wrapper.get('input[id$="-t"]').element as HTMLInputElement).value).toBe('Atlas')
   await wrapper.get('form').trigger('submit')
@@ -79,7 +82,7 @@ it('edits and archives after confirmation', async () => {
 
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   const archive = vi.spyOn(libraryApi, 'archive').mockResolvedValue()
-  await wrapper.findAll('article button')[1]!.trigger('click')
+  await button('Arsipkan').trigger('click')
   await flushPromises()
   expect(archive).toHaveBeenCalledWith('o', 'b1')
   expect(list).toHaveBeenCalledTimes(3)
@@ -91,4 +94,16 @@ it('previews an e-book in the reader', async () => {
   await flushPromises()
   await wrapper.get('article button.btn-primary').trigger('click')
   expect(wrapper.get('.reader').text()).toBe('pdf1')
+})
+
+it('publishes a draft from its card and sends catalog filters to the server', async () => {
+  const { wrapper, list } = setup()
+  await flushPromises()
+  const update = vi.spyOn(libraryApi, 'update').mockResolvedValue({ ...draft, published: true })
+  await wrapper.findAll('article button').find(b => b.text().startsWith('Terbitkan'))!.trigger('click')
+  await flushPromises()
+  expect(update).toHaveBeenCalledWith('o', draft.id, expect.objectContaining({ published: true }))
+  await wrapper.get('.toolbar select').setValue('ebook')
+  await flushPromises()
+  expect(list).toHaveBeenLastCalledWith('o', expect.objectContaining({ format: 'ebook', counts: true }))
 })

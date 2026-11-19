@@ -195,16 +195,18 @@ WHERE org_id = $1
   AND map_key <> 'campus'
   AND ($2::text IS NULL OR building_key = $2)
   AND ($3::boolean OR building_key <> 'ruang-guru')
-  AND ($4::timestamptz IS NULL
-       OR (created_at, id) < ($4::timestamptz, $5::uuid))
+  AND ($4::text IS NULL OR name ILIKE $4)
+  AND ($5::timestamptz IS NULL
+       OR (created_at, id) < ($5::timestamptz, $6::uuid))
 ORDER BY created_at DESC, id DESC
-LIMIT $6
+LIMIT $7
 `
 
 type ListRoomsParams struct {
 	OrgID           uuid.UUID
 	BuildingKey     pgtype.Text
 	IncludeStaff    bool
+	Pattern         pgtype.Text
 	CursorCreatedAt pgtype.Timestamptz
 	CursorID        uuid.NullUUID
 	RowLimit        int32
@@ -217,6 +219,7 @@ func (q *Queries) ListRooms(ctx context.Context, arg ListRoomsParams) ([]Room, e
 		arg.OrgID,
 		arg.BuildingKey,
 		arg.IncludeStaff,
+		arg.Pattern,
 		arg.CursorCreatedAt,
 		arg.CursorID,
 		arg.RowLimit,

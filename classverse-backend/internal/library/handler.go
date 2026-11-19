@@ -152,7 +152,8 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	q := r.URL.Query()
-	f := Filter{Shelf: q.Get("shelf"), Query: q.Get("q"), Cursor: q.Get("cursor"), Drafts: q.Get("drafts") == "true"}
+	f := Filter{Shelf: q.Get("shelf"), Query: q.Get("q"), Cursor: q.Get("cursor"), Drafts: q.Get("drafts") == "true",
+		Format: q.Get("format"), Level: q.Get("level"), Status: q.Get("status")}
 	if raw := q.Get("limit"); raw != "" {
 		if f.Limit, err = strconv.Atoi(raw); err != nil || f.Limit < 1 || f.Limit > maxLimit {
 			return httpx.ValidationFailed(map[string]string{"limit": "Limit 1–50"})
@@ -170,7 +171,15 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	if page.NextCursor != "" {
 		next = &page.NextCursor
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": next})
+	body := map[string]any{"items": items, "next_cursor": next}
+	if q.Get("counts") == "true" {
+		c, err := h.svc.Counts(r.Context(), user, orgID, f)
+		if err != nil {
+			return err
+		}
+		body["counts"] = map[string]int32{"all": c.AllCount, "published": c.PublishedCount, "draft": c.DraftCount}
+	}
+	httpx.JSON(w, http.StatusOK, body)
 	return nil
 }
 

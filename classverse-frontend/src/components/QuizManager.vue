@@ -3,7 +3,8 @@ import ListPagination from './ListPagination.vue'
 import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { levels } from '@/api/modules'
-import { quizApi, shapes } from '@/api/quizzes'
+import { lastPage } from '@/api/page'
+import { quizApi, shapes, type QuizResult } from '@/api/quizzes'
 import type { Level, QuestionInput, Quiz, QuizInput, QuizQuestion } from '@/api/types'
 import { useAuthorLeave } from './useAuthorLeave'
 import QuizPlayer from './QuizPlayer.vue'
@@ -34,17 +35,37 @@ const search = ref('')
 const page = ref(1)
 const total = ref(0)
 const pageSize = 20
-const counts = ref({ all: 0, published: 0, draft: 0, archived: 0 })
+const counts = ref({ all: 0, published: 0, draft: 0, empty: 0 })
 const statusTabs = computed(() => [
  { key: 'all', label: 'Semua', count: counts.value.all },
  { key: 'published', label: 'Terbit', count: counts.value.published },
  { key: 'draft', label: 'Draf', count: counts.value.draft },
 ])
-const visible = computed(() => quizzes.value.filter(item => (!levelFilter.value || item.level === levelFilter.value) && (!buildingFilter.value || item.building_key === buildingFilter.value) && item.title.toLowerCase().includes(search.value.trim().toLowerCase()) && (!['draft', 'published'].includes(statusFilter.value) || item.published === (statusFilter.value === 'published'))))
+// Filters run on the server before paging.
+const visible = quizzes
 watch([statusFilter, levelFilter, buildingFilter, search], () => { page.value = 1; void load() })
 watch(page, () => { void load() })
 
 const unpublishable = computed(() => quizzes.value.filter(q => !q.published && !q.question_count))
+// Results: each participant's best finished score (the Rapor rule), paged by the server.
+const results = ref<QuizResult[]>([])
+const resultsTotal = ref(0)
+const resultsPage = ref(1)
+const resultsFor = ref<string | null>(null)
+async function loadResults() {
+  const quiz = resultsFor.value
+  if (!quiz) return
+  try {
+    const r = await quizApi.results(props.orgId, quiz, (resultsPage.value - 1) * pageSize)
+    if (resultsFor.value === quiz) { results.value = r.items; resultsTotal.value = r.total }
+  } catch (err) { error.value = errorMessage(err) }
+}
+watch(resultsPage, loadResults)
+function showResults(item: Quiz) {
+  resultsFor.value = item.id; results.value = []; resultsTotal.value = 0
+  if (resultsPage.value === 1) void loadResults(); else resultsPage.value = 1
+}
+const when = (v: string) => new Date(v).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })
 const active = computed(() => quizzes.value.find((item) => item.id === selected.value))
 const preview = ref(false)
 const history=ref<{id:string;revision:number}[]>([])
@@ -91,18 +112,13 @@ let listGeneration = 0
 async function load() {
  const generation = ++listGeneration
   try {
-    const result = await quizApi.list(props.orgId, { drafts: true, building_key: buildingFilter.value, level: levelFilter.value, search: search.value, status: statusFilter.value === 'all' ? '' : statusFilter.value, offset: (page.value - 1) * pageSize, limit: pageSize })
+    const result = await quizApi.list(props.orgId, { drafts: true, counts: true, building_key: buildingFilter.value, level: levelFilter.value, search: search.value, status: statusFilter.value === 'all' ? '' : statusFilter.value, offset: (page.value - 1) * pageSize, limit: pageSize })
     if (generation !== listGeneration) return
+    const last = lastPage(page.value, result)
+    if (last !== page.value) { page.value = last; return }
     quizzes.value = result.items
     total.value = result.total ?? result.items.length
-    const query = { drafts: true, building_key: buildingFilter.value, level: levelFilter.value, search: search.value, limit: 1 }
-    const [all, published, draft] = await Promise.all([
-      quizApi.list(props.orgId, query),
-      quizApi.list(props.orgId, { ...query, status: 'published' }),
-      quizApi.list(props.orgId, { ...query, status: 'draft' }),
-    ])
-    if (generation !== listGeneration) return
-    counts.value = { all: all.total ?? all.items.length, published: published.total ?? published.items.filter(i => i.published).length, draft: draft.total ?? draft.items.filter(i => !i.published).length, archived: 0 }
+    if (result.counts) counts.value = result.counts
   } catch (err) {
     error.value = errorMessage(err)
   }
@@ -215,9 +231,9 @@ onMounted(async () => {
       </div>
       <button v-if="!editing" type="button" class="btn-primary" :disabled="!choices.length" @click="edit()">+ Kuis baru</button>
     </header>
-    <div v-if="!selected && !editing && unpublishable.length" class="banner warn" role="note">
-      <strong>{{ unpublishable.length }} kuis belum bisa diterbitkan</strong>
-      <span>{{ unpublishable.map((q) => `“${q.title}”`).join(', ') }} belum punya soal. Kuis butuh minimal 1 soal sebelum diterbitkan.</span>
+    <div v-if="!selected && !editing && counts.empty" class="banner warn" role="note">
+      <strong>{{ counts.empty }} kuis belum punya soal</strong>
+      <span><template v-if="unpublishable.length">Di halaman ini: {{ unpublishable.map((q) => `“${q.title}”`).join(', ') }}. </template>Kuis butuh minimal 1 soal sebelum diterbitkan.</span>
     </div>
     <p v-if="message" class="notice" role="status">{{ message }}</p>
     <p v-if="error" class="alert" role="alert">{{ error }} {{ !editing ? fields.questions : '' }}</p>
@@ -250,18 +266,20 @@ onMounted(async () => {
       </div>
       <label :for="`${id}-search`" class="sr">Cari kuis</label>
       <input :id="`${id}-search`" v-model="search" type="search" class="search" placeholder="Cari kuis…" />
-      <p v-if="!visible.length" class="empty">{{ quizzes.length ? 'Tidak ada kuis yang cocok dengan filter ini.' : 'Belum ada kuis. Buat kuis pertama.' }}</p>
+      <p v-if="!visible.length" class="empty">{{ counts.all ? 'Tidak ada kuis yang cocok dengan filter ini.' : 'Belum ada kuis. Buat kuis pertama.' }}</p>
       <div v-else class="table-wrap">
         <table :id="`${id}-table`" class="data-table">
-          <thead><tr><th scope="col">Kuis</th><th scope="col">Soal</th><th scope="col">Nilai lulus</th><th scope="col">Status</th><th scope="col"><span class="sr">Aksi</span></th></tr></thead>
+          <thead><tr><th scope="col">Kuis</th><th scope="col">Soal</th><th scope="col">Nilai lulus</th><th scope="col">Modul</th><th scope="col">Status</th><th scope="col"><span class="sr">Aksi</span></th></tr></thead>
           <tbody>
             <tr v-for="item in visible" :key="item.id" class="catalog-row">
               <th scope="row"><strong>{{ item.title }}</strong><small>{{ buildingName(item.building_key) }} · {{ item.level }}</small></th>
               <td :class="{ danger: !item.question_count }">{{ item.question_count }} soal</td>
               <td>{{ item.pass_score }}</td>
+              <td><small>{{ item.module_titles?.length ? item.module_titles.join(', ') : 'Belum dipakai modul' }}</small></td>
               <td><span :class="['chip', item.published ? 'ok' : 'draft']">{{ item.published ? 'Terbit' : 'Draf' }}</span></td>
               <td class="row-actions">
                 <button type="button" :class="item.published || item.question_count ? 'btn-secondary' : 'btn-primary'" :aria-label="`${item.published ? 'Buka' : item.question_count ? 'Edit soal' : 'Tambah soal'} ${item.title}`" @click="openItem(item)">{{ item.published ? 'Buka' : item.question_count ? 'Edit soal' : '+ Tambah soal' }}</button>
+                <button v-if="item.published" type="button" class="btn-secondary" :aria-label="`Lihat hasil ${item.title}`" @click="showResults(item)">Lihat hasil</button>
               </td>
             </tr>
           </tbody>
@@ -270,6 +288,21 @@ onMounted(async () => {
       <p class="hint">Kuis dengan 1–2 soal kurang akurat untuk rapor. Disarankan minimal 5 soal.</p>
     </div>
     <ListPagination v-if="!selected && !editing" v-model="page" :total="total" :size="pageSize" label="Halaman kuis" />
+    <section v-if="resultsFor && !selected && !editing" class="results" :aria-labelledby="`${id}-results`">
+      <header class="editor-head">
+        <h3 :id="`${id}-results`">Hasil: {{ quizzes.find(q => q.id === resultsFor)?.title ?? 'kuis' }}</h3>
+        <button type="button" class="btn-secondary" @click="resultsFor = null">Tutup hasil</button>
+      </header>
+      <p class="hint">Nilai tertinggi tiap siswa dari percobaan yang selesai, sama dengan Rapor.</p>
+      <p v-if="!results.length" class="empty">Belum ada siswa yang menyelesaikan kuis ini.</p>
+      <div v-else class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th scope="col">Siswa</th><th scope="col">Nilai tertinggi</th><th scope="col">Percobaan</th><th scope="col">Terakhir selesai</th></tr></thead>
+          <tbody><tr v-for="r in results" :key="r.user_id"><th scope="row">{{ r.display_name }}</th><td>{{ r.best_score }}</td><td>{{ r.attempts }}</td><td>{{ when(r.last_finished_at) }}</td></tr></tbody>
+        </table>
+      </div>
+      <ListPagination v-model="resultsPage" :total="resultsTotal" :size="pageSize" label="Halaman hasil kuis" />
+    </section>
     <form v-if="editing" class="form" novalidate @submit.prevent="save">
       <h3 class="form-title">{{ editing === 'new' ? 'Kuis baru' : 'Ubah kuis' }}</h3>
       <div class="grid">

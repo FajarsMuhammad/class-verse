@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { hasMore } from '@/api/page'
 import PagedSelect from './PagedSelect.vue'
 import RemotePagination from './RemotePagination.vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { assignmentApi, deadline, type Assignment, type AssignmentRecipient, type AssignmentInput } from '@/api/assignments'
 import { classApi, type AcademicYear, type SchoolClass } from '@/api/classes'
 import { moduleApi } from '@/api/modules'
@@ -19,7 +20,9 @@ const panel = ref<HTMLElement | null>(null)
 const newButton = ref<HTMLButtonElement | null>(null)
 const search = ref('')
 const classFilter = ref('')
-const visibleTasks = computed(() => tasks.value.filter(a => (!classFilter.value || a.class_name === classFilter.value) && a.title.toLowerCase().includes(search.value.trim().toLowerCase())))
+// Search and the class filter run on the server before paging.
+const visibleTasks = tasks
+const moreTasks = ref(false)
 const pageNumber = ref(1)
 function movePage(delta: number) { pageNumber.value += delta; void load() }
 watch([search, classFilter], () => { pageNumber.value = 1; void load() })
@@ -36,28 +39,29 @@ onBeforeUnmount(() => { generation++ })
 async function classFilterOptions(offset: number) {
  if (!year.value) return { items: [], more: false }
  const result = await classApi.classes(props.orgId, year.value, offset)
- return { items: result.items.map(c => ({ value: c.name, label: c.name })), more: result.items.length === 20 }
+ return { items: result.items.map(c => ({ value: c.id, label: c.name })), more: hasMore(offset, result) }
 }
 async function classOptions(offset: number) {
  if (!year.value) return { items: [], more: false }
  const result = await classApi.classes(props.orgId, year.value, offset)
- return { items: result.items.map(c => ({ value: c.id, label: `${c.name} · ${c.students} siswa${!c.students ? ' · Belum bisa ditugaskan' : ''}`, disabled: !c.students })), more: result.items.length === 20 }
+ return { items: result.items.map(c => ({ value: c.id, label: `${c.name} · ${c.students} siswa${!c.students ? ' · Belum bisa ditugaskan' : ''}`, disabled: !c.students })), more: hasMore(offset, result) }
 }
 async function moduleOptions(offset: number) {
- const result = await moduleApi.list(props.orgId, { limit: 20, offset })
- return { items: result.items.filter(m => m.published && m.steps.length > 0).map(m => ({ value: m.id, label: `${m.title} · ${m.level}` })), more: offset + 20 < (result.total ?? (result.items.length === 20 ? offset + 21 : offset)) }
+ const result = await moduleApi.list(props.orgId, { status: 'published', limit: 20, offset })
+ // Published only (server filter); a module without steps stays visible but disabled so no page is emptied.
+ return { items: result.items.map(m => ({ value: m.id, label: `${m.title} · ${m.level}${m.steps.length ? '' : ' · Belum ada langkah'}`, disabled: !m.steps.length })), more: hasMore(offset, result) }
 }
 async function yearOptions(offset: number) {
  const result = await classApi.years(props.orgId, offset)
  years.value = [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
- return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: result.items.length === 20 }
+ return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: hasMore(offset, result) }
 }
 async function load() {
   const g = ++generation; busy.value = true; error.value = ''
   try {
     const [y, a] = await Promise.all([classApi.years(props.orgId), assignmentApi.list(props.orgId, (pageNumber.value - 1) * 20, search.value.trim(), classFilter.value)])
     if (g !== generation) return
-    years.value = y.items; tasks.value = a.items
+    years.value = y.items; tasks.value = a.items; moreTasks.value = hasMore((pageNumber.value - 1) * 20, a)
     year.value = year.value || y.items.find(y => y.active)?.id || y.items[0]?.id || ''
     if (year.value) {
       const c = await classApi.classes(props.orgId, year.value, 0)
@@ -67,7 +71,7 @@ async function load() {
   finally { if (g === generation) busy.value = false }
 }
 async function changeYear() {
-  classID.value = ''; classes.value = []; busy.value = true; error.value = ''
+  classID.value = ''; classFilter.value = ''; classes.value = []; busy.value = true; error.value = ''
   const g = ++generation
   try { const result = await classApi.classes(props.orgId, year.value, 0); if (g === generation) classes.value = result.items }
   catch (e) { if (g === generation) error.value = errorMessage(e) }
@@ -128,15 +132,20 @@ onMounted(() => {
     <div class="task-layout" :class="{ 'with-panel': panelOpen }">
     <div class="task-list">
       <div class="toolbar">
-        <PagedSelect v-model="classFilter" label="Filter kelas" placeholder="Semua kelas" :key="`filter-${year}`" :load="classFilterOptions" />
+        <PagedSelect v-model="classFilter" :label="`Filter kelas ${years.find(y => y.id === year)?.label ?? ''}`.trim()" placeholder="Semua kelas" :key="`filter-${year}`" :load="classFilterOptions" />
         <label>Cari tugas <input v-model="search" type="search" placeholder="Cari tugas…" /></label>
       </div>
       <ul class="tasks"><li v-for="a in visibleTasks" :key="a.id">
         <strong>{{ a.title }}</strong><p>{{ a.class_name }} · {{ a.year_label }} · {{ deadline(a.due_at) }} {{ a.cancelled ? '· Dibatalkan' : '' }}</p>
+        <template v-if="a.recipients">
+          <progress :value="a.finished ?? 0" :max="a.recipients" :aria-label="`Siswa selesai ${a.title}`" />
+          <p class="counts">{{ a.finished }} selesai · {{ (a.started ?? 0) - (a.finished ?? 0) }} sedang · {{ a.recipients - (a.started ?? 0) }} belum mulai</p>
+        </template>
+        <p v-else class="counts">Tidak ada penerima.</p>
         <div class="actions"><button type="button" :disabled="busy" @click="progress(a)">Progres siswa</button><button v-if="!a.cancelled" type="button" :disabled="busy" @click="cancel(a)">Batalkan tugas</button></div>
       </li></ul>
-      <RemotePagination :page="pageNumber" :more="tasks.length === 20" @move="movePage" />
-      <div v-if="!visibleTasks.length && !busy" class="empty"><h3>{{ tasks.length ? 'Tidak ada tugas yang cocok' : 'Belum ada tugas' }}</h3><p>Tugas muncul di panel “Tugas kelas” siswa. Progres dihitung per langkah modul dan dapat dipantau di sini.</p></div>
+      <RemotePagination v-if="pageNumber > 1 || moreTasks" :page="pageNumber" :more="moreTasks" :busy="busy" @move="movePage" />
+      <div v-if="!visibleTasks.length && !busy" class="empty"><h3>{{ search || classFilter ? 'Tidak ada tugas yang cocok' : 'Belum ada tugas' }}</h3><p>Tugas muncul di panel “Tugas kelas” siswa. Progres dihitung per langkah modul dan dapat dipantau di sini.</p></div>
       <section v-if="rosterTitle" aria-live="polite"><h3>Progres: {{ rosterTitle }}</h3><ul><li v-for="r in roster" :key="r.user_id">{{ r.display_name }} · {{ r.done }}/{{ r.total }} selesai</li></ul></section>
     </div>
     <aside v-if="panelOpen" ref="panel" tabindex="-1" class="task-panel" aria-labelledby="new-task-heading" @keydown.esc="closePanel">
@@ -173,6 +182,8 @@ onMounted(() => {
 .task-panel { box-sizing: border-box; }
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .tasks { padding: 0; list-style: none; }
+.tasks progress { width: 100%; height: 8px; accent-color: var(--kv-primary); }
+.counts { margin: var(--space-1) 0 0; color: var(--kv-text-muted); font-size: var(--text-sm); }
 .tasks > li { padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); background: var(--kv-surface); }
 .empty { padding: var(--space-6); border: 1px solid var(--kv-line); border-radius: var(--radius-2xl); text-align: center; background: var(--kv-surface); color: var(--kv-text-muted); }
 .freeze-notice { background: var(--kv-primary-soft); color: var(--kv-primary-soft-text); padding: var(--space-4); border-radius: var(--radius-lg); margin-block: var(--space-4); }

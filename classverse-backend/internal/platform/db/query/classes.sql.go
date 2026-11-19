@@ -542,7 +542,10 @@ func (q *Queries) GetMemberRoleForUpdate(ctx context.Context, arg GetMemberRoleF
 }
 
 const listAcademicYears = `-- name: ListAcademicYears :many
-SELECT id, org_id, label, active, created_at FROM academic_years WHERE org_id = $1 ORDER BY active DESC, label DESC, id LIMIT $3::integer OFFSET $2::integer
+SELECT y.id, y.org_id, y.label, y.active, y.created_at, count(*) OVER()::integer AS total_count,
+  (SELECT count(*) FROM classes c WHERE c.academic_year_id = y.id AND c.archived_at IS NULL)::integer AS class_count,
+  (SELECT count(*) FROM class_enrollments e WHERE e.academic_year_id = y.id AND e.ended_at IS NULL)::integer AS student_count
+FROM academic_years y WHERE y.org_id = $1 ORDER BY y.active DESC, y.label DESC, y.id LIMIT $3::integer OFFSET $2::integer
 `
 
 type ListAcademicYearsParams struct {
@@ -551,21 +554,35 @@ type ListAcademicYearsParams struct {
 	PageLimit  pgtype.Int4
 }
 
-func (q *Queries) ListAcademicYears(ctx context.Context, arg ListAcademicYearsParams) ([]AcademicYear, error) {
+type ListAcademicYearsRow struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	Label        string
+	Active       bool
+	CreatedAt    pgtype.Timestamptz
+	TotalCount   int32
+	ClassCount   int32
+	StudentCount int32
+}
+
+func (q *Queries) ListAcademicYears(ctx context.Context, arg ListAcademicYearsParams) ([]ListAcademicYearsRow, error) {
 	rows, err := q.db.Query(ctx, listAcademicYears, arg.OrgID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AcademicYear{}
+	items := []ListAcademicYearsRow{}
 	for rows.Next() {
-		var i AcademicYear
+		var i ListAcademicYearsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrgID,
 			&i.Label,
 			&i.Active,
 			&i.CreatedAt,
+			&i.TotalCount,
+			&i.ClassCount,
+			&i.StudentCount,
 		); err != nil {
 			return nil, err
 		}
@@ -622,7 +639,7 @@ func (q *Queries) ListClassTeachers(ctx context.Context, arg ListClassTeachersPa
 }
 
 const listClasses = `-- name: ListClasses :many
-SELECT c.id, c.academic_year_id, c.name,
+SELECT c.id, c.academic_year_id, c.name, count(*) OVER()::integer AS total_count,
   (SELECT count(*) FROM class_enrollments e WHERE e.class_id = c.id AND e.ended_at IS NULL)::integer AS students,
   (SELECT count(*) FROM class_teachers t WHERE t.class_id = c.id AND t.role = 'subject' AND t.ended_at IS NULL)::integer AS subject_teachers,
   h.user_id AS homeroom_id, hu.display_name AS homeroom_name, mine.role AS my_role
@@ -650,6 +667,7 @@ type ListClassesRow struct {
 	ID              uuid.UUID
 	AcademicYearID  uuid.UUID
 	Name            string
+	TotalCount      int32
 	Students        int32
 	SubjectTeachers int32
 	HomeroomID      uuid.NullUUID
@@ -679,6 +697,7 @@ func (q *Queries) ListClasses(ctx context.Context, arg ListClassesParams) ([]Lis
 			&i.ID,
 			&i.AcademicYearID,
 			&i.Name,
+			&i.TotalCount,
 			&i.Students,
 			&i.SubjectTeachers,
 			&i.HomeroomID,
@@ -696,7 +715,14 @@ func (q *Queries) ListClasses(ctx context.Context, arg ListClassesParams) ([]Lis
 }
 
 const listRoster = `-- name: ListRoster :many
-SELECT u.id AS user_id, u.display_name, u.avatar_key, e.class_id
+SELECT u.id AS user_id, u.display_name, u.avatar_key, e.class_id,
+  (SELECT count(*) FROM assignment_progress p JOIN assignments a ON a.org_id = p.org_id AND a.id = p.assignment_id
+    JOIN classes ac ON ac.org_id = a.org_id AND ac.id = a.class_id
+    WHERE p.org_id = m.org_id AND p.user_id = m.user_id AND a.cancelled_at IS NULL AND ac.academic_year_id = $1)::integer AS steps_done,
+  (SELECT count(*) FROM assignment_recipients r JOIN assignments a ON a.org_id = r.org_id AND a.id = r.assignment_id
+    JOIN classes ac ON ac.org_id = a.org_id AND ac.id = a.class_id
+    JOIN assignment_steps st ON st.assignment_id = a.id
+    WHERE r.org_id = m.org_id AND r.user_id = m.user_id AND a.cancelled_at IS NULL AND ac.academic_year_id = $1)::integer AS steps_total
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 LEFT JOIN class_enrollments e ON e.org_id = m.org_id AND e.user_id = m.user_id
@@ -724,6 +750,8 @@ type ListRosterRow struct {
 	DisplayName string
 	AvatarKey   string
 	ClassID     uuid.NullUUID
+	StepsDone   int32
+	StepsTotal  int32
 }
 
 // One page of the school's participants with their active class in the year (NULL: no class yet).
@@ -750,6 +778,8 @@ func (q *Queries) ListRoster(ctx context.Context, arg ListRosterParams) ([]ListR
 			&i.DisplayName,
 			&i.AvatarKey,
 			&i.ClassID,
+			&i.StepsDone,
+			&i.StepsTotal,
 		); err != nil {
 			return nil, err
 		}
@@ -762,7 +792,7 @@ func (q *Queries) ListRoster(ctx context.Context, arg ListRosterParams) ([]ListR
 }
 
 const listStaff = `-- name: ListStaff :many
-SELECT u.id AS user_id, u.display_name, m.role
+SELECT u.id AS user_id, u.display_name, m.role, count(*) OVER()::integer AS total_count
 FROM memberships m JOIN users u ON u.id = m.user_id
 WHERE m.org_id = $1 AND m.role IN ('teacher', 'admin')
 ORDER BY lower(u.display_name), u.id LIMIT $3::integer OFFSET $2::integer
@@ -778,6 +808,7 @@ type ListStaffRow struct {
 	UserID      uuid.UUID
 	DisplayName string
 	Role        OrgRole
+	TotalCount  int32
 }
 
 // Teachers and admins of the school: candidates for wali kelas and guru mapel.
@@ -790,7 +821,12 @@ func (q *Queries) ListStaff(ctx context.Context, arg ListStaffParams) ([]ListSta
 	items := []ListStaffRow{}
 	for rows.Next() {
 		var i ListStaffRow
-		if err := rows.Scan(&i.UserID, &i.DisplayName, &i.Role); err != nil {
+		if err := rows.Scan(
+			&i.UserID,
+			&i.DisplayName,
+			&i.Role,
+			&i.TotalCount,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

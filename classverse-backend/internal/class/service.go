@@ -51,9 +51,12 @@ type Authorizer interface {
 
 // Year is an academic year of a school.
 type Year struct {
-	ID     uuid.UUID
-	Label  string
-	Active bool
+	ID           uuid.UUID
+	Label        string
+	Active       bool
+	ClassCount   int32
+	StudentCount int32
+	TotalCount   int32 // years in the school; set by Years only
 }
 
 // Class is an active class with its number of placed students and teachers.
@@ -65,6 +68,7 @@ type Class struct {
 	SubjectTeachers int32
 	Homeroom        *Person // nil: no wali kelas
 	MyRole          string  // caller's role in the class: "homeroom", "subject" or ""
+	TotalCount      int32   // classes matching the list filter; set by ClassesFiltered only
 }
 
 // Person is a member shown by name.
@@ -83,9 +87,10 @@ type Teacher struct {
 
 // StaffMember is a teacher/admin of the school.
 type StaffMember struct {
-	UserID uuid.UUID
-	Name   string
-	Role   string
+	UserID     uuid.UUID
+	Name       string
+	Role       string
+	TotalCount int32
 }
 
 // RosterFilter narrows a roster page. ClassID and Unplaced are exclusive.
@@ -133,6 +138,8 @@ type RosterEntry struct {
 	DisplayName string
 	AvatarKey   string
 	ClassID     *uuid.UUID
+	StepsDone   int32 // finished steps of the year's active tasks
+	StepsTotal  int32
 }
 
 // Placement is one row of a student's class history.
@@ -214,7 +221,7 @@ func year(ctx context.Context, q *query.Queries, orgID, id uuid.UUID) (query.Aca
 }
 
 func classRow(c query.ListClassesRow) Class {
-	out := Class{ID: c.ID, YearID: c.AcademicYearID, Name: c.Name, Students: c.Students, SubjectTeachers: c.SubjectTeachers}
+	out := Class{ID: c.ID, YearID: c.AcademicYearID, Name: c.Name, Students: c.Students, SubjectTeachers: c.SubjectTeachers, TotalCount: c.TotalCount}
 	if c.HomeroomID.Valid {
 		out.Homeroom = &Person{ID: c.HomeroomID.UUID, Name: c.HomeroomName.String}
 	}
@@ -266,7 +273,7 @@ func (s *Service) Years(ctx context.Context, userID, orgID uuid.UUID, page ...in
 	}
 	out := make([]Year, len(rows))
 	for i, y := range rows {
-		out[i] = Year{ID: y.ID, Label: y.Label, Active: y.Active}
+		out[i] = Year{ID: y.ID, Label: y.Label, Active: y.Active, ClassCount: y.ClassCount, StudentCount: y.StudentCount, TotalCount: y.TotalCount}
 	}
 	return out, nil
 }
@@ -464,7 +471,7 @@ func (s *Service) Roster(ctx context.Context, userID, orgID, yearID uuid.UUID, f
 	}
 	out := make([]RosterEntry, len(rows))
 	for i, r := range rows {
-		out[i] = RosterEntry{UserID: r.UserID, DisplayName: r.DisplayName, AvatarKey: r.AvatarKey}
+		out[i] = RosterEntry{UserID: r.UserID, DisplayName: r.DisplayName, AvatarKey: r.AvatarKey, StepsDone: r.StepsDone, StepsTotal: r.StepsTotal}
 		if r.ClassID.Valid {
 			id := r.ClassID.UUID
 			out[i].ClassID = &id
@@ -656,7 +663,7 @@ func (s *Service) Staff(ctx context.Context, userID, orgID uuid.UUID, page ...in
 	}
 	out := make([]StaffMember, len(rows))
 	for i, r := range rows {
-		out[i] = StaffMember{UserID: r.UserID, Name: r.DisplayName, Role: string(r.Role)}
+		out[i] = StaffMember{UserID: r.UserID, Name: r.DisplayName, Role: string(r.Role), TotalCount: r.TotalCount}
 	}
 	return out, nil
 }

@@ -654,6 +654,87 @@ func (e SetClassTeacherJSONBodyRole) Valid() bool {
 	}
 }
 
+// Defines values for ListFilesParamsKind.
+const (
+	ListFilesParamsKindAudio ListFilesParamsKind = "audio"
+	ListFilesParamsKindPdf   ListFilesParamsKind = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the ListFilesParamsKind enum.
+func (e ListFilesParamsKind) Valid() bool {
+	switch e {
+	case ListFilesParamsKindAudio:
+		return true
+	case ListFilesParamsKindPdf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBooksParamsFormat.
+const (
+	ListBooksParamsFormatAudio ListBooksParamsFormat = "audio"
+	ListBooksParamsFormatBuku  ListBooksParamsFormat = "buku"
+	ListBooksParamsFormatEbook ListBooksParamsFormat = "ebook"
+)
+
+// Valid indicates whether the value is a known member of the ListBooksParamsFormat enum.
+func (e ListBooksParamsFormat) Valid() bool {
+	switch e {
+	case ListBooksParamsFormatAudio:
+		return true
+	case ListBooksParamsFormatBuku:
+		return true
+	case ListBooksParamsFormatEbook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBooksParamsLevel.
+const (
+	ListBooksParamsLevelSD   ListBooksParamsLevel = "SD"
+	ListBooksParamsLevelSMA  ListBooksParamsLevel = "SMA"
+	ListBooksParamsLevelSMP  ListBooksParamsLevel = "SMP"
+	ListBooksParamsLevelUmum ListBooksParamsLevel = "Umum"
+)
+
+// Valid indicates whether the value is a known member of the ListBooksParamsLevel enum.
+func (e ListBooksParamsLevel) Valid() bool {
+	switch e {
+	case ListBooksParamsLevelSD:
+		return true
+	case ListBooksParamsLevelSMA:
+		return true
+	case ListBooksParamsLevelSMP:
+		return true
+	case ListBooksParamsLevelUmum:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBooksParamsStatus.
+const (
+	ListBooksParamsStatusDraft     ListBooksParamsStatus = "draft"
+	ListBooksParamsStatusPublished ListBooksParamsStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the ListBooksParamsStatus enum.
+func (e ListBooksParamsStatus) Valid() bool {
+	switch e {
+	case ListBooksParamsStatusDraft:
+		return true
+	case ListBooksParamsStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListModulesParamsStatus.
 const (
 	ListModulesParamsStatusDraft     ListModulesParamsStatus = "draft"
@@ -728,11 +809,15 @@ func (e DecideGuestRequestJSONBodyDecision) Valid() bool {
 
 // AcademicYear defines model for AcademicYear.
 type AcademicYear struct {
-	Active bool               `json:"active"`
-	Id     openapi_types.UUID `json:"id"`
+	Active     bool               `json:"active"`
+	ClassCount *int               `json:"class_count,omitempty"`
+	Id         openapi_types.UUID `json:"id"`
 
 	// Label Example: 2026/2027
 	Label string `json:"label"`
+
+	// StudentCount Penempatan siswa aktif di tahun ini
+	StudentCount *int `json:"student_count,omitempty"`
 }
 
 // AccessTokenResponse defines model for AccessTokenResponse.
@@ -742,16 +827,25 @@ type AccessTokenResponse struct {
 
 // Assignment defines model for Assignment.
 type Assignment struct {
-	BuildingKey string             `json:"building_key"`
-	Cancelled   bool               `json:"cancelled"`
-	ClassName   string             `json:"class_name"`
-	Done        int                `json:"done"`
-	DueAt       *time.Time         `json:"due_at"`
-	Id          openapi_types.UUID `json:"id"`
-	Level       Level              `json:"level"`
-	Title       string             `json:"title"`
-	Total       int                `json:"total"`
-	YearLabel   string             `json:"year_label"`
+	BuildingKey string     `json:"building_key"`
+	Cancelled   bool       `json:"cancelled"`
+	ClassName   string     `json:"class_name"`
+	Done        int        `json:"done"`
+	DueAt       *time.Time `json:"due_at"`
+
+	// Finished Staf saja: penerima yang menyelesaikan semua langkah
+	Finished *int               `json:"finished,omitempty"`
+	Id       openapi_types.UUID `json:"id"`
+	Level    Level              `json:"level"`
+
+	// Recipients Staf saja (0 untuk peserta): jumlah penerima beku
+	Recipients *int `json:"recipients,omitempty"`
+
+	// Started Staf saja: penerima yang menyelesaikan minimal satu langkah
+	Started   *int   `json:"started,omitempty"`
+	Title     string `json:"title"`
+	Total     int    `json:"total"`
+	YearLabel string `json:"year_label"`
 }
 
 // AssignmentInput defines model for AssignmentInput.
@@ -862,6 +956,11 @@ type BookInputLevel string
 
 // BookList defines model for BookList.
 type BookList struct {
+	Counts *struct {
+		All       int `json:"all"`
+		Draft     int `json:"draft"`
+		Published int `json:"published"`
+	} `json:"counts,omitempty"`
 	Items      []Book  `json:"items"`
 	NextCursor *string `json:"next_cursor"`
 }
@@ -959,6 +1058,9 @@ type FileItem struct {
 	Position    int                 `json:"position"`
 	Size        int64               `json:"size"`
 	UploadedBy  openapi_types.UUID  `json:"uploaded_by"`
+
+	// UsedBy Maks 3 judul buku/modul/tugas aktif yang memakai file; tidak kosong berarti tidak bisa dihapus
+	UsedBy *[]string `json:"used_by,omitempty"`
 }
 
 // FileItemContentType defines model for FileItem.ContentType.
@@ -971,6 +1073,7 @@ type FileItemKind string
 type FileList struct {
 	Items      []FileItem `json:"items"`
 	QuotaBytes int64      `json:"quota_bytes"`
+	Total      int        `json:"total"`
 	UsedBytes  int64      `json:"used_bytes"`
 }
 
@@ -1213,7 +1316,15 @@ type ModuleInput struct {
 
 // ModuleList defines model for ModuleList.
 type ModuleList struct {
+	// Counts Hanya bila counts=true (pengajar/admin)
+	Counts *struct {
+		All       *int `json:"all,omitempty"`
+		Archived  *int `json:"archived,omitempty"`
+		Draft     *int `json:"draft,omitempty"`
+		Published *int `json:"published,omitempty"`
+	} `json:"counts,omitempty"`
 	Items []Module `json:"items"`
+	Total int      `json:"total"`
 }
 
 // ModuleResume defines model for ModuleResume.
@@ -1316,12 +1427,15 @@ type Quiz struct {
 	Attempts int `json:"attempts"`
 
 	// BestScore Nilai tertinggi pemanggil; null jika belum pernah selesai
-	BestScore           *int                `json:"best_score"`
-	BuildingKey         string              `json:"building_key"`
-	Description         string              `json:"description"`
-	DraftVersion        *int64              `json:"draft_version,omitempty"`
-	Id                  openapi_types.UUID  `json:"id"`
-	Level               Level               `json:"level"`
+	BestScore    *int               `json:"best_score"`
+	BuildingKey  string             `json:"building_key"`
+	Description  string             `json:"description"`
+	DraftVersion *int64             `json:"draft_version,omitempty"`
+	Id           openapi_types.UUID `json:"id"`
+	Level        Level              `json:"level"`
+
+	// ModuleTitles Pengajar/admin dengan drafts=true: maks 3 modul aktif yang memakai kuis ini
+	ModuleTitles        *[]string           `json:"module_titles,omitempty"`
 	PassScore           int                 `json:"pass_score"`
 	Published           bool                `json:"published"`
 	PublishedRevisionId *openapi_types.UUID `json:"published_revision_id,omitempty"`
@@ -1365,7 +1479,17 @@ type QuizInput struct {
 
 // QuizList defines model for QuizList.
 type QuizList struct {
+	// Counts Hanya bila counts=true (pengajar/admin)
+	Counts *struct {
+		All   *int `json:"all,omitempty"`
+		Draft *int `json:"draft,omitempty"`
+
+		// Empty Kuis tanpa soal
+		Empty     *int `json:"empty,omitempty"`
+		Published *int `json:"published,omitempty"`
+	} `json:"counts,omitempty"`
 	Items []Quiz `json:"items"`
+	Total int    `json:"total"`
 }
 
 // QuizQuestion defines model for QuizQuestion.
@@ -1471,7 +1595,11 @@ type RosterEntry struct {
 	// ClassId Null = belum ditempatkan
 	ClassId     *openapi_types.UUID `json:"class_id"`
 	DisplayName string              `json:"display_name"`
-	UserId      openapi_types.UUID  `json:"user_id"`
+
+	// StepsDone Langkah tugas aktif tahun ini yang selesai
+	StepsDone  *int               `json:"steps_done,omitempty"`
+	StepsTotal *int               `json:"steps_total,omitempty"`
+	UserId     openapi_types.UUID `json:"user_id"`
 }
 
 // SchoolClass defines model for SchoolClass.
@@ -1732,8 +1860,8 @@ type ListAssignmentsParams struct {
 	// Search Cari nama sebelum pagination.
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
 
-	// ClassName Nama kelas pada snapshot tugas.
-	ClassName *string `form:"class_name,omitempty" json:"class_name,omitempty"`
+	// ClassId Kelas penerima tugas.
+	ClassId *openapi_types.UUID `form:"class_id,omitempty" json:"class_id,omitempty"`
 }
 
 // SetClassTeacherJSONBody defines parameters for SetClassTeacher.
@@ -1752,7 +1880,13 @@ type ListFilesParams struct {
 	// Limit Ukuran halaman; default 20.
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Kind Filter jenis sebelum pagination.
+	Kind *ListFilesParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
 }
+
+// ListFilesParamsKind defines parameters for ListFiles.
+type ListFilesParamsKind string
 
 // GetFileContentParams defines parameters for GetFileContent.
 type GetFileContentParams struct {
@@ -1814,11 +1948,28 @@ type ListBooksParams struct {
 	Shelf *Shelf `form:"shelf,omitempty" json:"shelf,omitempty"`
 
 	// Q Cari judul/penulis, teks literal
-	Q      *string `form:"q,omitempty" json:"q,omitempty"`
-	Drafts *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+	Q      *string                `form:"q,omitempty" json:"q,omitempty"`
+	Drafts *bool                  `form:"drafts,omitempty" json:"drafts,omitempty"`
+	Format *ListBooksParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+	Level  *ListBooksParamsLevel  `form:"level,omitempty" json:"level,omitempty"`
+
+	// Status draft hanya berlaku untuk pengajar/admin dengan drafts=true
+	Status *ListBooksParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Counts Pengajar/admin: sertakan hitungan tab untuk filter non-status
+	Counts *bool   `form:"counts,omitempty" json:"counts,omitempty"`
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
+
+// ListBooksParamsFormat defines parameters for ListBooks.
+type ListBooksParamsFormat string
+
+// ListBooksParamsLevel defines parameters for ListBooks.
+type ListBooksParamsLevel string
+
+// ListBooksParamsStatus defines parameters for ListBooks.
+type ListBooksParamsStatus string
 
 // ListModerationLogParams defines parameters for ListModerationLog.
 type ListModerationLogParams struct {
@@ -1841,6 +1992,9 @@ type ListModulesParams struct {
 
 	// ModuleId Ambil satu modul untuk pin/detail tanpa memuat daftar.
 	ModuleId *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
+
+	// Counts Pengajar/admin: sertakan hitungan tab untuk filter non-status.
+	Counts *bool `form:"counts,omitempty" json:"counts,omitempty"`
 }
 
 // ListModulesParamsStatus defines parameters for ListModules.
@@ -1862,6 +2016,9 @@ type ListQuizzesParams struct {
 	Limit  *int                     `form:"limit,omitempty" json:"limit,omitempty"`
 	Search *string                  `form:"search,omitempty" json:"search,omitempty"`
 	Status *ListQuizzesParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Counts Pengajar/admin: sertakan hitungan tab untuk filter non-status.
+	Counts *bool `form:"counts,omitempty" json:"counts,omitempty"`
 }
 
 // ListQuizzesParamsStatus defines parameters for ListQuizzes.
@@ -1883,6 +2040,13 @@ type ReorderQuizQuestionsJSONBody struct {
 	QuestionIds []openapi_types.UUID `json:"question_ids"`
 }
 
+// ListQuizResultsParams defines parameters for ListQuizResults.
+type ListQuizResultsParams struct {
+	// Limit Ukuran halaman; default 20.
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // ListReportsParams defines parameters for ListReports.
 type ListReportsParams struct {
 	Status *ReportStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -1895,6 +2059,16 @@ type ListRoomsParams struct {
 	Building *string `form:"building,omitempty" json:"building,omitempty"`
 	Limit    *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Cursor   *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Q Cari nama ruang, teks literal
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ListStaffParams defines parameters for ListStaff.
+type ListStaffParams struct {
+	// Limit Ukuran halaman; default 20.
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // ListStaff200JSONResponseBodyItemsRole defines parameters for ListStaff.

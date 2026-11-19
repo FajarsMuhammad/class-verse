@@ -150,15 +150,25 @@ func (q *Queries) GetReadyFile(ctx context.Context, arg GetReadyFileParams) (Fil
 
 const listReadyFiles = `-- name: ListReadyFiles :many
 SELECT f.id, f.kind, f.name, f.size_bytes, f.content_type, f.uploaded_by, f.created_at,
-  COALESCE(p.position, 0)::integer AS position
+  COALESCE(p.position, 0)::integer AS position, count(*) OVER()::integer AS total_count,
+  -- Names of the active books and modules that keep this file from being deleted.
+  ARRAY(SELECT b.title FROM library_books b WHERE b.org_id = f.org_id AND b.file_id = f.id AND b.archived_at IS NULL
+    UNION SELECT m.title FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+      WHERE s.org_id = f.org_id AND s.file_id = f.id AND s.archived_at IS NULL AND m.archived_at IS NULL
+    UNION SELECT a.title FROM assignment_steps s JOIN assignments a ON a.id = s.assignment_id
+      WHERE s.org_id = f.org_id AND s.file_id = f.id
+    UNION SELECT rm.title FROM module_revision_steps s JOIN module_revisions rm ON rm.id = s.revision_id
+      WHERE s.org_id = f.org_id AND s.file_id = f.id ORDER BY 1 LIMIT 3)::text[] AS used_by
 FROM files f LEFT JOIN reader_positions p ON p.file_id = f.id AND p.user_id = $1
 WHERE f.org_id = $2 AND f.status = 'ready'
-ORDER BY f.created_at DESC, f.id LIMIT $4::integer OFFSET $3::integer
+  AND ($3::text = '' OR f.kind = $3)
+ORDER BY f.created_at DESC, f.id LIMIT $5::integer OFFSET $4::integer
 `
 
 type ListReadyFilesParams struct {
 	UserID     uuid.UUID
 	OrgID      uuid.UUID
+	Kind       string
 	PageOffset int32
 	PageLimit  pgtype.Int4
 }
@@ -172,12 +182,15 @@ type ListReadyFilesRow struct {
 	UploadedBy  uuid.UUID
 	CreatedAt   pgtype.Timestamptz
 	Position    int32
+	TotalCount  int32
+	UsedBy      []string
 }
 
 func (q *Queries) ListReadyFiles(ctx context.Context, arg ListReadyFilesParams) ([]ListReadyFilesRow, error) {
 	rows, err := q.db.Query(ctx, listReadyFiles,
 		arg.UserID,
 		arg.OrgID,
+		arg.Kind,
 		arg.PageOffset,
 		arg.PageLimit,
 	)
@@ -197,6 +210,8 @@ func (q *Queries) ListReadyFiles(ctx context.Context, arg ListReadyFilesParams) 
 			&i.UploadedBy,
 			&i.CreatedAt,
 			&i.Position,
+			&i.TotalCount,
+			&i.UsedBy,
 		); err != nil {
 			return nil, err
 		}

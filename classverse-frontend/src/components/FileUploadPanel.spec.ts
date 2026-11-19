@@ -22,6 +22,7 @@ afterEach(() => vi.restoreAllMocks())
 function setup(isAdmin = false) {
   const list = vi.spyOn(files.fileApi, 'list').mockResolvedValue({
     items: [item('mine', 'me', 3), item('theirs', 'other')],
+    total: 2,
     used_bytes: 5_000_000,
     quota_bytes: 5_000_000_000,
   })
@@ -32,8 +33,8 @@ function setup(isAdmin = false) {
 it('lists files with usage, resume label, and delete only for own files', async () => {
   const { wrapper } = setup()
   await flushPromises()
-  expect(wrapper.text()).toContain('Terpakai 5 MB dari 5.000 MB')
-  const rows = wrapper.findAll('li')
+  expect(wrapper.text()).toContain('5 MB dari 5.000 MB')
+  const rows = wrapper.findAll('tbody tr')
   expect(rows[0]!.text()).toContain('Lanjutkan')
   expect(rows[0]!.text()).toContain('Hapus')
   expect(rows[1]!.text()).toContain('Baca')
@@ -45,7 +46,7 @@ it('admin can delete any file after confirmation', async () => {
   await flushPromises()
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   const remove = vi.spyOn(files.fileApi, 'remove').mockResolvedValue()
-  await wrapper.findAll('li')[1]!.findAll('button')[1]!.trigger('click')
+  await wrapper.findAll('tbody tr')[1]!.findAll('button')[1]!.trigger('click')
   await flushPromises()
   expect(remove).toHaveBeenCalledWith('o', 'theirs')
   expect(list).toHaveBeenCalledTimes(2)
@@ -75,4 +76,16 @@ it('rejects unsupported types before uploading', async () => {
   await wrapper.get('button.btn-primary').trigger('click')
   expect(upload).not.toHaveBeenCalled()
   expect(wrapper.get('[role=alert]').text()).toContain('PDF, MP3, atau M4A')
+})
+
+it('filters by kind on the server and blocks deleting a file in use', async () => {
+  const { wrapper, list } = setup()
+  list.mockResolvedValue({ items: [{ ...item('mine', 'me'), used_by: ['Tata Surya'] }], total: 1, used_bytes: 0, quota_bytes: 1 })
+  await flushPromises()
+  await wrapper.get('[aria-label="Jenis berkas"] button:nth-child(3)').trigger('click')
+  await flushPromises()
+  expect(list).toHaveBeenLastCalledWith('o', 0, 'audio')
+  const del = wrapper.get('tbody tr').findAll('button')[1]!
+  expect(wrapper.get('tbody tr').text()).toContain('Tata Surya')
+  expect(del.attributes('disabled')).toBeDefined()
 })

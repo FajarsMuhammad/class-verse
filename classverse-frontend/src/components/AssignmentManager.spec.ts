@@ -54,3 +54,10 @@ it('retries uncertain issuance with the same client ID and locks payload edits',
   await w.get('form').trigger('submit'); await flushPromises()
   expect(vi.mocked(assignmentApi.issue).mock.calls[1]![1].id).toBe(first.id)
 })
+it('shows class progress counts from the server aggregate', async () => {
+  vi.mocked(assignmentApi.list).mockResolvedValue({ items: [{ id: 'a', title: 'Tata Surya', class_name: 'XI', year_label: '2026/2027', building_key: 'sains', level: 'SD', due_at: null, cancelled: false, done: 0, total: 3, recipients: 5, finished: 2, started: 3 }], total: 1 })
+  const w = mount(AssignmentManager, { props: { orgId: 'org' } })
+  await flushPromises()
+  expect(w.text()).toContain('2 selesai · 1 sedang · 2 belum mulai')
+  expect(w.find('.remote-pagination').exists()).toBe(false)
+})

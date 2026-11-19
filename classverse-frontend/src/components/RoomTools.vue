@@ -23,10 +23,15 @@ const emit = defineEmits<{ pinned: []; assign: [moduleId: string] }>()
   <ClassManager v-else-if="tool === 'classes' || tool === 'students' || tool === 'years'" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" :view="tool" />
   <AssignmentManager v-else-if="tool === 'assignments'" :org-id="orgId" :module-id="assignModule" />
   <GradebookReport v-else-if="tool === 'gradebook'" embedded />
-  <template v-else-if="tool === 'rooms'">
+  <div v-else-if="tool === 'rooms'" class="rooms-layout">
     <RoomPanel :org-id="orgId" />
-    <InvitePanel :org-id="orgId" :my-id="userId" :my-role="isAdmin ? 'admin' : 'teacher'" />
-  </template>
+    <aside class="rooms-invite" aria-label="Undang anggota"><InvitePanel :org-id="orgId" :my-id="userId" :my-role="isAdmin ? 'admin' : 'teacher'" /></aside>
+  </div>
   <FileUploadPanel v-else-if="tool === 'files'" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" />
   <LibraryManager v-else-if="tool === 'books'" :org-id="orgId" />
 </template>
+
+<style scoped>
+.rooms-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-5); align-items: start; }
+@media (max-width: 1100px) { .rooms-layout { grid-template-columns: minmax(0, 1fr); } }
+</style>
