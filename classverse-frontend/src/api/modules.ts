@@ -10,6 +10,7 @@ export interface ModuleQuery {
   drafts?: boolean
   offset?: number
   limit?: number
+  module_id?: string
   search?: string
   status?: string
   archived?: boolean
@@ -24,6 +25,7 @@ export const moduleApi = {
     if (query.archived) p.set('archived', 'true')
     if (query.offset !== undefined) p.set('offset', String(query.offset))
     if (query.limit !== undefined) p.set('limit', String(query.limit))
+    if (query.module_id) p.set('module_id', query.module_id)
     if (query.search) p.set('search', query.search)
     if (query.status) p.set('status', query.status)
     return api<{ items: Module[]; total?: number }>(`${base(orgID)}?${p}`)

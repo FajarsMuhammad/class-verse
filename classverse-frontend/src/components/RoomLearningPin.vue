@@ -23,7 +23,7 @@ watch([pin, () => props.orgId], async ([value], _, onCleanup) => {
   error.value = ''
   if (!value?.step_id) return
   try {
-    const result = await moduleApi.list(props.orgId, { building_key: value.building_key })
+    const result = await moduleApi.list(props.orgId, { building_key: value.building_key, module_id: value.module_id, limit: 1 })
     if (!stale) stepTitle.value = result.items.find((m) => m.id === value.module_id)?.steps.find((s) => s.id === value.step_id)?.title ?? ''
   } catch (err) {
     if (!stale) error.value = errorMessage(err)

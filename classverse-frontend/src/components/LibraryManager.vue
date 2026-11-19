@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
 import RemotePagination from './RemotePagination.vue'
-import { computed, onMounted, ref, useId } from 'vue'
+import { onMounted, ref, useId } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
 import { formatLabel, libraryApi, shelves } from '@/api/library'
-import type { Book, BookInput, FileItem } from '@/api/types'
+import type { Book, BookInput } from '@/api/types'
 import BookCard from './BookCard.vue'
 import FileReader, { type ReadableFile } from './FileReader.vue'
 
@@ -30,7 +31,6 @@ async function movePage(delta: number) {
 }
 async function loadPage() { await load(true) }
 const next = ref<string | null>(null)
-const files = ref<FileItem[]>([])
 const editing = ref<string | null>(null)
 const form = ref<BookInput>(blank())
 const fields = ref<Record<string, string>>({})
@@ -40,7 +40,6 @@ const error = ref('')
 const reading = ref<ReadableFile | null>(null)
 
 // Only files matching the format can be chosen; the server checks this again.
-const choices = computed(() => files.value.filter((f) => f.kind === (form.value.format === 'audio' ? 'audio' : 'pdf')))
 
 async function load(more = false) {
   if (!more) { pageNumber.value = 1; cursors.value = [undefined] }
@@ -52,12 +51,9 @@ async function load(more = false) {
     error.value = errorMessage(err)
   }
 }
-async function loadFiles() {
-  try {
-    files.value = (await fileApi.list(props.orgId)).items
-  } catch {
-    files.value = []
-  }
+async function fileOptions(offset: number) {
+  const result = await fileApi.list(props.orgId, offset)
+  return { items: result.items.filter(f => f.kind === (form.value.format === 'audio' ? 'audio' : 'pdf')).map(f => ({ value: f.id, label: f.name })), more: result.items.length === 20 }
 }
 
 function edit(book?: Book) {
@@ -68,7 +64,7 @@ function edit(book?: Book) {
     ? { title: book.title, author: book.author, shelf: book.shelf, level: book.level, format: book.format,
         copies: book.copies, file_id: book.file_id ?? null, cover: book.cover, published: book.published }
     : blank()
-  void loadFiles()
+
 }
 
 async function save() {
@@ -158,15 +154,7 @@ onMounted(() => load())
           <p v-if="fields.copies" class="field-error">{{ fields.copies }}</p>
 </template>
         <template v-else>
-          <label :for="`${id}-file`">File</label>
-          <select :id="`${id}-file`" v-model="form.file_id" :aria-invalid="!!fields.file_id"
-            :aria-describedby="`${id}-fh`">
-            <option :value="null" disabled>Pilih file</option>
-            <option v-for="f in choices" :key="f.id" :value="f.id">{{ f.name }}</option>
-          </select>
-          <p :id="`${id}-fh`" :class="fields.file_id ? 'field-error' : 'hint'">
-            {{ fields.file_id || (choices.length ? (form.format === 'audio' ? 'MP3 atau M4A dari File belajar.' : 'PDF dari File belajar.') : 'Belum ada file yang cocok. Unggah dulu di File belajar.') }}
-          </p>
+          <PagedSelect :id="`${id}-file`" :key="form.format" :model-value="form.file_id ?? ''" label="File" placeholder="Pilih file" :load="fileOptions" @update:model-value="form.file_id = $event || null" />
         </template>
 
         <label :for="`${id}-cv`">Warna sampul</label>

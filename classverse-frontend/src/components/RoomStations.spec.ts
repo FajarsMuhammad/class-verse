@@ -17,7 +17,7 @@ it('staff tools link to existing management, recording and grading are not fake 
   const get = vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [{ id: 'm', title: 'Materi nyata', building_key: 'sains', level: 'SD', description: '', published: false, updated_at: '2026-11-13T00:00:00Z', steps: [] }] })
   const w = mount(RoomStations, { props: { orgId: 'o', mapKey: 'staff', station: 'kerja', teacher: true }, global })
   await flushPromises()
-  expect(get).toHaveBeenCalledWith('o', { drafts: true })
+  expect(get).toHaveBeenCalledWith('o', { drafts: true, limit: 20, offset: 0 })
   expect(w.text()).toContain('Materi nyata')
   expect(w.text()).toContain('Draf')
   expect(w.text()).toContain('Buat dan kelola modul')

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { classApi, type MoveResult, type Placement, type RosterEntry, type SchoolClass } from '@/api/classes'
 
@@ -30,8 +31,13 @@ const own = computed(() => props.classes.filter(c => c.my_role === 'homeroom'))
 const fixed = computed(() => props.classes.find(c => c.id === props.classId))
 const canManageFixed = computed(() => props.isAdmin || fixed.value?.my_role === 'homeroom')
 const canMove = computed(() => !props.classId && (props.isAdmin || own.value.length > 0))
-const targets = computed(() => props.isAdmin ? props.classes : own.value)
-const className = (id: string | null | undefined) => props.classes.find(c => c.id === id)?.name ?? 'Belum punya kelas'
+const targetNames = ref<Record<string, string>>({})
+async function targetOptions(offset: number) {
+ const result = await classApi.classes(props.orgId, props.yearId, offset)
+ targetNames.value = { ...targetNames.value, ...Object.fromEntries(result.items.map(c => [c.id, c.name])) }
+ return { items: [...(props.isAdmin && offset === 0 ? [{ value: 'none', label: 'Keluarkan dari kelas' }] : []), ...result.items.filter(c => props.isAdmin || c.my_role === 'homeroom').map(c => ({ value: c.id, label: c.name }))], more: result.items.length === 20 }
+}
+const className = (id: string | null | undefined) => props.classes.find(c => c.id === id)?.name ?? (id ? targetNames.value[id] ?? 'Kelas terpilih' : 'Belum punya kelas')
 const message = (e: unknown) => e instanceof Error ? e.message : 'Perubahan gagal disimpan. Coba lagi.'
 let generation = 0
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -139,13 +145,7 @@ onMounted(load)
 
     <div v-if="canMove && selected.length" class="bulk" data-test="bulk">
       <strong>{{ selected.length }} siswa dipilih</strong>
-      <label>Pindahkan ke kelas
-        <select v-model="target" data-test="move-target">
-          <option value="" disabled>Pilih kelas</option>
-          <option v-for="c in targets" :key="c.id" :value="c.id">{{ c.name }}</option>
-          <option v-if="isAdmin" value="none">Keluarkan dari kelas</option>
-        </select>
-      </label>
+      <PagedSelect v-model="target" test-id="move-target" placeholder="Pilih kelas" label="Pindahkan ke kelas" :load="targetOptions" />
       <button type="button" class="btn-primary" data-action="move" :disabled="!target || saving" @click="moveSelected">Pindahkan</button>
       <button type="button" class="btn-secondary" @click="selected = []">Batal pilih</button>
     </div>

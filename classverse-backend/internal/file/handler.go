@@ -191,7 +191,7 @@ type Item struct {
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	var pagination []int32
-	if r.URL.Query().Has("limit") || r.URL.Query().Has("offset") {
+	{
 		limit, offset, err := httpx.Pagination(r)
 		if err != nil {
 			return err

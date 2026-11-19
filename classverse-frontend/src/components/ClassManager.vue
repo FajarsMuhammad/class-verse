@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
 import RemotePagination from './RemotePagination.vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { classApi, type AcademicYear, type SchoolClass } from '@/api/classes'
 import ClassTeachers from './ClassTeachers.vue'
 import InvitePanel from './InvitePanel.vue'
@@ -31,6 +32,7 @@ const needle = computed(() => search.value.trim().toLocaleLowerCase('id'))
 const visibleClasses = computed(() => classes.value.filter(c => c.name.toLocaleLowerCase('id').includes(needle.value)))
 const pageNumber = ref(1)
 function movePage(delta: number) { pageNumber.value += delta; void load() }
+watch(search, () => { pageNumber.value = 1; void load() })
 const groupedClasses = computed(() => {
   const groups = new Map<string, SchoolClass[]>()
   for (const c of visibleClasses.value) {
@@ -46,6 +48,11 @@ let generation = 0
 onBeforeUnmount(() => { generation++ })
 const message = (e: unknown) => e instanceof Error ? e.message : 'Perubahan gagal disimpan. Coba lagi.'
 
+async function yearOptions(offset: number) {
+ const result = await classApi.years(props.orgId, offset)
+ years.value = [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
+ return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: result.items.length === 20 }
+}
 async function load() {
   const g = ++generation
   loading.value = true
@@ -53,8 +60,8 @@ async function load() {
   try {
     const result = await classApi.years(props.orgId, props.view === 'years' ? (pageNumber.value - 1) * 20 : undefined)
     if (g !== generation) return
-    years.value = result.items
-    yearID.value = result.items.find(y => y.id === yearID.value)?.id ?? result.items.find(y => y.active)?.id ?? result.items[0]?.id ?? ''
+    years.value = props.view === 'years' ? result.items : [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
+    yearID.value = yearID.value || result.items.find(y => y.active)?.id || result.items[0]?.id || ''
     if (!yearID.value || props.view === 'years') {
       classes.value = []
       return
@@ -64,7 +71,7 @@ async function load() {
   finally { if (g === generation) loading.value = false }
 }
 async function fetchYear(g: number) {
-  const c = await classApi.classes(props.orgId, yearID.value, props.view === 'classes' ? (pageNumber.value - 1) * 20 : undefined)
+  const c = await classApi.classes(props.orgId, yearID.value, (pageNumber.value - 1) * 20, search.value.trim())
   if (g !== generation) return
   classes.value = c.items
   if (openID.value && !c.items.some(x => x.id === openID.value)) openID.value = ''
@@ -73,8 +80,8 @@ async function refreshClasses() {
   const g = generation
   try { await fetchYear(g) } catch (e) { if (g === generation) error.value = message(e) }
 }
-async function changeYear(event: Event) {
-  yearID.value = (event.target as HTMLSelectElement).value
+async function changeYear() {
+  pageNumber.value = 1
   const g = ++generation
   loading.value = true; error.value = ''; openID.value = ''
   classes.value = []
@@ -136,7 +143,7 @@ onMounted(load)
       <template v-if="view === 'years'">
         <p class="muted">Tahun aktif dipilih admin, bukan berdasarkan kalender. Mengganti tahun aktif tidak memindahkan siswa.</p>
         <form v-if="isAdmin" data-test="create-year" class="row" @submit.prevent="createYear">
-          <label>Tahun ajaran baru <input v-model="newYear" required placeholder="2027/2028" pattern="[0-9]{4}/[0-9]{4}" maxlength="9" /></label>
+          <PagedSelect v-model="yearID" label="Tahun ajaran" :load="yearOptions" @update:model-value="changeYear" />
           <button type="submit" class="btn-primary">Tambah</button>
         </form>
         <ul class="list">
@@ -162,6 +169,7 @@ onMounted(load)
               <option v-for="y in years" :key="y.id" :value="y.id">{{ y.label }}{{ y.active ? ' (aktif)' : '' }}</option>
             </select>
           </label>
+          <RemotePagination v-if="view === 'students'" :page="pageNumber" :more="classes.length === 20" @move="movePage" />
           <label v-if="view === 'classes'">Cari kelas <input v-model="search" type="search" /></label>
           <button v-if="view === 'classes' && isAdmin && !creating" type="button" class="btn-primary new" @click="creating = true">+ Kelas baru</button>
         </div>

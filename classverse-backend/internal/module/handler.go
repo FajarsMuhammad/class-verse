@@ -211,7 +211,15 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	if status := q.Get("status"); status != "" && status != "draft" && status != "published" {
 		return httpx.ValidationFailed(map[string]string{"status": "Status tidak valid"})
 	}
-	mods, err := h.svc.List(r.Context(), user, p[0], Filter{Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true", Archived: q.Get("archived") == "true"})
+	var moduleID uuid.NullUUID
+	if raw := q.Get("module_id"); raw != "" {
+		parsed, parseErr := uuid.Parse(raw)
+		if parseErr != nil {
+			return httpx.ValidationFailed(map[string]string{"module_id": "ID modul tidak valid"})
+		}
+		moduleID = uuid.NullUUID{UUID: parsed, Valid: true}
+	}
+	mods, err := h.svc.List(r.Context(), user, p[0], Filter{ModuleID: moduleID, Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true", Archived: q.Get("archived") == "true"})
 	if err != nil {
 		return err
 	}

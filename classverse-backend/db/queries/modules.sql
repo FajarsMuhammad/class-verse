@@ -23,6 +23,7 @@ WHERE m.org_id = sqlc.arg(org_id) AND (m.archived_at IS NOT NULL) = sqlc.arg(arc
   AND (sqlc.arg(include_drafts)::boolean OR m.published_at IS NOT NULL)
   AND (sqlc.narg(building_key)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.building_key ELSE r.building_key END = sqlc.narg(building_key))
   AND (sqlc.narg(level)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.level ELSE r.level END = sqlc.narg(level))
+  AND (sqlc.narg(module_id)::uuid IS NULL OR m.id = sqlc.narg(module_id))
   AND (sqlc.arg(search)::text = '' OR position(lower(sqlc.arg(search)) in lower(CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.title ELSE r.title END)) > 0)
   AND (sqlc.arg(status)::text = '' OR (m.published_at IS NOT NULL) = (sqlc.arg(status) = 'published'))
 ORDER BY m.created_at, m.id

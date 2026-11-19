@@ -302,10 +302,11 @@ WHERE m.org_id = $2 AND (m.archived_at IS NOT NULL) = $3::boolean
   AND ($4::boolean OR m.published_at IS NOT NULL)
   AND ($5::text IS NULL OR CASE WHEN $4::boolean THEN m.building_key ELSE r.building_key END = $5)
   AND ($6::text IS NULL OR CASE WHEN $4::boolean THEN m.level ELSE r.level END = $6)
-  AND ($7::text = '' OR position(lower($7) in lower(CASE WHEN $4::boolean THEN m.title ELSE r.title END)) > 0)
-  AND ($8::text = '' OR (m.published_at IS NOT NULL) = ($8 = 'published'))
+  AND ($7::uuid IS NULL OR m.id = $7)
+  AND ($8::text = '' OR position(lower($8) in lower(CASE WHEN $4::boolean THEN m.title ELSE r.title END)) > 0)
+  AND ($9::text = '' OR (m.published_at IS NOT NULL) = ($9 = 'published'))
 ORDER BY m.created_at, m.id
-LIMIT $10::integer OFFSET $9::integer
+LIMIT $11::integer OFFSET $10::integer
 `
 
 type ListModulesParams struct {
@@ -315,6 +316,7 @@ type ListModulesParams struct {
 	IncludeDrafts bool
 	BuildingKey   pgtype.Text
 	Level         pgtype.Text
+	ModuleID      uuid.NullUUID
 	Search        string
 	Status        string
 	ListOffset    int32
@@ -335,6 +337,7 @@ func (q *Queries) ListModules(ctx context.Context, arg ListModulesParams) ([]Lis
 		arg.IncludeDrafts,
 		arg.BuildingKey,
 		arg.Level,
+		arg.ModuleID,
 		arg.Search,
 		arg.Status,
 		arg.ListOffset,

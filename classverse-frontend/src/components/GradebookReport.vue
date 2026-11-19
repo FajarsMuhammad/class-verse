@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useOrgStore } from '@/stores/org'
 import { errorMessage } from '@/api/client'
@@ -22,6 +23,16 @@ let generation = 0
 onBeforeUnmount(() => { generation++ })
 const score = (v: number | null | undefined) => v == null ? 'Belum dikerjakan' : String(Math.round(v * 100) / 100)
 
+async function classOptions(offset: number) {
+ if (!filter.value.year_id) return { items: [], more: false }
+ const result = await classApi.classes(orgId.value, filter.value.year_id, offset)
+ return { items: result.items.map(c => ({ value: c.id, label: c.name })), more: result.items.length === 20 }
+}
+async function yearOptions(offset: number) {
+ const result = await classApi.years(orgId.value, offset)
+ years.value = [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
+ return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: result.items.length === 20 }
+}
 async function load() {
   if (!orgId.value) return
   const g = ++generation; busy.value = true; error.value = ''
@@ -88,18 +99,8 @@ onMounted(async () => { await loadYears(); await load() })
       <p v-if="error" role="alert">{{ error }} <button type="button" @click="load">Coba lagi</button></p>
       <p v-if="busy" role="status">Memuat rapor…</p>
       <form v-if="staff" class="filters" aria-label="Filter rapor" @submit.prevent="apply">
-        <label>Tahun ajaran (roster)
-          <select v-model="filter.year_id" @change="changeYear">
-            <option :value="undefined">Semua peserta</option>
-            <option v-for="y in years" :key="y.id" :value="y.id">{{ y.label }}{{ y.active ? ' · Aktif' : '' }}</option>
-          </select>
-        </label>
-        <label>Kelas pada tahun itu
-          <select v-model="filter.class_id" :disabled="!filter.year_id">
-            <option :value="undefined">Semua kelas</option>
-            <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-        </label>
+        <PagedSelect :model-value="filter.year_id ?? ''" label="Tahun ajaran" placeholder="Semua tahun" :load="yearOptions" @update:model-value="filter.year_id = $event || undefined; changeYear()" />
+        <PagedSelect :model-value="filter.class_id ?? ''" label="Kelas" placeholder="Semua kelas" :key="filter.year_id" :load="classOptions" :disabled="!filter.year_id" @update:model-value="filter.class_id = $event || undefined" />
         <label>Gedung (kunci)
           <input v-model.trim="filter.building_key" maxlength="40" placeholder="mis. sains" />
         </label>

@@ -144,6 +144,11 @@ func (s *Service) Issue(ctx context.Context, user, orgID uuid.UUID, in Input) (q
 
 // List returns own tasks for students, all school tasks for staff.
 func (s *Service) List(ctx context.Context, user, orgID uuid.UUID, page ...int32) ([]query.ListAssignmentsRow, error) {
+	return s.ListFiltered(ctx, user, orgID, "", "", page...)
+}
+
+// ListFiltered applies search before selecting a page, preserving recipient authorization.
+func (s *Service) ListFiltered(ctx context.Context, user, orgID uuid.UUID, search, className string, page ...int32) ([]query.ListAssignmentsRow, error) {
 	pageLimit := pgtype.Int4{}
 	pageOffset := int32(0)
 	if len(page) == 2 {
@@ -155,7 +160,7 @@ func (s *Service) List(ctx context.Context, user, orgID uuid.UUID, page ...int32
 	if err != nil {
 		return nil, err
 	}
-	return query.New(s.pool).ListAssignments(ctx, query.ListAssignmentsParams{PageLimit: pageLimit, PageOffset: pageOffset, OrgID: orgID, UserID: user, Staff: role.AtLeast(org.RoleTeacher)})
+	return query.New(s.pool).ListAssignments(ctx, query.ListAssignmentsParams{Search: search, ClassName: className, PageLimit: pageLimit, PageOffset: pageOffset, OrgID: orgID, UserID: user, Staff: role.AtLeast(org.RoleTeacher)})
 }
 func (s *Service) accessible(ctx context.Context, q *query.Queries, user, orgID, id uuid.UUID, role org.Role) (query.Assignment, error) {
 	a, err := q.GetAssignment(ctx, query.GetAssignmentParams{OrgID: orgID, ID: id})

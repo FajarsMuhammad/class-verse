@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
+import RemotePagination from './RemotePagination.vue'
 import { computed, ref, watch } from 'vue'
 import { classApi, type AcademicYear, type Person, type SchoolClass } from '@/api/classes'
 
@@ -12,32 +14,59 @@ const withTeachers = ref(true)
 const fromClasses = ref<SchoolClass[]>([])
 const toClasses = ref<SchoolClass[]>([])
 const mapping = ref<Record<string, string>>({})
+const sourcePage = ref(1)
+const selectedSources = ref<SchoolClass[]>([])
+const yearNames = ref<Record<string, string>>({})
+const destinationNames = ref<Record<string, string>>({})
 const step = ref<'map' | 'preview'>('map')
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
 const skipped = ref<Person[]>([])
-const label = (id: string) => props.years.find(y => y.id === id)?.label ?? ''
+const label = (id: string) => props.years.find(y => y.id === id)?.label ?? yearNames.value[id] ?? 'Tahun terpilih'
 const sources = computed(() => props.years.filter(y => y.id !== toID.value))
-const chosen = computed(() => fromClasses.value.filter(c => mapping.value[c.id]))
+const chosen = computed(() => [...selectedSources.value.filter(c => !fromClasses.value.some(n => n.id === c.id)), ...fromClasses.value].filter(c => mapping.value[c.id]))
 const moving = computed(() => chosen.value.reduce((n, c) => n + c.students, 0))
 const message = (e: unknown) => e instanceof Error ? e.message : 'Perubahan gagal disimpan. Coba lagi.'
 let generation = 0
 
 watch(() => props.years, ys => {
-  if (!ys.some(y => y.id === toID.value)) toID.value = ys[0]?.id ?? ''
+  if (!toID.value) toID.value = ys[0]?.id ?? ''
 }, { immediate: true })
 watch(toID, () => { if (fromID.value === toID.value) fromID.value = '' })
 watch([toID, fromID], loadClasses)
 
+async function yearOptions(offset: number) {
+ const result = await classApi.years(props.orgId, offset)
+ yearNames.value = { ...yearNames.value, ...Object.fromEntries(result.items.map(y => [y.id, y.label])) }
+ return { items: result.items.map(y => ({ value: y.id, label: y.label })), more: result.items.length === 20 }
+}
+async function sourceYearOptions(offset: number) {
+ const result = await yearOptions(offset)
+ return { ...result, items: result.items.filter(y => y.value !== toID.value) }
+}
+async function destinationOptions(offset: number) {
+ const result = await classApi.classes(props.orgId, toID.value, offset)
+ destinationNames.value = { ...destinationNames.value, ...Object.fromEntries(result.items.map(c => [c.id, c.name])) }
+ return { items: result.items.map(c => ({ value: c.id, label: c.name })), more: result.items.length === 20 }
+}
+async function moveSource(delta: number) {
+ selectedSources.value = [...selectedSources.value.filter(c => !fromClasses.value.some(n => n.id === c.id)), ...fromClasses.value]
+ busy.value = true; error.value = ''
+ try {
+   const result = await classApi.classes(props.orgId, fromID.value, (sourcePage.value + delta - 1) * 20)
+   fromClasses.value = result.items; sourcePage.value += delta
+ } catch (e) { error.value = message(e) }
+ finally { busy.value = false }
+}
 async function loadClasses() {
   const g = ++generation
   step.value = 'map'; error.value = ''; notice.value = ''; skipped.value = []
-  fromClasses.value = []; toClasses.value = []; mapping.value = {}
+  fromClasses.value = []; toClasses.value = []; mapping.value = {}; selectedSources.value = []; sourcePage.value = 1
   if (!toID.value || !fromID.value) return
   busy.value = true
   try {
-    const [from, to] = await Promise.all([classApi.classes(props.orgId, fromID.value), classApi.classes(props.orgId, toID.value)])
+    const [from, to] = await Promise.all([classApi.classes(props.orgId, fromID.value, 0), classApi.classes(props.orgId, toID.value, 0)])
     if (g !== generation) return
     fromClasses.value = from.items; toClasses.value = to.items
   } catch (e) { if (g === generation) error.value = message(e) }
@@ -54,7 +83,7 @@ async function copy() {
   if (!window.confirm(`Salin struktur kelas ${label(fromID.value)} ke ${label(toID.value)}${withTeachers.value ? ' beserta pengajarnya' : ''}? Siswa tidak ikut disalin.`)) return
   await run(async () => {
     const res = await classApi.copy(props.orgId, toID.value, fromID.value, withTeachers.value)
-    const to = await classApi.classes(props.orgId, toID.value)
+    const to = await classApi.classes(props.orgId, toID.value, 0)
     toClasses.value = to.items
     notice.value = `${res.created} kelas dibuat.` + (res.skipped.length ? ` Sudah ada, dilewati: ${res.skipped.join(', ')}.` : '')
   })
@@ -66,7 +95,7 @@ async function promote() {
     skipped.value = res.skipped
     notice.value = `${res.moved} siswa ditempatkan di ${label(toID.value)}.` + (res.skipped.length ? ` ${res.skipped.length} siswa dilewati karena sudah punya kelas atau bukan peserta lagi:` : '')
     step.value = 'map'; mapping.value = {}
-    toClasses.value = (await classApi.classes(props.orgId, toID.value)).items
+    toClasses.value = (await classApi.classes(props.orgId, toID.value, 0)).items
   })
 }
 const nameIn = (list: SchoolClass[], id: string | undefined) => list.find(c => c.id === id)?.name ?? ''
@@ -84,24 +113,15 @@ const nameIn = (list: SchoolClass[], id: string | undefined) => list.find(c => c
     <fieldset :disabled="busy" class="class-part">
       <legend class="sr-only">Siapkan tahun ajaran</legend>
       <div class="filters">
-        <label>Tahun tujuan
-          <select v-model="toID" data-test="to-year">
-            <option v-for="y in years" :key="y.id" :value="y.id">{{ y.label }}</option>
-          </select>
-        </label>
-        <label>Tahun sumber
-          <select v-model="fromID" data-test="from-year">
-            <option value="" disabled>Pilih tahun</option>
-            <option v-for="y in sources" :key="y.id" :value="y.id">{{ y.label }}</option>
-          </select>
-        </label>
+        <PagedSelect v-model="toID" test-id="to-year" label="Tahun tujuan" :load="yearOptions" />
+        <PagedSelect v-model="fromID" test-id="from-year" label="Tahun sumber" :load="sourceYearOptions" />
       </div>
       <p v-if="sources.length === 0" class="muted">Tambahkan tahun ajaran lain dulu.</p>
       <template v-if="fromID">
         <h4 class="section-title">1. Salin struktur kelas</h4>
         <div class="row">
           <label class="check"><input v-model="withTeachers" type="checkbox" /> Sertakan wali kelas dan guru mapel</label>
-          <button type="button" class="btn-primary" data-action="copy" :disabled="!fromClasses.length" @click="copy">Salin {{ fromClasses.length }} kelas</button>
+          <button type="button" class="btn-primary" data-action="copy" :disabled="!fromClasses.length" @click="copy">Salin struktur seluruh kelas</button>
         </div>
         <p v-if="!fromClasses.length && !busy" class="muted">Tahun sumber belum punya kelas.</p>
 
@@ -112,19 +132,17 @@ const nameIn = (list: SchoolClass[], id: string | undefined) => list.find(c => c
             <li v-for="c in fromClasses" :key="c.id" :data-from="c.id">
               <div><strong>{{ c.name }}</strong><p class="meta">{{ c.students }} siswa</p></div>
               <label class="inline"><span class="sr-only">Kelas tujuan untuk {{ c.name }}</span>
-                <select v-model="mapping[c.id]">
-                  <option :value="undefined">Lewati</option>
-                  <option v-for="t in toClasses" :key="t.id" :value="t.id">{{ t.name }}</option>
-                </select>
+                <PagedSelect :model-value="mapping[c.id] ?? ''" :label="`Kelas tujuan untuk ${c.name}`" placeholder="Lewati" :load="destinationOptions" @update:model-value="mapping = { ...mapping, [c.id]: $event }" />
               </label>
             </li>
           </ul>
+          <RemotePagination :page="sourcePage" :more="fromClasses.length === 20" :busy="busy" @move="moveSource" />
           <button v-if="toClasses.length" type="button" class="btn-primary" data-action="preview" :disabled="!chosen.length" @click="step = 'preview'">Pratinjau</button>
         </template>
         <template v-else>
           <p>{{ moving }} siswa akan ditempatkan di {{ label(toID) }}. Siswa yang sudah punya kelas di tahun itu dilewati. Penempatan {{ label(fromID) }} tetap sebagai riwayat.</p>
           <ul class="list" data-test="preview">
-            <li v-for="c in chosen" :key="c.id"><div>{{ c.name }} ({{ c.students }} siswa) → <strong>{{ nameIn(toClasses, mapping[c.id]) }}</strong></div></li>
+            <li v-for="c in chosen" :key="c.id"><div>{{ c.name }} ({{ c.students }} siswa) → <strong>{{ nameIn(toClasses, mapping[c.id]) || destinationNames[mapping[c.id]!] || 'Kelas terpilih' }}</strong></div></li>
           </ul>
           <div class="row">
             <button type="button" class="btn-primary" data-action="promote" @click="promote">Naikkan {{ moving }} siswa</button>

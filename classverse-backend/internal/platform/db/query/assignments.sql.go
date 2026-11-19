@@ -278,13 +278,17 @@ SELECT a.id, a.org_id, a.class_id, a.module_id, a.title, a.class_name, a.year_la
  (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=$1) AS done
 FROM assignments a WHERE a.org_id=$2
  AND ($3::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=$1))
-ORDER BY a.created_at DESC,a.id LIMIT $5::integer OFFSET $4::integer
+ AND ($4::text = '' OR strpos(lower(a.title), lower($4)) > 0)
+ AND ($5::text = '' OR a.class_name = $5)
+ORDER BY a.created_at DESC,a.id LIMIT $7::integer OFFSET $6::integer
 `
 
 type ListAssignmentsParams struct {
 	UserID     uuid.UUID
 	OrgID      uuid.UUID
 	Staff      bool
+	Search     string
+	ClassName  string
 	PageOffset int32
 	PageLimit  pgtype.Int4
 }
@@ -312,6 +316,8 @@ func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams
 		arg.UserID,
 		arg.OrgID,
 		arg.Staff,
+		arg.Search,
+		arg.ClassName,
 		arg.PageOffset,
 		arg.PageLimit,
 	)

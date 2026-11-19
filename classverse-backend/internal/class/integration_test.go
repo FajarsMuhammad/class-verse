@@ -301,3 +301,21 @@ func TestConcurrentPlacement(t *testing.T) {
 		t.Fatalf("created=%d active=%d", created.Load(), active)
 	}
 }
+
+func TestManagementSummaryAuthorizationAndGlobalCounts(t *testing.T) {
+	f := setup(t)
+	ctx := t.Context()
+	result, err := f.svc.Summary(ctx, f.admin, f.school)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Students == 0 {
+		t.Fatal("missing participants")
+	}
+	if _, err := f.svc.Summary(ctx, f.ani, f.school); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("participant summary: %v", err)
+	}
+	if _, err := f.svc.Summary(ctx, f.out, f.school); err == nil {
+		t.Fatal("cross-school access")
+	}
+}

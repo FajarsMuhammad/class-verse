@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
 import { computed, onMounted, ref } from 'vue'
 import { classApi, type ClassTeacher, type Staff } from '@/api/classes'
 
@@ -17,12 +18,16 @@ const homeroom = computed(() => teachers.value.find(t => t.role === 'homeroom'))
 const subjects = computed(() => teachers.value.filter(t => t.role === 'subject'))
 const message = (e: unknown) => e instanceof Error ? e.message : 'Perubahan gagal disimpan. Coba lagi.'
 
+async function staffOptions(offset: number) {
+ const result = await classApi.staff(props.orgId, offset)
+ staff.value = [...staff.value.filter(s => !result.items.some(n => n.user_id === s.user_id)), ...result.items]
+ return { items: result.items.map(s => ({ value: s.user_id, label: s.display_name })), more: result.items.length === 20 }
+}
 async function load() {
   loading.value = true; error.value = ''
   try {
-    const [t, s] = await Promise.all([classApi.teachers(props.orgId, props.classId), props.isAdmin ? classApi.staff(props.orgId) : null])
+    const t = await classApi.teachers(props.orgId, props.classId)
     teachers.value = t.items
-    if (s) staff.value = s.items
   } catch (e) { error.value = message(e) }
   finally { loading.value = false }
 }
@@ -74,12 +79,7 @@ onMounted(load)
     <form v-if="isAdmin" class="row" data-test="add-teacher" @submit.prevent="add">
       <fieldset :disabled="saving || loading" class="row">
         <legend class="sr-only">Tambah pengajar kelas</legend>
-        <label>Pengajar
-          <select v-model="person" required>
-            <option value="" disabled>{{ staff.length ? 'Pilih pengajar' : 'Belum ada pengajar' }}</option>
-            <option v-for="s in staff" :key="s.user_id" :value="s.user_id">{{ s.display_name }}</option>
-          </select>
-        </label>
+        <PagedSelect v-model="person" label="Pengajar" placeholder="Pilih pengajar" :load="staffOptions" />
         <label>Peran
           <select v-model="role" data-test="teacher-role">
             <option value="subject">Guru mapel</option>

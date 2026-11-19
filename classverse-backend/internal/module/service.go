@@ -121,6 +121,7 @@ type Filter struct {
 	Search      string
 	Status      string
 	Archived    bool
+	ModuleID    uuid.NullUUID
 }
 
 // Service implements module rules.
@@ -559,7 +560,7 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	if limit < 1 || limit > 100 || f.Offset < 0 {
 		return nil, &ValidationError{Fields: map[string]string{"pagination": "Pagination tidak valid"}}
 	}
-	params := query.ListModulesParams{PageLimit: limit, Search: f.Search, Status: f.Status, ListOffset: f.Offset, UserID: userID, OrgID: orgID, Archived: f.Archived, IncludeDrafts: (f.Drafts || f.Archived) && role.AtLeast(org.RoleTeacher)}
+	params := query.ListModulesParams{ModuleID: f.ModuleID, PageLimit: limit, Search: f.Search, Status: f.Status, ListOffset: f.Offset, UserID: userID, OrgID: orgID, Archived: f.Archived, IncludeDrafts: (f.Drafts || f.Archived) && role.AtLeast(org.RoleTeacher)}
 	if f.BuildingKey != "" {
 		params.BuildingKey = pgtype.Text{String: f.BuildingKey, Valid: true}
 	}

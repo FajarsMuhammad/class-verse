@@ -542,7 +542,7 @@ func (q *Queries) GetMemberRoleForUpdate(ctx context.Context, arg GetMemberRoleF
 }
 
 const listAcademicYears = `-- name: ListAcademicYears :many
-SELECT id, org_id, label, active, created_at FROM academic_years WHERE org_id = $1 ORDER BY label DESC LIMIT $3::integer OFFSET $2::integer
+SELECT id, org_id, label, active, created_at FROM academic_years WHERE org_id = $1 ORDER BY active DESC, label DESC, id LIMIT $3::integer OFFSET $2::integer
 `
 
 type ListAcademicYearsParams struct {
@@ -632,7 +632,8 @@ LEFT JOIN users hu ON hu.id = h.user_id
 LEFT JOIN class_teachers mine ON mine.class_id = c.id AND mine.user_id = $1 AND mine.ended_at IS NULL
 WHERE c.org_id = $2 AND c.academic_year_id = $3 AND c.archived_at IS NULL
   AND ($4::uuid IS NULL OR c.id = $4)
-ORDER BY mine.role IS NULL, lower(c.name), c.id LIMIT $6::integer OFFSET $5::integer
+  AND strpos(lower(c.name), lower($5::text)) > 0
+ORDER BY mine.role IS NULL, lower(c.name), c.id LIMIT $7::integer OFFSET $6::integer
 `
 
 type ListClassesParams struct {
@@ -640,6 +641,7 @@ type ListClassesParams struct {
 	OrgID          uuid.UUID
 	AcademicYearID uuid.UUID
 	ClassID        uuid.NullUUID
+	Search         string
 	PageOffset     int32
 	PageLimit      pgtype.Int4
 }
@@ -662,6 +664,7 @@ func (q *Queries) ListClasses(ctx context.Context, arg ListClassesParams) ([]Lis
 		arg.OrgID,
 		arg.AcademicYearID,
 		arg.ClassID,
+		arg.Search,
 		arg.PageOffset,
 		arg.PageLimit,
 	)
@@ -762,8 +765,14 @@ const listStaff = `-- name: ListStaff :many
 SELECT u.id AS user_id, u.display_name, m.role
 FROM memberships m JOIN users u ON u.id = m.user_id
 WHERE m.org_id = $1 AND m.role IN ('teacher', 'admin')
-ORDER BY lower(u.display_name), u.id
+ORDER BY lower(u.display_name), u.id LIMIT $3::integer OFFSET $2::integer
 `
+
+type ListStaffParams struct {
+	OrgID      uuid.UUID
+	PageOffset int32
+	PageLimit  pgtype.Int4
+}
 
 type ListStaffRow struct {
 	UserID      uuid.UUID
@@ -772,8 +781,8 @@ type ListStaffRow struct {
 }
 
 // Teachers and admins of the school: candidates for wali kelas and guru mapel.
-func (q *Queries) ListStaff(ctx context.Context, orgID uuid.UUID) ([]ListStaffRow, error) {
-	rows, err := q.db.Query(ctx, listStaff, orgID)
+func (q *Queries) ListStaff(ctx context.Context, arg ListStaffParams) ([]ListStaffRow, error) {
+	rows, err := q.db.Query(ctx, listStaff, arg.OrgID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}

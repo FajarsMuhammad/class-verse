@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { moduleApi } from '@/api/modules'
-import { quizApi } from '@/api/quizzes'
 import { classApi } from '@/api/classes'
-import { assignmentApi } from '@/api/assignments'
 import { errorMessage } from '@/api/client'
 const props = defineProps<{ orgId: string }>()
 const emit = defineEmits<{ select: [tool: string] }>()
@@ -17,22 +14,20 @@ async function load() {
   const g = ++generation
   busy.value = true; error.value = ''
   try {
-    const [modules, quizzes, years, assignments] = await Promise.all([moduleApi.list(props.orgId, { drafts: true }), quizApi.list(props.orgId, { drafts: true }), classApi.years(props.orgId), assignmentApi.list(props.orgId)])
-    const active = years.items.find(y => y.active)
-    const [classes, students] = active ? await Promise.all([classApi.classes(props.orgId, active.id), classApi.roster(props.orgId, active.id, { limit: 1 })]) : [{ items: [] }, { total: 0 }]
+    const result = await classApi.summary(props.orgId)
     if (g !== generation) return
     cards.value = [
-      { label: 'Modul terbit', value: modules.items.filter(m => m.published).length, tool: 'modules' },
-      { label: 'Kuis terbit', value: quizzes.items.filter(q => q.published).length, tool: 'quizzes' },
-      { label: 'Siswa', value: students.total, tool: 'students' },
-      { label: 'Tugas aktif', value: assignments.items.filter(a => !a.cancelled).length, tool: 'assignments' },
+      { label: 'Modul terbit', value: result.published_modules, tool: 'modules' },
+      { label: 'Kuis terbit', value: result.published_quizzes, tool: 'quizzes' },
+      { label: 'Siswa', value: result.students, tool: 'students' },
+      { label: 'Tugas aktif', value: result.active_assignments, tool: 'assignments' },
     ]
     attention.value = [
-      ...quizzes.items.filter(q => !q.question_count).map(q => ({ label: `${q.title} · belum punya soal`, tool: 'quizzes' })),
-      ...classes.items.filter(c => !c.homeroom).map(c => ({ label: `${c.name} · belum ada wali kelas`, tool: 'classes' })),
-      ...classes.items.filter(c => !c.students).map(c => ({ label: `${c.name} · belum ada siswa`, tool: 'classes' })),
-      ...modules.items.filter(m => !m.published).map(m => ({ label: `${m.title} · modul draf`, tool: 'modules' })),
-    ]
+      { count: result.empty_quizzes, label: 'kuis belum punya soal', tool: 'quizzes' },
+      { count: result.missing_homerooms, label: 'kelas belum ada wali kelas', tool: 'classes' },
+      { count: result.empty_classes, label: 'kelas belum ada siswa', tool: 'classes' },
+      { count: result.draft_modules, label: 'modul draf', tool: 'modules' },
+    ].filter(a => a.count > 0).map(a => ({ label: `${a.count} ${a.label}`, tool: a.tool }))
   } catch (e) { if (g === generation) error.value = errorMessage(e) }
   finally { if (g === generation) busy.value = false }
 }
@@ -45,8 +40,8 @@ onMounted(load)
     <p v-if="error" role="alert">{{ error }} <button type="button" class="btn-secondary" @click="load">Coba lagi</button></p>
     <template v-if="!busy && !error">
       <div class="summary"><button v-for="card in cards" :key="card.tool" type="button" @click="emit('select', card.tool)"><span>{{ card.label }}</span><strong>{{ card.value }}</strong></button></div>
-      <p class="muted">Ringkasan mengikuti batas daftar API. Jumlah siswa memakai tahun ajaran aktif; tugas aktif berarti belum dibatalkan.</p>
-      <section class="attention"><h3>Perlu perhatian</h3><ul><li v-for="(item, index) in attention" :key="index"><span>{{ item.label }}</span><button type="button" class="btn-secondary" @click="emit('select', item.tool)">Buka</button></li></ul><p v-if="!attention.length">Tidak ada masalah pada data yang dimuat.</p></section>
+      <p class="muted">Jumlah siswa mencakup peserta sekolah. Perhatian kelas memakai tahun ajaran aktif; tugas aktif berarti belum dibatalkan.</p>
+      <section class="attention"><h3>Perlu perhatian</h3><ul><li v-for="(item, index) in attention" :key="index"><span>{{ item.label }}</span><button type="button" class="btn-secondary" @click="emit('select', item.tool)">Buka</button></li></ul><p v-if="!attention.length">Tidak ada hal yang perlu perhatian.</p></section>
       <section class="quick"><h3>Buat cepat</h3><div><button v-for="item in [{ label: 'Modul belajar', tool: 'modules' }, { label: 'Kuis', tool: 'quizzes' }, { label: 'Tugaskan modul', tool: 'assignments' }, { label: 'Undang anggota', tool: 'rooms' }]" :key="item.tool" type="button" class="btn-secondary" @click="emit('select', item.tool)">{{ item.label }}</button></div></section>
     </template>
   </section>

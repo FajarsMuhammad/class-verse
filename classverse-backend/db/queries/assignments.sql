@@ -34,6 +34,8 @@ SELECT a.*,
  (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=sqlc.arg(user_id)) AS done
 FROM assignments a WHERE a.org_id=sqlc.arg(org_id)
  AND (sqlc.arg(staff)::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=sqlc.arg(user_id)))
+ AND (sqlc.arg(search)::text = '' OR strpos(lower(a.title), lower(sqlc.arg(search))) > 0)
+ AND (sqlc.arg(class_name)::text = '' OR a.class_name = sqlc.arg(class_name))
 ORDER BY a.created_at DESC,a.id LIMIT sqlc.narg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer;
 
 -- name: OwnAssignmentRecipient :one

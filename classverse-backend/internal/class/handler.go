@@ -33,6 +33,7 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 
 // Routes mounts class endpoints.
 func (h *Handler) Routes(r chi.Router) {
+	r.Get("/orgs/{org_id}/management-summary", h.handle(h.summary))
 	r.Get("/orgs/{org_id}/academic-years", h.handle(h.years))
 	r.Post("/orgs/{org_id}/academic-years", h.handle(h.createYear))
 	r.Put("/orgs/{org_id}/academic-years/{year_id}/active", h.handle(h.activate))
@@ -161,7 +162,7 @@ func ids(r *http.Request, names ...string) (uuid.UUID, []uuid.UUID, error) {
 
 func (h *Handler) years(w http.ResponseWriter, r *http.Request) error {
 	var pagination []int32
-	if r.URL.Query().Has("limit") || r.URL.Query().Has("offset") {
+	{
 		limit, offset, err := httpx.Pagination(r)
 		if err != nil {
 			return err
@@ -218,7 +219,7 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) error {
 
 func (h *Handler) classes(w http.ResponseWriter, r *http.Request) error {
 	var pagination []int32
-	if r.URL.Query().Has("limit") || r.URL.Query().Has("offset") {
+	{
 		limit, offset, err := httpx.Pagination(r)
 		if err != nil {
 			return err
@@ -230,7 +231,7 @@ func (h *Handler) classes(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	classes, err := h.svc.Classes(r.Context(), user, p[0], p[1], pagination...)
+	classes, err := h.svc.ClassesFiltered(r.Context(), user, p[0], p[1], r.URL.Query().Get("search"), pagination...)
 	if err != nil {
 		return err
 	}
@@ -544,5 +545,18 @@ func (h *Handler) removeTeacher(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func (h *Handler) summary(w http.ResponseWriter, r *http.Request) error {
+	user, p, err := ids(r, "org_id")
+	if err != nil {
+		return err
+	}
+	result, err := h.svc.Summary(r.Context(), user, p[0])
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, http.StatusOK, result)
 	return nil
 }

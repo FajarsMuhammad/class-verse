@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
 import ListPagination from './ListPagination.vue'
 import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
 import type { RoomHandle } from '@/realtime/useRoom'
@@ -6,7 +7,7 @@ import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
 import { kindLabel, levels, moduleApi } from '@/api/modules'
 import { quizApi } from '@/api/quizzes'
-import type { FileItem, Level, Module, ModuleInput, ModuleStep, Quiz, StepInput } from '@/api/types'
+import type { Level, Module, ModuleInput, ModuleStep, StepInput } from '@/api/types'
 import RichEditor from './RichEditor.vue'
 import StatusTabs from './StatusTabs.vue'
 import RichContent from './RichContent.vue'
@@ -23,8 +24,6 @@ const emit = defineEmits<{ pinned: []; assign: [moduleId: string] }>()
 const id = useId()
 const modules = ref<Module[]>([])
 const buildings = ref<Building[]>([])
-const files = ref<FileItem[]>([])
-const quizzes = ref<Quiz[]>([]) // published quizzes of the building whose step form is open
 const editing = ref<string | null>(null) // module id or 'new'
 const form = ref<ModuleInput>(blank())
 const stepFor = ref<string | null>(null) // module id whose step form is open
@@ -235,6 +234,14 @@ async function archive(m: Module) {
   if (await run(() => moduleApi.archive(props.orgId, m.id), `${m.title} diarsipkan.`)) selected.value = null
 }
 
+async function fileOptions(offset: number) {
+ const result = await fileApi.list(props.orgId, offset)
+ return { items: result.items.map(f => ({ value: f.id, label: f.name })), more: result.items.length === 20 }
+}
+async function quizOptions(offset: number) {
+ const result = await quizApi.list(props.orgId, { building_key: active.value?.building_key, offset, limit: 20 })
+ return { items: result.items.map(q => ({ value: q.id, label: `${q.title} (${q.level}, ${q.question_count} soal)` })), more: offset + result.items.length < (result.total ?? (result.items.length === 20 ? offset + 21 : offset)) }
+}
 function editStep(m: Module, s?: ModuleStep) {
   stepSave.discard()
   stepVersion.value=m.draft_version!
@@ -246,11 +253,7 @@ function editStep(m: Module, s?: ModuleStep) {
     ? { kind: s.kind, title: s.title, body: s.body, file_id: s.file_id, video_id: s.video_id ?? '', quiz_id: s.quiz_id, minutes: s.minutes, rich_content:s.rich_content }
     : blankStep()
   stepSave.reset()
-  if (!files.value.length) {
-    fileApi.list(props.orgId).then((r) => (files.value = r.items)).catch((err) => { error.value = errorMessage(err) })
-  }
-  // Only published quizzes of this building can be linked (the server checks too).
-  quizApi.list(props.orgId, { building_key: m.building_key }).then((r) => (quizzes.value = r.items)).catch((err) => { error.value = errorMessage(err) })
+
 }
 async function saveStep() {
  await stepSave.flush(true)
@@ -464,22 +467,16 @@ onMounted(async () => {
           <p v-if="fields.title" class="field-error">{{ fields.title }}</p>
           <template v-if="step.kind === 'berkas'">
             <label :for="`${id}-sf`">File</label>
-            <select :id="`${id}-sf`" v-model="step.file_id" :aria-invalid="!!fields.file_id">
-              <option :value="null" disabled>Pilih file</option>
-              <option v-for="f in files" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
+            <PagedSelect :id="`${id}-sf`" :model-value="step.file_id ?? ''" label="Pilih berkas" :load="fileOptions" @update:model-value="step.file_id = $event || null" />
             <p :class="fields.file_id ? 'field-error' : 'hint'">
-              {{ fields.file_id || (files.length ? 'PDF atau audio dari File belajar.' : 'Belum ada file. Unggah dulu di File belajar.') }}
+              {{ fields.file_id || 'PDF atau audio dari File belajar. Ganti halaman pilihan untuk berkas lainnya.' }}
             </p>
           </template>
           <template v-if="step.kind === 'kuis'">
             <label :for="`${id}-sq`">Kuis</label>
-            <select :id="`${id}-sq`" v-model="step.quiz_id" aria-label="Kuis" :aria-invalid="!!fields.quiz_id">
-              <option :value="null" disabled>Pilih kuis</option>
-              <option v-for="z in quizzes" :key="z.id" :value="z.id">{{ z.title }} ({{ z.level }}, {{ z.question_count }} soal)</option>
-            </select>
+            <PagedSelect :id="`${id}-sq`" :model-value="step.quiz_id ?? ''" label="Kuis" :load="quizOptions" @update:model-value="step.quiz_id = $event || null" />
             <p :class="fields.quiz_id ? 'field-error' : 'hint'">
-              {{ fields.quiz_id || (quizzes.length ? 'Selesai otomatis saat peserta lulus kuis.' : 'Belum ada kuis terbit di gedung ini. Buat di bagian Kuis.') }}
+              {{ fields.quiz_id || 'Selesai otomatis saat peserta lulus kuis. Pilihan hanya kuis terbit di gedung ini.' }}
             </p>
           </template>
           <template v-if="step.kind === 'video'">

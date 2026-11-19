@@ -699,7 +699,7 @@ paths:
       operationId: listFiles
       description: File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota.
       parameters:
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
@@ -990,6 +990,7 @@ paths:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
         - { name: search, in: query, schema: { type: string } }
         - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
+        - { name: module_id, in: query, schema: { type: string, format: uuid }, description: "Ambil satu modul untuk pin/detail tanpa memuat daftar." }
       responses:
         "200":
           description: Daftar modul
@@ -1474,8 +1475,10 @@ paths:
     get:
       operationId: listAssignments
       parameters:
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+        - { name: search, in: query, schema: { type: string }, description: "Cari nama sebelum pagination." }
+        - { name: class_name, in: query, schema: { type: string }, description: "Nama kelas pada snapshot tugas." }
       responses:
         "200":
           description: Own tasks for participants, all school tasks for staff
@@ -1554,6 +1557,20 @@ paths:
       responses:
         "204": { description: Done or identical retry }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/management-summary:
+    get:
+      operationId: getManagementSummary
+      parameters:
+        - { $ref: '#/components/parameters/OrgID' }
+      responses:
+        '200':
+          description: School-wide counts for staff; class attention uses active academic year.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: integer }
+        default: { $ref: '#/components/responses/Error' }
   /api/orgs/{org_id}/academic-years:
     parameters:
       - $ref: "#/components/parameters/OrgID"
@@ -1561,7 +1578,7 @@ paths:
       operationId: listAcademicYears
       description: Pengajar/admin. Tahun ajaran sekolah, terbaru dulu; tepat satu aktif bila ada.
       parameters:
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
@@ -1618,8 +1635,9 @@ paths:
       operationId: listClasses
       description: Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa, wali kelas, jumlah guru mapel dan peran pemanggil; kelas yang diajar pemanggil lebih dulu.
       parameters:
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+        - { name: search, in: query, schema: { type: string }, description: "Cari nama sebelum pagination." }
       responses:
         "200":
           description: Daftar kelas

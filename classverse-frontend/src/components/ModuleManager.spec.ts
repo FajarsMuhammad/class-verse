@@ -105,7 +105,7 @@ it('adds a quiz step pointing at a published quiz of the same building', async (
   await w.get('.add').trigger('click')
   await w.get('form select').setValue('kuis')
   await flushPromises()
-  expect(quizzes).toHaveBeenCalledWith('o', { building_key: 'sains' })
+  expect(quizzes).toHaveBeenCalledWith('o', { building_key: 'sains', offset: 0, limit: 20 })
   await w.findAll('form input')[0]!.setValue('Kuis kecil')
   await w.get('form select[aria-label="Kuis"]').setValue('q1')
   await w.get('form').trigger('submit')

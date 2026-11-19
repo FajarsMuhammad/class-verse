@@ -325,6 +325,11 @@ func (s *Service) Activate(ctx context.Context, userID, orgID, yearID uuid.UUID)
 
 // Classes lists the active classes of a year with their student counts (teacher/admin).
 func (s *Service) Classes(ctx context.Context, userID, orgID, yearID uuid.UUID, page ...int32) ([]Class, error) {
+	return s.ClassesFiltered(ctx, userID, orgID, yearID, "", page...)
+}
+
+// ClassesFiltered applies name search before pagination.
+func (s *Service) ClassesFiltered(ctx context.Context, userID, orgID, yearID uuid.UUID, search string, page ...int32) ([]Class, error) {
 	pageLimit := pgtype.Int4{}
 	pageOffset := int32(0)
 	if len(page) == 2 {
@@ -339,7 +344,7 @@ func (s *Service) Classes(ctx context.Context, userID, orgID, yearID uuid.UUID, 
 	if _, err := year(ctx, q, orgID, yearID); err != nil {
 		return nil, err
 	}
-	rows, err := q.ListClasses(ctx, query.ListClassesParams{PageLimit: pageLimit, PageOffset: pageOffset, UserID: userID, OrgID: orgID, AcademicYearID: yearID})
+	rows, err := q.ListClasses(ctx, query.ListClassesParams{Search: search, PageLimit: pageLimit, PageOffset: pageOffset, UserID: userID, OrgID: orgID, AcademicYearID: yearID})
 	if err != nil {
 		return nil, fmt.Errorf("list classes: %w", err)
 	}
@@ -635,11 +640,17 @@ func (s *Service) History(ctx context.Context, userID, orgID, studentID uuid.UUI
 }
 
 // Staff lists the school's teachers and admins, candidates for class teachers (teacher/admin).
-func (s *Service) Staff(ctx context.Context, userID, orgID uuid.UUID) ([]StaffMember, error) {
+func (s *Service) Staff(ctx context.Context, userID, orgID uuid.UUID, page ...int32) ([]StaffMember, error) {
 	if _, err := s.auth.Authorize(ctx, userID, orgID, org.RoleTeacher); err != nil {
 		return nil, err
 	}
-	rows, err := query.New(s.pool).ListStaff(ctx, orgID)
+	limit := pgtype.Int4{}
+	offset := int32(0)
+	if len(page) == 2 {
+		limit = pgtype.Int4{Int32: page[0], Valid: true}
+		offset = page[1]
+	}
+	rows, err := query.New(s.pool).ListStaff(ctx, query.ListStaffParams{OrgID: orgID, PageLimit: limit, PageOffset: offset})
 	if err != nil {
 		return nil, fmt.Errorf("list staff: %w", err)
 	}
@@ -843,4 +854,12 @@ func (s *Service) Promote(ctx context.Context, userID, orgID, toYear, fromYear u
 		return nil
 	})
 	return res, err
+}
+
+// Summary returns school-wide management counts without reading list pages.
+func (s *Service) Summary(ctx context.Context, userID, orgID uuid.UUID) (query.ManagementSummaryRow, error) {
+	if _, err := s.auth.Authorize(ctx, userID, orgID, org.RoleTeacher); err != nil {
+		return query.ManagementSummaryRow{}, err
+	}
+	return query.New(s.pool).ManagementSummary(ctx, orgID)
 }

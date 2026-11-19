@@ -16,10 +16,11 @@ const year = (org: string, id: string) => `${base(org)}/academic-years/${encodeU
 const cls = (org: string, id: string) => `${base(org)}/classes/${encodeURIComponent(id)}`
 
 export const classApi = {
-  years: (org: string, offset?: number) => api<{ items: AcademicYear[] }>(`${base(org)}/academic-years${offset === undefined ? '' : `?limit=20&offset=${offset}`}`),
+  summary: (org: string) => api<{ published_modules: number; published_quizzes: number; active_assignments: number; draft_modules: number; empty_quizzes: number; students: number; missing_homerooms: number; empty_classes: number }>(`${base(org)}/management-summary`),
+  years: (org: string, offset = 0) => api<{ items: AcademicYear[] }>(`${base(org)}/academic-years${offset === undefined ? '' : `?limit=20&offset=${offset}`}`),
   createYear: (org: string, label: string) => api<AcademicYear>(`${base(org)}/academic-years`, { method: 'POST', body: { label } }),
   activate: (org: string, id: string) => api<void>(`${year(org, id)}/active`, { method: 'PUT' }),
-  classes: (org: string, id: string, offset?: number) => api<{ items: SchoolClass[] }>(`${year(org, id)}/classes${offset === undefined ? '' : `?limit=20&offset=${offset}`}`),
+  classes: (org: string, id: string, offset = 0, search = '') => api<{ items: SchoolClass[] }>(`${year(org, id)}/classes${offset === undefined ? '' : `?limit=20&offset=${offset}&search=${encodeURIComponent(search)}`}`),
   create: (org: string, id: string, name: string) => api<SchoolClass>(`${year(org, id)}/classes`, { method: 'POST', body: { name } }),
   rename: (org: string, id: string, name: string) => api<SchoolClass>(cls(org, id), { method: 'PUT', body: { name } }),
   archive: (org: string, id: string) => api<void>(cls(org, id), { method: 'DELETE' }),
@@ -33,7 +34,7 @@ export const classApi = {
     api<{ created: number; skipped: string[] }>(`${year(org, id)}/copy`, { method: 'POST', body: { from_year_id: from, teachers } }),
   promote: (org: string, id: string, from: string, mappings: { from_class_id: string; to_class_id: string }[]) =>
     api<{ moved: number; skipped: Person[] }>(`${year(org, id)}/promotions`, { method: 'POST', body: { from_year_id: from, mappings } }),
-  staff: (org: string) => api<{ items: Staff[] }>(`${base(org)}/staff`),
+  staff: (org: string, offset = 0) => api<{ items: Staff[] }>(`${base(org)}/staff?limit=20&offset=${offset}`),
   teachers: (org: string, id: string) => api<{ items: ClassTeacher[] }>(`${cls(org, id)}/teachers`),
   setTeacher: (org: string, id: string, user: string, role: 'homeroom' | 'subject', subject = '') =>
     api<void>(`${cls(org, id)}/teachers/${encodeURIComponent(user)}`, { method: 'PUT', body: { role, subject } }),

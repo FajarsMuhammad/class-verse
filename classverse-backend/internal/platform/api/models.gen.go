@@ -1662,7 +1662,7 @@ type RequestGuestAccessJSONBody struct {
 
 // ListAcademicYearsParams defines parameters for ListAcademicYears.
 type ListAcademicYearsParams struct {
-	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	// Limit Ukuran halaman; default 20.
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
@@ -1675,9 +1675,12 @@ type CreateAcademicYearJSONBody struct {
 
 // ListClassesParams defines parameters for ListClasses.
 type ListClassesParams struct {
-	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	// Limit Ukuran halaman; default 20.
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Search Cari nama sebelum pagination.
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
 // CopyYearClassesJSONBody defines parameters for CopyYearClasses.
@@ -1722,9 +1725,15 @@ type PlaceStudentJSONBody struct {
 
 // ListAssignmentsParams defines parameters for ListAssignments.
 type ListAssignmentsParams struct {
-	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	// Limit Ukuran halaman; default 20.
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Search Cari nama sebelum pagination.
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// ClassName Nama kelas pada snapshot tugas.
+	ClassName *string `form:"class_name,omitempty" json:"class_name,omitempty"`
 }
 
 // SetClassTeacherJSONBody defines parameters for SetClassTeacher.
@@ -1740,7 +1749,7 @@ type SetClassTeacherJSONBodyRole string
 
 // ListFilesParams defines parameters for ListFiles.
 type ListFilesParams struct {
-	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	// Limit Ukuran halaman; default 20.
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
@@ -1829,6 +1838,9 @@ type ListModulesParams struct {
 	Limit  *int                     `form:"limit,omitempty" json:"limit,omitempty"`
 	Search *string                  `form:"search,omitempty" json:"search,omitempty"`
 	Status *ListModulesParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// ModuleId Ambil satu modul untuk pin/detail tanpa memuat daftar.
+	ModuleId *openapi_types.UUID `form:"module_id,omitempty" json:"module_id,omitempty"`
 }
 
 // ListModulesParamsStatus defines parameters for ListModules.

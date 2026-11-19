@@ -1,16 +1,15 @@
 <script setup lang="ts">
+import PagedSelect from './PagedSelect.vue'
 import RemotePagination from './RemotePagination.vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { assignmentApi, deadline, type Assignment, type AssignmentRecipient, type AssignmentInput } from '@/api/assignments'
 import { classApi, type AcademicYear, type SchoolClass } from '@/api/classes'
 import { moduleApi } from '@/api/modules'
-import type { Module } from '@/api/types'
 import { ApiError, errorMessage } from '@/api/client'
 const props = defineProps<{ orgId: string; moduleId?: string }>()
 const years = ref<AcademicYear[]>([])
 const year = ref('')
 const classes = ref<SchoolClass[]>([])
-const modules = ref<Module[]>([])
 const tasks = ref<Assignment[]>([])
 const classID = ref('')
 const moduleID = ref(props.moduleId ?? '')
@@ -23,6 +22,7 @@ const classFilter = ref('')
 const visibleTasks = computed(() => tasks.value.filter(a => (!classFilter.value || a.class_name === classFilter.value) && a.title.toLowerCase().includes(search.value.trim().toLowerCase())))
 const pageNumber = ref(1)
 function movePage(delta: number) { pageNumber.value += delta; void load() }
+watch([search, classFilter], () => { pageNumber.value = 1; void load() })
 async function openPanel() { panelOpen.value = true; await nextTick(); panel.value?.focus() }
 function closePanel() { panelOpen.value = false; newButton.value?.focus() }
 const roster = ref<AssignmentRecipient[]>([])
@@ -33,15 +33,34 @@ const pending = ref<AssignmentInput | null>(null)
 const pendingKey = `kv-assignment-pending:${props.orgId}`
 let generation = 0
 onBeforeUnmount(() => { generation++ })
+async function classFilterOptions(offset: number) {
+ if (!year.value) return { items: [], more: false }
+ const result = await classApi.classes(props.orgId, year.value, offset)
+ return { items: result.items.map(c => ({ value: c.name, label: c.name })), more: result.items.length === 20 }
+}
+async function classOptions(offset: number) {
+ if (!year.value) return { items: [], more: false }
+ const result = await classApi.classes(props.orgId, year.value, offset)
+ return { items: result.items.map(c => ({ value: c.id, label: `${c.name} · ${c.students} siswa${!c.students ? ' · Belum bisa ditugaskan' : ''}`, disabled: !c.students })), more: result.items.length === 20 }
+}
+async function moduleOptions(offset: number) {
+ const result = await moduleApi.list(props.orgId, { limit: 20, offset })
+ return { items: result.items.filter(m => m.published && m.steps.length > 0).map(m => ({ value: m.id, label: `${m.title} · ${m.level}` })), more: offset + 20 < (result.total ?? (result.items.length === 20 ? offset + 21 : offset)) }
+}
+async function yearOptions(offset: number) {
+ const result = await classApi.years(props.orgId, offset)
+ years.value = [...years.value.filter(y => !result.items.some(n => n.id === y.id)), ...result.items]
+ return { items: result.items.map(y => ({ value: y.id, label: y.label + (y.active ? ' · Aktif' : '') })), more: result.items.length === 20 }
+}
 async function load() {
   const g = ++generation; busy.value = true; error.value = ''
   try {
-    const [y, m, a] = await Promise.all([classApi.years(props.orgId), moduleApi.list(props.orgId), assignmentApi.list(props.orgId, (pageNumber.value - 1) * 20)])
+    const [y, a] = await Promise.all([classApi.years(props.orgId), assignmentApi.list(props.orgId, (pageNumber.value - 1) * 20, search.value.trim(), classFilter.value)])
     if (g !== generation) return
-    years.value = y.items; modules.value = m.items.filter(m => m.published && m.steps.length > 0); tasks.value = a.items
-    year.value = y.items.find(y => y.id === year.value)?.id ?? y.items.find(y => y.active)?.id ?? y.items[0]?.id ?? ''
+    years.value = y.items; tasks.value = a.items
+    year.value = year.value || y.items.find(y => y.active)?.id || y.items[0]?.id || ''
     if (year.value) {
-      const c = await classApi.classes(props.orgId, year.value)
+      const c = await classApi.classes(props.orgId, year.value, 0)
       if (g === generation) classes.value = c.items
     } else classes.value = []
   } catch (e) { if (g === generation) error.value = errorMessage(e) }
@@ -50,7 +69,7 @@ async function load() {
 async function changeYear() {
   classID.value = ''; classes.value = []; busy.value = true; error.value = ''
   const g = ++generation
-  try { const result = await classApi.classes(props.orgId, year.value); if (g === generation) classes.value = result.items }
+  try { const result = await classApi.classes(props.orgId, year.value, 0); if (g === generation) classes.value = result.items }
   catch (e) { if (g === generation) error.value = errorMessage(e) }
   finally { if (g === generation) busy.value = false }
 }
@@ -109,7 +128,7 @@ onMounted(() => {
     <div class="task-layout" :class="{ 'with-panel': panelOpen }">
     <div class="task-list">
       <div class="toolbar">
-        <label>Filter kelas <select v-model="classFilter"><option value="">Semua kelas</option><option v-for="name in [...new Set(tasks.map(a => a.class_name))]" :key="name" :value="name">{{ name }}</option></select></label>
+        <PagedSelect v-model="classFilter" label="Filter kelas" placeholder="Semua kelas" :key="`filter-${year}`" :load="classFilterOptions" />
         <label>Cari tugas <input v-model="search" type="search" placeholder="Cari tugas…" /></label>
       </div>
       <ul class="tasks"><li v-for="a in visibleTasks" :key="a.id">
@@ -125,9 +144,9 @@ onMounted(() => {
     <form @submit.prevent="issue">
       <fieldset :disabled="busy || !!pending">
         <legend class="sr-only">Pilih penerima dan modul</legend>
-        <label>Tahun ajaran <select v-model="year" required @change="changeYear"><option value="" disabled>Pilih tahun</option><option v-for="y in years" :key="y.id" :value="y.id">{{ y.label }}</option></select></label>
-        <label>1 · Kelas <select v-model="classID" required><option value="" disabled>Pilih kelas</option><option v-for="c in classes" :key="c.id" :value="c.id" :disabled="!c.students">{{ c.name }} · {{ c.students }} siswa{{ !c.students ? ' · Belum bisa ditugaskan' : '' }}</option></select></label>
-        <label>2 · Modul terbit <select v-model="moduleID" required><option value="" disabled>Pilih modul</option><option v-for="m in modules" :key="m.id" :value="m.id">{{ m.title }} · {{ m.level }}</option></select></label>
+        <PagedSelect v-model="year" label="Tahun ajaran" :load="yearOptions" @update:model-value="changeYear" />
+        <PagedSelect v-model="classID" label="1 · Kelas" placeholder="Pilih kelas" :load="classOptions" :key="year" :disabled="busy || !year" />
+        <PagedSelect v-model="moduleID" label="2 · Modul terbit" placeholder="Pilih modul" :load="moduleOptions" :disabled="busy" />
         <label>3 · Tenggat opsional (WIB) <input v-model="due" type="datetime-local" /></label>
       </fieldset>
       <p>Tenggat hanya penanda, siswa tetap bisa mengerjakan setelahnya.</p>
