@@ -115,11 +115,20 @@ type StepResponse struct {
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
+	var pagination []int32
+	if r.URL.Query().Has("limit") || r.URL.Query().Has("offset") {
+		limit, offset, err := httpx.Pagination(r)
+		if err != nil {
+			return err
+		}
+		pagination = []int32{limit, offset}
+	}
+
 	user, p, err := ids(r, "org_id")
 	if err != nil {
 		return err
 	}
-	rows, err := h.svc.List(r.Context(), user, p[0])
+	rows, err := h.svc.List(r.Context(), user, p[0], pagination...)
 	if err != nil {
 		return err
 	}

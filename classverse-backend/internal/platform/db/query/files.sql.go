@@ -153,12 +153,14 @@ SELECT f.id, f.kind, f.name, f.size_bytes, f.content_type, f.uploaded_by, f.crea
   COALESCE(p.position, 0)::integer AS position
 FROM files f LEFT JOIN reader_positions p ON p.file_id = f.id AND p.user_id = $1
 WHERE f.org_id = $2 AND f.status = 'ready'
-ORDER BY f.created_at DESC, f.id LIMIT 200
+ORDER BY f.created_at DESC, f.id LIMIT $4::integer OFFSET $3::integer
 `
 
 type ListReadyFilesParams struct {
-	UserID uuid.UUID
-	OrgID  uuid.UUID
+	UserID     uuid.UUID
+	OrgID      uuid.UUID
+	PageOffset int32
+	PageLimit  pgtype.Int4
 }
 
 type ListReadyFilesRow struct {
@@ -173,7 +175,12 @@ type ListReadyFilesRow struct {
 }
 
 func (q *Queries) ListReadyFiles(ctx context.Context, arg ListReadyFilesParams) ([]ListReadyFilesRow, error) {
-	rows, err := q.db.Query(ctx, listReadyFiles, arg.UserID, arg.OrgID)
+	rows, err := q.db.Query(ctx, listReadyFiles,
+		arg.UserID,
+		arg.OrgID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

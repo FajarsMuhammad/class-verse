@@ -23,7 +23,7 @@ it('lists drafts compactly and only shows options in preview', async () => {
   const list = vi.spyOn(quizApi, 'list').mockResolvedValue({ items: [quiz()] })
   const w = mount(QuizManager, { props: { orgId: 'o' } })
   await flushPromises()
-  expect(list).toHaveBeenCalledWith('o', { drafts: true })
+  expect(list).toHaveBeenCalledWith('o', expect.objectContaining({ drafts: true }))
   expect(w.text()).toContain('Menara Sains · SD')
   expect(w.text()).toContain('Draf')
   expect(w.find('.correct').exists()).toBe(false)

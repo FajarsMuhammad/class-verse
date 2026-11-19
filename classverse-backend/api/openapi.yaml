@@ -698,6 +698,9 @@ paths:
     get:
       operationId: listFiles
       description: File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
           description: Daftar file
@@ -976,11 +979,17 @@ paths:
       operationId: listModules
       description: |
         Modul (jalur belajar) beserta langkah aktif berurutan. Peserta hanya melihat modul terbit; `drafts=true`
-        menyertakan draf untuk pengajar/admin. Arsip tidak pernah tampil. Maksimal 100 modul.
+        menyertakan draf untuk pengajar/admin. `archived=true` hanya untuk pengajar/admin, mengembalikan
+        daftar arsip terpisah (bukan gabungan dengan modul aktif). Maksimal 100 modul.
       parameters:
         - { name: building_key, in: query, schema: { type: string } }
         - { name: level, in: query, schema: { $ref: "#/components/schemas/Level" } }
         - { name: drafts, in: query, schema: { type: boolean } }
+        - { name: archived, in: query, schema: { type: boolean, default: false } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 }, description: "Lewati sejumlah baris; satu respons maksimal 100 item." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
       responses:
         "200":
           description: Daftar modul
@@ -1169,6 +1178,10 @@ paths:
         - { name: building_key, in: query, schema: { type: string } }
         - { name: level, in: query, schema: { $ref: "#/components/schemas/Level" } }
         - { name: drafts, in: query, schema: { type: boolean } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 }, description: "Lewati sejumlah baris; satu respons maksimal 100 item." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
       responses:
         "200":
           description: Daftar kuis
@@ -1460,6 +1473,9 @@ paths:
       - $ref: "#/components/parameters/OrgID"
     get:
       operationId: listAssignments
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
           description: Own tasks for participants, all school tasks for staff
@@ -1544,6 +1560,9 @@ paths:
     get:
       operationId: listAcademicYears
       description: Pengajar/admin. Tahun ajaran sekolah, terbaru dulu; tepat satu aktif bila ada.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
           description: Daftar tahun ajaran
@@ -1598,6 +1617,9 @@ paths:
     get:
       operationId: listClasses
       description: Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa, wali kelas, jumlah guru mapel dan peran pemanggil; kelas yang diajar pemanggil lebih dulu.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; bersama offset mengaktifkan pagination." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
           description: Daftar kelas

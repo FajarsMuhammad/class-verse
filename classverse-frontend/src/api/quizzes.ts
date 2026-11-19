@@ -9,16 +9,23 @@ export interface QuizQuery {
   building_key?: string
   level?: Level | ''
   drafts?: boolean
+  offset?: number
+  limit?: number
+  search?: string
+  status?: string
 }
 
 export const quizApi = {
-  list: (orgID: string, query: QuizQuery = {}) => {
+  list: async (orgID: string, query: QuizQuery = {}) => {
     const p = new URLSearchParams()
     if (query.building_key) p.set('building_key', query.building_key)
     if (query.level) p.set('level', query.level)
     if (query.drafts) p.set('drafts', 'true')
-    const qs = p.toString()
-    return api<{ items: Quiz[] }>(qs ? `${base(orgID)}?${qs}` : base(orgID))
+    if (query.offset !== undefined) p.set('offset', String(query.offset))
+    if (query.limit !== undefined) p.set('limit', String(query.limit))
+    if (query.search) p.set('search', query.search)
+    if (query.status) p.set('status', query.status)
+    return api<{ items: Quiz[]; total?: number }>(`${base(orgID)}?${p}`)
   },
   create: (orgID: string, body: QuizInput) => api<Quiz>(base(orgID), { method: 'POST', body }),
   update: (orgID: string, id: string, body: QuizInput) => api<Quiz>(one(orgID, id), { method: 'PUT', body }),

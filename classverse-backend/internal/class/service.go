@@ -249,11 +249,18 @@ func isHomeroom(ctx context.Context, q *query.Queries, classID, userID uuid.UUID
 }
 
 // Years lists the school's academic years, newest first (teacher/admin).
-func (s *Service) Years(ctx context.Context, userID, orgID uuid.UUID) ([]Year, error) {
+func (s *Service) Years(ctx context.Context, userID, orgID uuid.UUID, page ...int32) ([]Year, error) {
+	pageLimit := pgtype.Int4{}
+	pageOffset := int32(0)
+	if len(page) == 2 {
+		pageLimit = pgtype.Int4{Int32: page[0], Valid: true}
+		pageOffset = page[1]
+	}
+
 	if _, err := s.auth.Authorize(ctx, userID, orgID, org.RoleTeacher); err != nil {
 		return nil, err
 	}
-	rows, err := query.New(s.pool).ListAcademicYears(ctx, orgID)
+	rows, err := query.New(s.pool).ListAcademicYears(ctx, query.ListAcademicYearsParams{OrgID: orgID, PageLimit: pageLimit, PageOffset: pageOffset})
 	if err != nil {
 		return nil, fmt.Errorf("list academic years: %w", err)
 	}
@@ -317,7 +324,14 @@ func (s *Service) Activate(ctx context.Context, userID, orgID, yearID uuid.UUID)
 }
 
 // Classes lists the active classes of a year with their student counts (teacher/admin).
-func (s *Service) Classes(ctx context.Context, userID, orgID, yearID uuid.UUID) ([]Class, error) {
+func (s *Service) Classes(ctx context.Context, userID, orgID, yearID uuid.UUID, page ...int32) ([]Class, error) {
+	pageLimit := pgtype.Int4{}
+	pageOffset := int32(0)
+	if len(page) == 2 {
+		pageLimit = pgtype.Int4{Int32: page[0], Valid: true}
+		pageOffset = page[1]
+	}
+
 	if _, err := s.auth.Authorize(ctx, userID, orgID, org.RoleTeacher); err != nil {
 		return nil, err
 	}
@@ -325,7 +339,7 @@ func (s *Service) Classes(ctx context.Context, userID, orgID, yearID uuid.UUID) 
 	if _, err := year(ctx, q, orgID, yearID); err != nil {
 		return nil, err
 	}
-	rows, err := q.ListClasses(ctx, query.ListClassesParams{UserID: userID, OrgID: orgID, AcademicYearID: yearID})
+	rows, err := q.ListClasses(ctx, query.ListClassesParams{PageLimit: pageLimit, PageOffset: pageOffset, UserID: userID, OrgID: orgID, AcademicYearID: yearID})
 	if err != nil {
 		return nil, fmt.Errorf("list classes: %w", err)
 	}

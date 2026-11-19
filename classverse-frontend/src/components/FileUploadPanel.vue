@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RemotePagination from './RemotePagination.vue'
 import { onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
@@ -14,6 +15,8 @@ const sent = ref(0)
 const message = ref('')
 const error = ref('')
 const files = ref<FileItem[]>([])
+const pageNumber = ref(1)
+function movePage(delta: number) { pageNumber.value += delta; void load() }
 const used = ref(0)
 const quota = ref(0)
 const reading = ref<FileItem | null>(null)
@@ -24,7 +27,7 @@ const mb = (n: number) => `${(n / 1_000_000).toLocaleString('id-ID', { maximumFr
 
 async function load() {
   try {
-    const list = await fileApi.list(props.orgId)
+    const list = await fileApi.list(props.orgId, (pageNumber.value - 1) * 20)
     files.value = list.items
     used.value = list.used_bytes
     quota.value = list.quota_bytes
@@ -158,6 +161,7 @@ onBeforeUnmount(() => controller?.abort())
     </ul>
     <FileReader v-if="reading" :key="reading.id" :org-id="orgId" :file="reading" @close="closed" />
   </section>
+  <RemotePagination :page="pageNumber" :more="files.length === 20" @move="movePage" />
 </template>
 
 <style scoped>

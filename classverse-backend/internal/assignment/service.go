@@ -143,12 +143,19 @@ func (s *Service) Issue(ctx context.Context, user, orgID uuid.UUID, in Input) (q
 }
 
 // List returns own tasks for students, all school tasks for staff.
-func (s *Service) List(ctx context.Context, user, orgID uuid.UUID) ([]query.ListAssignmentsRow, error) {
+func (s *Service) List(ctx context.Context, user, orgID uuid.UUID, page ...int32) ([]query.ListAssignmentsRow, error) {
+	pageLimit := pgtype.Int4{}
+	pageOffset := int32(0)
+	if len(page) == 2 {
+		pageLimit = pgtype.Int4{Int32: page[0], Valid: true}
+		pageOffset = page[1]
+	}
+
 	role, err := s.auth.Authorize(ctx, user, orgID, org.RoleParticipant)
 	if err != nil {
 		return nil, err
 	}
-	return query.New(s.pool).ListAssignments(ctx, query.ListAssignmentsParams{OrgID: orgID, UserID: user, Staff: role.AtLeast(org.RoleTeacher)})
+	return query.New(s.pool).ListAssignments(ctx, query.ListAssignmentsParams{PageLimit: pageLimit, PageOffset: pageOffset, OrgID: orgID, UserID: user, Staff: role.AtLeast(org.RoleTeacher)})
 }
 func (s *Service) accessible(ctx context.Context, q *query.Queries, user, orgID, id uuid.UUID, role org.Role) (query.Assignment, error) {
 	a, err := q.GetAssignment(ctx, query.GetAssignmentParams{OrgID: orgID, ID: id})

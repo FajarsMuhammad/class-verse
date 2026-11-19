@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RemotePagination from './RemotePagination.vue'
 import { computed, onMounted, ref, useId } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { fileApi } from '@/api/files'
@@ -20,6 +21,14 @@ const blank = (): BookInput => ({
 
 const id = useId()
 const books = ref<Book[]>([])
+const pageNumber = ref(1)
+const cursors = ref<(string | undefined)[]>([undefined])
+async function movePage(delta: number) {
+ if (delta > 0) cursors.value = [...cursors.value.slice(0, pageNumber.value), next.value ?? undefined]
+ pageNumber.value += delta
+ await loadPage()
+}
+async function loadPage() { await load(true) }
 const next = ref<string | null>(null)
 const files = ref<FileItem[]>([])
 const editing = ref<string | null>(null)
@@ -34,9 +43,10 @@ const reading = ref<ReadableFile | null>(null)
 const choices = computed(() => files.value.filter((f) => f.kind === (form.value.format === 'audio' ? 'audio' : 'pdf')))
 
 async function load(more = false) {
+  if (!more) { pageNumber.value = 1; cursors.value = [undefined] }
   try {
-    const page = await libraryApi.list(props.orgId, { drafts: true, cursor: more ? next.value : null })
-    books.value = more ? [...books.value, ...page.items] : page.items
+    const page = await libraryApi.list(props.orgId, { drafts: true, cursor: more ? cursors.value[pageNumber.value - 1] : null })
+    books.value = page.items
     next.value = page.next_cursor
   } catch (err) {
     error.value = errorMessage(err)
@@ -146,7 +156,7 @@ onMounted(() => load())
           <input :id="`${id}-c`" v-model.number="form.copies" type="number" min="0" max="999" inputmode="numeric"
             :aria-invalid="!!fields.copies" />
           <p v-if="fields.copies" class="field-error">{{ fields.copies }}</p>
-        </template>
+</template>
         <template v-else>
           <label :for="`${id}-file`">File</label>
           <select :id="`${id}-file`" v-model="form.file_id" :aria-invalid="!!fields.file_id"
@@ -180,7 +190,8 @@ onMounted(() => load())
         </div>
       </BookCard>
     </div>
-    <button v-if="next" type="button" class="btn-secondary" @click="load(true)">Muat lagi</button>
+    <RemotePagination :page="pageNumber" :more="!!next" @move="movePage" />
+
     <FileReader v-if="reading" :key="reading.id" :org-id="orgId" :file="reading" @close="reading = null; load()" />
   </section>
 </template>

@@ -654,6 +654,42 @@ func (e SetClassTeacherJSONBodyRole) Valid() bool {
 	}
 }
 
+// Defines values for ListModulesParamsStatus.
+const (
+	ListModulesParamsStatusDraft     ListModulesParamsStatus = "draft"
+	ListModulesParamsStatusPublished ListModulesParamsStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the ListModulesParamsStatus enum.
+func (e ListModulesParamsStatus) Valid() bool {
+	switch e {
+	case ListModulesParamsStatusDraft:
+		return true
+	case ListModulesParamsStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListQuizzesParamsStatus.
+const (
+	ListQuizzesParamsStatusDraft     ListQuizzesParamsStatus = "draft"
+	ListQuizzesParamsStatusPublished ListQuizzesParamsStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the ListQuizzesParamsStatus enum.
+func (e ListQuizzesParamsStatus) Valid() bool {
+	switch e {
+	case ListQuizzesParamsStatusDraft:
+		return true
+	case ListQuizzesParamsStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListStaff200JSONResponseBodyItemsRole.
 const (
 	ListStaff200JSONResponseBodyItemsRoleAdmin   ListStaff200JSONResponseBodyItemsRole = "admin"
@@ -1624,10 +1660,24 @@ type RequestGuestAccessJSONBody struct {
 	RequestKey openapi_types.UUID `json:"request_key"`
 }
 
+// ListAcademicYearsParams defines parameters for ListAcademicYears.
+type ListAcademicYearsParams struct {
+	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // CreateAcademicYearJSONBody defines parameters for CreateAcademicYear.
 type CreateAcademicYearJSONBody struct {
 	// Label Example: 2026/2027
 	Label string `json:"label"`
+}
+
+// ListClassesParams defines parameters for ListClasses.
+type ListClassesParams struct {
+	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // CopyYearClassesJSONBody defines parameters for CopyYearClasses.
@@ -1670,6 +1720,13 @@ type PlaceStudentJSONBody struct {
 	ClassId *openapi_types.UUID `json:"class_id"`
 }
 
+// ListAssignmentsParams defines parameters for ListAssignments.
+type ListAssignmentsParams struct {
+	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // SetClassTeacherJSONBody defines parameters for SetClassTeacher.
 type SetClassTeacherJSONBody struct {
 	Role SetClassTeacherJSONBodyRole `json:"role"`
@@ -1680,6 +1737,13 @@ type SetClassTeacherJSONBody struct {
 
 // SetClassTeacherJSONBodyRole defines parameters for SetClassTeacher.
 type SetClassTeacherJSONBodyRole string
+
+// ListFilesParams defines parameters for ListFiles.
+type ListFilesParams struct {
+	// Limit Ukuran halaman; bersama offset mengaktifkan pagination.
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
 
 // GetFileContentParams defines parameters for GetFileContent.
 type GetFileContentParams struct {
@@ -1758,7 +1822,17 @@ type ListModulesParams struct {
 	BuildingKey *string `form:"building_key,omitempty" json:"building_key,omitempty"`
 	Level       *Level  `form:"level,omitempty" json:"level,omitempty"`
 	Drafts      *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+	Archived    *bool   `form:"archived,omitempty" json:"archived,omitempty"`
+
+	// Offset Lewati sejumlah baris; satu respons maksimal 100 item.
+	Offset *int                     `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit  *int                     `form:"limit,omitempty" json:"limit,omitempty"`
+	Search *string                  `form:"search,omitempty" json:"search,omitempty"`
+	Status *ListModulesParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 }
+
+// ListModulesParamsStatus defines parameters for ListModules.
+type ListModulesParamsStatus string
 
 // ReorderModuleStepsJSONBody defines parameters for ReorderModuleSteps.
 type ReorderModuleStepsJSONBody struct {
@@ -1770,7 +1844,16 @@ type ListQuizzesParams struct {
 	BuildingKey *string `form:"building_key,omitempty" json:"building_key,omitempty"`
 	Level       *Level  `form:"level,omitempty" json:"level,omitempty"`
 	Drafts      *bool   `form:"drafts,omitempty" json:"drafts,omitempty"`
+
+	// Offset Lewati sejumlah baris; satu respons maksimal 100 item.
+	Offset *int                     `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit  *int                     `form:"limit,omitempty" json:"limit,omitempty"`
+	Search *string                  `form:"search,omitempty" json:"search,omitempty"`
+	Status *ListQuizzesParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 }
+
+// ListQuizzesParamsStatus defines parameters for ListQuizzes.
+type ListQuizzesParamsStatus string
 
 // StartQuizAttemptParams defines parameters for StartQuizAttempt.
 type StartQuizAttemptParams struct {

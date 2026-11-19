@@ -1,5 +1,5 @@
 -- name: ListAcademicYears :many
-SELECT * FROM academic_years WHERE org_id = $1 ORDER BY label DESC;
+SELECT * FROM academic_years WHERE org_id = $1 ORDER BY label DESC LIMIT sqlc.narg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer;
 
 -- name: CountAcademicYears :one
 SELECT count(*)::integer FROM academic_years WHERE org_id = $1;
@@ -33,7 +33,7 @@ LEFT JOIN users hu ON hu.id = h.user_id
 LEFT JOIN class_teachers mine ON mine.class_id = c.id AND mine.user_id = sqlc.arg(user_id) AND mine.ended_at IS NULL
 WHERE c.org_id = sqlc.arg(org_id) AND c.academic_year_id = sqlc.arg(academic_year_id) AND c.archived_at IS NULL
   AND (sqlc.narg(class_id)::uuid IS NULL OR c.id = sqlc.narg(class_id))
-ORDER BY mine.role IS NULL, lower(c.name), c.id;
+ORDER BY mine.role IS NULL, lower(c.name), c.id LIMIT sqlc.narg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer;
 
 -- name: CreateClass :one
 INSERT INTO classes (id, org_id, academic_year_id, name, created_by, created_at) VALUES ($1, $2, $3, $4, $5, $6)

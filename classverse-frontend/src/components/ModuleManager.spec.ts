@@ -175,10 +175,10 @@ it('explains that a room is required on campus and never offers drafts for pinni
 })
 
 it('filters by status tab and search, and offers Tugaskan only for published modules', async () => {
-  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft, { ...draft, id: 'p', title: 'Bilangan', published: true }] })
+  vi.spyOn(moduleApi, 'list').mockImplementation(async (_org, query) => ({ items: query?.archived ? [] : [draft, { ...draft, id: 'p', title: 'Bilangan', published: true }] }))
   const w = mount(ModuleManager, { props: { orgId: 'o' } })
   await flushPromises()
-  expect(w.findAll('[role=tab]').map((t) => t.text())).toEqual(['Semua 2', 'Terbit 1', 'Draf 1'])
+  expect(w.findAll('[role=tab]').map((t) => t.text())).toEqual(['Semua 2', 'Terbit 1', 'Draf 1', 'Arsip 0'])
   expect(w.find('[aria-label="Tugaskan Tata Surya"]').exists()).toBe(false)
   await w.get('[aria-label="Tugaskan Bilangan"]').trigger('click')
   expect(w.emitted('assign')).toEqual([['p']])

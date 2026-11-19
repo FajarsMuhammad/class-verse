@@ -99,7 +99,7 @@ async function logout() {
   await auth.logout()
   await router.push({ name: 'login' })
 }
-const selectedTool = ref('modules')
+const selectedTool = ref('overview')
 function openModules() {
   selectedTool.value = 'modules'
   sideItem.value = 'tools'

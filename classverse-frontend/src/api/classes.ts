@@ -16,10 +16,10 @@ const year = (org: string, id: string) => `${base(org)}/academic-years/${encodeU
 const cls = (org: string, id: string) => `${base(org)}/classes/${encodeURIComponent(id)}`
 
 export const classApi = {
-  years: (org: string) => api<{ items: AcademicYear[] }>(`${base(org)}/academic-years`),
+  years: (org: string, offset?: number) => api<{ items: AcademicYear[] }>(`${base(org)}/academic-years${offset === undefined ? '' : `?limit=20&offset=${offset}`}`),
   createYear: (org: string, label: string) => api<AcademicYear>(`${base(org)}/academic-years`, { method: 'POST', body: { label } }),
   activate: (org: string, id: string) => api<void>(`${year(org, id)}/active`, { method: 'PUT' }),
-  classes: (org: string, id: string) => api<{ items: SchoolClass[] }>(`${year(org, id)}/classes`),
+  classes: (org: string, id: string, offset?: number) => api<{ items: SchoolClass[] }>(`${year(org, id)}/classes${offset === undefined ? '' : `?limit=20&offset=${offset}`}`),
   create: (org: string, id: string, name: string) => api<SchoolClass>(`${year(org, id)}/classes`, { method: 'POST', body: { name } }),
   rename: (org: string, id: string, name: string) => api<SchoolClass>(cls(org, id), { method: 'PUT', body: { name } }),
   archive: (org: string, id: string) => api<void>(cls(org, id), { method: 'DELETE' }),

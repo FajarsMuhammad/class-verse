@@ -138,6 +138,8 @@ watch(active, async (now, before) => {
 .wide .panel { width: min(580px, 43vw); }
 .full-page.open { flex: 1; min-width: 0; }
 .full-page .panel { flex: 1; width: auto; min-width: 0; padding: var(--space-6); }
+.full-page .panel:has([data-panel='tools']:not([style*='display: none'])) { padding: 0; border-radius: 0; }
+.full-page .panel:has([data-panel='tools']:not([style*='display: none'])) > .panel-head { padding: var(--space-4) var(--space-6); margin: 0; border-bottom: 1px solid var(--kv-line); }
 .full-page .collapse { padding: 0 var(--space-4); }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
 .panel-head h2 { margin: 0; font: var(--weight-semibold) var(--text-lg) / var(--line-tight) var(--font-display); }

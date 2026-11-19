@@ -1,4 +1,36 @@
 /* Shared by the Kelola → Kelas/Siswa/Tahun ajaran components. */
+.manage-header h2 { margin: 0 0 var(--space-2); font-family: var(--font-display); font-size: var(--text-3xl); }
+.class-panel { background: var(--kv-page); padding: var(--space-5); border-radius: var(--radius-2xl); }
+.class-group { display: grid; gap: var(--space-3); }
+.class-layout { display: grid; gap: var(--space-4); align-items: start; }
+.class-layout.has-detail { grid-template-columns: minmax(0, 1fr) minmax(300px, 340px); }
+.class-catalog { display: grid; gap: var(--space-5); min-width: 0; }
+.class-detail { min-width: 0; padding: var(--space-4); background: var(--kv-surface); border: 1px solid var(--kv-line); border-radius: var(--radius-2xl); }
+.class-detail .detail-head { margin-bottom: var(--space-4); }
+.class-detail .tabs { flex-wrap: wrap; margin-bottom: var(--space-3); }
+@media (max-width: 1100px) { .class-layout.has-detail { grid-template-columns: minmax(0, 1fr); } .class-detail { grid-row: 1; } }
+.list.class-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: var(--space-3); }
+.list.class-cards > li { padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-2xl); background: var(--kv-surface); }
+.homeroom-warning { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); flex-basis: 100%; padding: var(--space-3); border-radius: var(--radius-lg); background: var(--kv-draft-soft); color: var(--kv-draft-ink); font-size: var(--text-sm); }
+.roster-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--space-4); }
+.roster-content { min-width: 0; display: grid; gap: var(--space-3); }
+.class-filters { display: flex; flex-direction: column; gap: var(--space-2); align-self: start; padding: var(--space-3); border: 1px solid var(--kv-line); border-radius: var(--radius-2xl); background: var(--kv-surface); }
+.student-table-wrap { overflow-x: auto; background: var(--kv-surface); border: 1px solid var(--kv-line); border-radius: var(--radius-2xl); }
+.student-table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--text-sm); }
+.student-table th, .student-table td { padding: var(--space-4); border-bottom: 1px solid var(--kv-line); overflow-wrap: anywhere; }
+.student-table thead { color: var(--kv-text-muted); font-size: var(--text-xs); text-transform: uppercase; }
+.student-table tbody tr:last-child > * { border-bottom: 0; }
+.student-table tbody th { font-weight: var(--weight-semibold); }
+.student-actions { text-align: right; }
+.student-initial { display: inline-grid; place-items: center; width: var(--touch-min); height: var(--touch-min); margin-right: var(--space-2); border-radius: 50%; background: var(--kv-primary-soft); color: var(--kv-primary-soft-text); }
+@media (max-width: 700px) {
+  .student-table th, .student-table td { padding: var(--space-2); }
+  .student-initial { display: none; }
+  .student-table .badge { display: inline-block; }
+}
+.class-filters button { text-align: left; }
+.class-filters [aria-pressed='true'] { background: var(--kv-primary-soft); color: var(--kv-primary-soft-text); border-color: var(--kv-primary); }
+@media (max-width: 700px) { .roster-layout { grid-template-columns: minmax(0, 1fr); } .class-filters { flex-direction: row; flex-wrap: wrap; } .class-panel { padding: var(--space-3); } }
 .class-panel, .class-part { display: grid; gap: var(--space-3); }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: var(--space-3); }
 .muted, .meta { color: var(--kv-text-muted); font-size: var(--text-sm); margin: 0; }
@@ -30,5 +62,6 @@ input, select { box-sizing: border-box; max-width: 100%; min-height: var(--touch
 .check { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-regular); }
 .check input { min-height: auto; }
 .pager { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-.bulk { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); }
+.bulk { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); background: var(--kv-ink); color: var(--kv-surface); }
+.bulk .btn-secondary { background: var(--kv-surface); color: var(--kv-ink); }
 .section-title { margin: 0; font: var(--weight-semibold) var(--text-md)/var(--line-tight) var(--font-display); }

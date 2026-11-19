@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListPagination from './ListPagination.vue'
 import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
 import type { RoomHandle } from '@/realtime/useRoom'
 import { ApiError, errorMessage } from '@/api/client'
@@ -38,15 +39,20 @@ const selected = ref<string | null>(null)
 const statusFilter = ref('all')
 const buildingFilter = ref('')
 const search = ref('')
-// Status counts follow the other filters so each tab number matches what it would show.
-const filtered = computed(() => modules.value.filter((item) => (!levelFilter.value || item.level === levelFilter.value) &&
-  (!buildingFilter.value || item.building_key === buildingFilter.value) && item.title.toLowerCase().includes(search.value.trim().toLowerCase())))
+const page = ref(1)
+const total = ref(0)
+const pageSize = 20
+const counts = ref({ all: 0, published: 0, draft: 0, archived: 0 })
 const statusTabs = computed(() => [
-  { key: 'all', label: 'Semua', count: filtered.value.length },
-  { key: 'published', label: 'Terbit', count: filtered.value.filter((m) => m.published).length },
-  { key: 'draft', label: 'Draf', count: filtered.value.filter((m) => !m.published).length },
+ { key: 'all', label: 'Semua', count: counts.value.all },
+ { key: 'published', label: 'Terbit', count: counts.value.published },
+ { key: 'draft', label: 'Draf', count: counts.value.draft },
+ { key: 'archived', label: 'Arsip', count: counts.value.archived },
 ])
-const visible = computed(() => filtered.value.filter((item) => statusFilter.value === 'all' || item.published === (statusFilter.value === 'published')))
+const visible = computed(() => modules.value.filter(item => (!levelFilter.value || item.level === levelFilter.value) && (!buildingFilter.value || item.building_key === buildingFilter.value) && item.title.toLowerCase().includes(search.value.trim().toLowerCase()) && (!['draft', 'published'].includes(statusFilter.value) || item.published === (statusFilter.value === 'published'))))
+watch([statusFilter, levelFilter, buildingFilter, search], () => { page.value = 1; void load() })
+watch(page, () => { void load() })
+
 const active = computed(() => modules.value.find((item) => item.id === selected.value))
 const preview = ref(false)
 const starter = ref<'empty' | 'reading' | 'practice'>('empty')
@@ -130,9 +136,24 @@ function blankStep(): StepInput {
 const choices = computed(() => buildings.value.filter((b) => !b.staffOnly && (!props.buildingKey || b.key === props.buildingKey)))
 const buildingName = (key: string) => buildings.value.find((b) => b.key === key)?.name ?? key
 
+let listGeneration = 0
 async function load() {
+ const generation = ++listGeneration
   try {
-    modules.value = (await moduleApi.list(props.orgId, { drafts: true, building_key: props.buildingKey })).items
+    const result = await moduleApi.list(props.orgId, { drafts: true, archived: statusFilter.value === 'archived', building_key: props.buildingKey || buildingFilter.value, level: levelFilter.value, search: search.value, status: ['draft', 'published'].includes(statusFilter.value) ? statusFilter.value : '', offset: (page.value - 1) * pageSize, limit: pageSize })
+    if (generation !== listGeneration) return
+    modules.value = result.items
+    total.value = result.total ?? result.items.length
+    const query = { drafts: true, building_key: buildingFilter.value, level: levelFilter.value, search: search.value, limit: 1 }
+    const [all, published, draft, archived] = await Promise.all([
+      moduleApi.list(props.orgId, query),
+      moduleApi.list(props.orgId, { ...query, status: 'published' }),
+      moduleApi.list(props.orgId, { ...query, status: 'draft' }),
+      moduleApi.list(props.orgId, { ...query, archived: true }),
+    ])
+    if (generation !== listGeneration) return
+    counts.value = { all: all.total ?? all.items.length, published: published.total ?? published.items.filter(i => i.published).length, draft: draft.total ?? draft.items.filter(i => !i.published).length, archived: archived.total ?? archived.items.length }
+
   } catch (err) {
     error.value = errorMessage(err)
   }
@@ -281,7 +302,7 @@ onMounted(async () => {
     <p v-if="message" class="notice" role="status">{{ message }}</p>
     <p v-if="error" class="alert" role="alert">{{ error }}</p>
 
-    <header v-if="selected || editing" class="editor-head">
+    <header v-if="selected || (editing && editing !== 'new')" class="editor-head">
       <button type="button" class="btn-secondary" data-action="back" :disabled="busy" @click="back">Kembali ke daftar</button>
       <h3 ref="editorHeading" class="editor-title" tabindex="-1">{{ active?.title || 'Modul baru' }}</h3>
       <span v-if="active" class="chip">{{ active.published ? 'Terbit' : 'Draf' }}</span>
@@ -342,8 +363,8 @@ onMounted(async () => {
               <td><span class="tag">{{ buildingName(item.building_key) }}</span></td>
               <td>{{ item.level }}</td>
               <td class="meta"><span class="phone-only">{{ buildingName(item.building_key) }} · {{ item.level }} · </span>{{ item.steps.length }} langkah</td>
-              <td><span :class="['chip', item.published ? 'ok' : 'draft']">{{ item.published ? 'Terbit' : 'Draf' }}</span></td>
-              <td class="row-actions">
+              <td><span :class="['chip', statusFilter !== 'archived' && item.published ? 'ok' : 'draft']">{{ statusFilter === 'archived' ? 'Arsip' : item.published ? 'Terbit' : 'Draf' }}</span></td>
+              <td v-if="statusFilter !== 'archived'" class="row-actions">
                 <button v-if="item.published" type="button" class="btn-secondary soft" :aria-label="`Tugaskan ${item.title}`" @click="emit('assign', item.id)">Tugaskan</button>
                 <button type="button" class="btn-secondary" :aria-label="`${item.published ? 'Buka' : 'Lanjutkan edit'} ${item.title}`" @click="openItem(item)">{{ item.published ? 'Buka' : 'Lanjutkan edit' }}</button>
               </td>
@@ -352,6 +373,7 @@ onMounted(async () => {
         </table>
       </div>
     </div>
+    <ListPagination v-if="!selected && !editing" v-model="page" :total="total" :size="pageSize" label="Halaman modul" />
     <div v-if="editing === 'new'" class="studio-start">
       <h2>Buat modul baru</h2>
       <p>Pilih cara paling mudah. Semua bagian bisa diubah lagi di editor.</p>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RemotePagination from './RemotePagination.vue'
 import { onMounted, ref } from 'vue'
 import { errorMessage } from '@/api/client'
 import { roomApi } from '@/api/rooms'
@@ -8,6 +9,14 @@ import RoomForm from './RoomForm.vue'
 
 const props = defineProps<{ orgId: string }>()
 const rooms = ref<Room[]>([])
+const pageNumber = ref(1)
+const cursors = ref<(string | undefined)[]>([undefined])
+async function movePage(delta: number) {
+ if (delta > 0) cursors.value = [...cursors.value.slice(0, pageNumber.value), cursor.value ?? undefined]
+ pageNumber.value += delta
+ await loadPage()
+}
+async function loadPage() { await load(cursors.value[pageNumber.value - 1]) }
 const buildings = ref<Building[]>([])
 const cursor = ref<string | null>(null)
 const loading = ref(false)
@@ -19,11 +28,12 @@ const archiving = ref<string | null>(null)
 const busy = ref(false)
 
 async function load(next?: string) {
+  if (!next) { pageNumber.value = 1; cursors.value = [undefined] }
   loading.value = true
   error.value = ''
   try {
     const page = await roomApi.list(props.orgId, { cursor: next })
-    rooms.value = next ? [...rooms.value, ...page.items] : page.items
+    rooms.value = page.items
     cursor.value = page.next_cursor
   } catch (e) {
     error.value = errorMessage(e)
@@ -156,9 +166,7 @@ function schedule(iso: string) {
         ><span>Buat ruang</span>
       </button>
     </div>
-    <button v-if="cursor" class="btn-secondary more" :disabled="loading" @click="load(cursor)">
-      Muat ruang berikutnya
-    </button>
+
     <RoomForm
       v-if="formOpen"
       :org-id="orgId"
@@ -168,6 +176,7 @@ function schedule(iso: string) {
       @saved="saved"
     />
   </section>
+  <RemotePagination :page="pageNumber" :more="!!cursor" @move="movePage" />
 </template>
 
 <style scoped>

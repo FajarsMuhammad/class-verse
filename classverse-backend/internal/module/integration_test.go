@@ -281,6 +281,21 @@ func TestModules(t *testing.T) {
 	if got := list(admin, module.Filter{Drafts: true}); len(got) != 0 {
 		t.Fatalf("archived module listed: %+v", got)
 	}
+	if got := list(admin, module.Filter{Drafts: true, Archived: true}); len(got) != 1 || !got[0].ArchivedAt.Valid {
+		t.Fatalf("staff archive list: %+v", got)
+	}
+	if _, err := svc.List(ctx, student, school.ID, module.Filter{Archived: true}); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("participant archive list: %v", err)
+	}
+	if w := call(admin, "GET", base+"?offset=-1", ""); w.Code != 400 {
+		t.Fatalf("negative offset: %d", w.Code)
+	}
+	if got := list(admin, module.Filter{Archived: true, Search: "no-match-unique", Limit: 20}); len(got) != 0 {
+		t.Fatalf("archive search ignored: %+v", got)
+	}
+	if got := list(admin, module.Filter{Archived: true, Offset: 100}); len(got) != 0 {
+		t.Fatalf("archive offset ignored: %+v", got)
+	}
 	if w := call(admin, "GET", base+"?level=TK", ""); w.Code != 400 {
 		t.Fatalf("http bad level: %d", w.Code)
 	}

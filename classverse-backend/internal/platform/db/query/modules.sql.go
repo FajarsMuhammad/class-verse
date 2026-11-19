@@ -295,55 +295,73 @@ func (q *Queries) ListModuleSteps(ctx context.Context, arg ListModuleStepsParams
 }
 
 const listModules = `-- name: ListModules :many
-SELECT m.id, m.org_id, m.building_key, m.level, m.title, m.description, m.created_by, m.created_at, m.updated_at, m.published_at, m.archived_at, m.draft_version, m.published_revision_id FROM modules m
+SELECT m.id, m.org_id, m.building_key, m.level, m.title, m.description, m.created_by, m.created_at, m.updated_at, m.published_at, m.archived_at, m.draft_version, m.published_revision_id, count(*) OVER() AS total_count FROM modules m
 LEFT JOIN module_revision_pins pin ON pin.org_id=m.org_id AND pin.module_id=m.id AND pin.user_id=$1
 LEFT JOIN module_revisions r ON r.id=COALESCE(pin.revision_id,m.published_revision_id)
-WHERE m.org_id = $2 AND m.archived_at IS NULL
-  AND ($3::boolean OR m.published_at IS NOT NULL)
-  AND ($4::text IS NULL OR CASE WHEN $3::boolean THEN m.building_key ELSE r.building_key END = $4)
-  AND ($5::text IS NULL OR CASE WHEN $3::boolean THEN m.level ELSE r.level END = $5)
+WHERE m.org_id = $2 AND (m.archived_at IS NOT NULL) = $3::boolean
+  AND ($4::boolean OR m.published_at IS NOT NULL)
+  AND ($5::text IS NULL OR CASE WHEN $4::boolean THEN m.building_key ELSE r.building_key END = $5)
+  AND ($6::text IS NULL OR CASE WHEN $4::boolean THEN m.level ELSE r.level END = $6)
+  AND ($7::text = '' OR position(lower($7) in lower(CASE WHEN $4::boolean THEN m.title ELSE r.title END)) > 0)
+  AND ($8::text = '' OR (m.published_at IS NOT NULL) = ($8 = 'published'))
 ORDER BY m.created_at, m.id
-LIMIT 100
+LIMIT $10::integer OFFSET $9::integer
 `
 
 type ListModulesParams struct {
 	UserID        uuid.UUID
 	OrgID         uuid.UUID
+	Archived      bool
 	IncludeDrafts bool
 	BuildingKey   pgtype.Text
 	Level         pgtype.Text
+	Search        string
+	Status        string
+	ListOffset    int32
+	PageLimit     int32
 }
 
-// Staff may include drafts; archived modules never show.
-func (q *Queries) ListModules(ctx context.Context, arg ListModulesParams) ([]Module, error) {
+type ListModulesRow struct {
+	Module     Module
+	TotalCount int64
+}
+
+// Archived rows are a separate staff-only list, authorized by the service.
+func (q *Queries) ListModules(ctx context.Context, arg ListModulesParams) ([]ListModulesRow, error) {
 	rows, err := q.db.Query(ctx, listModules,
 		arg.UserID,
 		arg.OrgID,
+		arg.Archived,
 		arg.IncludeDrafts,
 		arg.BuildingKey,
 		arg.Level,
+		arg.Search,
+		arg.Status,
+		arg.ListOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Module{}
+	items := []ListModulesRow{}
 	for rows.Next() {
-		var i Module
+		var i ListModulesRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.BuildingKey,
-			&i.Level,
-			&i.Title,
-			&i.Description,
-			&i.CreatedBy,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.PublishedAt,
-			&i.ArchivedAt,
-			&i.DraftVersion,
-			&i.PublishedRevisionID,
+			&i.Module.ID,
+			&i.Module.OrgID,
+			&i.Module.BuildingKey,
+			&i.Module.Level,
+			&i.Module.Title,
+			&i.Module.Description,
+			&i.Module.CreatedBy,
+			&i.Module.CreatedAt,
+			&i.Module.UpdatedAt,
+			&i.Module.PublishedAt,
+			&i.Module.ArchivedAt,
+			&i.Module.DraftVersion,
+			&i.Module.PublishedRevisionID,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

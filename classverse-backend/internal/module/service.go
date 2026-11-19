@@ -106,6 +106,7 @@ type Step struct {
 
 // Module is a module with its active steps in order.
 type Module struct {
+	TotalCount int64
 	query.Module
 	Steps []Step
 }
@@ -115,6 +116,11 @@ type Filter struct {
 	BuildingKey string
 	Level       string
 	Drafts      bool
+	Offset      int32
+	Limit       int32
+	Search      string
+	Status      string
+	Archived    bool
 }
 
 // Service implements module rules.
@@ -539,8 +545,21 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	if f.Level != "" && !slices.Contains(Levels, f.Level) {
 		return nil, &ValidationError{Fields: map[string]string{"level": "Jenjang tidak dikenal"}}
 	}
+	if f.Offset < 0 {
+		return nil, &ValidationError{Fields: map[string]string{"offset": "Offset tidak boleh negatif"}}
+	}
 	q := query.New(s.pool)
-	params := query.ListModulesParams{UserID: userID, OrgID: orgID, IncludeDrafts: f.Drafts && role.AtLeast(org.RoleTeacher)}
+	if f.Archived && !role.AtLeast(org.RoleTeacher) {
+		return nil, org.ErrForbidden
+	}
+	limit := f.Limit
+	if limit == 0 {
+		limit = 100
+	}
+	if limit < 1 || limit > 100 || f.Offset < 0 {
+		return nil, &ValidationError{Fields: map[string]string{"pagination": "Pagination tidak valid"}}
+	}
+	params := query.ListModulesParams{PageLimit: limit, Search: f.Search, Status: f.Status, ListOffset: f.Offset, UserID: userID, OrgID: orgID, Archived: f.Archived, IncludeDrafts: (f.Drafts || f.Archived) && role.AtLeast(org.RoleTeacher)}
 	if f.BuildingKey != "" {
 		params.BuildingKey = pgtype.Text{String: f.BuildingKey, Valid: true}
 	}
@@ -557,8 +576,9 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	ids := make([]uuid.UUID, len(rows))
 	byID := make(map[uuid.UUID]int, len(rows))
 	out := make([]Module, len(rows))
-	for i, m := range rows {
-		ids[i], byID[m.ID], out[i] = m.ID, i, Module{Module: m, Steps: []Step{}}
+	for i, row := range rows {
+		m := row.Module
+		ids[i], byID[m.ID], out[i] = m.ID, i, Module{Module: m, TotalCount: row.TotalCount, Steps: []Step{}}
 	}
 	steps, err := q.ListModuleSteps(ctx, query.ListModuleStepsParams{UserID: userID, OrgID: orgID, ModuleIds: ids})
 	if err != nil {

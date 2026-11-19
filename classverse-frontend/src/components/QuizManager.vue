@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, useId } from 'vue'
+import ListPagination from './ListPagination.vue'
+import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
 import { ApiError, errorMessage } from '@/api/client'
 import { levels } from '@/api/modules'
 import { quizApi, shapes } from '@/api/quizzes'
@@ -30,16 +31,20 @@ const selected = ref<string | null>(null)
 const statusFilter = ref('all')
 const buildingFilter = ref('')
 const search = ref('')
-const filtered = computed(() => quizzes.value.filter((item) => (!levelFilter.value || item.level === levelFilter.value) &&
-  (!buildingFilter.value || item.building_key === buildingFilter.value) && item.title.toLowerCase().includes(search.value.trim().toLowerCase())))
+const page = ref(1)
+const total = ref(0)
+const pageSize = 20
+const counts = ref({ all: 0, published: 0, draft: 0, archived: 0 })
 const statusTabs = computed(() => [
-  { key: 'all', label: 'Semua', count: filtered.value.length },
-  { key: 'published', label: 'Terbit', count: filtered.value.filter((q) => q.published).length },
-  { key: 'draft', label: 'Draf', count: filtered.value.filter((q) => !q.published).length },
+ { key: 'all', label: 'Semua', count: counts.value.all },
+ { key: 'published', label: 'Terbit', count: counts.value.published },
+ { key: 'draft', label: 'Draf', count: counts.value.draft },
 ])
-const visible = computed(() => filtered.value.filter((item) => statusFilter.value === 'all' || item.published === (statusFilter.value === 'published')))
-const unpublishable = computed(() => quizzes.value.filter((q) => !q.published && !q.question_count))
-// TODO(api): kolom "Modul" (kuis dipakai modul mana) dan "Lihat hasil" per kuis butuh endpoint baru; ditanyakan dulu (handoff §4).
+const visible = computed(() => quizzes.value.filter(item => (!levelFilter.value || item.level === levelFilter.value) && (!buildingFilter.value || item.building_key === buildingFilter.value) && item.title.toLowerCase().includes(search.value.trim().toLowerCase()) && (!['draft', 'published'].includes(statusFilter.value) || item.published === (statusFilter.value === 'published'))))
+watch([statusFilter, levelFilter, buildingFilter, search], () => { page.value = 1; void load() })
+watch(page, () => { void load() })
+
+const unpublishable = computed(() => quizzes.value.filter(q => !q.published && !q.question_count))
 const active = computed(() => quizzes.value.find((item) => item.id === selected.value))
 const preview = ref(false)
 const history=ref<{id:string;revision:number}[]>([])
@@ -82,9 +87,22 @@ function blankQuestion(): QuestionInput {
 const choices = computed(() => buildings.value.filter((b) => !b.staffOnly))
 const buildingName = (key: string) => buildings.value.find((b) => b.key === key)?.name ?? key
 
+let listGeneration = 0
 async function load() {
+ const generation = ++listGeneration
   try {
-    quizzes.value = (await quizApi.list(props.orgId, { drafts: true })).items
+    const result = await quizApi.list(props.orgId, { drafts: true, building_key: buildingFilter.value, level: levelFilter.value, search: search.value, status: statusFilter.value === 'all' ? '' : statusFilter.value, offset: (page.value - 1) * pageSize, limit: pageSize })
+    if (generation !== listGeneration) return
+    quizzes.value = result.items
+    total.value = result.total ?? result.items.length
+    const query = { drafts: true, building_key: buildingFilter.value, level: levelFilter.value, search: search.value, limit: 1 }
+    const [all, published, draft] = await Promise.all([
+      quizApi.list(props.orgId, query),
+      quizApi.list(props.orgId, { ...query, status: 'published' }),
+      quizApi.list(props.orgId, { ...query, status: 'draft' }),
+    ])
+    if (generation !== listGeneration) return
+    counts.value = { all: all.total ?? all.items.length, published: published.total ?? published.items.filter(i => i.published).length, draft: draft.total ?? draft.items.filter(i => !i.published).length, archived: 0 }
   } catch (err) {
     error.value = errorMessage(err)
   }
@@ -251,6 +269,7 @@ onMounted(async () => {
       </div>
       <p class="hint">Kuis dengan 1–2 soal kurang akurat untuk rapor. Disarankan minimal 5 soal.</p>
     </div>
+    <ListPagination v-if="!selected && !editing" v-model="page" :total="total" :size="pageSize" label="Halaman kuis" />
     <form v-if="editing" class="form" novalidate @submit.prevent="save">
       <h3 class="form-title">{{ editing === 'new' ? 'Kuis baru' : 'Ubah kuis' }}</h3>
       <div class="grid">

@@ -72,13 +72,6 @@ function placeTo(student: RosterEntry, to: string | null) {
   if (!window.confirm(`Ubah kelas ${student.display_name} pada ${props.yearLabel} menjadi ${className(to)}? Riwayat tetap tersimpan.`)) return
   return save(() => classApi.place(props.orgId, props.yearId, student.user_id, to))
 }
-async function place(student: RosterEntry, event: Event) {
-  const select = event.target as HTMLSelectElement
-  const to = select.value || null
-  // Keep server truth visible on cancel/error; the new value is shown only after a successful reload.
-  select.value = student.class_id ?? ''
-  await placeTo(student, to)
-}
 async function addMember() {
   const student = candidates.value.find(r => r.user_id === addID.value)
   if (student) await placeTo(student, props.classId!)
@@ -133,14 +126,14 @@ onMounted(load)
     </form>
     <p v-if="classId" class="muted">{{ isAdmin ? 'Siswa dari kelas lain dipindahkan lewat Kelola → Siswa.' : canManageFixed ? 'Siswa yang sudah punya kelas lain dipindahkan oleh admin.' : 'Siswa kelas ini dikelola wali kelas dan admin.' }}</p>
 
+    <div :class="{ 'roster-layout': !classId }">
+    <nav v-if="!classId" class="class-filters" aria-label="Filter kelas siswa">
+      <button type="button" class="btn-secondary" :aria-pressed="filter === ''" @click="filter = ''">Semua kelas</button>
+      <button type="button" class="btn-secondary" data-filter="none" :aria-pressed="filter === 'none'" @click="filter = 'none'">Belum punya kelas ({{ unplacedTotal }})</button>
+      <button v-for="c in classes" :key="c.id" type="button" class="btn-secondary" :aria-pressed="filter === c.id" @click="filter = c.id">{{ c.name }} ({{ c.students }})</button>
+    </nav>
+    <div class="roster-content">
     <div class="filters">
-      <label v-if="!classId">Kelas
-        <select v-model="filter" data-test="class-filter">
-          <option value="">Semua kelas</option>
-          <option value="none">Belum punya kelas ({{ unplacedTotal }})</option>
-          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-      </label>
       <label>Cari siswa <input v-model="q" type="search" data-test="search" /></label>
     </div>
 
@@ -164,25 +157,25 @@ onMounted(load)
       <button v-if="offset + items.length < total" type="button" class="btn-secondary" data-action="next" :disabled="loading" @click="page(1)">Berikutnya</button>
     </div>
     <p v-if="loading" role="status">Memuat…</p>
-    <ul class="list">
-      <li v-for="student in items" :key="student.user_id" :data-student="student.user_id">
-        <label v-if="canMove" class="check"><input v-model="selected" type="checkbox" :value="student.user_id" /><span class="sr-only">Pilih {{ student.display_name }}</span></label>
-        <div><strong>{{ student.display_name }}</strong><p v-if="!classId && !isAdmin" class="meta">{{ className(student.class_id) }}</p></div>
-        <template v-if="classId">
+    <div class="student-table-wrap">
+    <table class="student-table" aria-label="Daftar siswa">
+      <thead><tr><th v-if="canMove" scope="col"><span class="sr-only">Pilih siswa</span></th><th scope="col">Nama</th><th v-if="!classId" scope="col">Kelas</th><th scope="col"><span class="sr-only">Aksi</span></th></tr></thead>
+      <tbody><tr v-for="student in items" :key="student.user_id" :data-student="student.user_id">
+        <td v-if="canMove"><label class="check"><input v-model="selected" type="checkbox" :value="student.user_id" :disabled="saving || loading" /><span class="sr-only">Pilih {{ student.display_name }}</span></label></td>
+        <th scope="row"><span class="student-initial" aria-hidden="true">{{ student.display_name.slice(0, 1).toLocaleUpperCase('id') }}</span>{{ student.display_name }}</th>
+        <td v-if="classId" class="student-actions">
           <button v-if="canManageFixed" type="button" class="btn-secondary" :disabled="saving" :aria-label="`Keluarkan ${student.display_name} dari ${fixed?.name}`" @click="placeTo(student, null)">Keluarkan</button>
-        </template>
+        </td>
         <template v-else>
-          <label v-if="isAdmin" class="inline"><span class="sr-only">Kelas {{ student.display_name }}</span>
-            <select :value="student.class_id ?? ''" :disabled="saving" @change="place(student, $event)">
-              <option value="">Belum punya kelas</option>
-              <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-          </label>
-          <button type="button" class="btn-secondary" :aria-label="`Riwayat kelas ${student.display_name}`" @click="showHistory(student)">Riwayat</button>
+          <td><span class="badge">{{ className(student.class_id) }}</span></td>
+          <td class="student-actions"><button type="button" class="btn-secondary" :disabled="saving || loading" :aria-label="`Riwayat kelas ${student.display_name}`" @click="showHistory(student)">Riwayat</button></td>
         </template>
-      </li>
-    </ul>
+      </tr></tbody>
+    </table>
+    </div>
     <p v-if="!items.length && !loading" class="muted">{{ classId ? 'Belum ada siswa di kelas ini.' : q || filter ? 'Siswa tidak ditemukan.' : 'Belum ada anggota berperan peserta.' }}</p>
+    </div>
+    </div>
     <section v-if="historyUser" class="history" aria-live="polite">
       <h3>Riwayat kelas {{ historyUser }}</h3>
       <ol>

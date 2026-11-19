@@ -190,12 +190,21 @@ type Item struct {
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
+	var pagination []int32
+	if r.URL.Query().Has("limit") || r.URL.Query().Has("offset") {
+		limit, offset, err := httpx.Pagination(r)
+		if err != nil {
+			return err
+		}
+		pagination = []int32{limit, offset}
+	}
+
 	user, _ := auth.UserID(r.Context())
 	orgID, err := org.PathUUID(r, "org_id")
 	if err != nil {
 		return err
 	}
-	rows, err := h.uploads.meta.List(r.Context(), user, orgID)
+	rows, err := h.uploads.meta.List(r.Context(), user, orgID, pagination...)
 	if err != nil {
 		return err
 	}

@@ -3,14 +3,16 @@ import { computed, ref, watch } from 'vue'
 import type { RoomHandle } from '@/realtime/useRoom'
 import RoomTools from './RoomTools.vue'
 import TeacherPanel from './TeacherPanel.vue'
+import ManageOverview from './ManageOverview.vue'
 
 const props = defineProps<{ orgId: string; userId: string; isAdmin: boolean; room: RoomHandle }>()
 const emit = defineEmits<{ pinned: [] }>()
-const active = defineModel<string>({ default: 'modules' })
+const active = defineModel<string>({ default: 'overview' })
 const assignModule = ref<string>() // Modul → Tugaskan preselects the module in Tugas
 // Grouped like docs/design/kelola (handoff §2). Rapor lives here too so staff have one place for school admin.
 type Tool = { key: string; label: string; note: string; icon: string }
 const groups: { label: string; items: Tool[] }[] = [
+  { label: '', items: [{ key: 'overview', label: 'Beranda', note: 'Ringkasan sekolah dan hal yang perlu perhatian.', icon: 'M3 11l9-8 9 8M5 10v11h14V10M9 21v-7h6v7' }] },
   { label: 'Konten belajar', items: [
     { key: 'modules', label: 'Modul belajar', note: 'Susun materi, atur urutan belajar, dan sematkan modul ke ruang.', icon: 'M4 4h7v16H4zM13 4h7v16h-7' },
     { key: 'quizzes', label: 'Kuis', note: 'Buat soal, tentukan jawaban, dan terbitkan kuis.', icon: 'M9 4h6M9 3v4h6V3M7 5H5v16h14V5h-2M8 12h8M8 16h5' },
@@ -40,7 +42,7 @@ const place = computed(() => inRoom.value ? props.room.current.value?.room_name 
 const current = computed(() => visible.value.find((item) => item.key === active.value) ?? items[0]!)
 const tool = computed(() => active.value === 'modules' && props.room.current.value?.map_key === 'library' ? 'library-modules' : active.value)
 watch(visible, (list) => {
-  if (!list.some((item) => item.key === active.value)) active.value = 'modules'
+  if (!list.some((item) => item.key === active.value)) active.value = 'overview'
 })
 function selectTool(key: string) {
  if (!window.dispatchEvent(new Event('kv-before-panel-change', { cancelable: true }))) return
@@ -52,7 +54,7 @@ function selectTool(key: string) {
   <div class="manage-workspace">
     <nav class="manage-nav" aria-label="Submenu Kelola">
       <template v-for="group in visibleGroups" :key="group.label">
-        <p class="nav-label">{{ group.label }}</p>
+        <p v-if="group.label" class="nav-label">{{ group.label }}</p>
         <button v-for="item in group.items" :key="item.key" type="button" :data-tool="item.key"
           :aria-current="current.key === item.key ? 'page' : undefined" @click="selectTool(item.key)">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path :d="item.icon" /></svg>
@@ -70,6 +72,7 @@ function selectTool(key: string) {
         <p>{{ current.note }}</p>
       </header>
       <TeacherPanel v-if="current.key === 'session'" :room="room" />
+      <ManageOverview v-else-if="current.key === 'overview'" :org-id="orgId" @select="selectTool" />
       <RoomTools v-else :key="tool" :tool="tool" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" :room="room" :assign-module="assignModule" @pinned="emit('pinned')" @assign="assignModule = $event; active = 'assignments'" />
     </section>
   </div>
@@ -77,7 +80,15 @@ function selectTool(key: string) {
 
 <style scoped>
 /* Kelola owns navigation; individual managers own lists/forms. No custom dropdown keyboard model. */
-.manage-workspace { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-content: start; min-height: 0; flex: 1; }
+.manage-workspace { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-content: start; min-height: 100%; flex: 1; background: var(--kv-surface); }
+.manage-content :deep(.authoring.studio), .manage-content :deep(.class-panel), .manage-content :deep(.assignment-manager), .manage-content :deep(.gradebook) { background: transparent; border: 0; border-radius: 0; margin: 0; padding: 0; }
+.manage-content :deep(h2), .manage-content :deep(.studio-start > h2) { font-family: var(--font-body); font-weight: var(--weight-bold); }
+.manage-content :deep(.studio-start + .new-layout) { margin-top: var(--space-5); }
+.manage-content :deep(.studio-start > h2) { margin-top: 0; }
+.manage-content :deep(.studio-metadata .grid > label) { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.manage-content :deep(.studio-metadata .grid > label[for$='-t']) { order: -3; }
+.manage-content :deep(.studio-metadata .grid > input[maxlength='120']) { order: -2; }
+.manage-content :deep(.studio-metadata .grid > .field-error) { order: -1; }
 .manage-nav { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-3) var(--space-3) 0; border-right: 1px solid var(--kv-line); align-self: start; }
 .nav-label { margin: var(--space-4) 0 var(--space-1) var(--space-3); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--kv-text-muted); }
 .nav-label:first-child { margin-top: 0; }
@@ -91,7 +102,9 @@ function selectTool(key: string) {
 .manage-nav button[aria-current='page'] { background: var(--color-primary-soft); color: var(--color-primary-strong); }
 .manage-nav button:focus-visible { outline: 3px solid var(--color-primary-strong); outline-offset: -3px; }
 svg { flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.manage-content { min-width: 0; padding: var(--space-3) 0 var(--space-3) var(--space-6); }
+.manage-content { min-width: 0; padding: 0 var(--space-6) var(--space-6); background: var(--kv-page); }
+.topbar { background: var(--kv-surface); margin: 0 calc(-1 * var(--space-6)) var(--space-6); padding: var(--space-4) var(--space-6); }
+.manage-content :deep(.studio-metadata .grid) { grid-template-columns: minmax(0, 1fr); }
 .tool-head { padding-bottom: var(--space-4); border-bottom: 1px solid var(--kv-line); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 h3 { margin: 0; font: var(--weight-semibold) var(--text-lg)/var(--line-normal) var(--font-display); }

@@ -542,11 +542,17 @@ func (q *Queries) GetMemberRoleForUpdate(ctx context.Context, arg GetMemberRoleF
 }
 
 const listAcademicYears = `-- name: ListAcademicYears :many
-SELECT id, org_id, label, active, created_at FROM academic_years WHERE org_id = $1 ORDER BY label DESC
+SELECT id, org_id, label, active, created_at FROM academic_years WHERE org_id = $1 ORDER BY label DESC LIMIT $3::integer OFFSET $2::integer
 `
 
-func (q *Queries) ListAcademicYears(ctx context.Context, orgID uuid.UUID) ([]AcademicYear, error) {
-	rows, err := q.db.Query(ctx, listAcademicYears, orgID)
+type ListAcademicYearsParams struct {
+	OrgID      uuid.UUID
+	PageOffset int32
+	PageLimit  pgtype.Int4
+}
+
+func (q *Queries) ListAcademicYears(ctx context.Context, arg ListAcademicYearsParams) ([]AcademicYear, error) {
+	rows, err := q.db.Query(ctx, listAcademicYears, arg.OrgID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -626,7 +632,7 @@ LEFT JOIN users hu ON hu.id = h.user_id
 LEFT JOIN class_teachers mine ON mine.class_id = c.id AND mine.user_id = $1 AND mine.ended_at IS NULL
 WHERE c.org_id = $2 AND c.academic_year_id = $3 AND c.archived_at IS NULL
   AND ($4::uuid IS NULL OR c.id = $4)
-ORDER BY mine.role IS NULL, lower(c.name), c.id
+ORDER BY mine.role IS NULL, lower(c.name), c.id LIMIT $6::integer OFFSET $5::integer
 `
 
 type ListClassesParams struct {
@@ -634,6 +640,8 @@ type ListClassesParams struct {
 	OrgID          uuid.UUID
 	AcademicYearID uuid.UUID
 	ClassID        uuid.NullUUID
+	PageOffset     int32
+	PageLimit      pgtype.Int4
 }
 
 type ListClassesRow struct {
@@ -654,6 +662,8 @@ func (q *Queries) ListClasses(ctx context.Context, arg ListClassesParams) ([]Lis
 		arg.OrgID,
 		arg.AcademicYearID,
 		arg.ClassID,
+		arg.PageOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err

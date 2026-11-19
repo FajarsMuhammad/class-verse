@@ -16,7 +16,7 @@ UPDATE quizzes SET archived_at = $3, updated_at = $3 WHERE org_id = $1 AND id = 
 
 -- name: ListQuizzes :many
 -- Staff may include drafts; archived quizzes never show. best_score is the caller's highest finished score.
-SELECT sqlc.embed(z),
+SELECT sqlc.embed(z), count(*) OVER() AS total_count,
   (SELECT count(*) FROM quiz_questions q WHERE q.quiz_id = z.id)::integer AS question_count,
   -- -1 when the caller has no finished attempt yet.
   COALESCE((SELECT max(a.score) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = sqlc.arg(user_id)), -1)::smallint AS best_score,
@@ -26,8 +26,10 @@ WHERE z.org_id = sqlc.arg(org_id) AND z.archived_at IS NULL
   AND (sqlc.arg(include_drafts)::boolean OR z.published_at IS NOT NULL)
   AND (sqlc.narg(building_key)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN z.building_key ELSE r.building_key END = sqlc.narg(building_key))
   AND (sqlc.narg(level)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN z.level ELSE r.level END = sqlc.narg(level))
+  AND (sqlc.arg(search)::text = '' OR position(lower(sqlc.arg(search)) in lower(CASE WHEN sqlc.arg(include_drafts)::boolean THEN z.title ELSE r.title END)) > 0)
+  AND (sqlc.arg(status)::text = '' OR (z.published_at IS NOT NULL) = (sqlc.arg(status) = 'published'))
 ORDER BY z.created_at, z.id
-LIMIT 100;
+LIMIT sqlc.arg(page_limit)::integer OFFSET sqlc.arg(list_offset)::integer;
 
 -- name: ListQuizQuestions :many
 SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY position, id;

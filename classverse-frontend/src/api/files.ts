@@ -4,7 +4,7 @@ import type { FileList } from './types'
 const base = (orgID: string) => `/api/orgs/${encodeURIComponent(orgID)}/files`
 
 export const fileApi = {
-  list: (orgID: string) => api<FileList>(base(orgID)),
+  list: (orgID: string, offset?: number) => api<FileList>(base(orgID) + (offset === undefined ? '' : `?limit=20&offset=${offset}`)),
   remove: (orgID: string, id: string) =>
     api<void>(`${base(orgID)}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   savePosition: (orgID: string, id: string, position: number) =>

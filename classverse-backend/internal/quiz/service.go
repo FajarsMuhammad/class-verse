@@ -95,6 +95,7 @@ type QuestionInput struct {
 
 // Quiz is a quiz with the caller's history and, for staff, its questions with answers.
 type Quiz struct {
+	TotalCount int64
 	query.Quiz
 	QuestionCount int32
 	BestScore     int16 // -1: no finished attempt yet
@@ -107,6 +108,10 @@ type Filter struct {
 	BuildingKey string
 	Level       string
 	Drafts      bool
+	Offset      int32
+	Limit       int32
+	Search      string
+	Status      string
 }
 
 // Service implements quiz rules.
@@ -455,7 +460,14 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	}
 	authoring := f.Drafts && role.AtLeast(org.RoleTeacher)
 	q := query.New(s.pool)
-	params := query.ListQuizzesParams{UserID: userID, OrgID: orgID, IncludeDrafts: authoring}
+	limit := f.Limit
+	if limit == 0 {
+		limit = 100
+	}
+	if limit < 1 || limit > 100 || f.Offset < 0 {
+		return nil, &ValidationError{Fields: map[string]string{"pagination": "Pagination tidak valid"}}
+	}
+	params := query.ListQuizzesParams{PageLimit: limit, Search: f.Search, Status: f.Status, ListOffset: f.Offset, UserID: userID, OrgID: orgID, IncludeDrafts: authoring}
 	if f.BuildingKey != "" {
 		params.BuildingKey = pgtype.Text{String: f.BuildingKey, Valid: true}
 	}
@@ -468,7 +480,7 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	}
 	out := make([]Quiz, len(rows))
 	for i, r := range rows {
-		out[i] = Quiz{Quiz: r.Quiz, QuestionCount: r.QuestionCount, BestScore: r.BestScore, Attempts: r.Attempts}
+		out[i] = Quiz{Quiz: r.Quiz, TotalCount: r.TotalCount, QuestionCount: r.QuestionCount, BestScore: r.BestScore, Attempts: r.Attempts}
 		if !authoring && r.Quiz.PublishedRevisionID.Valid {
 			rev, err := q.PublishedQuizRevision(ctx, query.PublishedQuizRevisionParams{OrgID: orgID, QuizID: r.Quiz.ID})
 			if err != nil {

@@ -8,6 +8,7 @@ const room = { current: ref({ room_id: 'r', map_key: 'library' }), kicked: ref(f
 const stubs = {
   RoomTools: { props: ['tool', 'room'], emits: ['pinned'], template: '<div class="body">{{ tool }}<button @click="$emit(\'pinned\')">Pin</button></div>' },
   TeacherPanel: { template: '<div class="session">Kontrol sesi</div>' },
+  ManageOverview: { template: '<div>Ringkasan sekolah</div>' },
 }
 it('groups modules and teacher tools under one navigation, mounting only the selected tool', async () => {
   const w = mount(TeacherTools, { props: { orgId: 'o', userId: 'u', isAdmin: false, room, modelValue: 'modules' }, global: { stubs } })
@@ -30,7 +31,7 @@ it('hides session controls on campus', async () => {
   const w = mount(TeacherTools, { props: { orgId: 'o', userId: 'u', isAdmin: false, room: campus }, global: { stubs } })
   await flushPromises()
   expect(w.find('[data-tool="session"]').exists()).toBe(false)
-  expect(w.get('[aria-current="page"]').text()).toBe('Modul belajar')
+  expect(w.get('[aria-current="page"]').text()).toBe('Beranda')
 })
 it('shows Kelas and Siswa separately; Tahun ajaran only for admin', async () => {
   const staff = mount(TeacherTools, { props: { orgId: 'o', userId: 'u', isAdmin: false, room }, global: { stubs } })

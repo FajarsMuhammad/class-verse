@@ -216,7 +216,26 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	q := r.URL.Query()
-	quizzes, err := h.svc.List(r.Context(), user, p[0], Filter{BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true"})
+	offset := int64(0)
+	if raw := q.Get("offset"); raw != "" {
+		parsed, parseErr := strconv.ParseInt(raw, 10, 32)
+		if parseErr != nil || parsed < 0 {
+			return httpx.ValidationFailed(map[string]string{"offset": "Offset tidak valid"})
+		}
+		offset = parsed
+	}
+	limit := int64(100)
+	if raw := q.Get("limit"); raw != "" {
+		parsed, parseErr := strconv.ParseInt(raw, 10, 32)
+		if parseErr != nil || parsed < 1 || parsed > 100 {
+			return httpx.ValidationFailed(map[string]string{"limit": "Limit harus 1–100"})
+		}
+		limit = parsed
+	}
+	if status := q.Get("status"); status != "" && status != "draft" && status != "published" {
+		return httpx.ValidationFailed(map[string]string{"status": "Status tidak valid"})
+	}
+	quizzes, err := h.svc.List(r.Context(), user, p[0], Filter{Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true"})
 	if err != nil {
 		return err
 	}
@@ -224,7 +243,11 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	for _, z := range quizzes {
 		items = append(items, toQuiz(z))
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items})
+	total := int64(0)
+	if len(quizzes) > 0 {
+		total = quizzes[0].TotalCount
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
 	return nil
 }
 

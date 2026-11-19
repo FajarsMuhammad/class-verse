@@ -15,16 +15,18 @@ RETURNING *;
 UPDATE modules SET archived_at = $3, updated_at = $3 WHERE org_id = $1 AND id = $2 AND archived_at IS NULL;
 
 -- name: ListModules :many
--- Staff may include drafts; archived modules never show.
-SELECT m.* FROM modules m
+-- Archived rows are a separate staff-only list, authorized by the service.
+SELECT sqlc.embed(m), count(*) OVER() AS total_count FROM modules m
 LEFT JOIN module_revision_pins pin ON pin.org_id=m.org_id AND pin.module_id=m.id AND pin.user_id=sqlc.arg(user_id)
 LEFT JOIN module_revisions r ON r.id=COALESCE(pin.revision_id,m.published_revision_id)
-WHERE m.org_id = sqlc.arg(org_id) AND m.archived_at IS NULL
+WHERE m.org_id = sqlc.arg(org_id) AND (m.archived_at IS NOT NULL) = sqlc.arg(archived)::boolean
   AND (sqlc.arg(include_drafts)::boolean OR m.published_at IS NOT NULL)
   AND (sqlc.narg(building_key)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.building_key ELSE r.building_key END = sqlc.narg(building_key))
   AND (sqlc.narg(level)::text IS NULL OR CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.level ELSE r.level END = sqlc.narg(level))
+  AND (sqlc.arg(search)::text = '' OR position(lower(sqlc.arg(search)) in lower(CASE WHEN sqlc.arg(include_drafts)::boolean THEN m.title ELSE r.title END)) > 0)
+  AND (sqlc.arg(status)::text = '' OR (m.published_at IS NOT NULL) = (sqlc.arg(status) = 'published'))
 ORDER BY m.created_at, m.id
-LIMIT 100;
+LIMIT sqlc.arg(page_limit)::integer OFFSET sqlc.arg(list_offset)::integer;
 
 -- name: ListModuleSteps :many
 -- Active steps of the given modules, in path order, with the caller's reader position for file steps.

@@ -278,13 +278,15 @@ SELECT a.id, a.org_id, a.class_id, a.module_id, a.title, a.class_name, a.year_la
  (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=$1) AS done
 FROM assignments a WHERE a.org_id=$2
  AND ($3::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=$1))
-ORDER BY a.created_at DESC,a.id
+ORDER BY a.created_at DESC,a.id LIMIT $5::integer OFFSET $4::integer
 `
 
 type ListAssignmentsParams struct {
-	UserID uuid.UUID
-	OrgID  uuid.UUID
-	Staff  bool
+	UserID     uuid.UUID
+	OrgID      uuid.UUID
+	Staff      bool
+	PageOffset int32
+	PageLimit  pgtype.Int4
 }
 
 type ListAssignmentsRow struct {
@@ -306,7 +308,13 @@ type ListAssignmentsRow struct {
 }
 
 func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams) ([]ListAssignmentsRow, error) {
-	rows, err := q.db.Query(ctx, listAssignments, arg.UserID, arg.OrgID, arg.Staff)
+	rows, err := q.db.Query(ctx, listAssignments,
+		arg.UserID,
+		arg.OrgID,
+		arg.Staff,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

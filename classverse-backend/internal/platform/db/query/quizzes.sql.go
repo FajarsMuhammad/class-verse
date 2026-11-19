@@ -316,7 +316,7 @@ func (q *Queries) ListQuizQuestions(ctx context.Context, quizID uuid.UUID) ([]Qu
 }
 
 const listQuizzes = `-- name: ListQuizzes :many
-SELECT z.id, z.org_id, z.building_key, z.level, z.title, z.description, z.pass_score, z.created_by, z.created_at, z.updated_at, z.published_at, z.archived_at, z.draft_version, z.published_revision_id,
+SELECT z.id, z.org_id, z.building_key, z.level, z.title, z.description, z.pass_score, z.created_by, z.created_at, z.updated_at, z.published_at, z.archived_at, z.draft_version, z.published_revision_id, count(*) OVER() AS total_count,
   (SELECT count(*) FROM quiz_questions q WHERE q.quiz_id = z.id)::integer AS question_count,
   -- -1 when the caller has no finished attempt yet.
   COALESCE((SELECT max(a.score) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = $1), -1)::smallint AS best_score,
@@ -326,8 +326,10 @@ WHERE z.org_id = $2 AND z.archived_at IS NULL
   AND ($3::boolean OR z.published_at IS NOT NULL)
   AND ($4::text IS NULL OR CASE WHEN $3::boolean THEN z.building_key ELSE r.building_key END = $4)
   AND ($5::text IS NULL OR CASE WHEN $3::boolean THEN z.level ELSE r.level END = $5)
+  AND ($6::text = '' OR position(lower($6) in lower(CASE WHEN $3::boolean THEN z.title ELSE r.title END)) > 0)
+  AND ($7::text = '' OR (z.published_at IS NOT NULL) = ($7 = 'published'))
 ORDER BY z.created_at, z.id
-LIMIT 100
+LIMIT $9::integer OFFSET $8::integer
 `
 
 type ListQuizzesParams struct {
@@ -336,10 +338,15 @@ type ListQuizzesParams struct {
 	IncludeDrafts bool
 	BuildingKey   pgtype.Text
 	Level         pgtype.Text
+	Search        string
+	Status        string
+	ListOffset    int32
+	PageLimit     int32
 }
 
 type ListQuizzesRow struct {
 	Quiz          Quiz
+	TotalCount    int64
 	QuestionCount int32
 	BestScore     int16
 	Attempts      int32
@@ -353,6 +360,10 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Lis
 		arg.IncludeDrafts,
 		arg.BuildingKey,
 		arg.Level,
+		arg.Search,
+		arg.Status,
+		arg.ListOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
@@ -376,6 +387,7 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Lis
 			&i.Quiz.ArchivedAt,
 			&i.Quiz.DraftVersion,
 			&i.Quiz.PublishedRevisionID,
+			&i.TotalCount,
 			&i.QuestionCount,
 			&i.BestScore,
 			&i.Attempts,

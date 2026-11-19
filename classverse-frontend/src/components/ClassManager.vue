@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RemotePagination from './RemotePagination.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 import { classApi, type AcademicYear, type SchoolClass } from '@/api/classes'
 import ClassTeachers from './ClassTeachers.vue'
@@ -28,6 +29,18 @@ const selectedYear = computed(() => years.value.find(y => y.id === yearID.value)
 const opened = computed(() => classes.value.find(c => c.id === openID.value))
 const needle = computed(() => search.value.trim().toLocaleLowerCase('id'))
 const visibleClasses = computed(() => classes.value.filter(c => c.name.toLocaleLowerCase('id').includes(needle.value)))
+const pageNumber = ref(1)
+function movePage(delta: number) { pageNumber.value += delta; void load() }
+const groupedClasses = computed(() => {
+  const groups = new Map<string, SchoolClass[]>()
+  for (const c of visibleClasses.value) {
+    const prefix = c.name.match(/^(\d+|[IVX]+)(?=\s|[A-Z]|$)/i)?.[1]
+    const label = prefix ? `Tingkat ${prefix}` : 'Kelas lainnya'
+    groups.set(label, [...(groups.get(label) ?? []), c])
+  }
+  return [...groups].map(([label, items]) => ({ label, items }))
+})
+async function configureHomeroom(c: SchoolClass) { await openClass(c); tab.value = 'teachers' }
 const roleLabel = (c: SchoolClass) => c.my_role === 'homeroom' ? 'Wali kelas Anda' : c.my_role === 'subject' ? 'Anda guru mapel' : ''
 let generation = 0
 onBeforeUnmount(() => { generation++ })
@@ -38,7 +51,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const result = await classApi.years(props.orgId)
+    const result = await classApi.years(props.orgId, props.view === 'years' ? (pageNumber.value - 1) * 20 : undefined)
     if (g !== generation) return
     years.value = result.items
     yearID.value = result.items.find(y => y.id === yearID.value)?.id ?? result.items.find(y => y.active)?.id ?? result.items[0]?.id ?? ''
@@ -51,7 +64,7 @@ async function load() {
   finally { if (g === generation) loading.value = false }
 }
 async function fetchYear(g: number) {
-  const c = await classApi.classes(props.orgId, yearID.value)
+  const c = await classApi.classes(props.orgId, yearID.value, props.view === 'classes' ? (pageNumber.value - 1) * 20 : undefined)
   if (g !== generation) return
   classes.value = c.items
   if (openID.value && !c.items.some(x => x.id === openID.value)) openID.value = ''
@@ -114,6 +127,7 @@ onMounted(load)
 
 <template>
   <section class="class-panel" :aria-busy="loading || saving" :aria-label="view === 'years' ? 'Tahun ajaran' : view === 'students' ? 'Siswa' : 'Kelas'">
+    <header class="manage-header"><h2>{{ view === 'years' ? 'Tahun ajaran' : view === 'students' ? 'Siswa' : 'Kelas' }}</h2><p class="muted">{{ view === 'classes' ? 'Atur kelas, wali kelas, dan guru mapel untuk tahun ajaran yang dipilih.' : view === 'students' ? 'Kelola penempatan siswa. Pilih siswa untuk memindahkan kelas sekaligus.' : 'Siapkan tahun ajaran dan tentukan tahun yang aktif.' }}</p></header>
     <p v-if="error" role="alert">{{ error }} <button type="button" class="btn-secondary" data-test="retry" :disabled="loading || saving" @click="load">Coba lagi</button></p>
     <p v-if="loading" role="status">Memuat…</p>
     <fieldset :disabled="loading || saving">
@@ -132,6 +146,7 @@ onMounted(load)
             <button v-else-if="isAdmin" type="button" class="btn-secondary" :aria-label="`Jadikan ${y.label} aktif`" @click="activate(y)">Jadikan aktif</button>
           </li>
         </ul>
+        <RemotePagination :page="pageNumber" :more="years.length === 20" @move="movePage" />
         <p v-if="!years.length && !loading" class="muted">Belum ada tahun ajaran.</p>
       </template>
 
@@ -139,7 +154,44 @@ onMounted(load)
         Belum ada tahun ajaran. {{ isAdmin ? 'Tambahkan di Kelola → Tahun ajaran.' : 'Minta admin sekolah menambahkan tahun ajaran.' }}
       </p>
 
-      <template v-else-if="view === 'classes' && opened">
+
+      <template v-else>
+        <div class="filters">
+          <label>Tahun ajaran
+            <select data-test="year" :value="yearID" @change="changeYear">
+              <option v-for="y in years" :key="y.id" :value="y.id">{{ y.label }}{{ y.active ? ' (aktif)' : '' }}</option>
+            </select>
+          </label>
+          <label v-if="view === 'classes'">Cari kelas <input v-model="search" type="search" /></label>
+          <button v-if="view === 'classes' && isAdmin && !creating" type="button" class="btn-primary new" @click="creating = true">+ Kelas baru</button>
+        </div>
+        <form v-if="view === 'classes' && creating" class="row create" @submit.prevent="createClass">
+          <label>Nama kelas baru <input v-model="newClass" required maxlength="40" placeholder="XI IPA 1" /></label>
+          <button type="submit" class="btn-primary">Buat kelas</button>
+          <button type="button" class="btn-secondary" @click="creating = false; newClass = ''">Batal</button>
+        </form>
+
+        <template v-if="view === 'classes'">
+          <div class="class-layout" :class="{ 'has-detail': opened }">
+          <div class="class-catalog">
+          <section v-for="group in groupedClasses" :key="group.label" class="class-group">
+          <h3 class="section-title">{{ group.label }}</h3>
+          <ul class="list class-cards">
+            <li v-for="c in group.items" :key="c.id" :data-class="c.id">
+              <div>
+                <strong>{{ c.name }}</strong>
+                <p class="meta">{{ c.students }} siswa · Wali kelas: {{ c.homeroom?.name ?? 'belum ada' }} · {{ c.subject_teachers }} guru mapel</p>
+              </div>
+              <span v-if="roleLabel(c)" class="badge">{{ roleLabel(c) }}</span>
+              <button type="button" class="btn-secondary" :aria-label="`Buka ${c.name}`" @click="openClass(c)">{{ c.students ? 'Buka kelas' : '+ Tambah siswa' }}</button>
+              <div v-if="!c.homeroom" class="homeroom-warning"><strong>Belum ada wali kelas</strong><button v-if="isAdmin" type="button" class="btn-secondary" :aria-label="`Atur wali kelas ${c.name}`" @click="configureHomeroom(c)">Atur</button></div>
+            </li>
+          </ul>
+          </section>
+          <RemotePagination :page="pageNumber" :more="visibleClasses.length === 20" @move="movePage" />
+          <p v-if="!visibleClasses.length && !loading" class="muted">{{ classes.length ? 'Kelas tidak ditemukan.' : isAdmin ? 'Belum ada kelas pada tahun ajaran ini.' : 'Belum ada kelas pada tahun ajaran ini. Kelas dibuat admin sekolah.' }}</p>
+          </div>
+          <aside v-if="opened" class="class-detail" aria-label="Detail kelas" @keydown.esc="openID = ''">
         <div class="detail-head">
           <button type="button" class="btn-secondary" data-action="back" @click="openID = ''">Kembali ke daftar</button>
           <h3 ref="title" class="detail-title" tabindex="-1">{{ opened.name }}</h3>
@@ -167,36 +219,9 @@ onMounted(load)
             <button type="button" class="btn-secondary" data-action="archive" :disabled="opened.students > 0" @click="archive">Arsipkan kelas</button>
           </div>
         </div>
-      </template>
 
-      <template v-else>
-        <div class="filters">
-          <label>Tahun ajaran
-            <select data-test="year" :value="yearID" @change="changeYear">
-              <option v-for="y in years" :key="y.id" :value="y.id">{{ y.label }}{{ y.active ? ' (aktif)' : '' }}</option>
-            </select>
-          </label>
-          <label v-if="view === 'classes'">Cari kelas <input v-model="search" type="search" /></label>
-          <button v-if="view === 'classes' && isAdmin && !creating" type="button" class="btn-primary new" @click="creating = true">+ Kelas baru</button>
-        </div>
-        <form v-if="view === 'classes' && creating" class="row create" @submit.prevent="createClass">
-          <label>Nama kelas baru <input v-model="newClass" required maxlength="40" placeholder="XI IPA 1" /></label>
-          <button type="submit" class="btn-primary">Buat kelas</button>
-          <button type="button" class="btn-secondary" @click="creating = false; newClass = ''">Batal</button>
-        </form>
-
-        <template v-if="view === 'classes'">
-          <ul class="list">
-            <li v-for="c in visibleClasses" :key="c.id" :data-class="c.id">
-              <div>
-                <strong>{{ c.name }}</strong>
-                <p class="meta">{{ c.students }} siswa · Wali kelas: {{ c.homeroom?.name ?? 'belum ada' }} · {{ c.subject_teachers }} guru mapel</p>
-              </div>
-              <span v-if="roleLabel(c)" class="badge">{{ roleLabel(c) }}</span>
-              <button type="button" class="btn-secondary" :aria-label="`Buka ${c.name}`" @click="openClass(c)">Buka</button>
-            </li>
-          </ul>
-          <p v-if="!visibleClasses.length && !loading" class="muted">{{ classes.length ? 'Kelas tidak ditemukan.' : isAdmin ? 'Belum ada kelas pada tahun ajaran ini.' : 'Belum ada kelas pada tahun ajaran ini. Kelas dibuat admin sekolah.' }}</p>
+          </aside>
+          </div>
         </template>
 
         <StudentRoster v-else-if="yearID" :key="yearID" :org-id="orgId" :year-id="yearID" :year-label="selectedYear?.label ?? ''" :classes="classes" :is-admin="isAdmin" @changed="refreshClasses" />

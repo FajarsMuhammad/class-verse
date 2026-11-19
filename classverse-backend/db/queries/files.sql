@@ -38,7 +38,7 @@ SELECT f.id, f.kind, f.name, f.size_bytes, f.content_type, f.uploaded_by, f.crea
   COALESCE(p.position, 0)::integer AS position
 FROM files f LEFT JOIN reader_positions p ON p.file_id = f.id AND p.user_id = sqlc.arg(user_id)
 WHERE f.org_id = sqlc.arg(org_id) AND f.status = 'ready'
-ORDER BY f.created_at DESC, f.id LIMIT 200;
+ORDER BY f.created_at DESC, f.id LIMIT sqlc.narg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer;
 
 -- name: GetReadyFile :one
 SELECT * FROM files WHERE org_id = $1 AND id = $2 AND status = 'ready';

@@ -160,11 +160,20 @@ func ids(r *http.Request, names ...string) (uuid.UUID, []uuid.UUID, error) {
 }
 
 func (h *Handler) years(w http.ResponseWriter, r *http.Request) error {
+	var pagination []int32
+	if r.URL.Query().Has("limit") || r.URL.Query().Has("offset") {
+		limit, offset, err := httpx.Pagination(r)
+		if err != nil {
+			return err
+		}
+		pagination = []int32{limit, offset}
+	}
+
 	user, p, err := ids(r, "org_id")
 	if err != nil {
 		return err
 	}
-	years, err := h.svc.Years(r.Context(), user, p[0])
+	years, err := h.svc.Years(r.Context(), user, p[0], pagination...)
 	if err != nil {
 		return err
 	}
@@ -208,11 +217,20 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *Handler) classes(w http.ResponseWriter, r *http.Request) error {
+	var pagination []int32
+	if r.URL.Query().Has("limit") || r.URL.Query().Has("offset") {
+		limit, offset, err := httpx.Pagination(r)
+		if err != nil {
+			return err
+		}
+		pagination = []int32{limit, offset}
+	}
+
 	user, p, err := ids(r, "org_id", "year_id")
 	if err != nil {
 		return err
 	}
-	classes, err := h.svc.Classes(r.Context(), user, p[0], p[1])
+	classes, err := h.svc.Classes(r.Context(), user, p[0], p[1], pagination...)
 	if err != nil {
 		return err
 	}
