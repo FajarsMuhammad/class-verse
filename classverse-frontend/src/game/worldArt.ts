@@ -3,6 +3,8 @@ import world from '@/assets/world/world.json'
 import rooms from '@/assets/world/rooms.json'
 import { cssToken } from './tiles'
 import { freezeGround } from './staticGround'
+import { campusScenery } from './campusLayout'
+import { ANIMATED, drawDecor, paintGround, treeArt } from './campusPaint'
 import { roomLayout } from './roomLayout'
 
 const assets = import.meta.glob<string>('../assets/world/sprites/**/*.svg', { eager: true, query: '?raw', import: 'default' })
@@ -121,32 +123,68 @@ function titleChip(scene: Phaser.Scene, x: number, y: number, name: string) {
 
 export function drawWorld(scene: Phaser.Scene, key: string) {
   if (key !== 'campus') return drawRoom(scene, key)
-  const g = scene.add.graphics().setDepth(-10)
-  g.fillStyle(Phaser.Display.Color.HexStringToColor(world.ground.color).color)
-  g.fillRect(0, 0, world.size.w, world.size.h)
-  g.fillStyle(Phaser.Display.Color.HexStringToColor(world.ground.dot_color).color)
-  for (let y = 0; y < world.size.h; y += world.ground.dot_spacing)
-    for (let x = 0; x < world.size.w; x += world.ground.dot_spacing) g.fillCircle(x, y, 1)
-  for (const l of world.lawns) {
-    g.fillStyle(Phaser.Display.Color.HexStringToColor(world.lawn_style.color).color)
-    g.fillRoundedRect(l.x, l.y, l.w, l.h, world.lawn_style.radius)
-  }
-  freezeGround(scene, g, world.size.w, world.size.h)
+  const { trees, decor } = campusScenery()
+  // Ground, roads, plaza, garden, arena and soft shadows are painted once into a single texture.
+  scene.textures.addCanvas('campus-ground', paintGround(trees))
+  scene.add.image(0, 0, 'campus-ground').setOrigin(0).setDisplaySize(world.size.w, world.size.h).setDepth(-10)
   for (const p of world.places) {
     scene.add.image(p.sprite_pos.x, p.sprite_pos.y, p.sprite).setOrigin(0)
-      .setDisplaySize(p.size.w, p.size.h).setDepth(p.sprite_pos.y+p.size.h-20)
+      .setDisplaySize(p.size.w, p.size.h).setDepth(p.sprite_pos.y + p.size.h - 20)
     const label = titleChip(scene, p.label_anchor.x, p.label_anchor.y, p.name)
     if (p.id === 'arena') label.setBackgroundColor(cssToken('--kv-ink')).setColor(cssToken('--kv-star'))
   }
   // Open places (Taman Diskusi, Alun-alun) carry the same title chip as buildings, centred on their top edge.
-  for (const z of world.zones) {
-    scene.add.image(z.rect.x, z.rect.y, z.sprite).setOrigin(0).setDepth(-5)
-    titleChip(scene, z.rect.x + z.rect.w / 2, z.rect.y, z.name)
+  for (const z of world.zones) titleChip(scene, z.rect.x + z.rect.w / 2, z.rect.y, z.name)
+  const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const sway: { img: Phaser.GameObjects.Image; sw: number; ph: number }[] = []
+  for (const t of trees) {
+    const art = treeArt(t)
+    const tex = `tree-${t.type}-${t.r}-${t.pal}`
+    if (!scene.textures.exists(tex)) scene.textures.addCanvas(tex, art.canvas)
+    // Origin at the trunk base; depth is the base y so avatars walk in front of or behind the crown correctly.
+    const img = scene.add.image(t.x, t.y, tex).setOrigin(art.ox / art.w, art.oy / art.h).setDisplaySize(art.w, art.h).setDepth(t.y)
+    if (!calm) sway.push({ img, sw: t.sw, ph: t.ph })
   }
-  for (const t of world.trees) scene.add.image(t.x, t.y, world.tree_sprite).setOrigin(0).setDepth(t.y+46)
-  for (const n of world.npcs) {
-    scene.add.image(n.feet.x, n.feet.y, n.sprite).setOrigin(0.5, 1).setDepth(n.feet.y)
-    scene.add.image(n.feet.x, n.feet.y-54, n.marker).setDepth(n.feet.y+1)
+  const live: { d: (typeof decor)[number]; tex: Phaser.Textures.CanvasTexture; ctx: CanvasRenderingContext2D; pad: number }[] = []
+  for (const d of decor) {
+    const box = decorBox(d)
+    const cv = document.createElement('canvas')
+    cv.width = box.w * 2; cv.height = box.h * 2
+    const ctx = cv.getContext('2d')!
+    ctx.scale(2, 2)
+    const name = `decor-${decor.indexOf(d)}`
+    const tex = scene.textures.addCanvas(name, cv)!
+    const paint = (t: number) => { ctx.clearRect(0, 0, box.w, box.h); drawDecor(ctx, { ...d, x: box.ox, y: box.oy }, t); tex.refresh() }
+    paint(0)
+    scene.add.image(d.x, d.y, name).setOrigin(box.ox / box.w, box.oy / box.h).setDisplaySize(box.w, box.h).setDepth(d.y)
+    if (!calm && ANIMATED.has(d.t)) live.push(({
+	d,
+	tex,
+	ctx,
+	pad: 0,
+	paint
+}) as never)
   }
+  if (!calm) animateScenery(scene, sway, live as unknown as { paint: (t: number) => void }[])
   return true
+}
+
+// decorBox is the canvas needed for one prop: a generous box around its feet, the same for every kind.
+function decorBox(d: { t: string }) {
+  const w = d.t === 'pendopo' ? 200 : d.t === 'fountain' ? 150 : 110
+  const h = d.t === 'pendopo' ? 150 : d.t === 'fountain' ? 150 : 130
+  return { w, h, ox: w / 2, oy: h - 14 }
+}
+
+// animateScenery drives the sway of trees and the moving props. Cheap: a few dozen transforms and four tiny canvases.
+function animateScenery(scene: Phaser.Scene, sway: { img: Phaser.GameObjects.Image; sw: number; ph: number }[], live: { paint: (t: number) => void }[]) {
+  let t = 0
+  const onUpdate = (_: number, dt: number) => {
+    t += dt / 1000
+    for (const s of sway) // Phaser 3 has no skew; a small tilt about the trunk base reads the same at these angles.
+    s.img.rotation = Math.sin(t * 1.1 + s.ph) * s.sw
+    for (const l of live) l.paint(t)
+  }
+  scene.events.on('update', onUpdate)
+  scene.events.once('shutdown', () => scene.events.off('update', onUpdate))
 }
