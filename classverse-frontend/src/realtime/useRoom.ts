@@ -38,6 +38,8 @@ export interface RoomHandle {
   voiceBroadcast: (on: boolean) => void
   kick: (target: string) => void
   moderate: (name: 'mute' | 'unmute', target: string) => void
+  // muteAll mutes (or unmutes) everyone in the room now; each change is audited separately. Later joiners are not muted.
+  muteAll: (on: boolean) => void
   setLocked: (locked: boolean) => void
   // muted lists participants muted in this session (staff only).
   mutedIds: Ref<string[]>
@@ -213,6 +215,9 @@ export function useRoom(getToken: () => Promise<string | null> = freshToken): Ro
     mutedIds,
     moderate: (name, target) => {
       if (status.value === 'open') client?.send('cmd', { name, target })
+    },
+    muteAll: (on) => {
+      if (status.value === 'open') client?.send('cmd', { name: on ? 'mute_all' : 'unmute_all' })
     },
     setLocked: (locked) => {
       if (status.value === 'open') client?.send('cmd', { name: locked ? 'lock' : 'unlock' })

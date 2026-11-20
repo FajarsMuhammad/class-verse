@@ -21,6 +21,7 @@ const {
   people,
   mutedIds,
   moderate,
+  muteAll,
   kick,
   banned,
   allow,
@@ -49,6 +50,7 @@ async function toggleAllChat() {
   }
 }
 const participants = computed(() => people.value.filter((p) => p.role === 'participant' || p.role === 'guest'))
+const allMuted = computed(() => participants.value.length > 0 && participants.value.every((p) => mutedIds.value.includes(p.id)))
 const confirmKick = ref<{ id: string; name: string } | null>(null)
 function doKick() {
   if (confirmKick.value) kick(confirmKick.value.id)
@@ -90,6 +92,18 @@ function doKick() {
         <span class="state" aria-hidden="true">{{ locked ? 'Aktif' : 'Mati' }}</span>
       </button>
       <p v-if="page" class="room-meta">Orang baru tidak bisa masuk. Yang sudah di dalam tetap tinggal.</p>
+    </div>
+    <div class="action" :class="{ card: page }">
+      <button
+        type="button"
+        class="btn-secondary switch"
+        :disabled="status !== 'open' || !participants.length"
+        :title="allMuted ? 'Aktifkan chat dan suara semua peserta' : 'Bisukan chat dan suara semua peserta'"
+        @click="muteAll(!allMuted)"
+      >
+        {{ allMuted ? 'Aktifkan semua' : 'Bisukan semua' }}
+      </button>
+      <p v-if="page" class="room-meta">Peserta tidak bisa chat atau bicara. Yang masuk setelahnya tidak ikut dibisukan.</p>
     </div>
     <details class="more" :open="page || undefined">
       <summary class="btn-secondary">

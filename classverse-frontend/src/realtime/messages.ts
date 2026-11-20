@@ -42,7 +42,7 @@ export interface ClientMessages {
 }
 
 export type CommandMsg =
-  | { name: 'gather' | 'lock' | 'unlock' | 'voice_broadcast' | 'voice_broadcast_off' }
+  | { name: 'gather' | 'lock' | 'unlock' | 'mute_all' | 'unmute_all' | 'voice_broadcast' | 'voice_broadcast_off' }
   | { name: 'kick' | 'allow' | 'mute' | 'unmute'; target: string }
   | { name: 'learning_pin'; target: string; step?: string }
   | { name: 'learning_unpin' }

@@ -134,7 +134,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 | `move` | `x`, `y`, `dir` | Maks 15 pesan/detik; ditolak jika menembus collision atau melebihi kecepatan maksimum |
 | `chat` | `text`, `scope` (`near` / `zone` / `room`) | Maks 3 pesan/detik; difilter; `room` ditolak jika chat semua ruangan dimatikan |
 | `emote` | `kind` (`wave`, `hand`, `quiz`, `cheer`) | Maks 1/detik; ditolak saat dibisukan; hanya koneksi aktif |
-| `cmd` | `name` (`broadcast`, `gather`, `mute`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
+| `cmd` | `name` (`broadcast`, `gather`, `mute`, `mute_all`, `unmute_all`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
 | `ping` | `ts` | Dibalas `pong` untuk mengukur latency |
 | `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali mode HP); koneksi dipindah tanpa reconnect |
 | `seat` | `zone` | Mode HP saja, di kelas/taman; maks 1/detik (slice 8) |
@@ -782,6 +782,7 @@ The user approved server-enforced zone audio without distance attenuation, confi
   Gateway handshake and eviction share an admission lock, preventing an in-flight handshake from landing after absence confirmation.
   `welcome`/`room_state` carry personal `voice_identity`, `voice_channel`, and staff-facing `voice_pending`.
   During a control API outage an existing media connection may remain live: staff sees unconfirmed eviction until recovery.
+- *Bisukan semua.* `cmd mute_all` / `unmute_all` (staff, not campus). The room expands it into one ordinary `mute`/`unmute` per participant or guest currently inside, so each change is audited separately and applies only after its audit row commits. Staff are never muted; people joining later are not muted. When nobody needs changing the sender gets `bad_message`.
 - *Broadcast voice.* `cmd voice_broadcast` / `voice_broadcast_off` (staff, not campus, not audited). The room keeps
   the set; `welcome` and `room_state` carry `voice_broadcast: [user_id]`. Leaving the room clears it.
 - *Config.* `LIVEKIT_URL` (private `ws(s)://` upstream), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; all empty disables voice (mic hidden).
