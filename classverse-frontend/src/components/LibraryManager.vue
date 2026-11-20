@@ -63,8 +63,8 @@ function edit(book?: Book) {
   error.value = ''
 }
 
+// A new book keeps the form open (banner + "Tambah buku lain"); the catalog refreshes behind it.
 async function saved(book: Book) {
-  editing.value = null
   await load()
   message.value = `${book.title} ${book.published ? 'terbit' : 'disimpan sebagai draf'}.`
 }
@@ -108,10 +108,10 @@ onMounted(() => load())
       <button v-if="!editing" type="button" class="btn-primary" @click="edit()">+ Tambah buku</button>
     </header>
     <p v-if="!editing" class="sub">Draf hanya terlihat oleh pengajar. Buku terbit muncul di ruang Perpustakaan.</p>
-    <p v-if="message" class="notice" role="status">{{ message }}</p>
-    <p v-if="error" class="alert" role="alert">{{ error }}</p>
+    <p v-if="message && !editing" class="notice" role="status">{{ message }}</p>
+    <p v-if="error && !editing" class="alert" role="alert">{{ error }}</p>
 
-    <BookForm v-if="editing" :org-id="orgId" :user-id="userId" :book="editing === 'new' ? undefined : editing" @saved="saved" @cancel="editing = null" />
+    <BookForm v-if="editing" :org-id="orgId" :user-id="userId" :book="editing === 'new' ? undefined : editing" @saved="saved" @done="editing = null" @cancel="editing = null" />
     <template v-else>
     <div class="toolbar">
       <StatusTabs v-model="statusFilter" :items="statusTabs" label="Status buku" :controls="`${id}-books`" />

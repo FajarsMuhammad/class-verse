@@ -49,6 +49,7 @@ it('edits and archives after confirmation', async () => {
   await wrapper.findAll('button').find(b => b.text() === 'Simpan sebagai draf')!.trigger('click')
   await flushPromises()
   expect(update).toHaveBeenCalledWith('o', 'b1', expect.objectContaining({ file_id: null, copies: 2, published: false }))
+  expect(wrapper.find('.book-form').exists()).toBe(false)
 
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   const archive = vi.spyOn(libraryApi, 'archive').mockResolvedValue()
