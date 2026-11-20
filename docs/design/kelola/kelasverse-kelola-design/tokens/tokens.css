@@ -1,0 +1,48 @@
+/* Kelasverse · Kelola design tokens (dipakai di semua mockup).
+   Kalau aplikasi sudah punya token sendiri, petakan nama di bawah ke token yang ada, jangan buat duplikat. */
+:root {
+  /* teks & permukaan */
+  --kv-ink: #1E1B3A;
+  --kv-muted: #5B5876;
+  --kv-line: #E3E1F0;
+  --kv-line-soft: #EFEEF6;
+  --kv-bg: #F6F6FB;
+  --kv-card: #FFFFFF;
+
+  /* aksi utama */
+  --kv-primary: #4338CA;
+  --kv-primary-soft: #ECEBFD;
+  --kv-primary-ink: #312E81;
+
+  /* status */
+  --kv-ok: #2F7D55;        --kv-ok-soft: #EAF7EF;     --kv-ok-ink: #1F5A3C;     /* Terbit, Live, Siap */
+  --kv-draft-soft: #FFF4DE; --kv-draft-ink: #7A4A00;                          /* Draf, peringatan ringan */
+  --kv-danger: #B42318;    --kv-danger-soft: #FDECEA; --kv-danger-ink: #8A1C12; /* Perlu perhatian, hapus */
+  --kv-neutral-soft: #F0EFF6; --kv-neutral-ink: #46435F;
+
+  /* tipografi */
+  --kv-font: Nunito, system-ui, sans-serif;
+  --kv-text-xs: 12px;  /* label tabel, chip */
+  --kv-text-sm: 13px;  /* teks pendukung */
+  --kv-text-md: 14px;  /* isi utama, tombol */
+  --kv-text-lg: 17px;  /* judul kartu */
+  --kv-text-xl: 28px;  /* judul halaman */
+  --kv-weight-regular: 600;
+  --kv-weight-bold: 800;
+
+  /* bentuk & jarak */
+  --kv-radius-sm: 10px;  /* item menu */
+  --kv-radius-md: 12px;  /* tombol, input */
+  --kv-radius-lg: 18px;  /* kartu */
+  --kv-radius-pill: 999px;
+  --kv-control-h: 40px;  /* tombol & filter; input form 44px */
+  --kv-input-h: 44px;
+  --kv-space-page: 32px;
+  --kv-gap: 20px;
+
+  /* layout */
+  --kv-rail-w: 72px;
+  --kv-sidebar-w: 248px;
+  --kv-content-max: 1180px;
+  --kv-drawer-w: 340px;
+}

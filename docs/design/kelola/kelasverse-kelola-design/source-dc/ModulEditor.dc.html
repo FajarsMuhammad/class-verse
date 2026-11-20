@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Editor modul</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#4338CA}a:hover{color:#312E81}
+</style>
+</helmet>
+<div style="font-family: Nunito, system-ui, sans-serif; color: #1E1B3A; background: #F6F6FB; min-height: 1240px">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E1F0; padding: 12px 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+<a href="Main.dc.html" aria-label="Kembali" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #E3E1F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E1B3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+<div style="display: flex; flex-direction: column">
+<span style="font-weight: 800; font-size: 18px">Fotosintesis: Dapur Ajaib Tumbuhan</span>
+<span style="font-size: 13px; color: #5B5876">Biologi · SMA Kelas X · Draf, tersimpan otomatis</span>
+</div>
+<div style="flex: 1"></div>
+<button style="font: inherit; font-weight: 700; height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #E3E1F0; background: #FFFFFF; color: #1E1B3A">Pratinjau sebagai siswa</button>
+<button style="font: inherit; font-weight: 800; height: 44px; padding: 0 18px; border-radius: 12px; border: none; background: #4338CA; color: #FFFFFF">Terbitkan</button>
+</header>
+
+<div style="max-width: 1400px; margin: 0 auto; padding: 24px 28px 48px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<nav aria-label="Bagian modul" style="flex: 1 1 240px; max-width: 300px; min-width: 0; background: #FFFFFF; border: 1px solid #E3E1F0; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; font-weight: 800; color: #5B5876; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px">Bagian modul</span>
+<a href="#" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 12px; text-decoration: none; color: #1E1B3A; font-weight: 700; font-size: 14px"><span style="width: 24px; height: 24px; border-radius: 50%; background: #2F7D55; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Pendahuluan</a>
+<a href="#" aria-current="true" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 12px; text-decoration: none; color: #312E81; background: #ECEBFD; font-weight: 800; font-size: 14px"><span style="width: 24px; height: 24px; border-radius: 50%; background: #4338CA; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px">2</span>Materi: bahan &amp; hasil</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 12px; text-decoration: none; color: #1E1B3A; font-weight: 700; font-size: 14px"><span style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C9C5F5; display: flex; align-items: center; justify-content: center; font-size: 12px; box-sizing: border-box">3</span>Contoh di sekitar kita</a>
+<a href="#" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 12px; text-decoration: none; color: #1E1B3A; font-weight: 700; font-size: 14px"><span style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C9C5F5; display: flex; align-items: center; justify-content: center; font-size: 12px; box-sizing: border-box">4</span>Rangkuman</a>
+<a href="QuizBuilder.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 12px; text-decoration: none; color: #1E1B3A; font-weight: 700; font-size: 14px"><span style="width: 24px; height: 24px; border-radius: 50%; background: #FFF4DE; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A4A00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 7h7l-5.5 4.5 2 7.5-6.5-4.5-6.5 4.5 2-7.5L2 9h7z"></path></svg></span>Quiz akhir</a>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; margin-top: 6px; border-radius: 12px; border: 1px dashed #B6B1EE; background: #FFFFFF; color: #4338CA">+ Tambah bagian</button>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 8px">
+<span style="font-size: 13px; font-weight: 800; color: #4338CA">BAGIAN 2 DARI 5</span>
+<h1 style="margin: 0; font-size: 28px; font-weight: 800">Materi: bahan &amp; hasil fotosintesis</h1>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E3E1F0; border-radius: 16px; padding: 18px 20px; font-size: 16px; line-height: 1.65">
+Bayangkan daun sebagai dapur kecil. Bahan masakannya air dari akar dan karbon dioksida dari udara. Kompornya adalah cahaya matahari, dan juru masaknya klorofil. Hasilnya: gula untuk energi tumbuhan, dan oksigen yang kita hirup.
+</div>
+
+<div style="background: #FFFFFF; border: 2px solid #4338CA; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; position: relative">
+<div style="position: absolute; top: -18px; right: 14px; display: flex; gap: 4px; background: #FFFFFF; border: 1px solid #E3E1F0; border-radius: 10px; padding: 4px">
+<button aria-label="Pindahkan blok" style="width: 32px; height: 28px; border: none; background: transparent; border-radius: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="#5B5876" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></button>
+<button aria-label="Duplikat blok" style="width: 32px; height: 28px; border: none; background: transparent; border-radius: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B5876" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+<button aria-label="Hapus blok" style="width: 32px; height: 28px; border: none; background: transparent; border-radius: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B5876" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 13h10l1-13"></path><path d="M9 7V4h6v3"></path></svg></button>
+</div>
+<span style="font-size: 12px; font-weight: 800; color: #4338CA; letter-spacing: 0.06em">BLOK RUMUS</span>
+<div style="font-size: 22px; font-weight: 800; text-align: center; padding: 14px; background: #ECEBFD; border-radius: 12px; color: #312E81">6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂</div>
+<span style="font-size: 14px; color: #5B5876; text-align: center">dengan bantuan cahaya matahari dan klorofil</span>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E3E1F0; border-radius: 16px; padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 18px; align-items: center">
+<div style="flex: 1 1 240px; height: 170px; border-radius: 12px; background: #EAF7EF; border: 2px dashed #9BD3B1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #2F7D55; font-weight: 700; font-size: 14px">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2F7D55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg>
+[Diagram daun — tarik gambar ke sini]
+</div>
+<div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 8px">
+<label for="alt" style="font-size: 14px; font-weight: 700">Teks alternatif</label>
+<input id="alt" placeholder="Jelaskan gambar untuk pembaca layar" style="font: inherit; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #E3E1F0">
+<label for="cap" style="font-size: 14px; font-weight: 700">Keterangan</label>
+<input id="cap" value="Bagian daun tempat fotosintesis terjadi" style="font: inherit; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #E3E1F0">
+</div>
+</div>
+
+<div style="background: #FFF4DE; border-radius: 16px; padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#7A4A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"></path></svg>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-weight: 800; color: #7A4A00">Tahukah kamu?</span>
+<span style="font-size: 15px; line-height: 1.6">Sebagian besar oksigen di bumi dihasilkan fitoplankton di laut, bukan hanya pohon di hutan.</span>
+</div>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #E3E1F0; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<span style="font-size: 12px; font-weight: 800; color: #2F7D55; letter-spacing: 0.06em">CEK CEPAT</span>
+<span style="font-size: 12px; color: #5B5876">tidak dinilai · muncul di tengah bacaan</span>
+</div>
+<span style="font-weight: 800; font-size: 16px">Gas apa yang dilepaskan tumbuhan saat fotosintesis?</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span style="padding: 10px 16px; border-radius: 12px; border: 1px solid #E3E1F0; font-size: 14px; font-weight: 700">Karbon dioksida</span>
+<span style="padding: 10px 16px; border-radius: 12px; border: 2px solid #2F7D55; background: #EAF7EF; font-size: 14px; font-weight: 800; color: #1F5A3C">Oksigen · benar</span>
+<span style="padding: 10px 16px; border-radius: 12px; border: 1px solid #E3E1F0; font-size: 14px; font-weight: 700">Nitrogen</span>
+</div>
+</div>
+
+<div style="border: 2px dashed #C9C5F5; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; background: #FFFFFF">
+<span style="font-size: 14px; color: #5B5876"><b style="color: #1E1B3A">+ Tambah blok</b> · atau ketik <b style="color: #1E1B3A">/</b> di mana saja</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">Teks</button>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">Gambar</button>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">Video / YouTube</button>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">File PDF</button>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">Rumus</button>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">Callout</button>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">Cek cepat</button>
+<button style="font: inherit; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3E1F0; background: #F6F6FB; color: #1E1B3A">Ajak diskusi</button>
+</div>
+</div>
+
+</main>
+
+<aside style="flex: 1 1 280px; max-width: 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+<section style="background: #FFFFFF; border: 1px solid #E3E1F0; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 800">Kelengkapan modul</h2>
+<div style="height: 10px; border-radius: 999px; background: #ECEBFD; overflow: hidden"><div style="width: 60%; height: 100%; background: #4338CA"></div></div>
+<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px">
+<li style="display: flex; gap: 10px; align-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2F7D55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Sudah"><path d="M5 12l5 5 9-10"></path></svg>Tujuan pembelajaran</li>
+<li style="display: flex; gap: 10px; align-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2F7D55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Sudah"><path d="M5 12l5 5 9-10"></path></svg>Minimal 3 bagian berisi</li>
+<li style="display: flex; gap: 10px; align-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2F7D55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Sudah"><path d="M5 12l5 5 9-10"></path></svg>Ada cek cepat</li>
+<li style="display: flex; gap: 10px; align-items: center; color: #5B5876"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A97B0" stroke-width="2" aria-label="Belum"><circle cx="12" cy="12" r="8"></circle></svg>Gambar punya teks alternatif</li>
+<li style="display: flex; gap: 10px; align-items: center; color: #5B5876"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A97B0" stroke-width="2" aria-label="Belum"><circle cx="12" cy="12" r="8"></circle></svg>Quiz akhir · <a href="QuizBuilder.dc.html" style="font-weight: 800">Buat sekarang</a></li>
+</ul>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #E3E1F0; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 800">Pengaturan bagian ini</h2>
+<div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #5B5876">Waktu baca</span><span style="font-weight: 800">± 6 menit (otomatis)</span></div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="xp" style="font-size: 14px; font-weight: 700">XP saat selesai dibaca</label>
+<input id="xp" value="20" style="font: inherit; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #E3E1F0">
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="syarat" style="font-size: 14px; font-weight: 700">Terbuka setelah</label>
+<select id="syarat" style="font: inherit; height: 44px; padding: 0 10px; border-radius: 12px; border: 1px solid #E3E1F0; background: #FFFFFF"><option>Pendahuluan selesai</option></select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 14px; font-weight: 700">Tingkat</span>
+<div style="display: flex; gap: 6px">
+<button aria-pressed="true" style="flex: 1; font: inherit; font-weight: 700; font-size: 14px; height: 44px; border-radius: 12px; border: 2px solid #4338CA; background: #ECEBFD; color: #312E81">Mudah</button>
+<button aria-pressed="false" style="flex: 1; font: inherit; font-weight: 700; font-size: 14px; height: 44px; border-radius: 12px; border: 1px solid #E3E1F0; background: #FFFFFF; color: #1E1B3A">Sedang</button>
+<button aria-pressed="false" style="flex: 1; font: inherit; font-weight: 700; font-size: 14px; height: 44px; border-radius: 12px; border: 1px solid #E3E1F0; background: #FFFFFF; color: #1E1B3A">Sulit</button>
+</div>
+</div>
+</section>
+
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
