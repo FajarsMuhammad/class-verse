@@ -2475,7 +2475,7 @@ components:
       required: [title, author, shelf, level, format, copies, cover, published]
       properties:
         title: { type: string, minLength: 1, maxLength: 200 }
-        author: { type: string, minLength: 1, maxLength: 120 }
+        author: { type: string, maxLength: 120, description: "Opsional; kosong berarti penulis tidak diketahui" }
         shelf: { $ref: "#/components/schemas/Shelf" }
         level: { type: string, enum: [SD, SMP, SMA, Umum] }
         format: { type: string, enum: [buku, ebook, audio] }

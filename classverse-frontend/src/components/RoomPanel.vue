@@ -303,5 +303,4 @@ p {
 .group-title { margin: 0 0 var(--space-3); font-size: var(--text-md); }
 .card { border: 1px solid var(--kv-line); }
 .new-room { margin-top: var(--space-2); }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 </style>

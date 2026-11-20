@@ -68,7 +68,7 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
       <template v-else>
         <FileUploadPanel :key="`library-upload-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me.id"
           :is-admin="org.active.role === 'admin'" />
-        <LibraryManager :key="`library-${org.active.id}`" :org-id="org.active.id" />
+        <LibraryManager :key="`library-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me.id" />
         <ModuleManager :key="`library-modules-${org.active.id}`" :org-id="org.active.id" building-key="perpus" />
       </template>
     </template>

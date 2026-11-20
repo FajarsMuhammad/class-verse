@@ -189,7 +189,6 @@ onMounted(() => {
 .freeze-notice { background: var(--kv-primary-soft); color: var(--kv-primary-soft-text); padding: var(--space-4); border-radius: var(--radius-lg); margin-block: var(--space-4); }
 .freeze-notice p { margin-bottom: 0; }
 button:focus-visible, .task-panel:focus-visible { outline: 2px solid var(--kv-primary); outline-offset: 2px; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 @media (max-width: 1000px) { .task-layout.with-panel { grid-template-columns: minmax(0, 1fr); } .task-panel { grid-row: 1; } }
 @media (max-width: 700px) { .assignment-manager { padding: var(--space-3); } }
 h2, h3 { font-family: var(--font-display); }

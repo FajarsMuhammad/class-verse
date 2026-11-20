@@ -4,11 +4,10 @@ package auth
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -25,11 +24,5 @@ func NewStore(pool *pgxpool.Pool) *Store {
 
 // InTx runs fn inside one transaction. fn's error rolls the transaction back.
 func (s *Store) InTx(ctx context.Context, fn func(q *query.Queries) error) error {
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		return fn(s.WithTx(tx))
-	})
-	if err != nil {
-		return fmt.Errorf("transaction: %w", err)
-	}
-	return nil
+	return db.InTx(ctx, s.pool, fn)
 }

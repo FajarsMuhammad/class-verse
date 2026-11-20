@@ -124,11 +124,4 @@ const status = computed(() => {
 .act {
   min-height: var(--touch-min);
 }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 </style>

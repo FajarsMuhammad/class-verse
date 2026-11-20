@@ -633,7 +633,6 @@ h1 {
   border-radius: var(--radius-pill);
   font-weight: var(--weight-bold);
 }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .leave-link {
   align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1);
   min-height: 0; height: var(--control-sm); margin-bottom: var(--space-2); padding: 0 var(--space-3);

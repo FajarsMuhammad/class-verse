@@ -167,5 +167,4 @@ th, td { padding: var(--space-4); border-bottom: 1px solid var(--color-border); 
 li { margin-block: var(--space-2); overflow-wrap: anywhere; }
 td button { white-space: nowrap; }
 .student { margin-top: var(--space-6); padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); background: var(--color-surface); }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 </style>

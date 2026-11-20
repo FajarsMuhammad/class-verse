@@ -49,7 +49,7 @@ Dev lokal: server Go jalan di host (`make run`, port 8080), Postgres dan Mailpit
 
 ## Struktur package Go
 
-Setiap fitur adalah satu package dengan tiga lapis yang konsisten: `handler` (HTTP/WS), `service` (aturan bisnis), dan `store` (akses database). Package fitur tidak saling mengimpor store milik fitur lain; komunikasi lewat interface service.
+Setiap fitur adalah satu package dengan lapis `handler` (HTTP/WS), `service` (otorisasi + aturan bisnis), dan akses data lewat `sqlc` Queries (ADR-014): `store.go` opsional. Package fitur tidak saling mengimpor; kebutuhan lintas fitur lewat interface kecil di sisi pemakai. Pola kode rinci: [`architecture.md`](architecture.md).
 
 ```
 classverse-backend/
@@ -242,6 +242,24 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-009 | Peta sekolah adalah room biasa (`map_key = campus`) dengan area of interest | Memakai ulang hub dan protokol yang sama, tanpa service terpisah | Satu sekolah butuh lebih dari 200 orang di peta bersamaan |
 | ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
 | ADR-011 | Redis hanya untuk leaderboard mingguan (sorted set per organisasi per minggu WIB); Postgres `point_events` tetap sumber kebenaran | Top-N dan peringkat per user O(log n) tanpa agregasi `SUM` tiap request; reset mingguan lewat kunci berganti tanpa job; bisa dibangun ulang dari Postgres | Redis dipakai untuk state room (ADR-002) atau data yang tidak bisa dibangun ulang |
+
+## ADR-014 — Lapis data adalah sqlc Queries; `store.go` opsional (disetujui)
+
+**Konteks.** Desain awal menetapkan `store.go` per fitur. Dalam praktik setiap `store.go` hanya `struct{ *query.Queries }`
+plus `InTx`, bertipe konkret, dan tidak pernah di-fake; fitur yang lebih baru (assignment, class, library, module, quiz)
+memanggil `query.New` langsung di service. Yang benar-benar berulang adalah helper transaksi (8 salinan).
+
+**Keputusan.**
+- Lapis data = query `sqlc` (`internal/platform/db/query`). Service boleh memegang `*pgxpool.Pool` dan memanggil
+  `query.New(pool)` / `db.InTx(ctx, pool, fn)`.
+- `store.go` hanya dibuat bila ada logika akses data yang dipakai bersama beberapa method (bukan wrapper kosong).
+  `store.go` yang ada tidak dipindah.
+- Transaksi hanya lewat `db.InTx`; konversi umum `db.Time`, pencarian `ILIKE` literal `db.Contains`.
+- Interface hanya untuk dependensi lintas fitur atau sistem luar (Authorizer, Mailer, Uploader, Occupancy), didefinisikan
+  di sisi pemakai. Perilaku SQL dan otorisasi diuji dengan Postgres asli (`dbtest`), bukan mock query.
+
+**Konsekuensi.** Lebih sedikit lapisan tipis; aturan bisnis yang bergantung SQL hanya teruji lewat integration test.
+**Dievaluasi ulang jika** perlu mengganti penyimpanan (bukan Postgres) atau tes service tanpa database menjadi kebutuhan.
 
 ## ADR-013 — Draft dan revisi materi immutable (CS, disetujui)
 

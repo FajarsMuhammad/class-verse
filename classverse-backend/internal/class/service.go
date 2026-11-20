@@ -24,6 +24,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -181,7 +182,7 @@ func validName(s string) (string, bool) {
 	return s, n >= 1 && n <= 40 && !strings.ContainsFunc(s, unicode.IsControl)
 }
 
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 
 // uniqueViolation reports a unique constraint violation (SQLSTATE 23505).
 func uniqueViolation(err error) bool {
@@ -190,7 +191,7 @@ func uniqueViolation(err error) bool {
 }
 
 func (s *Service) inTx(ctx context.Context, fn func(*query.Queries) error) error {
-	return s.inRawTx(ctx, func(tx pgx.Tx) error { return fn(query.New(tx)) })
+	return db.InTx(ctx, s.pool, fn)
 }
 
 func (s *Service) inRawTx(ctx context.Context, fn func(pgx.Tx) error) error {

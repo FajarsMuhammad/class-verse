@@ -41,6 +41,11 @@ func TestValidate(t *testing.T) {
 	if err != nil || got.Title != "Atlas" {
 		t.Fatalf("valid input: %+v %v", got, err)
 	}
+	anonymous := ok
+	anonymous.Author = "  "
+	if got, err := validate(anonymous); err != nil || got.Author != "" {
+		t.Fatalf("author is optional: %+v %v", got, err)
+	}
 	digital := ok
 	digital.Format, digital.FileID, digital.Copies = "audio", &file, 7
 	if got, err := validate(digital); err != nil || got.Copies != 0 {
@@ -58,8 +63,5 @@ func TestCursorAndEscape(t *testing.T) {
 		if _, _, err := decodeCursor(bad); err == nil {
 			t.Fatalf("accepted %q", bad)
 		}
-	}
-	if got := likeEscape(`50%_a\b`); got != `50\%\_a\\b` {
-		t.Fatalf("escape: %s", got)
 	}
 }

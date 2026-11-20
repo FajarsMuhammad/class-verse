@@ -220,13 +220,6 @@ progress {
   flex-wrap: wrap;
   gap: var(--space-3);
 }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 .usage { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--kv-line); border-radius: var(--radius-lg); }
 .usage progress { grid-column: 1 / -1; }
 .drop { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-5); border: 1px dashed var(--kv-primary); border-radius: var(--radius-lg); }
@@ -242,4 +235,13 @@ table.list th, table.list td { padding: var(--space-3); border-bottom: 1px solid
 .row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
 .hint { margin: 0; color: var(--color-ink-muted); font-size: var(--text-sm); }
 .name { overflow-wrap: anywhere; }
+/* Phone: list only — each row stacks; the header row is redundant there. */
+@media (max-width: 640px) {
+  table.list thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  table.list, table.list tbody, table.list tr, table.list th, table.list td { display: block; }
+  table.list tr { padding: var(--space-3) 0; border-bottom: 1px solid var(--kv-line); }
+  table.list th, table.list td { padding: var(--space-1) 0; border: 0; }
+  table.list td:nth-of-type(1), table.list td:nth-of-type(2) { display: inline; margin-right: var(--space-2); color: var(--color-ink-muted); }
+  .row-actions { justify-content: flex-start; padding-top: var(--space-2); }
+}
 </style>

@@ -898,6 +898,7 @@ type AttemptQuestion struct {
 
 // Book defines model for Book.
 type Book struct {
+	// Author Opsional; kosong berarti penulis tidak diketahui
 	Author string `json:"author"`
 
 	// Available Buku fisik: eksemplar yang tidak sedang dipinjam
@@ -932,6 +933,7 @@ type BookLevel string
 
 // BookInput defines model for BookInput.
 type BookInput struct {
+	// Author Opsional; kosong berarti penulis tidak diketahui
 	Author string `json:"author"`
 
 	// Copies Eksemplar fisik; selalu 0 untuk ebook/audio

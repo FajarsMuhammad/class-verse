@@ -93,6 +93,12 @@ func TestCatalog(t *testing.T) {
 	if err != nil || draft.PublishedAt.Valid {
 		t.Fatalf("draft: %+v %v", draft, err)
 	}
+	// Author is optional (migration 00022).
+	anonymous := physical
+	anonymous.Author = ""
+	if b, err := svc.Create(ctx, admin, school.ID, anonymous); err != nil || b.Author != "" {
+		t.Fatalf("anonymous author: %+v %v", b, err)
+	}
 
 	// A file from another school or of the wrong kind is rejected.
 	foreign := sample.FileID.UUID

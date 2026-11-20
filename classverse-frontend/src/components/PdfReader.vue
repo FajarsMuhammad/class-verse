@@ -184,13 +184,6 @@ onBeforeUnmount(() => {
   width: max-content;
   margin: 0 auto;
 }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 /* Minimal subset of pdfjs-dist/web/pdf_viewer.css: invisible but selectable, screen-reader text. */
 .sheet :deep(.textLayer) {
   position: absolute;

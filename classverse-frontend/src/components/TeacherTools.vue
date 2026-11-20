@@ -106,7 +106,6 @@ svg { flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-li
 .topbar { background: var(--kv-surface); margin: 0 calc(-1 * var(--space-6)) var(--space-6); padding: var(--space-4) var(--space-6); }
 .manage-content :deep(.studio-metadata .grid) { grid-template-columns: minmax(0, 1fr); }
 .tool-head { padding-bottom: var(--space-4); border-bottom: 1px solid var(--kv-line); }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 h3 { margin: 0; font: var(--weight-semibold) var(--text-lg)/var(--line-normal) var(--font-display); }
 .tool-head p { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--kv-text-muted); }
 @media (max-width: 1000px) {

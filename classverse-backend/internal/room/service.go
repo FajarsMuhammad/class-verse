@@ -19,6 +19,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -189,7 +190,7 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, building st
 			if utf8.RuneCountInString(q) > 100 {
 				return Page{}, &ValidationError{Fields: map[string]string{"q": "Pencarian maksimal 100 karakter"}}
 			}
-			params.Pattern = pgtype.Text{String: "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q) + "%", Valid: true}
+			params.Pattern = db.Contains(q)
 		}
 	}
 	if cursor != "" {
@@ -340,7 +341,7 @@ func timePtr(t pgtype.Timestamptz) *time.Time {
 	return &u
 }
 
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 
 func pgTimePtr(t *time.Time) pgtype.Timestamptz {
 	if t == nil {

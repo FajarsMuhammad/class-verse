@@ -7,6 +7,7 @@ Sumber kebenaran produk dan teknis:
 
 - `docs/spec.md` — scope MVP, user stories (US-xx), aturan keamanan, NFR.
 - `docs/design.md` — arsitektur, struktur package, protokol WebSocket, auth, skema SQL, API contract, ADR.
+- `docs/architecture.md` — pola kode BE/FE yang berlaku sekarang; acuan wajib untuk fitur baru.
 - `docs/visual.md` + `docs/screens/*.png` — arah visual, alur layar, spesifikasi komponen, aturan aksesibilitas.
   Lihat screenshot layar terkait sebelum mengerjakan UI.
 

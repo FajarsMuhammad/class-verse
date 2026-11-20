@@ -343,11 +343,4 @@ function closed(position: number) {
   font-weight: var(--weight-bold);
 }
 .quiz-card .btn-primary { flex: none; min-height: var(--touch-min); }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 </style>

@@ -28,7 +28,7 @@ const emit = defineEmits<{ pinned: []; assign: [moduleId: string] }>()
     <aside class="rooms-invite" aria-label="Undang anggota"><InvitePanel :org-id="orgId" :my-id="userId" :my-role="isAdmin ? 'admin' : 'teacher'" /></aside>
   </div>
   <FileUploadPanel v-else-if="tool === 'files'" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" />
-  <LibraryManager v-else-if="tool === 'books'" :org-id="orgId" />
+  <LibraryManager v-else-if="tool === 'books'" :org-id="orgId" :user-id="userId" />
 </template>
 
 <style scoped>

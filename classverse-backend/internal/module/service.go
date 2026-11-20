@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -264,7 +265,7 @@ func checkFile(ctx context.Context, q *query.Queries, orgID uuid.UUID, id *uuid.
 	return nil
 }
 
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 
 func nullID(id *uuid.UUID) uuid.NullUUID {
 	if id == nil {
@@ -276,18 +277,7 @@ func nullID(id *uuid.UUID) uuid.NullUUID {
 func nullText(s string) pgtype.Text { return pgtype.Text{String: s, Valid: s != ""} }
 
 func (s *Service) inTx(ctx context.Context, fn func(*query.Queries) error) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin module transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if err := fn(query.New(tx)); err != nil {
-		return err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit module transaction: %w", err)
-	}
-	return nil
+	return db.InTx(ctx, s.pool, fn)
 }
 
 func (s *Service) staff(ctx context.Context, userID, orgID uuid.UUID) error {

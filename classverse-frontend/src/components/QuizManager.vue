@@ -577,13 +577,6 @@ onMounted(async () => {
   width: 22px;
   height: 22px;
 }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 @media (max-width: 560px) {
   .grid {
     grid-template-columns: minmax(0, 1fr);

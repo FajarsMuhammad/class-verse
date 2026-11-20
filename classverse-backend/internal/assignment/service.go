@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -44,20 +45,9 @@ type Service struct {
 func NewService(pool *pgxpool.Pool, auth *org.Service, now func() time.Time) *Service {
 	return &Service{pool: pool, auth: auth, now: now}
 }
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 func (s *Service) inTx(ctx context.Context, fn func(*query.Queries) error) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin assignment: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if err := fn(query.New(tx)); err != nil {
-		return err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit assignment: %w", err)
-	}
-	return nil
+	return db.InTx(ctx, s.pool, fn)
 }
 func notFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
