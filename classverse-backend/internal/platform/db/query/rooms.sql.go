@@ -81,6 +81,46 @@ func (q *Queries) CloseRoomSession(ctx context.Context, arg CloseRoomSessionPara
 	return err
 }
 
+const countRooms = `-- name: CountRooms :one
+SELECT count(*) FILTER (WHERE archived_at IS NULL)::integer AS total,
+       count(*) FILTER (WHERE archived_at IS NULL AND id = ANY($1::uuid[]))::integer AS live,
+       count(*) FILTER (WHERE archived_at IS NOT NULL)::integer AS archived
+FROM rooms
+WHERE org_id = $2
+  AND map_key <> 'campus'
+  AND ($3::text IS NULL OR building_key = $3)
+  AND ($4::boolean OR building_key <> 'ruang-guru')
+  AND ($5::text IS NULL OR name ILIKE $5)
+`
+
+type CountRoomsParams struct {
+	LiveIds      []uuid.UUID
+	OrgID        uuid.UUID
+	BuildingKey  pgtype.Text
+	IncludeStaff bool
+	Pattern      pgtype.Text
+}
+
+type CountRoomsRow struct {
+	Total    int32
+	Live     int32
+	Archived int32
+}
+
+// Tab counts with the list's non-status filters. live_ids are the rooms open in the hub.
+func (q *Queries) CountRooms(ctx context.Context, arg CountRoomsParams) (CountRoomsRow, error) {
+	row := q.db.QueryRow(ctx, countRooms,
+		arg.LiveIds,
+		arg.OrgID,
+		arg.BuildingKey,
+		arg.IncludeStaff,
+		arg.Pattern,
+	)
+	var i CountRoomsRow
+	err := row.Scan(&i.Total, &i.Live, &i.Archived)
+	return i, err
+}
+
 const createRoom = `-- name: CreateRoom :one
 INSERT INTO rooms (org_id, name, map_key, building_key, capacity, scheduled_at, created_by, created_at)
 VALUES ($1, $2, $3, $4, 40,
@@ -191,19 +231,22 @@ func (q *Queries) GetRoomForMember(ctx context.Context, arg GetRoomForMemberPara
 const listRooms = `-- name: ListRooms :many
 SELECT id, org_id, name, map_key, building_key, capacity, all_chat_enabled, scheduled_at, created_by, created_at, archived_at FROM rooms
 WHERE org_id = $1
-  AND archived_at IS NULL
+  AND (archived_at IS NOT NULL) = $2::boolean
+  AND ($3::uuid[] IS NULL OR id = ANY($3::uuid[]))
   AND map_key <> 'campus'
-  AND ($2::text IS NULL OR building_key = $2)
-  AND ($3::boolean OR building_key <> 'ruang-guru')
-  AND ($4::text IS NULL OR name ILIKE $4)
-  AND ($5::timestamptz IS NULL
-       OR (created_at, id) < ($5::timestamptz, $6::uuid))
+  AND ($4::text IS NULL OR building_key = $4)
+  AND ($5::boolean OR building_key <> 'ruang-guru')
+  AND ($6::text IS NULL OR name ILIKE $6)
+  AND ($7::timestamptz IS NULL
+       OR (created_at, id) < ($7::timestamptz, $8::uuid))
 ORDER BY created_at DESC, id DESC
-LIMIT $7
+LIMIT $9
 `
 
 type ListRoomsParams struct {
 	OrgID           uuid.UUID
+	Archived        bool
+	OnlyIds         []uuid.UUID
 	BuildingKey     pgtype.Text
 	IncludeStaff    bool
 	Pattern         pgtype.Text
@@ -212,11 +255,14 @@ type ListRoomsParams struct {
 	RowLimit        int32
 }
 
-// Non-campus, non-archived rooms of one organization, newest first. Staff-only
-// buildings are filtered by the caller's role.
+// Non-campus rooms of one organization, newest first. Staff-only buildings are
+// filtered by the caller's role. archived selects the archive instead of the live list;
+// only_ids (NULL = no filter) narrows to rooms currently open in the hub.
 func (q *Queries) ListRooms(ctx context.Context, arg ListRoomsParams) ([]Room, error) {
 	rows, err := q.db.Query(ctx, listRooms,
 		arg.OrgID,
+		arg.Archived,
+		arg.OnlyIds,
 		arg.BuildingKey,
 		arg.IncludeStaff,
 		arg.Pattern,

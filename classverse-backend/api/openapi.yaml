@@ -257,6 +257,8 @@ paths:
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: cursor, in: query, schema: { type: string } }
         - { name: q, in: query, description: "Cari nama ruang, teks literal", schema: { type: string, maxLength: 100 } }
+        - { name: status, in: query, description: "Kosong = semua ruang aktif; live = sedang ada orang; archived = arsip (hanya pengajar)", schema: { type: string, enum: [live, archived] } }
+        - { name: counts, in: query, description: "true menambah hitungan tab (mengikuti filter gedung dan pencarian)", schema: { type: boolean } }
       responses:
         "200":
           description: Daftar ruang
@@ -2786,6 +2788,14 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Room" }
         next_cursor: { type: string, nullable: true }
+        counts:
+          type: object
+          required: [all, live, archived]
+          description: "Hanya bila counts=true. archived selalu 0 untuk peserta."
+          properties:
+            all: { type: integer }
+            live: { type: integer }
+            archived: { type: integer }
     ReportStatus:
       type: string
       enum: [open, reviewed, dismissed]

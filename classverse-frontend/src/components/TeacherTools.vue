@@ -73,7 +73,7 @@ function selectTool(key: string) {
       </header>
       <TeacherPanel v-if="current.key === 'session'" :room="room" page />
       <ManageOverview v-else-if="current.key === 'overview'" :org-id="orgId" @select="selectTool" />
-      <RoomTools v-else :key="tool" :tool="tool" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" :room="room" :assign-module="assignModule" @pinned="emit('pinned')" @assign="assignModule = $event; active = 'assignments'" />
+      <RoomTools v-else :key="tool" :tool="tool" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" :room="room" :assign-module="assignModule" @pinned="emit('pinned')" @assign="assignModule = $event; active = 'assignments'" @control="selectTool('session')" />
     </section>
   </div>
 </template>

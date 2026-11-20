@@ -508,6 +508,19 @@ func (h *Hub) Occupancy(roomID uuid.UUID) (int, bool) {
 	return s.people, s.live
 }
 
+// LiveRooms lists the rooms of one organization that currently have people in them.
+func (h *Hub) LiveRooms(orgID uuid.UUID) []uuid.UUID {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := []uuid.UUID{}
+	for id, s := range h.stats {
+		if s.orgID == orgID && s.live {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // buildingCounts aggregates classroom and garden stats of one organization.
 // Ruang Guru is hidden from participants.
 func (h *Hub) buildingCounts(orgID uuid.UUID, role string) []BuildingCount {

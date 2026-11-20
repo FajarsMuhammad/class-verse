@@ -2179,6 +2179,7 @@ export interface components {
         Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
         BookInput: {
             title: string;
+            /** @description Opsional; kosong berarti penulis tidak diketahui */
             author: string;
             shelf: components["schemas"]["Shelf"];
             /** @enum {string} */
@@ -2486,6 +2487,12 @@ export interface components {
         RoomList: {
             items: components["schemas"]["Room"][];
             next_cursor: string | null;
+            /** @description Hanya bila counts=true. archived selalu 0 untuk peserta. */
+            counts?: {
+                all: number;
+                live: number;
+                archived: number;
+            };
         };
         /** @enum {string} */
         ReportStatus: "open" | "reviewed" | "dismissed";
@@ -3125,6 +3132,10 @@ export interface operations {
                 cursor?: string;
                 /** @description Cari nama ruang, teks literal */
                 q?: string;
+                /** @description Kosong = semua ruang aktif; live = sedang ada orang; archived = arsip (hanya pengajar) */
+                status?: "live" | "archived";
+                /** @description true menambah hitungan tab (mengikuti filter gedung dan pencarian) */
+                counts?: boolean;
             };
             header?: never;
             path: {

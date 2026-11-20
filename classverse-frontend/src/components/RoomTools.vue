@@ -13,7 +13,7 @@ import LibraryManager from './LibraryManager.vue'
 // Staff tool bodies for the side menu. Reuses the Kelola managers unchanged; `library-modules` limits the
 // module manager to the Perpustakaan building.
 defineProps<{ tool: string; orgId: string; userId: string; isAdmin: boolean; room?: RoomHandle; assignModule?: string }>()
-const emit = defineEmits<{ pinned: []; assign: [moduleId: string] }>()
+const emit = defineEmits<{ pinned: []; assign: [moduleId: string]; control: [] }>()
 </script>
 
 <template>
@@ -24,7 +24,7 @@ const emit = defineEmits<{ pinned: []; assign: [moduleId: string] }>()
   <AssignmentManager v-else-if="tool === 'assignments'" :org-id="orgId" :module-id="assignModule" />
   <GradebookReport v-else-if="tool === 'gradebook'" embedded />
   <div v-else-if="tool === 'rooms'" class="rooms-layout">
-    <RoomPanel :org-id="orgId" />
+    <RoomPanel :org-id="orgId" :current-room-id="room?.current.value?.room_id" @control="emit('control')" />
     <aside class="rooms-invite" aria-label="Undang anggota"><InvitePanel :org-id="orgId" :my-id="userId" :my-role="isAdmin ? 'admin' : 'teacher'" /></aside>
   </div>
   <FileUploadPanel v-else-if="tool === 'files'" :org-id="orgId" :user-id="userId" :is-admin="isAdmin" />

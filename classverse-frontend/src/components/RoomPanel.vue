@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import RemotePagination from './RemotePagination.vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, useId, watch } from 'vue'
 import { errorMessage } from '@/api/client'
 import { roomApi } from '@/api/rooms'
 import type { Room } from '@/api/types'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 import RoomForm from './RoomForm.vue'
+import StatusTabs from './StatusTabs.vue'
 
-const props = defineProps<{ orgId: string }>()
+// currentRoomId: the room the staff member is in now; "Kontrol" is offered only there (session tools act on the current room).
+const props = defineProps<{ orgId: string; currentRoomId?: string }>()
+const emit = defineEmits<{ control: [] }>()
+const id = useId()
 const rooms = ref<Room[]>([])
 const pageNumber = ref(1)
 const cursors = ref<(string | undefined)[]>([undefined])
@@ -27,9 +31,16 @@ const editing = ref<Room>()
 const archiving = ref<string | null>(null)
 const busy = ref(false)
 const buildingFilter = ref('')
+const statusFilter = ref('all')
+const counts = ref({ all: 0, live: 0, archived: 0 })
+const statusTabs = computed(() => [
+  { key: 'all', label: 'Semua', count: counts.value.all },
+  { key: 'live', label: 'Live', count: counts.value.live },
+  { key: 'archived', label: 'Arsip', count: counts.value.archived },
+])
 const search = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | undefined
-watch(buildingFilter, () => void load())
+watch([buildingFilter, statusFilter], () => void load())
 watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => void load(), 250) })
 const buildingName = (key: string) => buildings.value.find((b) => b.key === key)?.name ?? key
 // One server page grouped by building, in campus map order.
@@ -44,7 +55,11 @@ async function load(next?: string) {
   loading.value = true
   error.value = ''
   try {
-    const page = await roomApi.list(props.orgId, { cursor: next, building: buildingFilter.value, q: search.value })
+    const page = await roomApi.list(props.orgId, {
+      cursor: next, building: buildingFilter.value, q: search.value, counts: true,
+      status: statusFilter.value === 'live' || statusFilter.value === 'archived' ? statusFilter.value : undefined,
+    })
+    if (page.counts) counts.value = page.counts
     rooms.value = page.items
     cursor.value = page.next_cursor
   } catch (e) {
@@ -115,6 +130,7 @@ function schedule(iso: string) {
       <h2 id="rooms-title">Ruang sekolah</h2>
       <button class="btn-primary" :disabled="!buildings.length" @click="edit()">+ Ruang baru</button>
     </header>
+    <StatusTabs v-model="statusFilter" :items="statusTabs" label="Status ruang" :controls="`${id}-rooms`" />
     <div class="filters">
       <label>Gedung
         <select v-model="buildingFilter"><option value="">Semua gedung</option><option v-for="b in buildings" :key="b.key" :value="b.key">{{ b.name }}</option></select>
@@ -128,8 +144,9 @@ function schedule(iso: string) {
     <p role="status">{{ status }}</p>
     <p v-if="loading" role="status">Memuat ruang…</p>
     <p v-else-if="!rooms.length && !error">
-      {{ search || buildingFilter ? 'Ruang tidak ditemukan.' : 'Belum ada ruang. Pilih gedung dan peta untuk membuat ruang pertamamu.' }}
+      {{ search || buildingFilter ? 'Ruang tidak ditemukan.' : statusFilter === 'live' ? 'Belum ada ruang yang sedang dipakai.' : statusFilter === 'archived' ? 'Belum ada ruang yang diarsipkan.' : 'Belum ada ruang. Pilih gedung dan peta untuk membuat ruang pertamamu.' }}
     </p>
+    <div :id="`${id}-rooms`">
     <section v-for="group in groups" :key="group.key" class="group" :aria-label="group.name">
       <h3 class="group-title">{{ group.name }}</h3>
       <div class="cards">
@@ -140,12 +157,14 @@ function schedule(iso: string) {
         <div class="card-title">
           <h4>{{ room.name }}</h4>
           <span class="badge" :class="{ live: room.live, scheduled: !!room.scheduled_at && !room.live }">{{
-            room.live ? `Live · ${room.people}` : room.scheduled_at ? 'Terjadwal' : 'Siap' }}</span>
+            statusFilter === 'archived' ? 'Arsip' : room.live ? `Live · ${room.people}` : room.scheduled_at ? 'Terjadwal' : 'Siap' }}</span>
         </div>
         <p>{{ buildingName(room.building_key) }} · kapasitas {{ room.capacity }}</p>
         <p v-if="room.scheduled_at">{{ schedule(room.scheduled_at) }}</p>
-        <div class="actions">
+        <p v-if="statusFilter === 'archived'" class="muted">Diarsipkan. Ruang tidak tampil di peta.</p>
+        <div v-else class="actions">
           <RouterLink class="btn-primary map-link" :to="{ path: '/', query: { building: room.building_key } }">Masuk<span class="sr"> {{ room.name }}</span></RouterLink>
+          <button v-if="room.live && room.id === currentRoomId" type="button" class="btn-secondary" @click="emit('control')">Kontrol<span class="sr"> {{ room.name }}</span></button>
           <button class="btn-secondary" :disabled="busy" @click="edit(room)">Ubah<span class="sr"> {{ room.name }}</span></button>
           <button v-if="room.scheduled_at" class="btn-secondary" :disabled="busy" @click="openNow(room)">Buka sekarang</button>
           <button class="btn-secondary" :disabled="busy" @click="archiving = room.id">Arsipkan<span class="sr"> {{ room.name }}</span></button>
@@ -158,7 +177,8 @@ function schedule(iso: string) {
       </article>
       </div>
     </section>
-    <button class="new-room" :disabled="!buildings.length" @click="edit()">
+    </div>
+    <button v-if="statusFilter !== 'archived'" class="new-room" :disabled="!buildings.length" @click="edit()">
       <strong>Ruang baru</strong><span>Pilih gedung dan peta ruang, siap dalam satu menit.</span>
     </button>
 

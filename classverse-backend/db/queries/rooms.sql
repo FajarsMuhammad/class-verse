@@ -5,11 +5,13 @@ VALUES (sqlc.arg(org_id), sqlc.arg(name), sqlc.arg(map_key), sqlc.arg(building_k
 RETURNING *;
 
 -- name: ListRooms :many
--- Non-campus, non-archived rooms of one organization, newest first. Staff-only
--- buildings are filtered by the caller's role.
+-- Non-campus rooms of one organization, newest first. Staff-only buildings are
+-- filtered by the caller's role. archived selects the archive instead of the live list;
+-- only_ids (NULL = no filter) narrows to rooms currently open in the hub.
 SELECT * FROM rooms
 WHERE org_id = sqlc.arg(org_id)
-  AND archived_at IS NULL
+  AND (archived_at IS NOT NULL) = sqlc.arg(archived)::boolean
+  AND (sqlc.narg(only_ids)::uuid[] IS NULL OR id = ANY(sqlc.narg(only_ids)::uuid[]))
   AND map_key <> 'campus'
   AND (sqlc.narg(building_key)::text IS NULL OR building_key = sqlc.narg(building_key))
   AND (sqlc.arg(include_staff)::boolean OR building_key <> 'ruang-guru')
@@ -18,6 +20,18 @@ WHERE org_id = sqlc.arg(org_id)
        OR (created_at, id) < (sqlc.narg(cursor_created_at)::timestamptz, sqlc.narg(cursor_id)::uuid))
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(row_limit);
+
+-- name: CountRooms :one
+-- Tab counts with the list's non-status filters. live_ids are the rooms open in the hub.
+SELECT count(*) FILTER (WHERE archived_at IS NULL)::integer AS total,
+       count(*) FILTER (WHERE archived_at IS NULL AND id = ANY(sqlc.arg(live_ids)::uuid[]))::integer AS live,
+       count(*) FILTER (WHERE archived_at IS NOT NULL)::integer AS archived
+FROM rooms
+WHERE org_id = sqlc.arg(org_id)
+  AND map_key <> 'campus'
+  AND (sqlc.narg(building_key)::text IS NULL OR building_key = sqlc.narg(building_key))
+  AND (sqlc.arg(include_staff)::boolean OR building_key <> 'ruang-guru')
+  AND (sqlc.narg(pattern)::text IS NULL OR name ILIKE sqlc.narg(pattern));
 
 -- name: GetRoomForMember :one
 SELECT r.*, m.role AS member_role

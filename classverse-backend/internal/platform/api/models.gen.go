@@ -771,6 +771,24 @@ func (e ListQuizzesParamsStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListRoomsParamsStatus.
+const (
+	Archived ListRoomsParamsStatus = "archived"
+	Live     ListRoomsParamsStatus = "live"
+)
+
+// Valid indicates whether the value is a known member of the ListRoomsParamsStatus enum.
+func (e ListRoomsParamsStatus) Valid() bool {
+	switch e {
+	case Archived:
+		return true
+	case Live:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListStaff200JSONResponseBodyItemsRole.
 const (
 	ListStaff200JSONResponseBodyItemsRoleAdmin   ListStaff200JSONResponseBodyItemsRole = "admin"
@@ -1583,6 +1601,12 @@ type Room struct {
 
 // RoomList defines model for RoomList.
 type RoomList struct {
+	// Counts Hanya bila counts=true. archived selalu 0 untuk peserta.
+	Counts *struct {
+		All      int `json:"all"`
+		Archived int `json:"archived"`
+		Live     int `json:"live"`
+	} `json:"counts,omitempty"`
 	Items      []Room  `json:"items"`
 	NextCursor *string `json:"next_cursor"`
 }
@@ -2064,7 +2088,16 @@ type ListRoomsParams struct {
 
 	// Q Cari nama ruang, teks literal
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Status Kosong = semua ruang aktif; live = sedang ada orang; archived = arsip (hanya pengajar)
+	Status *ListRoomsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Counts true menambah hitungan tab (mengikuti filter gedung dan pencarian)
+	Counts *bool `form:"counts,omitempty" json:"counts,omitempty"`
 }
+
+// ListRoomsParamsStatus defines parameters for ListRooms.
+type ListRoomsParamsStatus string
 
 // ListStaffParams defines parameters for ListStaff.
 type ListStaffParams struct {
