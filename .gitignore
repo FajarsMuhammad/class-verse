@@ -1,2 +1,5 @@
 kelasverse-assets
 kelasverse-assets/*
+# Local database dumps contain password hashes and personal data; never commit them.
+*.sql.dump
+db/*.sql
