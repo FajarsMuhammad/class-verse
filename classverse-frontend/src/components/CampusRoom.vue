@@ -435,6 +435,7 @@ onBeforeUnmount(() => {
               sendMove,
               currentZone: () => chat.zone.key,
               speaking: () => voice?.speaking.value ?? new Set(),
+              counts: () => buildings,
               inset: () => inset,
               walkTarget: () => walkTarget,
               zoom: () => zoom,

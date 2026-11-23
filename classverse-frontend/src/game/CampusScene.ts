@@ -2,17 +2,19 @@ import Phaser from 'phaser'
 
 import type { MapData } from '@/realtime/mapdata'
 import { directionOf, moveToward, SEND_INTERVAL_MS, step, type Vec } from '@/realtime/movement'
-import type { Direction, MoveMsg } from '@/realtime/messages'
+import type { BuildingCount, Direction, MoveMsg } from '@/realtime/messages'
 import { findPath, nearestOpen } from '@/realtime/pathfind'
 import { roomLayout, shelfAt, stationAt } from './roomLayout'
 import { drawStations } from './stationArt'
 import type { World } from '@/realtime/world'
-import { avatarKeys, avatarKey, avatarURL } from './avatars'
+import { avatarKey } from './avatars'
+import { avatarSheet, frameIndex, walkFrame, FOOT_PAD } from './avatarPaint'
 import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
 import { roomArt, roomLandmarks } from './roomArt'
 import { stackLabels } from './layout'
-import { drawWorld, preloadWorld } from './worldArt'
+import { drawWorld, preloadWorld, type BuildingLabels } from './worldArt'
+import { badgeFor, visibleNames } from './mapLabels'
 
 export interface SceneDeps {
   map: MapData
@@ -37,6 +39,8 @@ export interface SceneDeps {
   inset?: () => { top: number; bottom: number }
   // walkTarget is set by the UI ("Keluar ruang") to walk to a map point.
   walkTarget?: () => { x: number; y: number; id: number } | null
+  // counts returns the live people per building (server data); the campus labels show it as a badge.
+  counts?: () => BuildingCount[]
 }
 
 
@@ -44,6 +48,11 @@ interface Sprite {
   body: Phaser.GameObjects.Image
   tag: Phaser.GameObjects.Container
   name: string
+  lastX: number
+  lastY: number
+  travelled: number
+  moving: boolean
+  lastMoveAt: number
 }
 
 const AVATAR_SIZE = 36
@@ -81,6 +90,10 @@ export class CampusScene extends Phaser.Scene {
   private lastSentPos: { x: number; y: number; dir: Direction } | null = null
   private labels: Phaser.GameObjects.Container[] = []
   private zoneLayer: Phaser.GameObjects.Graphics | null = null
+  private buildingLabels: BuildingLabels = new Map()
+  private badgeKey = ''
+  // hoveredId: the other player under the pointer on the campus (their name shows while hovered).
+  private hoveredId: string | null = null
   private zoneLabels: Phaser.GameObjects.Text[] = []
   private drawnZone = '?'
   private radius: Phaser.GameObjects.Graphics | null = null
@@ -89,7 +102,8 @@ export class CampusScene extends Phaser.Scene {
   private movementRevision = 0
   private walkId = 0
   private fitted = ''
-  private avatarLoads = new Set<string>()
+  // calm: the user asked for less motion, so avatars keep one pose.
+  private calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   private emoteBubbles = new Map<string, Phaser.GameObjects.Container>()
   private shelfShown = ''
   private shelfRing: Phaser.GameObjects.Graphics | null = null
@@ -104,14 +118,12 @@ export class CampusScene extends Phaser.Scene {
 
   preload() {
     preloadWorld(this)
-    for (const key of avatarKeys)
-      this.load.svg(`avatar-${key}`, avatarURL(key), { width: 112, height: 152 })
   }
 
   create() {
     const { map } = this.deps
     this.centre = null
-    const newArt = drawWorld(this, this.deps.world.mapKey ?? 'campus')
+    const newArt = drawWorld(this, this.deps.world.mapKey ?? 'campus', this.buildingLabels)
     drawStations(this, this.deps.world.mapKey ?? 'campus')
     if (!newArt) {
     this.textures.addCanvas(
@@ -190,7 +202,16 @@ export class CampusScene extends Phaser.Scene {
     this.press = { x: p.x, y: p.y, centre: this.centre ?? { x: cam.midPoint.x, y: cam.midPoint.y }, dragged: false }
   }
 
+  // avatarAt returns the id of the other player standing at a world point (about an avatar's body), or null.
+  private avatarAt(x: number, y: number): string | null {
+    for (const a of this.deps.world.avatars?.values() ?? []) {
+      if (!a.hidden && Math.abs(a.x - x) <= 16 && y >= a.y - 40 && y <= a.y + 6) return a.id
+    }
+    return null
+  }
+
   private onPointerMove(p: Phaser.Input.Pointer) {
+    if (this.deps.world.mapKey === 'campus') this.hoveredId = this.avatarAt(p.worldX, p.worldY)
     const press = this.press
     if (!press || !p.isDown || this.deps.world.mapKey !== 'campus') return
     if (!press.dragged && Math.hypot(p.x - press.x, p.y - press.y) <= DRAG_PX) return
@@ -273,6 +294,16 @@ export class CampusScene extends Phaser.Scene {
     this.path = goal ? findPath(this.deps.map, self, goal, this.tablePenalty(self, goal)) : []
   }
 
+  // syncBadges shows the server's people count on each building label; it only redraws when a figure changed.
+  private syncBadges() {
+    const counts = this.deps.counts?.()
+    if (!counts || this.buildingLabels.size === 0) return
+    const key = counts.map((c) => `${c.building_key}:${c.people}`).join('|')
+    if (key === this.badgeKey) return
+    this.badgeKey = key
+    for (const [id, label] of this.buildingLabels) label.setBadge(badgeFor(counts, id))
+  }
+
   update(time: number, delta: number) {
     const { world, map } = this.deps
     if (this.movementRevision !== world.movementRevision) {
@@ -290,6 +321,7 @@ export class CampusScene extends Phaser.Scene {
       this.path = findPath(map, self, target, this.tablePenalty(self, target))
     }
     this.highlightShelf()
+    this.syncBadges()
     const inset = this.deps.inset?.()
     if ((this.deps.world.mapKey === 'campus' &&
       this.cameras.main.zoom !== Math.max(0.3, Math.min(1, this.deps.zoom?.() ?? 0.5))) ||
@@ -431,7 +463,7 @@ export class CampusScene extends Phaser.Scene {
     if (campus && start) this.panTo(start)
     else camera.centerOn(map.pixelWidth / 2, map.pixelHeight / 2 - (campus ? 0 : shift))
     for (const child of this.children.list) {
-      if (child.name === 'world-label') (child as Phaser.GameObjects.Text).setScale(1 / zoom)
+      if (child.name === 'world-label') (child as Phaser.GameObjects.Container).setScale(1 / zoom)
     }
     for (const label of this.labels) label.setScale(1 / zoom)
     for (const s of [...this.sprites.values(), ...(this.self ? [this.self] : [])]) {
@@ -451,6 +483,11 @@ export class CampusScene extends Phaser.Scene {
 
   private syncSprites() {
     const { world } = this.deps
+    // On the busy campus only nearby or hovered people carry a name; rooms keep every name.
+    const campus = world.mapKey === 'campus'
+    const named = campus
+      ? visibleNames(world.self, [...world.avatars.values()].filter((a) => !a.hidden), this.hoveredId)
+      : new Set<string>()
     for (const [id, s] of this.sprites) {
       const a = world.avatars.get(id)
       if (!a) {
@@ -466,8 +503,9 @@ export class CampusScene extends Phaser.Scene {
         s.name = a.name
       }
       s.body.setVisible(!a.hidden).setPosition(a.x, a.y).setDepth(a.y)
+      this.animateAvatar(s, a.x, a.y, a.dir, this.time.now)
       s.tag
-        .setVisible(!a.hidden)
+        .setVisible(!a.hidden && (!campus || named.has(id)))
         .setPosition(a.x, a.y + 6)
         .setDepth(a.y + 1)
     }
@@ -489,6 +527,7 @@ export class CampusScene extends Phaser.Scene {
         this.self.name = world.selfName
       }
       this.self.body.setPosition(self.x, self.y).setDepth(self.y)
+      this.animateAvatar(this.self, self.x, self.y, self.dir, this.time.now)
       this.self.tag.setPosition(self.x, self.y + 6).setDepth(self.y + 1)
     }
     this.unstackTags()
@@ -539,35 +578,50 @@ export class CampusScene extends Phaser.Scene {
     y: number,
     avatar = 'default',
   ): Sprite {
-    const body = this.add
-      .image(x, y, this.ensureAvatar(avatar))
+    const body = this.add.image(x, y, this.ensureAvatar(avatar), 0)
     this.sizeAvatar(body)
     const tag = this.makeTag(name, kind)
     tag.setPosition(x, y + 6)
-    return { body, tag, name }
+    return { body, tag, name, lastX: x, lastY: y, travelled: 0, moving: false, lastMoveAt: 0 }
   }
 
+  // ensureAvatar builds the walking sheet of a saved avatar key once; unknown keys fall back to the default look.
   private ensureAvatar(value: string) {
     const key = avatarKey(value), texture = `avatar-${key}`
-    if (!this.textures.exists(texture) && !this.avatarLoads.has(key)) {
-      this.avatarLoads.add(key)
-      this.load.svg(texture, avatarURL(key), { width: 112, height: 152 })
-      this.load.start()
+    if (!this.textures.exists(texture)) {
+      const sheet = avatarSheet(key)
+      const tex = this.textures.addCanvas(texture, sheet.canvas)
+      // Frames are 2x supersampled, so the frame size in the sheet is twice the logical size.
+      const w = sheet.frameW * 2, h = sheet.frameH * 2
+      for (let r = 0; r < sheet.rows; r++) for (let c = 0; c < sheet.cols; c++) tex?.add(r * sheet.cols + c, 0, c * w, r * h, w, h)
     }
-    return this.textures.exists(texture) ? texture : 'avatar-default'
+    return texture
   }
 
+  // Logical avatar box: the frame is 40x64 with the feet FOOT_PAD above its bottom edge.
   private sizeAvatar(body: Phaser.GameObjects.Image) {
     const zoom = this.cameras.main.zoom
-    body.setOrigin(0.5, 1).setDisplaySize(28 / zoom, 38 / zoom)
+    body.setOrigin(0.5, 1 - FOOT_PAD / 64).setDisplaySize(40 / zoom, 64 / zoom)
   }
 
   private drawAvatar(body: Phaser.GameObjects.Image, key: string) {
     const texture = this.ensureAvatar(key)
     if (body.texture.key !== texture) {
-      body.setTexture(texture)
+      body.setTexture(texture, 0)
       this.sizeAvatar(body)
     }
+  }
+
+  // animateAvatar picks the pose from the direction and the distance walked since the last frame, so the legs
+  // follow real movement (also other players') and stop the moment someone stands still.
+  private animateAvatar(sprite: Sprite, x: number, y: number, dir: Direction, now: number) {
+    const d = Math.hypot(x - sprite.lastX, y - sprite.lastY)
+    sprite.lastX = x; sprite.lastY = y
+    if (d > 0.2) { sprite.travelled += d; sprite.lastMoveAt = now }
+    const moving = now - sprite.lastMoveAt < 120
+    sprite.moving = moving
+    const frame = this.calm ? 0 : walkFrame(moving, sprite.travelled)
+    sprite.body.setFrame(frameIndex(dir, frame))
   }
 
   private makeTag(name: string, kind: 'self' | 'teacher' | 'other') {

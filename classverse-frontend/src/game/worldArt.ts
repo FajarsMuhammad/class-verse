@@ -3,7 +3,7 @@ import world from '@/assets/world/world.json'
 import rooms from '@/assets/world/rooms.json'
 import { cssToken } from './tiles'
 import { freezeGround } from './staticGround'
-import { campusScenery } from './campusLayout'
+import { campusScenery, mulberry32 } from './campusLayout'
 import { ANIMATED, drawDecor, paintGround, treeArt } from './campusPaint'
 import { roomLayout } from './roomLayout'
 
@@ -113,15 +113,42 @@ function drawRoom(scene: Phaser.Scene, key: string) {
   return true
 }
 
-// titleChip is the white name chip above buildings and open places; CampusScene rescales 'world-label' on zoom.
-function titleChip(scene: Phaser.Scene, x: number, y: number, name: string) {
-  return scene.add.text(x, y, name, {
-      fontFamily: cssToken('--kv-font-display'), fontSize: '15px', fontStyle: '600',
-      color: cssToken('--kv-ink'), backgroundColor: cssToken('--kv-surface'), padding: { x: 10, y: 5 },
-    }).setOrigin(0.5).setDepth(100000).setResolution(2).setName('world-label')
+// MapLabel is the name chip above a building or open place: a coloured dot, the name, and (buildings) a people badge.
+// CampusScene rescales every 'world-label' on zoom so the chip keeps its screen size.
+export interface MapLabel extends Phaser.GameObjects.Container { setBadge: (text: string) => void }
+
+function titleChip(scene: Phaser.Scene, x: number, y: number, name: string, dot: string, opts: { dark?: boolean; badge?: boolean } = {}): MapLabel {
+  const ink = color(cssToken('--kv-ink'))
+  const text = scene.add.text(7, 0, name, {
+    fontFamily: cssToken('--kv-font-display'), fontSize: '15px', fontStyle: '600',
+    color: opts.dark ? cssToken('--kv-star') : cssToken('--kv-ink'),
+  }).setOrigin(0.5).setResolution(2)
+  const w = text.width + 34, h = 26
+  const bg = scene.add.graphics()
+  bg.fillStyle(color(opts.dark ? cssToken('--kv-ink') : cssToken('--kv-surface'))).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2)
+  bg.lineStyle(2.5, ink).strokeRoundedRect(-w / 2, -h / 2, w, h, h / 2)
+  bg.fillStyle(color(dot)).fillCircle(-w / 2 + 14, 0, 5)
+  const badgeText = scene.add.text(w / 2 - 4, -h / 2 - 3, '', {
+    fontFamily: cssToken('--kv-font-ui'), fontSize: '11px', fontStyle: '800', color: cssToken('--kv-surface'),
+  }).setOrigin(0.5).setResolution(2)
+  const badgeBg = scene.add.graphics().setVisible(false)
+  const box = scene.add.container(x, y, [bg, text, badgeBg, badgeText]).setDepth(100000).setName('world-label') as MapLabel
+  box.setBadge = (value: string) => {
+    badgeText.setText(value).setVisible(opts.badge === true && value !== '')
+    const bw = Math.max(20, badgeText.width + 12)
+    badgeBg.clear().setVisible(opts.badge === true && value !== '')
+    badgeBg.fillStyle(color(dot)).fillRoundedRect(w / 2 - 4 - bw / 2, -h / 2 - 12, bw, 18, 9)
+    badgeBg.lineStyle(2, ink).strokeRoundedRect(w / 2 - 4 - bw / 2, -h / 2 - 12, bw, 18, 9)
+  }
+  // Depth: badge sits above its pill.
+  box.sendToBack(bg); box.bringToTop(badgeBg); box.bringToTop(badgeText)
+  return box
 }
 
-export function drawWorld(scene: Phaser.Scene, key: string) {
+/** Building labels by place key, so the scene can update the people badge from server counts. */
+export type BuildingLabels = Map<string, MapLabel>
+
+export function drawWorld(scene: Phaser.Scene, key: string, labels?: BuildingLabels) {
   if (key !== 'campus') return drawRoom(scene, key)
   const { trees, decor } = campusScenery()
   // Ground, roads, plaza, garden, arena and soft shadows are painted once into a single texture.
@@ -130,42 +157,53 @@ export function drawWorld(scene: Phaser.Scene, key: string) {
   for (const p of world.places) {
     scene.add.image(p.sprite_pos.x, p.sprite_pos.y, p.sprite).setOrigin(0)
       .setDisplaySize(p.size.w, p.size.h).setDepth(p.sprite_pos.y + p.size.h - 20)
-    const label = titleChip(scene, p.label_anchor.x, p.label_anchor.y, p.name)
-    if (p.id === 'arena') label.setBackgroundColor(cssToken('--kv-ink')).setColor(cssToken('--kv-star'))
+    const label = titleChip(scene, p.label_anchor.x, p.label_anchor.y, p.name, p.uiColor, { dark: p.id === 'arena', badge: true })
+    labels?.set(p.id, label)
   }
   // Open places (Taman Diskusi, Alun-alun) carry the same title chip as buildings, centred on their top edge.
-  for (const z of world.zones) titleChip(scene, z.rect.x + z.rect.w / 2, z.rect.y, z.name)
+  for (const z of world.zones) titleChip(scene, z.rect.x + z.rect.w / 2, z.rect.y, z.name, cssToken('--kv-subject-diskusi'))
   const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   const sway: { img: Phaser.GameObjects.Image; sw: number; ph: number }[] = []
-  for (const t of trees) {
-    const art = treeArt(t)
-    const tex = `tree-${t.type}-${t.r}-${t.pal}`
-    if (!scene.textures.exists(tex)) scene.textures.addCanvas(tex, art.canvas)
-    // Origin at the trunk base; depth is the base y so avatars walk in front of or behind the crown correctly.
-    const img = scene.add.image(t.x, t.y, tex).setOrigin(art.ox / art.w, art.oy / art.h).setDisplaySize(art.w, art.h).setDepth(t.y)
-    if (!calm) sway.push({ img, sw: t.sw, ph: t.ph })
-  }
-  const live: { d: (typeof decor)[number]; tex: Phaser.Textures.CanvasTexture; ctx: CanvasRenderingContext2D; pad: number }[] = []
-  for (const d of decor) {
+  // Every static tree and prop goes into ONE atlas texture. 200+ separate textures would break the WebGL batch
+  // on every sprite (measured: ~8 fps in a software renderer vs 60 for one atlas).
+  const atlas = new Atlas(scene, 'campus-atlas')
+  const treeFrames = trees.map((t) => atlas.add(`t${t.type}|${t.r}|${t.pal}`, treeArt(t).canvas))
+  const staticDecor = decor.filter((d) => calm || !ANIMATED.has(d.t))
+  const decorFrames = staticDecor.map((d) => {
     const box = decorBox(d)
     const cv = document.createElement('canvas')
     cv.width = box.w * 2; cv.height = box.h * 2
     const ctx = cv.getContext('2d')!
     ctx.scale(2, 2)
-    const name = `decor-${decor.indexOf(d)}`
-    const tex = scene.textures.addCanvas(name, cv)!
-    const paint = (t: number) => { ctx.clearRect(0, 0, box.w, box.h); drawDecor(ctx, { ...d, x: box.ox, y: box.oy }, t); tex.refresh() }
-    paint(0)
-    scene.add.image(d.x, d.y, name).setOrigin(box.ox / box.w, box.oy / box.h).setDisplaySize(box.w, box.h).setDepth(d.y)
-    if (!calm && ANIMATED.has(d.t)) live.push(({
-	d,
-	tex,
-	ctx,
-	pad: 0,
-	paint
-}) as never)
+    drawDecor(ctx, { ...d, x: box.ox, y: box.oy }, 0)
+    return { d, box, frame: atlas.add(`d${d.t}|${box.w}x${box.h}|${d.cl ?? ''}|${d.t === 'sign' ? d.x : ''}`, cv) }
+  })
+  atlas.seal()
+  trees.forEach((t, k) => {
+    const art = treeArt(t)
+    // Origin at the trunk base; depth is the base y so avatars walk in front of or behind the crown correctly.
+    const img = scene.add.image(t.x, t.y, 'campus-atlas', treeFrames[k]).setOrigin(art.ox / art.w, art.oy / art.h).setDisplaySize(art.w, art.h).setDepth(t.y)
+    if (!calm) sway.push({ img, sw: t.sw, ph: t.ph })
+  })
+  for (const { d, box, frame } of decorFrames) {
+    scene.add.image(d.x, d.y, 'campus-atlas', frame).setOrigin(box.ox / box.w, box.oy / box.h).setDisplaySize(box.w, box.h).setDepth(d.y)
   }
-  if (!calm) animateScenery(scene, sway, live as unknown as { paint: (t: number) => void }[])
+  if (!calm) {
+    // Moving props (flags, fountain, scoreboard): four small textures redrawn each frame, not the whole atlas.
+    const live = decor.filter((d) => ANIMATED.has(d.t)).map((d) => {
+      const box = decorBox(d)
+      const cv = document.createElement('canvas')
+      cv.width = box.w * 2; cv.height = box.h * 2
+      const ctx = cv.getContext('2d')!
+      ctx.scale(2, 2)
+      const name = `decor-live-${decor.indexOf(d)}`
+      const tex = scene.textures.addCanvas(name, cv)!
+      scene.add.image(d.x, d.y, name).setOrigin(box.ox / box.w, box.oy / box.h).setDisplaySize(box.w, box.h).setDepth(d.y)
+      return { paint: (t: number) => { ctx.clearRect(0, 0, box.w, box.h); drawDecor(ctx, { ...d, x: box.ox, y: box.oy }, t); tex.refresh() } }
+    })
+    animateScenery(scene, sway, live)
+    ambient(scene)
+  }
   return true
 }
 
@@ -187,4 +225,65 @@ function animateScenery(scene: Phaser.Scene, sway: { img: Phaser.GameObjects.Ima
   }
   scene.events.on('update', onUpdate)
   scene.events.once('shutdown', () => scene.events.off('update', onUpdate))
+}
+
+// ambient adds client-only life: butterflies drifting over the lawns and slow cloud shadows. Not avatars, no collision,
+// seeded so everyone sees the same start. Skipped entirely under prefers-reduced-motion (caller).
+function ambient(scene: Phaser.Scene) {
+  const rnd = mulberry32(11)
+  const R = (a: number, b: number) => a + rnd() * (b - a)
+  const colours = ['#fde047', '#fb923c', '#f0abfc', '#93c5fd', '#ffffff']
+  const flies = Array.from({ length: 14 }, () => ({ x: R(250, 1950), y: R(480, 1380), a: R(0, 6.28), ph: R(0, 6), cl: color(colours[Math.floor(rnd() * colours.length)]!) }))
+  const clouds = Array.from({ length: 4 }, () => ({ x: R(0, world.size.w), y: R(100, world.size.h - 100), s: R(0.8, 1.4), v: R(10, 18) }))
+  const g = scene.add.graphics().setDepth(99990)
+  const ink = color('#23203a')
+  const onUpdate = (_: number, dtMs: number) => {
+    const dt = Math.min(dtMs, 100) / 1000
+    g.clear()
+    g.fillStyle(ink, 0.06)
+    for (const c of clouds) {
+      c.x += c.v * dt
+      if (c.x > world.size.w + 300) c.x = -300
+      for (const [dx, dy, r] of [[0, 0, 90], [70, 10, 70], [-70, 14, 64], [20, -30, 60]] as [number, number, number][]) g.fillCircle(c.x + dx * c.s, c.y + dy * c.s, r * c.s)
+    }
+    for (const f of flies) {
+      f.a += (rnd() - 0.5) * dt * 4
+      f.x += Math.cos(f.a) * 30 * dt; f.y += Math.sin(f.a) * 22 * dt; f.ph += dt
+      if (f.x < 200 || f.x > 2000 || f.y < 460 || f.y > 1420) f.a += Math.PI * dt * 4
+      const wing = Math.abs(Math.sin(f.ph * 14))
+      g.fillStyle(f.cl, 1).lineStyle(1, ink, 1)
+      for (const side of [-1, 1]) { g.fillEllipse(f.x + side * 3 * wing, f.y, (3.6 * wing + 0.5) * 2, 6); g.strokeEllipse(f.x + side * 3 * wing, f.y, (3.6 * wing + 0.5) * 2, 6) }
+    }
+  }
+  scene.events.on('update', onUpdate)
+  scene.events.once('shutdown', () => { scene.events.off('update', onUpdate); g.destroy() })
+}
+
+// Atlas packs many small canvases into one texture (shelf packing). Frames are looked up by the name given to add().
+class Atlas {
+  private items: { name: string; canvas: HTMLCanvasElement }[] = []
+  private index = new Map<string, number>()
+  constructor(private scene: Phaser.Scene, private key: string) {}
+  add(name: string, canvas: HTMLCanvasElement): string {
+    if (!this.index.has(name)) { this.index.set(name, this.items.length); this.items.push({ name, canvas }) }
+    return name
+  }
+  seal() {
+    const maxW = 4096
+    let x = 0, y = 0, rowH = 0
+    const placed = this.items.map((it) => {
+      const w = it.canvas.width, h = it.canvas.height
+      if (x + w > maxW) { x = 0; y += rowH + 2; rowH = 0 }
+      const at = { name: it.name, canvas: it.canvas, x, y, w, h }
+      x += w + 2; rowH = Math.max(rowH, h)
+      return at
+    })
+    const height = y + rowH
+    const cv = document.createElement('canvas')
+    cv.width = maxW; cv.height = Math.max(1, height)
+    const ctx = cv.getContext('2d')!
+    for (const it of placed) ctx.drawImage(it.canvas, it.x, it.y)
+    const tex = this.scene.textures.addCanvas(this.key, cv)!
+    for (const it of placed) tex.add(it.name, 0, it.x, it.y, it.w, it.h)
+  }
 }
