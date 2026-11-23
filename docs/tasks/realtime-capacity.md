@@ -70,3 +70,19 @@ Frontend/protokol tidak diubah dalam slice ini; validasi browser/voice produksi 
 
 Belum: soak berjam-jam, VPS target, TLS/internet, DB/auth asli, renderer 500 avatar, voice LiveKit,
 monitoring produksi, pemisahan kampus dan kebijakan kerumunan. Tidak menambah Redis/Kafka/microservice.
+
+## Renderer peta (browser), uji avatar palsu
+
+Halaman dev `classverse-frontend/bench/map.html?n=200&moving=1&s=6` (tidak ikut build): `World` + `CampusScene` asli,
+avatar palsu bergerak lewat snapshot 10 Hz, peta dari `/api/maps/campus`. Chrome headless (SwiftShader, tanpa GPU),
+1300x760, zoom default (seluruh kampus terlihat). fps di SwiftShader tidak bermakna; yang dipakai adalah metrik CPU/GL:
+
+| n | `update()` p50 / p95 | draw call p50 / maks | heap JS |
+| ---: | ---: | ---: | ---: |
+| 0 | 0,1 / 0,2 ms | 5 / 5 | 85 MB |
+| 50 | 0,3 / 0,8 ms | 8 / 13 | 116 MB |
+| 200 | 0,5 / 1,7 ms | 18 / 35 | 119 MB |
+| 500 | 0,9 / 3,4 ms | 35 / 78 | 118 MB |
+
+Kesimpulan: di sisi browser 200 (bahkan 500) avatar murah (< 4 ms JS, < 80 draw call per frame). Batas tetap di
+server (lihat atas). Belum: fps di GPU nyata/HP — buka halaman bench di browser biasa.

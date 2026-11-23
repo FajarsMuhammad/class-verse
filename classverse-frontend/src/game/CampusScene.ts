@@ -13,6 +13,7 @@ import { cssToken } from './tiles'
 import { campusArt } from './campusArt'
 import { roomArt, roomLandmarks } from './roomArt'
 import { stackLabels } from './layout'
+import { CONTENT, ZOOM_DEFAULT, cameraZoom } from './mapZoom'
 import { drawWorld, preloadWorld, type BuildingLabels } from './worldArt'
 import { badgeFor, visibleNames } from './mapLabels'
 
@@ -324,7 +325,7 @@ export class CampusScene extends Phaser.Scene {
     this.syncBadges()
     const inset = this.deps.inset?.()
     if ((this.deps.world.mapKey === 'campus' &&
-      this.cameras.main.zoom !== Math.max(0.3, Math.min(1, this.deps.zoom?.() ?? 0.5))) ||
+      this.cameras.main.zoom !== this.campusZoom()) ||
       (inset && `${inset.top},${inset.bottom}` !== this.fitted)) this.fitCamera()
 
     this.focused = this.game.canvas.parentElement === document.activeElement
@@ -445,6 +446,11 @@ export class CampusScene extends Phaser.Scene {
     }
   }
 
+  // campusZoom: the user's factor (1 = whole campus in view) for the current canvas size.
+  private campusZoom() {
+    return cameraZoom(this.deps.zoom?.() ?? ZOOM_DEFAULT, this.scale.width, this.scale.height)
+  }
+
   private fitCamera() {
     const { map } = this.deps
     const camera = this.cameras.main
@@ -453,13 +459,15 @@ export class CampusScene extends Phaser.Scene {
     const free = Math.max(1, this.scale.height - inset.top - inset.bottom)
     const campus = this.deps.world.mapKey === 'campus'
     const zoom = campus
-      ? Math.max(0.3, Math.min(1, this.deps.zoom?.() ?? 0.5))
+      ? this.campusZoom()
       : Math.min(this.scale.width / map.pixelWidth, free / map.pixelHeight)
     // Centre the map in the band between the toolbars, not the whole canvas.
     const shift = (inset.top - inset.bottom) / 2 / zoom
     camera.setZoom(zoom)
-    // Campus starts on the avatar, then stays where the user panned it; zoom keeps that centre.
-    const start = this.centre ?? this.deps.world.self
+    // Campus opens on the whole campus (every building in view), then stays where the user panned it; zoom keeps
+    // that centre. Zoomed in past the overview, it opens on the avatar instead.
+    const overview = { x: CONTENT.x + CONTENT.w / 2, y: CONTENT.y + CONTENT.h / 2 }
+    const start = this.centre ?? ((this.deps.zoom?.() ?? ZOOM_DEFAULT) > ZOOM_DEFAULT ? this.deps.world.self : overview)
     if (campus && start) this.panTo(start)
     else camera.centerOn(map.pixelWidth / 2, map.pixelHeight / 2 - (campus ? 0 : shift))
     for (const child of this.children.list) {

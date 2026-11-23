@@ -4,7 +4,7 @@ import rooms from '@/assets/world/rooms.json'
 import { cssToken } from './tiles'
 import { freezeGround } from './staticGround'
 import { campusScenery, mulberry32 } from './campusLayout'
-import { ANIMATED, drawDecor, paintGround, treeArt } from './campusPaint'
+import { ANIMATED, ART_SCALE, drawDecor, paintGround, treeArt } from './campusPaint'
 import { roomLayout } from './roomLayout'
 
 const assets = import.meta.glob<string>('../assets/world/sprites/**/*.svg', { eager: true, query: '?raw', import: 'default' })
@@ -172,9 +172,9 @@ export function drawWorld(scene: Phaser.Scene, key: string, labels?: BuildingLab
   const decorFrames = staticDecor.map((d) => {
     const box = decorBox(d)
     const cv = document.createElement('canvas')
-    cv.width = box.w * 2; cv.height = box.h * 2
+    cv.width = box.w * ART_SCALE; cv.height = box.h * ART_SCALE
     const ctx = cv.getContext('2d')!
-    ctx.scale(2, 2)
+    ctx.scale(ART_SCALE, ART_SCALE)
     drawDecor(ctx, { ...d, x: box.ox, y: box.oy }, 0)
     return { d, box, frame: atlas.add(`d${d.t}|${box.w}x${box.h}|${d.cl ?? ''}|${d.t === 'sign' ? d.x : ''}`, cv) }
   })
@@ -193,9 +193,9 @@ export function drawWorld(scene: Phaser.Scene, key: string, labels?: BuildingLab
     const live = decor.filter((d) => ANIMATED.has(d.t)).map((d) => {
       const box = decorBox(d)
       const cv = document.createElement('canvas')
-      cv.width = box.w * 2; cv.height = box.h * 2
+      cv.width = box.w * ART_SCALE; cv.height = box.h * ART_SCALE
       const ctx = cv.getContext('2d')!
-      ctx.scale(2, 2)
+      ctx.scale(ART_SCALE, ART_SCALE)
       const name = `decor-live-${decor.indexOf(d)}`
       const tex = scene.textures.addCanvas(name, cv)!
       scene.add.image(d.x, d.y, name).setOrigin(box.ox / box.w, box.oy / box.h).setDisplaySize(box.w, box.h).setDepth(d.y)
@@ -214,13 +214,19 @@ function decorBox(d: { t: string }) {
   return { w, h, ox: w / 2, oy: h - 14 }
 }
 
-// animateScenery drives the sway of trees and the moving props. Cheap: a few dozen transforms and four tiny canvases.
+// Moving props repaint a canvas and re-upload it to the GPU, so they run at this rate instead of every frame.
+const LIVE_STEP = 1 / 20
+
+// animateScenery drives the sway of trees and the moving props: a few dozen transforms per frame, and the seven
+// small prop canvases re-uploaded at LIVE_STEP.
 function animateScenery(scene: Phaser.Scene, sway: { img: Phaser.GameObjects.Image; sw: number; ph: number }[], live: { paint: (t: number) => void }[]) {
-  let t = 0
+  let t = 0, lastPaint = -LIVE_STEP
   const onUpdate = (_: number, dt: number) => {
     t += dt / 1000
     for (const s of sway) // Phaser 3 has no skew; a small tilt about the trunk base reads the same at these angles.
     s.img.rotation = Math.sin(t * 1.1 + s.ph) * s.sw
+    if (t - lastPaint < LIVE_STEP) return
+    lastPaint = t
     for (const l of live) l.paint(t)
   }
   scene.events.on('update', onUpdate)
@@ -235,28 +241,36 @@ function ambient(scene: Phaser.Scene) {
   const colours = ['#fde047', '#fb923c', '#f0abfc', '#93c5fd', '#ffffff']
   const flies = Array.from({ length: 14 }, () => ({ x: R(250, 1950), y: R(480, 1380), a: R(0, 6.28), ph: R(0, 6), cl: color(colours[Math.floor(rnd() * colours.length)]!) }))
   const clouds = Array.from({ length: 4 }, () => ({ x: R(0, world.size.w), y: R(100, world.size.h - 100), s: R(0.8, 1.4), v: R(10, 18) }))
-  const g = scene.add.graphics().setDepth(99990)
+  // Shapes are baked once into textures; per frame only image transforms change. Redrawing a Graphics every frame
+  // re-tessellated ~70 circles/ellipses on the CPU and re-uploaded the vertices each frame.
   const ink = color('#23203a')
+  const g = scene.make.graphics({}, false)
+  g.fillStyle(ink, 1)
+  for (const [dx, dy, r] of [[0, 0, 90], [70, 10, 70], [-70, 14, 64], [20, -30, 60]] as [number, number, number][]) g.fillCircle(180 + dx, 140 + dy, r)
+  g.generateTexture('campus-cloud', 360, 260)
+  g.clear().fillStyle(0xffffff, 1).lineStyle(1, ink, 1).fillEllipse(5, 4, 8, 6).strokeEllipse(5, 4, 8, 6)
+  g.generateTexture('campus-wing', 10, 8)
+  g.destroy()
+  // Puffs are baked opaque then shaded at 6% as one image, so a cloud no longer darkens where its own puffs overlap.
+  const cloudImgs = clouds.map((c) => scene.add.image(c.x, c.y, 'campus-cloud').setOrigin(0.5, 140 / 260).setScale(c.s).setAlpha(0.06).setDepth(99990))
+  const wings = flies.map((f) => [-1, 1].map((side) => scene.add.image(f.x, f.y, 'campus-wing').setOrigin(side < 0 ? 1 : 0, 0.5).setTint(f.cl).setDepth(99991)))
   const onUpdate = (_: number, dtMs: number) => {
     const dt = Math.min(dtMs, 100) / 1000
-    g.clear()
-    g.fillStyle(ink, 0.06)
-    for (const c of clouds) {
+    clouds.forEach((c, i) => {
       c.x += c.v * dt
       if (c.x > world.size.w + 300) c.x = -300
-      for (const [dx, dy, r] of [[0, 0, 90], [70, 10, 70], [-70, 14, 64], [20, -30, 60]] as [number, number, number][]) g.fillCircle(c.x + dx * c.s, c.y + dy * c.s, r * c.s)
-    }
-    for (const f of flies) {
+      cloudImgs[i]!.setX(c.x)
+    })
+    flies.forEach((f, i) => {
       f.a += (rnd() - 0.5) * dt * 4
       f.x += Math.cos(f.a) * 30 * dt; f.y += Math.sin(f.a) * 22 * dt; f.ph += dt
       if (f.x < 200 || f.x > 2000 || f.y < 460 || f.y > 1420) f.a += Math.PI * dt * 4
-      const wing = Math.abs(Math.sin(f.ph * 14))
-      g.fillStyle(f.cl, 1).lineStyle(1, ink, 1)
-      for (const side of [-1, 1]) { g.fillEllipse(f.x + side * 3 * wing, f.y, (3.6 * wing + 0.5) * 2, 6); g.strokeEllipse(f.x + side * 3 * wing, f.y, (3.6 * wing + 0.5) * 2, 6) }
-    }
+      const wing = Math.abs(Math.sin(f.ph * 14)) * 0.9 + 0.1
+      for (const w of wings[i]!) w.setPosition(f.x, f.y).setScale(wing, 1)
+    })
   }
   scene.events.on('update', onUpdate)
-  scene.events.once('shutdown', () => { scene.events.off('update', onUpdate); g.destroy() })
+  scene.events.once('shutdown', () => scene.events.off('update', onUpdate))
 }
 
 // Atlas packs many small canvases into one texture (shelf packing). Frames are looked up by the name given to add().

@@ -13,6 +13,7 @@ import ProfileDialog from './ProfileDialog.vue'
 import logoUrl from '@/assets/avatars/round.svg'
 import DoorRooms from '@/components/DoorRooms.vue'
 import MapZoom from '@/components/MapZoom.vue'
+import { ZOOM_DEFAULT } from '@/game/mapZoom'
 import MapMinimap from '@/components/MapMinimap.vue'
 import PlaceCard from '@/components/PlaceCard.vue'
 import PlaceList from '@/components/PlaceList.vue'
@@ -105,7 +106,7 @@ function openModules() {
   sideItem.value = 'tools'
 }
 const nearDoor = ref<Building | null>(null)
-const zoom = ref(0.5)
+const zoom = ref(ZOOM_DEFAULT)
 const position = ref<{ x: number; y: number } | null>(null)
 const otherPositions = ref<{ x: number; y: number }[]>([])
 const campus = computed(() => !current.value || current.value.map_key === 'campus')

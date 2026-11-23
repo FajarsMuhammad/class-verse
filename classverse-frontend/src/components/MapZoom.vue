@@ -1,15 +1,17 @@
 <script setup lang="ts">
-const zoom = defineModel<number>({ default: 0.5 })
+import { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN, clampZoom } from '@/game/mapZoom'
+
+const zoom = defineModel<number>({ default: ZOOM_DEFAULT })
 function change(delta: number) {
-  zoom.value = Math.max(0.3, Math.min(1, Math.round((zoom.value + delta) * 10) / 10))
+  zoom.value = clampZoom(zoom.value + delta)
 }
 </script>
 
 <template>
   <div class="zoom" role="group" aria-label="Zoom peta">
-    <button aria-label="Perbesar peta" :disabled="zoom >= 1" @click="change(0.1)">+</button>
-    <button aria-label="Reset zoom peta" @click="zoom = 0.5">{{ Math.round(zoom * 100) }}%</button>
-    <button aria-label="Perkecil peta" :disabled="zoom <= 0.3" @click="change(-0.1)">−</button>
+    <button aria-label="Perbesar peta" :disabled="zoom >= ZOOM_MAX" @click="change(0.1)">+</button>
+    <button aria-label="Reset zoom peta" @click="zoom = ZOOM_DEFAULT">{{ Math.round(zoom * 100) }}%</button>
+    <button aria-label="Perkecil peta" :disabled="zoom <= ZOOM_MIN" @click="change(-0.1)">−</button>
   </div>
 </template>
 

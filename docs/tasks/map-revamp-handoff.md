@@ -30,6 +30,8 @@ Berkas utama (semua di `classverse-frontend/src/`):
    - `ambient()` di `worldArt.ts` memakai `Graphics` yang di-`clear()` dan digambar ulang tiap frame (awan + kupu-kupu);
      ganti ke satu tekstur awan yang digeser, atau kurangi jumlahnya;
    - animasi bendera/air mancur/papan skor (`ANIMATED` di `campusPaint.ts`): empat canvas kecil di-`refresh()` tiap frame.
+   **Sudah diperbaiki (belum di-commit):** `ART_SCALE`/`GROUND_SCALE` = 1 (atlas 63→15 MB, lantai 30→13 MB),
+   `ambient()` memakai tekstur awan/sayap yang digeser, prop animasi di-refresh 20x/detik. Tinggal uji di GPU/HP.
    Cara ukur yang berhasil: toggle sementara `window.__kv` (noGround/noTrees/noAmbient) + interval rAF 60 frame.
    **Hapus toggle sebelum commit** (`grep -rn __kv src` harus kosong).
 2. **Cek commit `f3f7028`**: "Implement code changes…" menambah `db/kelasverse.sql` (8.900 baris, dump SQL). Bukan dari sesi ini.

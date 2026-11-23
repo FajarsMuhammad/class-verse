@@ -21,13 +21,18 @@ const PAL: Record<TreePalette, [string, string, string, string]> = {
 export interface TreeArt { canvas: HTMLCanvasElement; ox: number; oy: number; w: number; h: number }
 const treeCache = new Map<string, TreeArt>()
 
-// treeArt renders one tree (trunk at the origin, origin offset returned) at 2x for crisp zoom; cached per look.
+// ART_SCALE is texels per world pixel for scenery canvases. The Phaser canvas is CSS-sized (no devicePixelRatio)
+// and the campus camera tops out at 1.2 (mapZoom.ts), so 1 is at most 1.2 screen px per texel; 2x cost ~63 MB.
+// shortcut: if zoom ever needs to go well past 1.2, raise this (memory grows with its square).
+export const ART_SCALE = 1
+
+// treeArt renders one tree (trunk at the origin, origin offset returned) at ART_SCALE; cached per look.
 export function treeArt(t: Pick<Tree, 'type' | 'r' | 'pal'>): TreeArt {
   const key = `${t.type}|${t.r}|${t.pal}`
   const hit = treeCache.get(key)
   if (hit) return hit
   const { type, r, pal } = t
-  const S = 2, wd = Math.ceil(r * 3 + 20), ht = Math.ceil(r * 3.4 + 24)
+  const S = ART_SCALE, wd = Math.ceil(r * 3 + 20), ht = Math.ceil(r * 3.4 + 24)
   const cv = document.createElement('canvas')
   cv.width = wd * S; cv.height = ht * S
   const c = cv.getContext('2d')!
@@ -133,7 +138,8 @@ export function drawDecor(c: Ctx, d: Decor, t: number) {
 // Decor that moves needs a redraw every frame; the rest is baked once.
 export const ANIMATED = new Set(['flag', 'aflag', 'fountain', 'score'])
 
-export const GROUND_SCALE = 1.5
+// 1.5 made a 3300x2250 (~30 MB) texture; see ART_SCALE for why 1 is enough.
+export const GROUND_SCALE = 1
 
 // paintGround draws everything static on the floor: grass, shadows, roads, aprons, garden, plaza, arena.
 export function paintGround(trees: Tree[]): HTMLCanvasElement {
