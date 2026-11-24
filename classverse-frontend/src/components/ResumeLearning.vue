@@ -44,7 +44,7 @@ function close() {
     </template>
     <p v-else class="muted">Belum ada modul untuk dilanjutkan. Buka modul dari gedung dan tandai langkah selesai.</p>
     <BuildingModules v-if="opened && resume" :key="orgId" :org-id="orgId" :building-key="resume.building_key"
-      :building-name="resume.title" :initial-level="resume.level" :module-id="resume.module_id" @close="close" />
+      :initial-level="resume.level" :module-id="resume.module_id" @close="close" />
   </section>
 </template>
 

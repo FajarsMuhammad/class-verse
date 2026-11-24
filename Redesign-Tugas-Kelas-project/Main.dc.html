@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Popup tugas kelas</title>
+<script src="./_runtime/react.js"></script>
+<script src="./_runtime/react-dom.js"></script>
+<script src="./_runtime/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5b4ee0}a:hover{color:#3f33b8}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:3px solid #5b4ee0;outline-offset:2px}
+</style>
+</helmet>
+<div style="position: relative; min-height: 900px; box-sizing: border-box; padding: 48px 24px; display: flex; justify-content: center; align-items: flex-start; background: #a6db8e; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1d2140; overflow: hidden">
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 210px; height: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 640px; height: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; left: 22%; top: 0; bottom: 0; width: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; right: 24%; top: 0; bottom: 0; width: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; left: 6%; top: 60px; width: 200px; height: 120px; border-radius: 18px; background: #dbe7ff"></div>
+  <div aria-hidden="true" style="position: absolute; right: 6%; top: 330px; width: 260px; height: 170px; border-radius: 50%; background: #f6a05c"></div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(29, 33, 64, 0.58)"></div>
+
+  <section aria-labelledby="task-title" style="position: relative; width: 100%; max-width: 1160px; min-height: 790px; background: #ffffff; border-radius: 24px; box-shadow: 0 24px 60px rgba(17, 19, 45, 0.35); display: flex; flex-direction: column; overflow: hidden">
+
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 22px 28px; border-bottom: 1px solid #e9ebf3">
+      <div style="flex: 999 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+          <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #e6eeff; color: #1f4fb8; font-size: 13px; font-weight: 700">Matematika</span>
+          <span style="font-size: 13px; font-weight: 600; color: #5d6280">Tugas kelas</span>
+        </div>
+        <h1 id="task-title" style="margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800">Pecahan Sederhana</h1>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; font-weight: 600; color: #5d6280">
+          <span style="display: inline-flex; align-items: center; gap: 6px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Kelas 1A · 2026/2027</span>
+          <span style="display: inline-flex; align-items: center; gap: 6px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>Tanpa tenggat</span>
+          <span style="display: inline-flex; align-items: center; gap: 6px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>Urutan wajib</span>
+        </div>
+      </div>
+      <div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 8px; max-width: 280px">
+        <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700"><span>Progres</span><span style="color: #5b4ee0">{{progressText}}</span></div>
+        <div role="progressbar" aria-label="Progres tugas" aria-valuemin="0" aria-valuemax="4" aria-valuenow="{{doneCount}}" style="height: 10px; border-radius: 999px; background: #e9ebf3; overflow: hidden"><div style="height: 100%; border-radius: 999px; background: #5b4ee0; {{pctStyle}}"></div></div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <a href="AllTasks.dc.html" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #e9ebf3; color: #1d2140; text-decoration: none; font-size: 14px; font-weight: 700">Semua tugas</a>
+        <button type="button" aria-label="Tutup" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #e9ebf3; background: #ffffff; color: #1d2140; display: grid; place-items: center; cursor: pointer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+    </header>
+
+    <div style="flex: 1; display: flex; flex-wrap: wrap">
+      <nav aria-label="Langkah tugas" style="flex: 1 1 280px; max-width: 100%; box-sizing: border-box; padding: 22px 20px; background: #f7f7fc; border-right: 1px solid #e9ebf3; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0 0 4px 8px; font-size: 13px; font-weight: 800; color: #5d6280">Langkah</h2>
+        <sc-for list="{{steps}}" as="item" hint-placeholder-count="4">
+          <button type="button" onClick="{{item.pick}}" disabled="{{item.isLocked}}" aria-current="{{item.ariaCur}}" style="display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 2px solid transparent; text-align: left; color: #1d2140; {{item.rowVar}}">
+            <span style="flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 800; {{item.badgeVar}}">
+              <sc-if value="{{item.isDone}}" hint-placeholder-val="{{false}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+              <sc-if value="{{item.isLocked}}" hint-placeholder-val="{{false}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></sc-if>
+              <sc-if value="{{item.showNum}}" hint-placeholder-val="{{true}}">{{item.n}}</sc-if>
+            </span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 15px; font-weight: 700; line-height: 1.3">{{item.title}}</span>
+              <span style="font-size: 13px; font-weight: 600; color: #5d6280">{{item.label}} · {{item.status}}</span>
+            </span>
+          </button>
+        </sc-for>
+        <p style="margin: auto 8px 0; padding-top: 16px; font-size: 13px; line-height: 1.5; color: #5d6280">Langkah berikutnya terbuka setelah langkah sebelumnya selesai. Progres tugas terpisah dari katalog; nilai dan progres lama tetap tersimpan.</p>
+      </nav>
+
+      <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+        <div style="flex: 1; padding: 30px 44px 28px; display: flex; flex-direction: column; gap: 20px; max-width: 820px; box-sizing: border-box">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; color: #5d6280">
+            <span style="padding: 4px 10px; border-radius: 8px; background: #efedff; color: #4a3dd1">{{cur.label}}</span>
+            <span>Langkah {{cur.n}} dari 4</span>
+            <span>· {{cur.dur}}</span>
+          </div>
+          <h2 style="margin: 0; font-size: 32px; line-height: 1.15; font-weight: 800">{{cur.title}}</h2>
+
+          <sc-if value="{{cur.kMateri}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+              <div style="flex: 999 1 340px; min-width: 0; font-size: 17px; line-height: 1.7; color: #2a2f52">
+                <p style="margin: 0 0 14px">Pecahan menyatakan bagian dari suatu keseluruhan. Bayangkan sebuah roti dipotong menjadi 2 bagian sama besar: satu potong disebut setengah (1/2).</p>
+                <p style="margin: 0 0 14px">Angka di atas garis disebut <b>pembilang</b>, yaitu banyak bagian yang kita ambil. Angka di bawah garis disebut <b>penyebut</b>, yaitu banyak bagian yang sama besar.</p>
+                <p style="margin: 0; padding: 14px 16px; border-radius: 14px; background: #fff7e6; color: #6b4a00; font-weight: 600">Syarat penting: semua bagian harus sama besar.</p>
+              </div>
+              <figure style="flex: 1 1 220px; margin: 0; padding: 18px; border-radius: 18px; background: #f7f7fc; display: flex; flex-direction: column; gap: 12px; align-items: center">
+                <svg role="img" aria-label="Lingkaran utuh, setengah, dan seperempat" width="240" height="96" viewBox="0 0 240 96">
+                  <circle cx="40" cy="44" r="32" fill="#f6c453" stroke="#1d2140" stroke-width="2.5"></circle>
+                  <circle cx="120" cy="44" r="32" fill="#ffffff" stroke="#1d2140" stroke-width="2.5"></circle>
+                  <path d="M120 12 A32 32 0 0 1 120 76 Z" fill="#f6c453" stroke="#1d2140" stroke-width="2.5"></path>
+                  <circle cx="200" cy="44" r="32" fill="#ffffff" stroke="#1d2140" stroke-width="2.5"></circle>
+                  <path d="M200 44 L200 12 A32 32 0 0 1 232 44 Z" fill="#f6c453" stroke="#1d2140" stroke-width="2.5"></path>
+                  <path d="M168 44h64M200 12v64" stroke="#1d2140" stroke-width="2"></path>
+                  <text x="40" y="93" text-anchor="middle" font-size="13" font-weight="700" fill="#1d2140">1</text>
+                  <text x="120" y="93" text-anchor="middle" font-size="13" font-weight="700" fill="#1d2140">1/2</text>
+                  <text x="200" y="93" text-anchor="middle" font-size="13" font-weight="700" fill="#1d2140">1/4</text>
+                </svg>
+                <figcaption style="font-size: 13px; font-weight: 600; color: #5d6280; text-align: center">Bagian yang diwarnai = pembilang</figcaption>
+              </figure>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{cur.kVideo}}" hint-placeholder-val="{{false}}">
+            <div style="display: flex; flex-direction: column; gap: 14px">
+              <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 18px; background: #1d2140; display: grid; place-items: center; overflow: hidden">
+                <button type="button" aria-label="Putar video" style="width: 76px; height: 76px; border-radius: 50%; border: 0; background: #ffffff; color: #5b4ee0; display: grid; place-items: center; cursor: pointer"><svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></button>
+                <span style="position: absolute; left: 16px; bottom: 14px; padding: 4px 10px; border-radius: 8px; background: rgba(255,255,255,0.14); color: #ffffff; font-size: 13px; font-weight: 700">08:12</span>
+              </div>
+              <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #2a2f52">Tonton sampai selesai, lalu tandai langkah ini. Video tampil lebar di sini, tidak lagi terjepit di sidebar.</p>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{cur.kBerkas}}" hint-placeholder-val="{{false}}">
+            <div style="display: flex; flex-direction: column; gap: 14px">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 18px; border-radius: 18px; border: 1px solid #e9ebf3">
+                <span style="flex: none; width: 52px; height: 60px; border-radius: 10px; background: #fde8e8; color: #b42318; display: grid; place-items: center; font-size: 13px; font-weight: 800">PDF</span>
+                <div style="flex: 1 1 200px; min-width: 0">
+                  <div style="font-size: 16px; font-weight: 700">Lembar latihan pecahan.pdf</div>
+                  <div style="font-size: 14px; font-weight: 600; color: #5d6280">2 halaman</div>
+                </div>
+                <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #e9ebf3; background: #ffffff; color: #1d2140; font-size: 14px; font-weight: 700; cursor: pointer">Buka di tab baru</button>
+              </div>
+              <div style="height: 300px; border-radius: 18px; background: #f7f7fc; border: 1px dashed #c9cce0; display: grid; place-items: center; font-size: 14px; font-weight: 600; color: #5d6280">Pratinjau berkas tampil di sini</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{cur.kKuis}}" hint-placeholder-val="{{false}}">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 26px; border-radius: 20px; background: #fff3e8">
+              <div style="flex: none; width: 88px; height: 88px; border-radius: 22px; background: #ea580c; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 14px; box-sizing: border-box">
+                <span style="border-radius: 6px; background: #ef4444"></span><span style="border-radius: 6px; background: #3b82f6"></span><span style="border-radius: 6px; background: #f5b70b"></span><span style="border-radius: 6px; background: #16a34a"></span>
+              </div>
+              <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+                <div style="font-size: 20px; font-weight: 800">Kuis pecahan · 10 soal</div>
+                <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #5a3a1a">Lulus kuis melalui tugas ini. Hasil kuis katalog tidak menyelesaikan tugas.</p>
+              </div>
+              <button type="button" onClick="{{markDone}}" style="height: 48px; padding: 0 22px; border-radius: 14px; border: 0; background: #ea580c; color: #ffffff; font-size: 16px; font-weight: 800; cursor: pointer">{{quizLabel}}</button>
+            </div>
+          </sc-if>
+        </div>
+
+        <footer style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 44px; border-top: 1px solid #e9ebf3; background: #ffffff">
+          <button type="button" onClick="{{prev}}" disabled="{{prevDisabled}}" style="height: 48px; padding: 0 18px; border-radius: 14px; border: 1px solid #e9ebf3; background: #ffffff; color: #1d2140; font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; {{prevVar}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>Sebelumnya</button>
+          <div style="flex: 1"></div>
+          <sc-if value="{{cur.isDone}}" hint-placeholder-val="{{false}}">
+            <span style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-radius: 12px; background: #e7f8ee; color: #15703d; font-size: 15px; font-weight: 700"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Selesai</span>
+          </sc-if>
+          <sc-if value="{{canMark}}" hint-placeholder-val="{{true}}">
+            <button type="button" onClick="{{markDone}}" style="height: 48px; padding: 0 22px; border-radius: 14px; border: 0; background: #5b4ee0; color: #ffffff; font-size: 15px; font-weight: 800; cursor: pointer">Tandai selesai</button>
+          </sc-if>
+          <button type="button" onClick="{{next}}" disabled="{{nextDisabled}}" style="height: 48px; padding: 0 18px; border-radius: 14px; font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; {{nextVar}}">{{nextLabel}}<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button>
+        </footer>
+      </main>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cur: 0, done: [false, false, false, false] };
+  }
+  renderVals() {
+    var S = [
+      { title: 'Apa itu pecahan?', kind: 'materi', label: 'Materi', dur: '5 menit baca' },
+      { title: 'Membandingkan pecahan', kind: 'video', label: 'Video', dur: '8 menit' },
+      { title: 'Lembar latihan pecahan', kind: 'berkas', label: 'Berkas', dur: 'PDF' },
+      { title: 'Kuis pecahan', kind: 'kuis', label: 'Kuis', dur: '10 soal' }
+    ];
+    var self = this;
+    var st = this.state;
+    var done = st.done;
+    var unl = function (i) { return i === 0 || done[i - 1]; };
+    var steps = S.map(function (s, i) {
+      var isCur = i === st.cur, isDone = done[i], isLocked = !unl(i);
+      var row = isCur ? 'border-color: #5b4ee0; background: #ffffff; box-shadow: 0 6px 18px rgba(91,78,224,0.14);' : 'background: transparent;';
+      row += isLocked ? ' opacity: 0.55; cursor: not-allowed;' : ' cursor: pointer;';
+      var badge = isDone ? 'background: #16a34a; color: #ffffff;' : isLocked ? 'background: #e9ebf3; color: #5d6280;' : isCur ? 'background: #5b4ee0; color: #ffffff;' : 'background: #ffffff; color: #1d2140; border: 2px solid #d9dbe8;';
+      return {
+        n: i + 1, title: s.title, label: s.label,
+        status: isDone ? 'Selesai' : isLocked ? 'Terkunci' : isCur ? 'Sedang dibuka' : 'Belum',
+        isDone: isDone, isLocked: isLocked, showNum: !isDone && !isLocked,
+        ariaCur: isCur ? 'step' : 'false',
+        rowVar: row, badgeVar: badge,
+        pick: function () { if (!isLocked) self.setState({ cur: i }); }
+      };
+    });
+    var c = S[st.cur];
+    var doneCount = done.filter(Boolean).length;
+    var isLast = st.cur === S.length - 1;
+    var nextDisabled = isLast || !unl(st.cur + 1);
+    var markDone = function () {
+      var d = self.state.done.slice();
+      d[self.state.cur] = true;
+      self.setState({ done: d });
+    };
+    return {
+      steps: steps,
+      cur: { n: st.cur + 1, title: c.title, label: c.label, dur: c.dur, isDone: done[st.cur],
+        kMateri: c.kind === 'materi', kVideo: c.kind === 'video', kBerkas: c.kind === 'berkas', kKuis: c.kind === 'kuis' },
+      canMark: !done[st.cur] && c.kind !== 'kuis',
+      quizLabel: done[st.cur] ? 'Kuis lulus' : 'Mulai kuis',
+      doneCount: doneCount,
+      progressText: doneCount + ' dari 4 selesai',
+      pctStyle: 'width: ' + (doneCount / 4 * 100) + '%;',
+      markDone: markDone,
+      prev: function () { if (self.state.cur > 0) self.setState({ cur: self.state.cur - 1 }); },
+      next: function () { if (!nextDisabled) self.setState({ cur: self.state.cur + 1 }); },
+      prevDisabled: st.cur === 0,
+      prevVar: st.cur === 0 ? 'opacity: 0.45; cursor: not-allowed;' : 'cursor: pointer;',
+      nextDisabled: nextDisabled,
+      nextLabel: isLast ? 'Langkah terakhir' : 'Lanjut',
+      nextVar: nextDisabled ? 'border: 1px solid #e9ebf3; background: #f3f4f8; color: #8a8fa8; cursor: not-allowed;' : 'border: 1px solid #5b4ee0; background: #ffffff; color: #4a3dd1; cursor: pointer;'
+    };
+  }
+}
+</script>
+</body>
+</html>

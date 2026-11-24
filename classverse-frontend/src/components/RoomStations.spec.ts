@@ -3,13 +3,13 @@ import { expect, it, vi } from 'vitest'
 import { moduleApi } from '@/api/modules'
 import RoomStations from './RoomStations.vue'
 
-const global = { stubs: { ModulePath: true, RouterLink: { template: '<a><slot /></a>' } } }
+const global = { stubs: { BuildingModules: true, RouterLink: { template: '<a><slot /></a>' } } }
 it('offers science stations and the real module catalog, without simulated pupils or scores', async () => {
   const w = mount(RoomStations, { props: { orgId: 'o', mapKey: 'science', station: 'tatasurya', teacher: false }, global })
   expect(w.text()).toContain('Model Tata Surya')
   expect(w.text()).toContain('simulasi interaktif belum tersedia')
   await w.get('.btn-primary').trigger('click')
-  expect(w.findComponent({ name: 'ModulePath' }).props('buildingKey')).toBe('sains')
+  expect(w.findComponent({ name: 'BuildingModules' }).props('buildingKey')).toBe('sains')
   await w.findAll('.station-tab')[2]!.trigger('click')
   expect(w.emitted('select')?.[0]).toEqual(['kimia'])
 })

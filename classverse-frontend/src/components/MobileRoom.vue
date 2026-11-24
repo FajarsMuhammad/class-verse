@@ -206,7 +206,7 @@ function reported() {
         </li>
       </ul>
       <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
-        :building-name="modulesOf.name" @close="modulesOf = null; progressKey++" />
+        @close="modulesOf = null; progressKey++" />
     </template>
 
     <template v-else>

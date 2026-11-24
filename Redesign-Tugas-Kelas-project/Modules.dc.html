@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Popup modul gedung</title>
+<script src="./_runtime/react.js"></script>
+<script src="./_runtime/react-dom.js"></script>
+<script src="./_runtime/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5b4ee0}a:hover{color:#3f33b8}
+button{font-family:inherit}
+a:focus-visible,button:focus-visible{outline:3px solid #5b4ee0;outline-offset:2px}
+</style>
+</helmet>
+<div style="position: relative; min-height: 900px; box-sizing: border-box; padding: 48px 24px; display: flex; justify-content: center; align-items: flex-start; background: #a6db8e; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #1d2140; overflow: hidden">
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 210px; height: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 640px; height: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; left: 22%; top: 0; bottom: 0; width: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; right: 24%; top: 0; bottom: 0; width: 56px; background: #f2e1ba"></div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(29, 33, 64, 0.58)"></div>
+
+  <section aria-labelledby="mod-title" style="position: relative; width: 100%; max-width: 1160px; min-height: 790px; background: #ffffff; border-radius: 24px; box-shadow: 0 24px 60px rgba(17, 19, 45, 0.35); display: flex; flex-direction: column; overflow: hidden">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 22px 28px; background: #eef3ff; border-bottom: 1px solid #dfe6fb">
+      <div aria-hidden="true" style="flex: none; width: 64px; height: 64px; border-radius: 18px; background: #2f6fe4; display: grid; place-items: center">
+        <svg width="34" height="34" viewBox="0 0 34 34"><path d="M5 26h9L9.5 16Z" fill="#ef4444" stroke="#1d2140" stroke-width="2" stroke-linejoin="round"></path><rect x="15" y="9" width="9" height="9" rx="2" fill="#fbbf24" stroke="#1d2140" stroke-width="2"></rect><circle cx="24" cy="24" r="5" fill="#ffffff" stroke="#1d2140" stroke-width="2"></circle></svg>
+      </div>
+      <div style="flex: 999 1 300px; min-width: 0">
+        <div style="font-size: 13px; font-weight: 700; color: #1f4fb8">Gedung · Matematika</div>
+        <h1 id="mod-title" style="margin: 2px 0 0; font-size: 30px; line-height: 1.15; font-weight: 800">Modul Rumah Angka</h1>
+      </div>
+      <div role="tablist" aria-label="Jenjang" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border-radius: 14px; background: #ffffff; border: 1px solid #dfe6fb">
+        <sc-for list="{{levels}}" as="l" hint-placeholder-count="4">
+          <button type="button" role="tab" aria-selected="{{l.sel}}" onClick="{{l.pick}}" style="height: 40px; min-width: 56px; padding: 0 14px; border-radius: 10px; border: 0; font-size: 14px; font-weight: 800; cursor: pointer; {{l.style}}">{{l.label}}</button>
+        </sc-for>
+      </div>
+      <button type="button" aria-label="Tutup" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #dfe6fb; background: #ffffff; color: #1d2140; display: grid; place-items: center; cursor: pointer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+    </header>
+
+    <div style="padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 26px">
+      <section aria-labelledby="mod-list" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px">
+          <h2 id="mod-list" style="margin: 0; font-size: 20px; font-weight: 800">Modul jenjang {{levelName}}</h2>
+          <span style="font-size: 14px; font-weight: 600; color: #5d6280">Semua modul terbuka, kerjakan urut atau loncat sesukamu</span>
+        </div>
+        <sc-if value="{{hasModules}}" hint-placeholder-val="{{true}}">
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px">
+            <sc-for list="{{modules}}" as="m" hint-placeholder-count="3">
+              <a href="ModulePlayer.dc.html" style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 20px; border: 1px solid #e9ebf3; background: #ffffff; color: #1d2140; text-decoration: none; box-shadow: 0 3px 0 #e9ebf3">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <sc-for list="{{m.dots}}" as="d" hint-placeholder-count="3">
+                    <span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; font-weight: 800; {{d.style}}">{{d.ch}}</span>
+                  </sc-for>
+                  <span style="margin-left: auto; font-size: 13px; font-weight: 700; {{m.stateVar}}">{{m.state}}</span>
+                </div>
+                <div>
+                  <div style="font-size: 20px; font-weight: 800; line-height: 1.25">{{m.title}}</div>
+                  <p style="margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: #4a4f72">{{m.desc}}</p>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid #e9ebf3">
+                  <span style="font-size: 13px; font-weight: 700; color: #5d6280">{{m.meta}}</span>
+                  <span style="display: inline-flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 12px; font-size: 14px; font-weight: 800; {{m.ctaVar}}">{{m.cta}}</span>
+                </div>
+              </a>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{noModules}}" hint-placeholder-val="{{false}}">
+          <p style="margin: 0; padding: 40px; border-radius: 18px; background: #f7f7fc; text-align: center; font-size: 15px; font-weight: 600; color: #5d6280">Belum ada modul untuk jenjang ini.</p>
+        </sc-if>
+      </section>
+
+      <section aria-labelledby="mod-quiz" style="display: flex; flex-direction: column; gap: 14px">
+        <h2 id="mod-quiz" style="margin: 0; font-size: 20px; font-weight: 800">Kuis di gedung ini</h2>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 18px 20px; border-radius: 20px; background: #fff3e8">
+          <div aria-hidden="true" style="flex: none; width: 56px; height: 56px; border-radius: 16px; background: #ea580c; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 10px; box-sizing: border-box">
+            <span style="border-radius: 4px; background: #ef4444"></span><span style="border-radius: 4px; background: #3b82f6"></span><span style="border-radius: 4px; background: #f5b70b"></span><span style="border-radius: 4px; background: #16a34a"></span>
+          </div>
+          <div style="flex: 1 1 220px; min-width: 0">
+            <div style="font-size: 17px; font-weight: 800">Kuis Pecahan Sederhana</div>
+            <div style="font-size: 14px; font-weight: 600; color: #5a3a1a">5 soal · nilai terbaik 80</div>
+          </div>
+          <button type="button" style="height: 44px; padding: 0 20px; border-radius: 12px; border: 0; background: #ea580c; color: #ffffff; font-size: 15px; font-weight: 800; cursor: pointer">Main lagi</button>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { level: 'SD' };
+  }
+  renderVals() {
+    var self = this;
+    var DATA = {
+      SD: [
+        { title: 'Pecahan Sederhana', desc: 'Mengenal setengah, sepertiga, dan seperempat lewat contoh sehari-hari.', kinds: ['materi', 'materi', 'kuis'], mins: 21, done: 0 },
+        { title: 'Bangun Datar', desc: 'Persegi, segitiga, dan lingkaran: sisi, sudut, dan kelilingnya.', kinds: ['materi', 'video', 'kuis'], mins: 18, done: 2 },
+        { title: 'Perkalian Dasar', desc: 'Perkalian sebagai penjumlahan berulang, sampai tabel 1 sampai 10.', kinds: ['materi', 'video', 'berkas', 'kuis'], mins: 25, done: 4 }
+      ],
+      SMP: [
+        { title: 'Aljabar Pertama', desc: 'Variabel, konstanta, dan cara menyederhanakan bentuk aljabar.', kinds: ['materi', 'video', 'kuis'], mins: 24, done: 0 }
+      ],
+      SMA: [],
+      Umum: []
+    };
+    var ICON = { materi: 'M', video: 'V', berkas: 'B', kuis: '?' };
+    var lv = this.state.level;
+    var levels = ['SD', 'SMP', 'SMA', 'Umum'].map(function (l) {
+      var sel = l === lv;
+      return { label: l, sel: sel ? 'true' : 'false', style: sel ? 'background: #2f6fe4; color: #ffffff;' : 'background: transparent; color: #1d2140;', pick: function () { self.setState({ level: l }); } };
+    });
+    var modules = DATA[lv].map(function (m) {
+      var n = m.kinds.length, all = m.done === n;
+      return {
+        title: m.title, desc: m.desc,
+        meta: n + ' langkah · ' + m.mins + ' menit · ' + m.done + ' dari ' + n + ' selesai',
+        state: all ? 'Selesai' : m.done ? 'Sedang dipelajari' : 'Baru',
+        stateVar: all ? 'color: #15703d;' : m.done ? 'color: #4a3dd1;' : 'color: #5d6280;',
+        cta: all ? 'Ulangi' : m.done ? 'Lanjutkan' : 'Mulai',
+        ctaVar: all ? 'border: 1px solid #e9ebf3; color: #1d2140;' : 'background: #5b4ee0; color: #ffffff;',
+        dots: m.kinds.map(function (k, i) {
+          var d = i < m.done;
+          return { ch: d ? '✓' : ICON[k], style: d ? 'background: #16a34a; color: #ffffff;' : k === 'kuis' ? 'background: #fff3e8; color: #9a3d07;' : 'background: #eef3ff; color: #1f4fb8;' };
+        })
+      };
+    });
+    return { levels: levels, levelName: lv, modules: modules, hasModules: modules.length > 0, noModules: modules.length === 0 };
+  }
+}
+</script>
+</body>
+</html>

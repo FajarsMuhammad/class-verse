@@ -459,7 +459,7 @@ onBeforeUnmount(() => {
           :occupancy="buildings.find((item) => item.building_key === panelBuilding?.key)"
           @walk="walkToPlace" @rooms="showPlaceRooms" @close="closePlace" @modules="modulesOf = panelBuilding ?? null" />
         <BuildingModules v-if="modulesOf && org.active" :org-id="org.active.id" :building-key="modulesOf.key"
-          :building-name="modulesOf.name" @close="modulesOf = null; progressKey++" />
+          @close="modulesOf = null; progressKey++" />
         <div v-if="kicked" class="connection-overlay" role="alert">
           <p>
             Kamu dikeluarkan dari sesi ini oleh pengajar. Minta izin pengajar untuk masuk lagi.

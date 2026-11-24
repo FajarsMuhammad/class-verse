@@ -56,6 +56,17 @@
   --kv-room-window: #bfe6ff;
   --kv-room-door: #c8935a;
   --kv-library-wall: #e8cfd9;
+  --kv-learn-rail: #f7f7fc; /* learning popup step column */
+  --kv-learn-step-line: #d9dbe8; /* outline of an open step badge */
+  --kv-learn-body: #2a2f52; /* long reading text */
+  --kv-learn-done: #16a34a; /* finished step badge */
+  --kv-learn-done-soft: #e7f8ee;
+  --kv-learn-done-ink: #15703d;
+  --kv-learn-quiz: #c2410c; /* quiz card button, same as Arena */
+  --kv-learn-quiz-ink: #5a3a1a;
+  --kv-learn-due-soft: #fff1e6; /* deadline within 3 days */
+  --kv-learn-due-ink: #9a3d07;
+  --kv-quiz-red: #ef4444; --kv-quiz-blue: #3b82f6; --kv-quiz-yellow: #f5b70b; --kv-quiz-green: #16a34a;
   --kv-subject-matematika: #2563eb;
   --kv-subject-ipa: #0f766e;
   --kv-subject-bahasa: #be185d;

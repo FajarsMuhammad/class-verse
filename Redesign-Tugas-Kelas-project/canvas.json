@@ -1,0 +1,75 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 380,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Popup tugas — kerjakan langkah",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    {
+      "file": "Sidebar.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 806,
+      "title": "Sidebar — peluncur tugas"
+    },
+    {
+      "file": "AllTasks.dc.html",
+      "x": 1900,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Popup — semua tugas",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    {
+      "file": "Modules.dc.html",
+      "x": 380,
+      "y": 1300,
+      "w": 1440,
+      "h": 900,
+      "title": "Popup modul gedung — katalog",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    {
+      "file": "ModulePlayer.dc.html",
+      "x": 1900,
+      "y": 1300,
+      "w": 1440,
+      "h": 900,
+      "title": "Popup modul — kerjakan langkah",
+      "expand": "fill",
+      "is_interactive": true
+    }
+  ],
+  "annotations": [
+    {
+      "id": "t1",
+      "x": 0,
+      "y": -300,
+      "w": 240,
+      "maxW": 3340,
+      "text": "Tugas kelas: sidebar membuka popup besar",
+      "kind": "title1"
+    },
+    {
+      "id": "t2",
+      "x": 0,
+      "y": 1000,
+      "w": 240,
+      "maxW": 3340,
+      "text": "Modul gedung: katalog dan langkah dalam popup yang sama",
+      "kind": "title1"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

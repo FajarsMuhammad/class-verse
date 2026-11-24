@@ -57,7 +57,7 @@ watch([pin, () => props.orgId], async ([value], _, onCleanup) => {
     </template>
     <p v-else class="note">Belum ada modul yang disematkan.</p>
     <p v-if="error" class="alert" role="alert">{{ error }}</p>
-    <BuildingModules v-if="opened && pin" :org-id="orgId" :building-key="pin.building_key" :building-name="pin.title"
+    <BuildingModules v-if="opened && pin" :org-id="orgId" :building-key="pin.building_key"
       :initial-level="pin.level as Level" :module-id="pin.module_id" :step-id="pin.step_id" @close="opened = false" />
   </section>
 </template>

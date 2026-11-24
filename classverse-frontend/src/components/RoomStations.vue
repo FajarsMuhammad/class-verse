@@ -7,7 +7,7 @@ import { roomLayout } from '@/game/roomLayout'
 import { moduleApi } from '@/api/modules'
 import { errorMessage } from '@/api/client'
 import type { Module } from '@/api/types'
-import ModulePath from './ModulePath.vue'
+import BuildingModules from './BuildingModules.vue'
 
 const props = defineProps<{ orgId: string; mapKey: string; station: string; teacher: boolean }>()
 // manage opens the Modul tool beside the map; without a listener (phone list mode) it links to Kelola.
@@ -63,8 +63,7 @@ const description = computed(() => {
       <p>{{ description }}</p>
       <button v-if="staff && teacher && inPlace" type="button" class="btn-primary" @click="emit('manage')">Buat dan kelola modul</button>
       <RouterLink v-else-if="staff && teacher" to="/kelola-ruang" class="btn-primary">Buat dan kelola modul</RouterLink>
-      <button v-else-if="!staff" type="button" class="btn-primary" @click="showModules = !showModules"
-        :aria-expanded="showModules">{{ showModules ? 'Tutup modul' : 'Lihat modul IPA' }}</button>
+      <button v-else-if="!staff" type="button" class="btn-primary" @click="showModules = true">Lihat modul IPA</button>
     </div>
     <section v-if="staff && teacher" class="school-modules" aria-label="Modul sekolah">
       <h3>Modul sekolah</h3>
@@ -77,7 +76,7 @@ const description = computed(() => {
       </component>
       <RemotePagination :page="pageNumber" :more="more" :busy="loading" @move="move" />
     </section>
-    <ModulePath v-if="!staff && showModules" :org-id="orgId" building-key="sains" building-name="Menara Sains" />
+    <BuildingModules v-if="!staff && showModules" :org-id="orgId" building-key="sains" @close="showModules = false" />
     <p class="note">{{ staff ? 'Modul, kuis, kelas, tugas, dan rapor ada di menu alat guru. Rekaman dan statistik kelas menyusul.' : 'Modul tersedia untuk semua stasiun. Pengelompokan modul per stasiun belum tersedia.' }}</p>
   </section>
 </template>
