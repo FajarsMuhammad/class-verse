@@ -151,13 +151,13 @@ const sideItems = computed<SideItem[]>(() => [
   ...(contentRoom.value && (!org.isTeacher || library.value) ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value && !org.isTeacher, companion: true }] : []),
   ...toolItems.value,
 ])
-// The panel remembers being collapsed so the map stays wide; when open, content rooms start on their catalog.
-const SIDE_KEY = 'kv-side-collapsed'
-const sideItem = ref<string | null>(localStorage.getItem(SIDE_KEY) === '1' ? null : org.isTeacher ? 'map' : 'learn')
+// The panel always opens on entry; collapsing it is for this visit only. Content rooms start on their catalog.
+// Drop the old remembered-collapse flag so nobody stays stuck with a hidden panel.
+localStorage.removeItem('kv-side-collapsed')
+const sideItem = ref<string | null>(org.isTeacher ? 'map' : 'learn')
 const pageOpen = computed(() => org.isTeacher && !!sideItem.value &&
   !sideItems.value.find(item => item.key === sideItem.value)?.companion)
 watch(sideItem, (key) => {
-  localStorage.setItem(SIDE_KEY, key ? '0' : '1')
   if (key === 'chat') seenChat.value = chatCount.value
   if (key === 'learn') seenPin.value = pinKey.value
 })
