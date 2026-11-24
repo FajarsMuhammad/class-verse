@@ -34,11 +34,7 @@ Berkas utama (semua di `classverse-frontend/src/`):
    `ambient()` memakai tekstur awan/sayap yang digeser, prop animasi di-refresh 20x/detik. Tinggal uji di GPU/HP.
    Cara ukur yang berhasil: toggle sementara `window.__kv` (noGround/noTrees/noAmbient) + interval rAF 60 frame.
    **Hapus toggle sebelum commit** (`grep -rn __kv src` harus kosong).
-2. **`db/kelasverse.sql` (commit `f3f7028`) sudah ter-push** ke `origin/kelola-management-api`. Isinya dump DB dev:
-   email pengguna (termasuk 2 alamat gmail asli), hash password bcrypt, tanggal lahir, `google_sub`, dan 3.481 hash
-   refresh token (3.217 belum kedaluwarsa). Commit `f29beb1` melepasnya dari repo + `.gitignore db/*.sql`, tetapi
-   file masih ada di riwayat git. Sisa: cabut sesi di DB dev, ganti password akun asli, dan (kalau repo publik
-   atau akan dibagikan) tulis ulang riwayat dengan `git filter-repo` + force-push, perlu persetujuan pemilik.
+2. `db/kelasverse.sql` (commit `f3f7028`) sengaja di-commit pemilik repo sebagai dump DB dev. Biarkan.
 3. **Tidak dikerjakan sengaja (butuh backend, kalau tidak jadi data palsu):** HUD level/XP/koin/runtun, panel Misi harian,
    penanda misi "!". Aturan proyek melarang data/kontrol palsu. Kalau mau dibuat, butuh keputusan produk + migration + API.
 4. Gaya avatar belum membedakan peran (hijab, guru, topi) seperti prototipe karena data avatar hanya menyimpan kulit/rambut/baju.
