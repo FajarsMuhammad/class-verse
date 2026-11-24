@@ -11,6 +11,7 @@ const props = defineProps<{
   disabled: boolean
   campus: boolean
   teacher?: boolean
+  guest?: boolean
   // Presence lives in the chat (map and panels show no online counts). Omit both to hide it.
   online?: number
   people?: string[]
@@ -153,11 +154,12 @@ function time(iso: string) {
       <div v-for="l in lines" :key="l.key" class="line" :class="{ mine: l.mine }">
         <span class="who"
           >{{ l.mine ? 'Kamu' : l.fromName }}
-          <span v-if="l.role !== 'participant' && !l.mine" class="role">Pengajar</span>
+          <span v-if="l.role === 'guest'" class="role">Tamu</span>
+                <span v-else-if="l.role !== 'participant' && !l.mine" class="role">Pengajar</span>
           <time :datetime="l.at">{{ time(l.at) }}</time></span
         >
         <button
-          v-if="!l.mine"
+          v-if="!guest && !l.mine"
           type="button"
           class="report"
           :aria-label="`Laporkan pesan dari ${l.fromName}`"
@@ -411,14 +413,6 @@ textarea:focus-visible { outline: none; }
 .count.over {
   color: var(--color-ink);
   font-weight: var(--weight-bold);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
 }
 @media (prefers-reduced-motion: reduce) { .presence .chev { transition: none; } }
 </style>

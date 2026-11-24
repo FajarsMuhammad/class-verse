@@ -49,7 +49,7 @@ Dev lokal: server Go jalan di host (`make run`, port 8080), Postgres dan Mailpit
 
 ## Struktur package Go
 
-Setiap fitur adalah satu package dengan tiga lapis yang konsisten: `handler` (HTTP/WS), `service` (aturan bisnis), dan `store` (akses database). Package fitur tidak saling mengimpor store milik fitur lain; komunikasi lewat interface service.
+Setiap fitur adalah satu package dengan lapis `handler` (HTTP/WS), `service` (otorisasi + aturan bisnis), dan akses data lewat `sqlc` Queries (ADR-014): `store.go` opsional. Package fitur tidak saling mengimpor; kebutuhan lintas fitur lewat interface kecil di sisi pemakai. Pola kode rinci: [`architecture.md`](architecture.md).
 
 ```
 classverse-backend/
@@ -134,7 +134,7 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 | `move` | `x`, `y`, `dir` | Maks 15 pesan/detik; ditolak jika menembus collision atau melebihi kecepatan maksimum |
 | `chat` | `text`, `scope` (`near` / `zone` / `room`) | Maks 3 pesan/detik; difilter; `room` ditolak jika chat semua ruangan dimatikan |
 | `emote` | `kind` (`wave`, `hand`, `quiz`, `cheer`) | Maks 1/detik; ditolak saat dibisukan; hanya koneksi aktif |
-| `cmd` | `name` (`broadcast`, `gather`, `mute`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
+| `cmd` | `name` (`broadcast`, `gather`, `mute`, `mute_all`, `unmute_all`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
 | `ping` | `ts` | Dibalas `pong` untuk mengukur latency |
 | `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali mode HP); koneksi dipindah tanpa reconnect |
 | `seat` | `zone` | Mode HP saja, di kelas/taman; maks 1/detik (slice 8) |
@@ -243,6 +243,75 @@ Setiap keputusan besar dicatat singkat agar alasan dan batasnya tidak hilang.
 | ADR-010 | Monorepo berisi dua project mandiri (`classverse-backend`, `classverse-frontend`) | Satu tempat untuk dokumen dan perubahan lintas sisi selama MVP, tapi batasnya sudah siap untuk dipisah | Tim backend dan frontend terpisah, atau siklus rilis keduanya berbeda |
 | ADR-011 | Redis hanya untuk leaderboard mingguan (sorted set per organisasi per minggu WIB); Postgres `point_events` tetap sumber kebenaran | Top-N dan peringkat per user O(log n) tanpa agregasi `SUM` tiap request; reset mingguan lewat kunci berganti tanpa job; bisa dibangun ulang dari Postgres | Redis dipakai untuk state room (ADR-002) atau data yang tidak bisa dibangun ulang |
 
+## ADR-014 — Lapis data adalah sqlc Queries; `store.go` opsional (disetujui)
+
+**Konteks.** Desain awal menetapkan `store.go` per fitur. Dalam praktik setiap `store.go` hanya `struct{ *query.Queries }`
+plus `InTx`, bertipe konkret, dan tidak pernah di-fake; fitur yang lebih baru (assignment, class, library, module, quiz)
+memanggil `query.New` langsung di service. Yang benar-benar berulang adalah helper transaksi (8 salinan).
+
+**Keputusan.**
+- Lapis data = query `sqlc` (`internal/platform/db/query`). Service boleh memegang `*pgxpool.Pool` dan memanggil
+  `query.New(pool)` / `db.InTx(ctx, pool, fn)`.
+- `store.go` hanya dibuat bila ada logika akses data yang dipakai bersama beberapa method (bukan wrapper kosong).
+  `store.go` yang ada tidak dipindah.
+- Transaksi hanya lewat `db.InTx`; konversi umum `db.Time`, pencarian `ILIKE` literal `db.Contains`.
+- Interface hanya untuk dependensi lintas fitur atau sistem luar (Authorizer, Mailer, Uploader, Occupancy), didefinisikan
+  di sisi pemakai. Perilaku SQL dan otorisasi diuji dengan Postgres asli (`dbtest`), bukan mock query.
+
+**Konsekuensi.** Lebih sedikit lapisan tipis; aturan bisnis yang bergantung SQL hanya teruji lewat integration test.
+**Dievaluasi ulang jika** perlu mengganti penyimpanan (bukan Postgres) atau tes service tanpa database menjadi kebutuhan.
+
+## ADR-013 — Draft dan revisi materi immutable (CS, disetujui)
+
+Menggantikan keputusan M1/M2 2026-11-13 tentang edit modul terbit langsung. Content Studio tetap
+memakai modul/langkah/kuis existing, bukan course/lesson/enrollment baru. Rich text terstruktur wajib;
+plain text, berkas, video, dan kuis lama tetap terbaca. Template hanya struktur awal satu editor/renderer.
+
+Target implementasi: working draft berversi optimistik terpisah dari snapshot terbit immutable. Modul
+mengikat revisi kuis terbit yang dipilih; publish modul tidak menerbitkan draft kuis bersama secara implisit.
+Progres memin revisi modul, attempt tetap memakai snapshot, tugas tetap memakai konteks issuance sendiri.
+Backfill additive mempertahankan ID langkah, riwayat, hasil, Rapor dan akses file. Revisi bukan bypass
+membership/resource authorization. Tidak menghitung ulang nilai lama atau mereset completion.
+
+Kebijakan Q1 tetap default lulus 60, unlimited attempts, bobot sama/floor, reveal setelah finish. Batas
+attempt, bobot berbeda dan perubahan reveal bukan bagian persetujuan ini. Implementasi CS lokal selesai, belum deploy;
+upgrade wajib `make migrate` (preflight antara migration 20 dan 21). Rencana dan gate ada di
+[`class-verse_content_studio_implementation_plan.md`](tasks/class-verse_content_studio_implementation_plan.md).
+
+## ADR-012 — Prinsipal tamu pertemuan (G1)
+
+**Disetujui:** tamu mengikuti satu ruang lewat tautan dan persetujuan guru/admin sekolah ruang itu,
+terpisah dari akun anggota dan kelas/rombel. Implementasi memakai `users.is_guest` agar attendance,
+chat, moderation, dan voice tetap memakai satu `user_id`. Email tamu `NULL`; CHECK dan trigger database
+menolak kredensial login, tanggal lahir, membership, OTP, serta refresh token untuk tamu. Lookup akun
+mengecualikan tamu. Tidak ada konversi tamu menjadi akun pada G1.
+
+`guest_links` mengikat organisasi dan ruang dengan FK komposit; bukan kampus atau Ruang Guru.
+Link maksimal 24 jam dan 40 identitas tamu, tetap dibatasi kapasitas ruang bersama anggota.
+Slot terpakai saat permintaan pertama dibuat; penolakan tidak mengembalikan slot. Retry dengan
+UUID v4 rahasia yang sama memakai identitas lama tanpa slot tambahan. Server menyimpan hash kunci;
+kunci tidak masuk URL/log, dan tidak bisa dipakai untuk link lain. Browser menyimpan kredensial hanya
+in-memory; reload memulai permintaan baru. Usia tidak diminta atau disimpan; host/sekolah tetap
+bertanggung jawab atas persetujuan wali dan kelayakan undangan.
+
+Approval/deny dan revoke diserialkan lewat lock baris link. Keputusan dan audit ditulis satu transaksi.
+`guest_decisions` terpisah karena audit admission merujuk link dan target opsional (revoke link),
+sedangkan `moderation_actions` tetap memegang kick/mute sesi. Bukan perubahan enum moderasi lama.
+
+JWT tamu memakai audience `kelasverse-guest`, paling lama 15 menit atau sisa usia link. Hanya endpoint
+`/api/guest`, socket ruang tujuan, dan voice ruang itu menerimanya; API akun menolak audience tamu.
+Polling status memperbarui token selama grant aktif. Admission diperiksa setiap koneksi/reconnect;
+`travel` ditolak. Ruang mengakhiri presence live maupun yang ditahan saat link habis/dicabut,
+sekaligus mencabut voice. Kick memakai ban sesi yang sama dengan anggota.
+
+Frontend `/guest/{code}` berada di luar guard akun, dengan shell ruang minimal tanpa data belajar,
+menu sekolah, atau navigasi antar-ruang. Desktop memiliki peta/chat/voice; HP tetap daftar tempat/chat,
+tanpa peta, movement, atau voice. Route lama belum dimigrasi.
+
+Migration `00019` mengubah email nullable tanpa mengubah data anggota. Rollback menolak berjalan
+bila identitas tamu sudah ada: penghapusan/export/retensi data memerlukan persetujuan terpisah.
+Sebelum pilot, tinjauan PDP/persetujuan wali dan pengujian perangkat fisik tetap wajib.
+
 ## MVP 2 fitur belajar — keputusan dan batas perencanaan
 
 Status: F1, L1, L2, M1 selesai; M2 progres modul diimplementasikan. Rencana dan checklist tunggal:
@@ -277,8 +346,8 @@ state room tetap in-memory; Redis hanya proyeksi leaderboard (ADR-011).
   Belum ada tooltip kelas, assignment, auto-promosi, atau pembatasan room/katalog berdasarkan kelas.
   Tidak mengubah izin masuk ruang atau membuat leaderboard per kelas secara otomatis.
 - **Modul (M1/M2):** katalog terbit per gedung/jenjang terbuka bagi anggota sekolah dari mana saja;
-  bukan dibatasi rombel atau lokasi avatar (disetujui 2026-11-13). Modul terbit diedit langsung; langkah hanya
-  diarsip, tanpa revisi immutable. `module_progress(org_id,user_id,step_id,completed_at)` menyimpan tanda selesai
+  bukan dibatasi rombel atau lokasi avatar (disetujui 2026-11-13). Runtime sebelum CS: modul terbit diedit langsung;
+  langkah hanya diarsip. ADR-013: draft/revisi immutable terimplementasi lokal; belum deployed. `module_progress(org_id,user_id,step_id,completed_at)` menyimpan tanda selesai
   pemanggil; FK komposit ke membership dan langkah satu organisasi. Selesai idempotent mempertahankan waktu pertama,
   batal selesai menghapus tanda; server memeriksa akses dan mengunci modul dalam transaksi yang sama.
   Semua langkah bebas dibuka, termasuk yang belum selesai. Total menghitung langkah aktif saja. Lanjutkan belajar
@@ -526,7 +595,8 @@ Sesi ruang tidak punya endpoint start/stop: sesi dibuka otomatis saat orang pert
 - Organisasi, membership admin pembuat, dan room peta sekolah (`map_key='campus'`, nama "Peta sekolah", kapasitas 200) dibuat dalam satu transaksi.
 - Kode undangan 8 karakter dari `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (`crypto/rand`), ditampilkan `ABCD-EFGH`; input tidak peka huruf besar dan mengabaikan `-`/spasi. Link: `FRONTEND_URL/gabung/{code}`.
 - Undangan berisi `role` (`teacher`/`participant`), `expires_in_days` 1–7 (default 7), `max_uses` opsional 1–500. Pengajar hanya membuat undangan `participant` dan hanya mencabut undangan buatannya; admin mencabut semua.
-- Kode tidak ada → 404 `not_found`; kedaluwarsa, dicabut, atau kuota habis → 410 `invite_expired`; sudah anggota → 409 `conflict` tanpa mengubah role atau kuota. Pratinjau hanya berisi nama organisasi dan role. Pratinjau dan accept dibatasi 10/menit per user.
+- Kode tidak ada → 404 `not_found`; kedaluwarsa, dicabut, atau kuota habis → 410 `invite_expired`; undangan sekolah untuk yang sudah anggota → 409 `conflict` tanpa mengubah role atau kuota. Pratinjau dan accept dibatasi 10/menit per user.
+- C2 undangan berkelas (migration 00018): `class_id` opsional, kelas aktif sekolah yang sama, hanya `participant`. Admin atau wali kelas aktif boleh membuatnya dari detail Kelas → Siswa. Pratinjau menyertakan nama kelas dan tahun ajaran. Saat diterima, server memeriksa ulang kelas serta hak pembuat, memakai lock roster yang sama dengan penempatan kelas. Keanggotaan tetap berhasil bila penempatan gagal aman: `placement_status` = `has_class`, `class_unavailable`, atau `not_student`; kelas/peran lama tidak diubah. `placed` berarti sudah/berhasil ditempatkan di kelas tujuan. Anggota peserta lama boleh menerima undangan kelas, tetapi penerimaan ulang yang tidak menambah keanggotaan/penempatan tidak memakai kuota lagi. Undangan sekolah tanpa kelas tidak berubah.
 - Non-anggota mendapat 404 `not_found` untuk resource organisasi (tidak membocorkan keberadaannya); anggota dengan role kurang 403 `forbidden`. Role dibaca dari database setiap request.
 - `GET /api/me` mengembalikan `orgs: [{id, name, slug, role}]`. Frontend menyimpan id organisasi aktif di `localStorage` (bukan data pribadi); server tetap memeriksa membership.
 
@@ -712,6 +782,7 @@ The user approved server-enforced zone audio without distance attenuation, confi
   Gateway handshake and eviction share an admission lock, preventing an in-flight handshake from landing after absence confirmation.
   `welcome`/`room_state` carry personal `voice_identity`, `voice_channel`, and staff-facing `voice_pending`.
   During a control API outage an existing media connection may remain live: staff sees unconfirmed eviction until recovery.
+- *Bisukan semua.* `cmd mute_all` / `unmute_all` (staff, not campus). The room expands it into one ordinary `mute`/`unmute` per participant or guest currently inside, so each change is audited separately and applies only after its audit row commits. Staff are never muted; people joining later are not muted. When nobody needs changing the sender gets `bad_message`.
 - *Broadcast voice.* `cmd voice_broadcast` / `voice_broadcast_off` (staff, not campus, not audited). The room keeps
   the set; `welcome` and `room_state` carry `voice_broadcast: [user_id]`. Leaving the room clears it.
 - *Config.* `LIVEKIT_URL` (private `ws(s)://` upstream), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`; all empty disables voice (mic hidden).

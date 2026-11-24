@@ -93,6 +93,12 @@ func TestCatalog(t *testing.T) {
 	if err != nil || draft.PublishedAt.Valid {
 		t.Fatalf("draft: %+v %v", draft, err)
 	}
+	// Author is optional (migration 00022).
+	anonymous := physical
+	anonymous.Author = ""
+	if b, err := svc.Create(ctx, admin, school.ID, anonymous); err != nil || b.Author != "" {
+		t.Fatalf("anonymous author: %+v %v", b, err)
+	}
 
 	// A file from another school or of the wrong kind is rejected.
 	foreign := sample.FileID.UUID
@@ -139,6 +145,24 @@ func TestCatalog(t *testing.T) {
 	}
 	if _, err := svc.List(ctx, outsider, school.ID, library.Filter{}); !errors.Is(err, org.ErrNotMember) {
 		t.Fatalf("outsider list: %v", err)
+	}
+	if got := list(admin, library.Filter{Drafts: true, Status: "draft"}); len(got) != 1 {
+		t.Fatalf("draft filter: %v", got)
+	}
+	if got := list(student, library.Filter{Drafts: true, Status: "draft"}); len(got) != 0 {
+		t.Fatalf("participant draft filter leaks: %v", got)
+	}
+	if got := list(admin, library.Filter{Drafts: true, Format: "ebook"}); fmt.Sprint(got) != "[Contoh: Petualangan di Tata Surya]" {
+		t.Fatalf("format filter: %v", got)
+	}
+	if _, err := svc.List(ctx, admin, school.ID, library.Filter{Level: "TK"}); !isField(err, "level") {
+		t.Fatalf("bad level: %v", err)
+	}
+	if c, err := svc.Counts(ctx, admin, school.ID, library.Filter{}); err != nil || c.AllCount != 2 || c.PublishedCount != 1 || c.DraftCount != 1 {
+		t.Fatalf("counts: %+v %v", c, err)
+	}
+	if _, err := svc.Counts(ctx, student, school.ID, library.Filter{}); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("participant counts: %v", err)
 	}
 
 	// Paging is stable by title.

@@ -3,10 +3,15 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { assignmentApi, deadline, type Assignment, type AssignmentStep } from '@/api/assignments'
 import { errorMessage } from '@/api/client'
 import { embedURL, kindLabel } from '@/api/modules'
+import RichContent from './RichContent.vue'
 import FileReader, { type ReadableFile } from './FileReader.vue'
 import QuizPlayer from './QuizPlayer.vue'
+import RemotePagination from './RemotePagination.vue'
+import { PAGE, hasMore, lastPage } from '@/api/page'
 const props = defineProps<{ orgId: string }>()
 const tasks = ref<Assignment[]>([])
+const pageNumber = ref(1)
+const more = ref(false)
 const selected = ref<Assignment | null>(null)
 const steps = ref<AssignmentStep[]>([])
 const current = ref<AssignmentStep | null>(null)
@@ -19,8 +24,11 @@ onBeforeUnmount(() => { generation++ })
 async function load() {
   const g = ++generation; busy.value = true; error.value = ''
   try {
-    const result = await assignmentApi.list(props.orgId)
+    const result = await assignmentApi.list(props.orgId, (pageNumber.value - 1) * PAGE)
     if (g !== generation) return
+    const last = lastPage(pageNumber.value, result)
+    if (last !== pageNumber.value) { pageNumber.value = last; busy.value = false; return load() }
+    more.value = hasMore((pageNumber.value - 1) * PAGE, result)
     tasks.value = result.items
     if (selected.value) {
       selected.value = result.items.find(a => a.id === selected.value?.id) ?? null
@@ -65,6 +73,7 @@ onMounted(load)
         <span>{{ a.cancelled ? 'Dibatalkan' : `${a.done}/${a.total} selesai` }} · {{ deadline(a.due_at) }}</span>
       </button>
     </li></ul>
+    <RemotePagination v-if="pageNumber > 1 || more" :page="pageNumber" :more="more" :busy="busy" @move="pageNumber += $event; load()" />
     <section v-if="selected" class="detail">
       <h4>{{ selected.title }}</h4>
       <p>Urutan wajib. Progres tugas terpisah dari katalog; nilai dan progres lama tetap tersimpan.</p>
@@ -74,7 +83,8 @@ onMounted(load)
       </li></ol>
       <div v-if="current" class="content">
         <h4>{{ current.title }}</h4>
-        <p v-if="current.body" class="body">{{ current.body }}</p>
+        <RichContent v-if="current.rich_content" :content="current.rich_content" />
+        <p v-else-if="current.body" class="body">{{ current.body }}</p>
         <iframe v-if="current.kind === 'video' && current.video_id" :src="embedURL(current.video_id)" :title="current.title"
           sandbox="allow-scripts allow-same-origin allow-presentation" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" />
         <p v-if="current.kind === 'kuis'">Lulus kuis melalui tugas ini. Hasil kuis katalog tidak menyelesaikan tugas.</p>

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/auth"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
@@ -45,6 +46,7 @@ func (h *Handler) Routes(r chi.Router) {
 
 func (h *Handler) handle(fn func(w http.ResponseWriter, r *http.Request) error) http.HandlerFunc {
 	return httpx.Handle(h.log, func(w http.ResponseWriter, r *http.Request) error {
+		w.Header().Set("Cache-Control", "no-store")
 		return toAPIError(fn(w, r))
 	})
 }
@@ -60,7 +62,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	inv, err := h.svc.Create(r.Context(), userID, orgID, CreateInput{
-		Role: org.Role(req.Role), ExpiresInDays: req.ExpiresInDays, MaxUses: req.MaxUses,
+		Role: org.Role(req.Role), ExpiresInDays: req.ExpiresInDays, MaxUses: req.MaxUses, ClassID: req.ClassId,
 	})
 	if err != nil {
 		return err
@@ -81,7 +83,15 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 			return httpx.ValidationFailed(map[string]string{"limit": "limit harus 1–100"})
 		}
 	}
-	page, err := h.svc.List(r.Context(), userID, orgID, limit, r.URL.Query().Get("cursor"))
+	var classID *uuid.UUID
+	if raw := r.URL.Query().Get("class_id"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			return httpx.ValidationFailed(map[string]string{"class_id": "ID kelas tidak valid"})
+		}
+		classID = &id
+	}
+	page, err := h.svc.List(r.Context(), userID, orgID, limit, r.URL.Query().Get("cursor"), classID)
 	if err != nil {
 		return err
 	}
@@ -122,7 +132,12 @@ func (h *Handler) preview(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	httpx.JSON(w, http.StatusOK, api.InvitePreview{OrgName: p.OrgName, Role: api.InviteRole(p.Role)})
+	resp := api.InvitePreview{OrgName: p.OrgName, Role: api.InviteRole(p.Role)}
+	if p.ClassName != "" {
+		resp.ClassName = &p.ClassName
+		resp.YearLabel = &p.YearLabel
+	}
+	httpx.JSON(w, http.StatusOK, resp)
 	return nil
 }
 
@@ -135,13 +150,18 @@ func (h *Handler) accept(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	httpx.JSON(w, http.StatusOK, api.Membership{OrgId: m.OrgID, UserId: m.UserID, Role: api.Role(m.Role), JoinedAt: m.JoinedAt.UTC()})
+	resp := api.Membership{OrgId: m.OrgID, UserId: m.UserID, Role: api.Role(m.Role), JoinedAt: m.JoinedAt.UTC()}
+	if m.PlacementStatus != "" {
+		status := api.MembershipPlacementStatus(m.PlacementStatus)
+		resp.PlacementStatus = &status
+	}
+	httpx.JSON(w, http.StatusOK, resp)
 	return nil
 }
 
 func (h *Handler) toAPI(inv Invite) api.Invite {
 	return api.Invite{
-		Id: inv.ID, Code: inv.Code, Link: h.frontendURL + "/gabung/" + inv.Code,
+		Id: inv.ID, ClassId: inv.ClassID, Code: inv.Code, Link: h.frontendURL + "/gabung/" + inv.Code,
 		Role: api.InviteRole(inv.Role), MaxUses: inv.MaxUses, UsedCount: inv.UsedCount,
 		ExpiresAt: inv.ExpiresAt.UTC(), CreatedBy: inv.CreatedBy, CreatedAt: inv.CreatedAt.UTC(),
 	}

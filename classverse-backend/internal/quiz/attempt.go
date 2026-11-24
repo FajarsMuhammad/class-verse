@@ -75,7 +75,7 @@ func toAttempt(row query.QuizAttempt) (Attempt, error) {
 // Start returns the caller's unfinished attempt for a published quiz, or starts a new one with a snapshot
 // of the current questions. Staff may also try drafts to check their own quiz.
 func (s *Service) Start(ctx context.Context, userID, orgID, quizID uuid.UUID) (Attempt, error) {
-	return s.start(ctx, userID, orgID, quizID, uuid.Nil)
+	return s.start(ctx, userID, orgID, quizID, uuid.Nil, uuid.Nil, uuid.Nil)
 }
 
 // StartAssignment starts a fresh task-context attempt, never reusing catalog work.
@@ -83,17 +83,19 @@ func (s *Service) StartAssignment(ctx context.Context, userID, orgID, quizID, st
 	if stepID == uuid.Nil {
 		return Attempt{}, ErrNotFound
 	}
-	return s.start(ctx, userID, orgID, quizID, stepID)
+	return s.start(ctx, userID, orgID, quizID, stepID, uuid.Nil, uuid.Nil)
 }
 
-func (s *Service) start(ctx context.Context, userID, orgID, quizID, stepID uuid.UUID) (Attempt, error) {
-	role, err := s.auth.Authorize(ctx, userID, orgID, org.RoleParticipant)
+func (s *Service) start(ctx context.Context, userID, orgID, quizID, stepID, moduleID, moduleStepID uuid.UUID) (Attempt, error) {
+	_, err := s.auth.Authorize(ctx, userID, orgID, org.RoleParticipant)
 	if err != nil {
 		return Attempt{}, err
 	}
 	var row query.QuizAttempt
 	err = s.inTx(ctx, func(q *query.Queries) error {
 		assignmentID := uuid.NullUUID{}
+		var revisionID, moduleRevisionID uuid.NullUUID
+
 		contextID := uuid.NullUUID{UUID: stepID, Valid: stepID != uuid.Nil}
 		if contextID.Valid {
 			step, err := q.AssignmentQuizContext(ctx, query.AssignmentQuizContextParams{OrgID: orgID, UserID: userID, StepID: stepID})
@@ -104,6 +106,7 @@ func (s *Service) start(ctx context.Context, userID, orgID, quizID, stepID uuid.
 				return fmt.Errorf("assignment quiz context: %w", err)
 			}
 			assignmentID = uuid.NullUUID{UUID: step.AssignmentID, Valid: true}
+			revisionID = step.QuizRevisionID
 			if _, err := q.LockAssignment(ctx, query.LockAssignmentParams{OrgID: orgID, ID: step.AssignmentID}); err != nil {
 				return err
 			}
@@ -112,31 +115,67 @@ func (s *Service) start(ctx context.Context, userID, orgID, quizID, stepID uuid.
 			}
 		}
 		// The quiz lock serializes concurrent starts, so the open-attempt index never races.
-		z, err := s.lock(ctx, q, orgID, quizID)
-		if err != nil {
-			return err
-		}
-		if !z.PublishedAt.Valid && (contextID.Valid || !role.AtLeast(org.RoleTeacher)) {
+		z, err := q.LockAttemptQuiz(ctx, query.LockAttemptQuizParams{OrgID: orgID, ID: quizID})
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
-		row, err = q.OpenAttempt(ctx, query.OpenAttemptParams{QuizID: quizID, UserID: userID, AssignmentStepID: contextID})
+		if err != nil {
+			return fmt.Errorf("lock attempt quiz: %w", err)
+		}
+		if (!z.PublishedAt.Valid || z.ArchivedAt.Valid) && !contextID.Valid && moduleID == uuid.Nil {
+			return ErrNotFound
+		}
+		if moduleID != uuid.Nil {
+			if contextID.Valid {
+				return ErrNotFound
+			}
+			if err := q.PinModuleRevision(ctx, query.PinModuleRevisionParams{OrgID: orgID, ModuleID: moduleID, UserID: userID}); err != nil {
+				return fmt.Errorf("pin quiz module: %w", err)
+			}
+			rev, err := q.ModuleQuizRevision(ctx, query.ModuleQuizRevisionParams{OrgID: orgID, ModuleID: moduleID, StepID: moduleStepID, UserID: userID, QuizID: uuid.NullUUID{UUID: quizID, Valid: true}})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			}
+			if err != nil {
+				return fmt.Errorf("module quiz binding: %w", err)
+			}
+			revisionID = uuid.NullUUID{UUID: rev.ID, Valid: true}
+			mr, err := q.ReadModuleRevision(ctx, query.ReadModuleRevisionParams{OrgID: orgID, ModuleID: moduleID, UserID: userID})
+			if err != nil {
+				return fmt.Errorf("module quiz revision: %w", err)
+			}
+			moduleRevisionID = uuid.NullUUID{UUID: mr.ID, Valid: true}
+		}
+		if !revisionID.Valid && !contextID.Valid {
+			revisionID = z.PublishedRevisionID
+		}
+		row, err = q.OpenAttempt(ctx, query.OpenAttemptParams{QuizID: quizID, UserID: userID, AssignmentStepID: contextID, ModuleRevisionID: moduleRevisionID})
 		if err == nil {
 			return nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("open attempt: %w", err)
 		}
-		questions, err := q.ListQuizQuestions(ctx, quizID)
-		if err != nil {
-			return fmt.Errorf("list questions: %w", err)
+		var snap []Snapshot
+		var passScore int16
+		if revisionID.Valid {
+			rev, err := q.GetQuizRevision(ctx, query.GetQuizRevisionParams{OrgID: orgID, QuizID: quizID, ID: revisionID.UUID})
+			if err != nil {
+				return fmt.Errorf("quiz revision: %w", err)
+			}
+			if err := json.Unmarshal(rev.Questions, &snap); err != nil {
+				return fmt.Errorf("revision questions: %w", err)
+			}
+			passScore = rev.PassScore
+		} else {
+			return ErrNotFound
 		}
-		if len(questions) == 0 {
+
+		if len(snap) == 0 {
 			return ErrNoQuestions
 		}
-		snap := make([]Snapshot, len(questions))
-		answers := make([]int16, len(questions))
-		for i, qq := range questions {
-			snap[i] = Snapshot{ID: qq.ID, Prompt: qq.Prompt, Options: qq.Options, Answer: int(qq.Answer), Explanation: qq.Explanation}
+		answers := make([]int16, len(snap))
+		for i := range answers {
 			answers[i] = unanswered
 		}
 		raw, err := json.Marshal(snap)
@@ -145,7 +184,7 @@ func (s *Service) start(ctx context.Context, userID, orgID, quizID, stepID uuid.
 		}
 		row, err = q.CreateAttempt(ctx, query.CreateAttemptParams{
 			ID: uuid.New(), OrgID: orgID, QuizID: quizID, UserID: userID, Questions: raw, Answers: answers,
-			PassScore: z.PassScore, StartedAt: pgTime(s.now()), AssignmentID: assignmentID, AssignmentStepID: contextID,
+			QuizRevisionID: revisionID, ModuleID: uuid.NullUUID{UUID: moduleID, Valid: moduleID != uuid.Nil}, ModuleRevisionID: moduleRevisionID, PassScore: passScore, StartedAt: pgTime(s.now()), AssignmentID: assignmentID, AssignmentStepID: contextID,
 		})
 		if err != nil {
 			return fmt.Errorf("create attempt: %w", err)
@@ -194,8 +233,12 @@ func (s *Service) Answer(ctx context.Context, userID, orgID, quizID, attemptID u
 		if index < 0 || index >= len(row.Answers) {
 			return &ValidationError{Fields: map[string]string{"index": "Soal tidak ada"}}
 		}
-		if choice < 0 || choice >= optionCount {
-			return &ValidationError{Fields: map[string]string{"choice": "Pilih salah satu dari 4 jawaban"}}
+		var snap []Snapshot
+		if err := json.Unmarshal(row.Questions, &snap); err != nil {
+			return fmt.Errorf("answer snapshot: %w", err)
+		}
+		if index >= len(snap) || choice < 0 || choice >= len(snap[index].Options) {
+			return &ValidationError{Fields: map[string]string{"choice": "Pilih jawaban yang tersedia"}}
 		}
 		answers := append([]int16(nil), row.Answers...)
 		answers[index] = int16(choice)
@@ -247,8 +290,13 @@ func (s *Service) Finish(ctx context.Context, userID, orgID, quizID, attemptID u
 				return fmt.Errorf("complete assignment quiz: %w", err)
 			}
 		}
+		if score >= int(row.PassScore) && !row.AssignmentID.Valid && !row.ModuleRevisionID.Valid && row.QuizRevisionID.Valid {
+			if err := q.PinQuizModules(ctx, query.PinQuizModulesParams{OrgID: orgID, UserID: userID, QuizID: uuid.NullUUID{UUID: quizID, Valid: true}, QuizRevisionID: row.QuizRevisionID}); err != nil {
+				return fmt.Errorf("pin quiz modules: %w", err)
+			}
+		}
 		if score >= int(row.PassScore) && !row.AssignmentID.Valid {
-			err = q.CompleteQuizSteps(ctx, query.CompleteQuizStepsParams{OrgID: orgID, UserID: userID, QuizID: uuid.NullUUID{UUID: quizID, Valid: true}, CompletedAt: row.FinishedAt})
+			err = q.CompleteQuizSteps(ctx, query.CompleteQuizStepsParams{OrgID: orgID, UserID: userID, QuizID: uuid.NullUUID{UUID: quizID, Valid: true}, QuizRevisionID: row.QuizRevisionID, ModuleRevisionID: row.ModuleRevisionID, CompletedAt: row.FinishedAt})
 			if err != nil {
 				return fmt.Errorf("complete quiz steps: %w", err)
 			}
@@ -262,3 +310,11 @@ func (s *Service) Finish(ctx context.Context, userID, orgID, quizID, attemptID u
 }
 
 func pgInt2(v int) pgtype.Int2 { return pgtype.Int2{Int16: int16(v), Valid: true} }
+
+// StartModule resolves quiz revision from caller's module pin, never browser-supplied revision IDs.
+func (s *Service) StartModule(ctx context.Context, userID, orgID, quizID, moduleID, stepID uuid.UUID) (Attempt, error) {
+	if moduleID == uuid.Nil || stepID == uuid.Nil {
+		return Attempt{}, ErrNotFound
+	}
+	return s.start(ctx, userID, orgID, quizID, uuid.Nil, moduleID, stepID)
+}

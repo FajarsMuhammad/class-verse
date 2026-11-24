@@ -10,6 +10,7 @@ import ModuleManager from '@/components/ModuleManager.vue'
 import QuizManager from '@/components/QuizManager.vue'
 import ClassManager from '@/components/ClassManager.vue'
 import AssignmentManager from '@/components/AssignmentManager.vue'
+import GradebookReport from '@/components/GradebookReport.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 
@@ -24,6 +25,7 @@ const sections = [
   { key: 'modul', label: 'Modul & kuis' },
   { key: 'kelas', label: 'Kelas & tugas' },
   { key: 'perpustakaan', label: 'Perpustakaan' },
+  { key: 'rapor', label: 'Rapor' },
 ] as const
 type Section = (typeof sections)[number]['key']
 const section = computed<Section>(() => sections.find((s) => s.key === route.query.bagian)?.key ?? 'ruang')
@@ -46,19 +48,27 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
         <InvitePanel :key="`invite-${org.active.id}`" :org-id="org.active.id" :my-role="org.active.role" :my-id="auth.me.id" />
       </template>
       <template v-else-if="section === 'modul'">
-        <ModuleManager :key="`modules-${org.active.id}`" :org-id="org.active.id" />
+        <ModuleManager :key="`modules-${org.active.id}`" :org-id="org.active.id" @assign="router.replace({ query: { ...route.query, bagian: 'kelas', modul: $event } })" />
         <QuizManager :key="`quizzes-${org.active.id}`" :org-id="org.active.id" />
         <FileUploadPanel :key="`upload-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me.id"
           :is-admin="org.active.role === 'admin'" />
       </template>
       <template v-else-if="section === 'kelas'">
-        <ClassManager :key="`classes-${org.active.id}`" :org-id="org.active.id" :is-admin="org.active.role === 'admin'" />
-        <AssignmentManager :key="`assignments-${org.active.id}`" :org-id="org.active.id" />
+        <h2 class="section-title">Kelas</h2>
+        <ClassManager :key="`classes-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me?.id" :is-admin="org.active.role === 'admin'" view="classes" />
+        <h2 class="section-title">Siswa</h2>
+        <ClassManager :key="`students-${org.active.id}`" :org-id="org.active.id" :is-admin="org.active.role === 'admin'" view="students" />
+        <template v-if="org.active.role === 'admin'">
+          <h2 class="section-title">Tahun ajaran</h2>
+          <ClassManager :key="`years-${org.active.id}`" :org-id="org.active.id" is-admin view="years" />
+        </template>
+        <AssignmentManager :key="`assignments-${org.active.id}`" :org-id="org.active.id" :module-id="typeof route.query.modul === 'string' ? route.query.modul : undefined" />
       </template>
+      <GradebookReport v-else-if="section === 'rapor'" embedded />
       <template v-else>
         <FileUploadPanel :key="`library-upload-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me.id"
           :is-admin="org.active.role === 'admin'" />
-        <LibraryManager :key="`library-${org.active.id}`" :org-id="org.active.id" />
+        <LibraryManager :key="`library-${org.active.id}`" :org-id="org.active.id" :user-id="auth.me.id" />
         <ModuleManager :key="`library-modules-${org.active.id}`" :org-id="org.active.id" building-key="perpus" />
       </template>
     </template>
@@ -67,6 +77,7 @@ const pick = (key: Section) => router.replace({ query: { ...route.query, bagian:
 
 <style scoped>
 .head { margin-bottom: var(--space-4); }
+.section-title { margin: var(--space-6) 0 var(--space-3); font: var(--weight-semibold) var(--text-lg)/var(--line-tight) var(--font-display); }
 .title { margin: 0; font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-3xl); line-height: var(--line-tight); }
 .sub { margin: var(--space-2) 0 0; color: var(--color-ink-muted); font-size: var(--text-lg); }
 .sections { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }

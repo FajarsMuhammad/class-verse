@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -92,6 +93,59 @@ type Filter struct {
 	Limit  int
 	Cursor string
 	Drafts bool
+	Format string // "", buku, ebook, audio
+	Level  string // "", SD, SMP, SMA, Umum
+	Status string // "", published, draft (draft only for staff with Drafts)
+}
+
+// Counts are the staff catalog tab counts.
+type Counts = query.CountBooksRow
+
+// validate checks the shared catalog filters.
+func (f Filter) validate() error {
+	fields := map[string]string{}
+	if f.Shelf != "" && !slices.Contains(Shelves, f.Shelf) {
+		fields["shelf"] = "Rak tidak dikenal"
+	}
+	if f.Format != "" && !slices.Contains(Formats, f.Format) {
+		fields["format"] = "Jenis tidak dikenal"
+	}
+	if f.Level != "" && !slices.Contains(Levels, f.Level) {
+		fields["level"] = "Jenjang tidak dikenal"
+	}
+	if f.Status != "" && f.Status != "published" && f.Status != "draft" {
+		fields["status"] = "Status tidak valid"
+	}
+	if len(fields) > 0 {
+		return &ValidationError{Fields: fields}
+	}
+	return nil
+}
+
+func optText(v string) pgtype.Text { return pgtype.Text{String: v, Valid: v != ""} }
+
+func (f Filter) pattern() pgtype.Text {
+	if q, ok := text(f.Query, 1, 100); ok {
+		return db.Contains(q)
+	}
+	return pgtype.Text{}
+}
+
+// Counts returns catalog tab counts for the list's non-status filters (teacher/admin).
+func (s *Service) Counts(ctx context.Context, userID, orgID uuid.UUID, f Filter) (Counts, error) {
+	if _, err := s.auth.Authorize(ctx, userID, orgID, org.RoleTeacher); err != nil {
+		return Counts{}, err
+	}
+	if err := f.validate(); err != nil {
+		return Counts{}, err
+	}
+	c, err := query.New(s.pool).CountBooks(ctx, query.CountBooksParams{
+		OrgID: orgID, Shelf: optText(f.Shelf), Format: optText(f.Format), Level: optText(f.Level), Pattern: f.pattern(),
+	})
+	if err != nil {
+		return Counts{}, fmt.Errorf("count books: %w", err)
+	}
+	return c, nil
 }
 
 // Service implements catalog rules.
@@ -119,8 +173,8 @@ func validate(in Input) (Input, error) {
 	if in.Title, ok = text(in.Title, 1, 200); !ok {
 		v.add("title", "Judul 1–200 karakter")
 	}
-	if in.Author, ok = text(in.Author, 1, 120); !ok {
-		v.add("author", "Penulis 1–120 karakter")
+	if in.Author, ok = text(in.Author, 0, 120); !ok {
+		v.add("author", "Penulis maksimal 120 karakter")
 	}
 	if !slices.Contains(Shelves, in.Shelf) {
 		v.add("shelf", "Pilih rak")
@@ -172,7 +226,7 @@ func checkFile(ctx context.Context, q *query.Queries, orgID uuid.UUID, in Input)
 	return nil
 }
 
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 
 func fileParam(id *uuid.UUID) uuid.NullUUID {
 	if id == nil {
@@ -182,18 +236,7 @@ func fileParam(id *uuid.UUID) uuid.NullUUID {
 }
 
 func (s *Service) inTx(ctx context.Context, fn func(*query.Queries) error) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin library transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if err := fn(query.New(tx)); err != nil {
-		return err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit library transaction: %w", err)
-	}
-	return nil
+	return db.InTx(ctx, s.pool, fn)
 }
 
 // Create adds a book (teacher/admin). Published books are visible to members immediately.
@@ -301,8 +344,8 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	if err != nil {
 		return Page{}, err
 	}
-	if f.Shelf != "" && !slices.Contains(Shelves, f.Shelf) {
-		return Page{}, &ValidationError{Fields: map[string]string{"shelf": "Rak tidak dikenal"}}
+	if err := f.validate(); err != nil {
+		return Page{}, err
 	}
 	limit := f.Limit
 	if limit < 1 || limit > maxLimit {
@@ -310,14 +353,8 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 	}
 	params := query.ListBooksParams{
 		OrgID: orgID, UserID: userID, IncludeDrafts: f.Drafts && role.AtLeast(org.RoleTeacher),
-		RowLimit: int32(limit + 1),
-	}
-	if f.Shelf != "" {
-		params.Shelf = pgtype.Text{String: f.Shelf, Valid: true}
-	}
-	if q, ok := text(f.Query, 1, 100); ok {
-		pattern := "%" + likeEscape(q) + "%"
-		params.Pattern = pgtype.Text{String: pattern, Valid: true}
+		RowLimit: int32(limit + 1), Shelf: optText(f.Shelf), Format: optText(f.Format), Level: optText(f.Level),
+		Pattern: f.pattern(), Published: pgtype.Bool{Bool: f.Status == "published", Valid: f.Status != ""},
 	}
 	if f.Cursor != "" {
 		title, id, err := decodeCursor(f.Cursor)
@@ -343,11 +380,6 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (
 		page.NextCursor = encodeCursor(last.Title, last.ID)
 	}
 	return page, nil
-}
-
-// likeEscape makes user input literal inside ILIKE (default escape character is backslash).
-func likeEscape(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
 // Cursor is opaque: base64url("<uuid>|<title>"). Title goes last because it may contain "|".

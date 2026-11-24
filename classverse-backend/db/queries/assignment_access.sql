@@ -15,7 +15,7 @@ WHERE s.org_id=sqlc.arg(org_id) AND s.file_id=sqlc.arg(file_id) AND a.cancelled_
 -- name: LockAssignmentFileReferences :many
 -- File deletion locks files first; issuance takes matching locks before adding durable references.
 SELECT f.id FROM files f WHERE f.org_id=sqlc.arg(org_id)
- AND f.id IN (SELECT s.file_id FROM module_steps s WHERE s.org_id=f.org_id AND s.module_id=sqlc.arg(module_id) AND s.archived_at IS NULL)
+ AND f.id IN (SELECT s.file_id FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id AND m.published_revision_id=s.revision_id WHERE s.org_id=f.org_id AND s.module_id=sqlc.arg(module_id))
  ORDER BY f.id FOR UPDATE;
 
 -- name: LockAssignmentRequest :exec

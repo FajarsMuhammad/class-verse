@@ -20,6 +20,7 @@ const preview = ref<InvitePreview | null>(null)
 const code = ref<string | null>(null)
 const error = ref('')
 const busy = ref(false)
+const result = ref('')
 
 const roleLabel = computed(() => (preview.value?.role === 'teacher' ? 'pengajar' : 'peserta'))
 
@@ -50,7 +51,13 @@ async function join() {
     const m = await inviteApi.accept(code.value)
     await auth.reload()
     org.select(m.org_id)
-    await router.push({ name: 'home' })
+    const notices: Record<string, string> = {
+      has_class: 'Kamu sudah bergabung ke sekolah, tetapi sudah punya kelas di tahun ajaran ini. Kelasmu tidak diubah. Hubungi admin untuk pindah kelas.',
+      class_unavailable: 'Kamu sudah bergabung ke sekolah, tetapi kelas undangan tidak tersedia atau wali kelas sudah berubah. Hubungi admin untuk penempatan kelas.',
+      not_student: 'Kamu sudah menjadi anggota sekolah sebagai pengajar/admin. Peranmu tidak diubah dan undangan kelas ini tidak menempatkanmu sebagai siswa.',
+    }
+    result.value = notices[m.placement_status ?? ''] ?? ''
+    if (!result.value) await router.push({ name: 'home' })
   } catch (e) {
     error.value = errorMessage(e)
   } finally {
@@ -67,7 +74,11 @@ onMounted(() => {
   <AuthCard title="Gabung ke sekolah" subtitle="Masukkan kode undangan dari guru atau admin.">
     <div class="form">
       <p v-if="error" class="alert" role="alert">{{ error }}</p>
-      <template v-if="!preview">
+      <template v-if="result">
+        <p class="notice" role="status">{{ result }}</p>
+        <RouterLink class="btn-primary" :to="{ name: 'home' }">Buka sekolah</RouterLink>
+      </template>
+      <template v-else-if="!preview">
         <form class="form-inner" novalidate @submit.prevent="check">
           <FormField v-model="input" label="Kode undangan" autocomplete="off" :maxlength="12" />
           <button type="submit" class="btn-primary" :disabled="busy">
@@ -78,6 +89,7 @@ onMounted(() => {
       <template v-else>
         <p class="notice" role="status">
           Kamu diundang ke <strong>{{ preview.org_name }}</strong> sebagai {{ roleLabel }}.
+          <span v-if="preview.class_name"> Kelas {{ preview.class_name }}, tahun ajaran {{ preview.year_label }}.</span>
         </p>
         <button type="button" class="btn-primary" :disabled="busy" @click="join">
           {{ busy ? 'Bergabung…' : `Gabung ke ${preview.org_name}` }}

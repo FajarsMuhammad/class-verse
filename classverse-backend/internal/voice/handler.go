@@ -31,8 +31,17 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/rooms/{room_id}/voice-token", httpx.Handle(h.log, h.token))
 }
 
+// GuestRoutes mounts the same endpoint for guests (G1); callers must pass
+// auth.RequireGuest. Presence limits a guest to the room they are inside.
+func (h *Handler) GuestRoutes(r chi.Router) {
+	r.Post("/guest/rooms/{room_id}/voice-token", httpx.Handle(h.log, h.token))
+}
+
 func (h *Handler) token(w http.ResponseWriter, r *http.Request) error {
-	userID, _ := auth.UserID(r.Context())
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		userID, _ = auth.GuestID(r.Context())
+	}
 	roomID, err := uuid.Parse(chi.URLParam(r, "room_id"))
 	if err != nil {
 		return httpx.ErrNotFound

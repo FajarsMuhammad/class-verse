@@ -7,6 +7,8 @@ import type { Level, Module, ModuleStep, Quiz, QuizAttempt } from '@/api/types'
 import FileReader, { type ReadableFile } from './FileReader.vue'
 import QuizPlayer from './QuizPlayer.vue'
 import StepViewer from './StepViewer.vue'
+import RemotePagination from './RemotePagination.vue'
+import { PAGE, hasMore } from '@/api/page'
 
 // Open catalog: every step remains accessible, regardless of completion order.
 const props = defineProps<{ orgId: string; buildingKey: string; buildingName: string; initialLevel?: Level; moduleId?: string; stepId?: string }>()
@@ -17,13 +19,16 @@ const level = ref<Level>(props.initialLevel ?? 'SD')
 const modules = ref<Module[]>([])
 const quizzes = ref<Quiz[]>([])
 // The quiz being played; stepID is set when it was opened from a module quiz step.
-const playing = ref<{ id: string; title: string; stepID?: string } | null>(null)
+const playing = ref<{ id: string; title: string; stepID?: string; moduleID?: string } | null>(null)
 const loading = ref(false)
 const error = ref('')
 const viewing = ref<ModuleStep | null>(null)
 const viewingModule = computed(() => modules.value.find((m) => m.steps.some((s) => s.id === viewing.value?.id)))
 const reading = ref<ReadableFile | null>(null)
 const saving = ref(false)
+// Modules and quizzes page independently, 20 at a time, so a big building never loads in one request.
+const modulePage = ref(1), quizPage = ref(1)
+const moreModules = ref(false), moreQuizzes = ref(false)
 let generation = 0
 
 async function load() {
@@ -31,17 +36,26 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const query = { building_key: props.buildingKey, level: level.value }
-    const [page, quizPage] = await Promise.all([moduleApi.list(props.orgId, query), quizApi.list(props.orgId, query)])
-    if (mine === generation) {
-      modules.value = page.items
-      quizzes.value = quizPage.items
-      if (props.moduleId) {
-        await nextTick()
-        document.getElementById(`module-${props.moduleId}`)?.focus()
-        const step = page.items.find(m => m.id === props.moduleId)?.steps.find(s => s.id === props.stepId)
-        if (step) open(step)
-      }
+    const query = { building_key: props.buildingKey, level: level.value, limit: PAGE }
+    const moduleOffset = (modulePage.value - 1) * PAGE, quizOffset = (quizPage.value - 1) * PAGE
+    const [page, quizList] = await Promise.all([moduleApi.list(props.orgId, { ...query, offset: moduleOffset }), quizApi.list(props.orgId, { ...query, offset: quizOffset })])
+    if (mine !== generation) return
+    let items = page.items
+    // A deep link to a module outside this page fetches that one module instead of every page.
+    if (props.moduleId && modulePage.value === 1 && !items.some(m => m.id === props.moduleId)) {
+      const one = await moduleApi.list(props.orgId, { building_key: props.buildingKey, level: level.value, module_id: props.moduleId, limit: 1 })
+      if (mine !== generation) return
+      items = [...one.items, ...items]
+    }
+    modules.value = items
+    quizzes.value = quizList.items
+    moreModules.value = hasMore(moduleOffset, page)
+    moreQuizzes.value = hasMore(quizOffset, quizList)
+    if (props.moduleId) {
+      await nextTick()
+      document.getElementById(`module-${props.moduleId}`)?.focus()
+      const step = items.find(m => m.id === props.moduleId)?.steps.find(s => s.id === props.stepId)
+      if (step) open(step)
     }
   } catch (err) {
     if (mine === generation) error.value = errorMessage(err)
@@ -49,7 +63,11 @@ async function load() {
     if (mine === generation) loading.value = false
   }
 }
-watch([() => props.orgId, () => props.buildingKey, level], load, { immediate: true })
+watch([() => props.orgId, () => props.buildingKey, level], () => {
+  if (modulePage.value === 1 && quizPage.value === 1) void load()
+  else modulePage.value = quizPage.value = 1
+}, { immediate: true })
+watch([modulePage, quizPage], () => void load())
 
 const minutes = (m: Module) => m.steps.reduce((sum, s) => sum + s.minutes, 0)
 const empty = computed(() => !loading.value && !error.value && !modules.value.length && !quizzes.value.length)
@@ -77,7 +95,7 @@ async function setDone(m: Module, step: ModuleStep) {
 function open(step: ModuleStep) {
   if (step.kind === 'kuis' && step.quiz_id) {
     viewing.value = null
-    playing.value = { id: step.quiz_id, title: step.title, stepID: step.id }
+    playing.value = { id: step.quiz_id, title: step.title, stepID: step.id, moduleID: modules.value.find(m => m.steps.some(s => s.id === step.id))?.id }
   } else if (step.kind === 'berkas' && step.file_id) {
     viewing.value = null
     reading.value = { id: step.file_id, name: step.title, kind: step.file_kind ?? 'pdf', position: step.reader_position }
@@ -139,7 +157,8 @@ function closed(position: number) {
         <p v-if="!m.steps.length" class="muted small">Modul ini belum punya langkah.</p>
       </article>
     </div>
-    <section v-if="quizzes.length" class="quizzes" aria-label="Kuis">
+    <RemotePagination v-if="modulePage > 1 || moreModules" :page="modulePage" :more="moreModules" :busy="loading" @move="modulePage += $event" />
+    <section v-if="quizzes.length || quizPage > 1" class="quizzes" aria-label="Kuis">
       <h3>Kuis</h3>
       <article v-for="z in quizzes" :key="z.id" class="quiz-card">
         <span class="quiz-icon" aria-hidden="true">?</span>
@@ -151,8 +170,9 @@ function closed(position: number) {
           {{ z.attempts ? 'Main lagi' : 'Main' }}<span class="sr"> {{ z.title }}</span>
         </button>
       </article>
+      <RemotePagination v-if="quizPage > 1 || moreQuizzes" :page="quizPage" :more="moreQuizzes" :busy="loading" @move="quizPage += $event" />
     </section>
-    <QuizPlayer v-if="playing" :key="playing.id" :org-id="orgId" :quiz-id="playing.id" :title="playing.title"
+    <QuizPlayer v-if="playing" :key="playing.id" :org-id="orgId" :quiz-id="playing.id" :title="playing.title" :module-id="playing.moduleID" :step-id="playing.stepID"
       @finished="quizFinished" @close="playing = null" />
     <StepViewer v-if="viewing" :step="viewing" :steps="viewingModule?.steps" :module-title="viewingModule?.title"
       :saving="saving" @select="open" @done="viewingModule && setDone(viewingModule, $event)" @close="viewing = null" />
@@ -323,11 +343,4 @@ function closed(position: number) {
   font-weight: var(--weight-bold);
 }
 .quiz-card .btn-primary { flex: none; min-height: var(--touch-min); }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 </style>

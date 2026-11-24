@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -44,20 +45,9 @@ type Service struct {
 func NewService(pool *pgxpool.Pool, auth *org.Service, now func() time.Time) *Service {
 	return &Service{pool: pool, auth: auth, now: now}
 }
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 func (s *Service) inTx(ctx context.Context, fn func(*query.Queries) error) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin assignment: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if err := fn(query.New(tx)); err != nil {
-		return err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit assignment: %w", err)
-	}
-	return nil
+	return db.InTx(ctx, s.pool, fn)
 }
 func notFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -143,12 +133,24 @@ func (s *Service) Issue(ctx context.Context, user, orgID uuid.UUID, in Input) (q
 }
 
 // List returns own tasks for students, all school tasks for staff.
-func (s *Service) List(ctx context.Context, user, orgID uuid.UUID) ([]query.ListAssignmentsRow, error) {
+func (s *Service) List(ctx context.Context, user, orgID uuid.UUID, page ...int32) ([]query.ListAssignmentsRow, error) {
+	return s.ListFiltered(ctx, user, orgID, "", uuid.NullUUID{}, page...)
+}
+
+// ListFiltered applies search before selecting a page, preserving recipient authorization.
+func (s *Service) ListFiltered(ctx context.Context, user, orgID uuid.UUID, search string, classID uuid.NullUUID, page ...int32) ([]query.ListAssignmentsRow, error) {
+	pageLimit := pgtype.Int4{}
+	pageOffset := int32(0)
+	if len(page) == 2 {
+		pageLimit = pgtype.Int4{Int32: page[0], Valid: true}
+		pageOffset = page[1]
+	}
+
 	role, err := s.auth.Authorize(ctx, user, orgID, org.RoleParticipant)
 	if err != nil {
 		return nil, err
 	}
-	return query.New(s.pool).ListAssignments(ctx, query.ListAssignmentsParams{OrgID: orgID, UserID: user, Staff: role.AtLeast(org.RoleTeacher)})
+	return query.New(s.pool).ListAssignments(ctx, query.ListAssignmentsParams{Search: search, ClassID: classID, PageLimit: pageLimit, PageOffset: pageOffset, OrgID: orgID, UserID: user, Staff: role.AtLeast(org.RoleTeacher)})
 }
 func (s *Service) accessible(ctx context.Context, q *query.Queries, user, orgID, id uuid.UUID, role org.Role) (query.Assignment, error) {
 	a, err := q.GetAssignment(ctx, query.GetAssignmentParams{OrgID: orgID, ID: id})
@@ -178,6 +180,8 @@ func (s *Service) Steps(ctx context.Context, user, orgID, id uuid.UUID) ([]query
 	for i, r := range rows {
 		if !r.Unlocked && !role.AtLeast(org.RoleTeacher) {
 			rows[i].Body = ""
+			rows[i].RichContent = nil
+			rows[i].QuizRevisionID = uuid.NullUUID{}
 			rows[i].FileID = uuid.NullUUID{}
 			rows[i].VideoID = pgtype.Text{}
 			rows[i].QuizID = uuid.NullUUID{}

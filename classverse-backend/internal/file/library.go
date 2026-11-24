@@ -18,14 +18,24 @@ import (
 const maxPosition = 1_000_000
 
 // List returns ready files with the caller's last position. Staff only: it is the Kelola file manager.
-func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID) ([]query.ListReadyFilesRow, error) {
+func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, kind string, page ...int32) ([]query.ListReadyFilesRow, error) {
+	pageLimit := pgtype.Int4{}
+	pageOffset := int32(0)
+	if len(page) == 2 {
+		pageLimit = pgtype.Int4{Int32: page[0], Valid: true}
+		pageOffset = page[1]
+	}
+
+	if kind != "" && kind != "pdf" && kind != "audio" {
+		return nil, ErrBadKind
+	}
 	var rows []query.ListReadyFilesRow
 	err := s.store.inTx(ctx, func(q *query.Queries) error {
 		if err := member(ctx, q, userID, orgID, true); err != nil {
 			return err
 		}
 		var err error
-		rows, err = q.ListReadyFiles(ctx, query.ListReadyFilesParams{OrgID: orgID, UserID: userID})
+		rows, err = q.ListReadyFiles(ctx, query.ListReadyFilesParams{PageLimit: pageLimit, PageOffset: pageOffset, OrgID: orgID, UserID: userID, Kind: kind})
 		return err
 	})
 	return rows, err
@@ -50,6 +60,12 @@ func (s *Service) readable(ctx context.Context, userID, orgID, id uuid.UUID) (qu
 		published, err := q.FilePublished(ctx, query.FilePublishedParams{OrgID: orgID, FileID: uuid.NullUUID{UUID: id, Valid: true}})
 		if err != nil {
 			return fmt.Errorf("check published file: %w", err)
+		}
+		if !published {
+			published, err = q.SnapshotFileReadable(ctx, query.SnapshotFileReadableParams{OrgID: orgID, UserID: userID, FileID: uuid.NullUUID{UUID: id, Valid: true}})
+			if err != nil {
+				return fmt.Errorf("check revision file: %w", err)
+			}
 		}
 		if !published {
 			published, err = q.AssignmentFileReadable(ctx, query.AssignmentFileReadableParams{OrgID: orgID, UserID: userID, FileID: uuid.NullUUID{UUID: id, Valid: true}})
@@ -104,6 +120,9 @@ func (u *Uploader) Open(ctx context.Context, f query.File, start, end int64) (Co
 
 // ErrInUse protects files still referenced by an active library book or module step.
 var ErrInUse = errors.New("file in use")
+
+// ErrBadKind rejects a list filter other than pdf or audio.
+var ErrBadKind = errors.New("bad file kind")
 
 // ErrRange maps to 416 so the browser can retry without Range.
 var ErrRange = errors.New("unsatisfiable range")

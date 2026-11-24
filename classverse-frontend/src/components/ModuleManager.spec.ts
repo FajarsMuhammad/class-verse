@@ -20,15 +20,32 @@ const step = (id: string): ModuleStep => ({
   id, kind: 'materi', title: `Langkah ${id}`, body: 'x', file_id: null, file_kind: null, video_id: null, quiz_id: null, minutes: 5, reader_position: 0, done: false,
 })
 const draft: Module = {
-  id: 'm1', building_key: 'sains', level: 'SD', title: 'Tata Surya', description: '', published: false,
+  id: 'm1', draft_version:1, building_key: 'sains', level: 'SD', title: 'Tata Surya', description: '', published: false,
   updated_at: '2026-01-01T00:00:00Z', steps: [step('a'), step('b'), step('c')],
 }
 
 beforeEach(() => {
-  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft] })
-  vi.spyOn(fileApi, 'list').mockResolvedValue({ items: [], used_bytes: 0, quota_bytes: 1 })
+  vi.spyOn(moduleApi, 'history').mockResolvedValue({items:[]})
+  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft], counts: { all: 1, published: 0, draft: 1, archived: 0 } })
+  vi.spyOn(fileApi, 'list').mockResolvedValue({ items: [], total: 0, used_bytes: 0, quota_bytes: 1 })
 })
 afterEach(() => vi.restoreAllMocks())
+
+it('creates reading sections with sequential draft versions', async () => {
+  vi.spyOn(moduleApi, 'create').mockResolvedValue({ ...draft, steps: [] })
+  const add = vi.spyOn(moduleApi, 'addStep').mockResolvedValue(step('new'))
+  const w = mount(ModuleManager, { props: { orgId: 'o' } })
+  await flushPromises()
+  await w.get('.head .btn-primary').trigger('click')
+  await w.get('input[value="reading"]').setValue(true)
+  await w.get('input[maxlength="120"]').setValue('Materi baru')
+  await w.get('form').trigger('submit')
+  await flushPromises()
+  expect(add).toHaveBeenCalledTimes(4)
+  expect(add.mock.calls.map(call => call[2].title)).toEqual(['Pendahuluan', 'Materi', 'Contoh', 'Rangkuman'])
+  expect(add.mock.calls.map(call => call[2].expected_version)).toEqual([1, 2, 3, 4])
+  w.unmount()
+})
 
 it('creates a module only in learning buildings and shows drafts', async () => {
   const create = vi.spyOn(moduleApi, 'create').mockResolvedValue(draft)
@@ -36,10 +53,11 @@ it('creates a module only in learning buildings and shows drafts', async () => {
   await flushPromises()
   expect(w.text()).toContain('Draf')
   expect(w.text()).toContain('Menara Sains · SD · 3 langkah')
+  expect(w.get('[role=tablist]').text()).toContain('Draf 1')
   await w.get('.head .btn-primary').trigger('click')
-  const options = w.findAll('form select')[0]!.findAll('option').map((o) => o.text())
-  expect(options).toEqual(['Menara Sains'])
-  await w.get('form input').setValue('Gerak Planet')
+  expect(w.findAll('[role=radiogroup][aria-label=Gedung] label').map((o) => o.text())).toEqual(['Menara Sains'])
+  await w.get('input[value="empty"]').setValue(true)
+  await w.get('input[maxlength="120"]').setValue('Gerak Planet')
   await w.get('form').trigger('submit')
   await flushPromises()
   expect(create).toHaveBeenCalledWith('o', { building_key: 'sains', level: 'SD', title: 'Gerak Planet', description: '', published: false })
@@ -55,7 +73,7 @@ it('moves a step with the full new order and blocks moving past the ends', async
   expect(w.get('[aria-label="Turunkan Langkah c"]').attributes('disabled')).toBeDefined()
   await w.get('[aria-label="Turunkan Langkah a"]').trigger('click')
   await flushPromises()
-  expect(reorder).toHaveBeenCalledWith('o', 'm1', ['b', 'a', 'c'])
+  expect(reorder).toHaveBeenCalledWith('o', 'm1', ['b', 'a', 'c'],1)
 })
 
 it('adds a video step and shows server field errors next to the field', async () => {
@@ -87,7 +105,7 @@ it('adds a quiz step pointing at a published quiz of the same building', async (
   await w.get('.add').trigger('click')
   await w.get('form select').setValue('kuis')
   await flushPromises()
-  expect(quizzes).toHaveBeenCalledWith('o', { building_key: 'sains' })
+  expect(quizzes).toHaveBeenCalledWith('o', { building_key: 'sains', offset: 0, limit: 20 })
   await w.findAll('form input')[0]!.setValue('Kuis kecil')
   await w.get('form select[aria-label="Kuis"]').setValue('q1')
   await w.get('form').trigger('submit')
@@ -96,12 +114,15 @@ it('adds a quiz step pointing at a published quiz of the same building', async (
 })
 
  it('keeps the catalog compact and filters by level before opening one item', async () => {
-  vi.spyOn(moduleApi, 'list').mockResolvedValue({ items: [draft, { ...draft, id: 'other', level: 'SMP', title: 'Jenjang lain' }] })
+  const all = [draft, { ...draft, id: 'other', level: 'SMP' as const, title: 'Jenjang lain' }]
+  const list = vi.spyOn(moduleApi, 'list').mockImplementation(async (_org, opts) => ({ items: all.filter(m => !opts?.level || m.level === opts.level) }))
   const w = mount(ModuleManager, { props: { orgId: 'o' } })
   await flushPromises()
   expect(w.findAll('.catalog-row')).toHaveLength(2)
   expect(w.find('.steps').exists()).toBe(false)
   await w.get('[aria-label="Filter jenjang"]').setValue('SMP')
+  await flushPromises()
+  expect(list).toHaveBeenLastCalledWith('o', expect.objectContaining({ level: 'SMP' }))
   expect(w.findAll('.catalog-row')).toHaveLength(1)
   expect(w.get('.catalog-row').text()).toContain('Jenjang lain')
   await w.get('.catalog-row button').trigger('click')
@@ -119,11 +140,12 @@ it('starts the first content form after creating a filtered draft', async () => 
   await flushPromises()
   await w.get('[aria-label="Filter jenjang"]').setValue('SMA')
   await w.get('.head button').trigger('click')
+  await w.get('input[value="empty"]').setValue(true)
   await w.get('input[maxlength="120"]').setValue('Baru')
   await w.get('form').trigger('submit')
   await flushPromises()
   expect(create).toHaveBeenCalledWith('o', expect.objectContaining({ level: 'SMA', published: false }))
-  expect(w.find('textarea[maxlength="5000"]').exists()).toBe(true)
+  expect(w.find('[aria-label="Isi materi rich text"]').exists()).toBe(true)
   expect(w.find('.catalog').exists()).toBe(false)
 })
 
@@ -134,7 +156,7 @@ it('pins only a published module from its detail, with a named current-room targ
   const w = mount(ModuleManager, { props: { orgId: 'o', room } })
   await flushPromises()
   expect(w.find('[data-action="pin"]').exists()).toBe(false)
-  await w.get('.catalog-row button').trigger('click')
+  await w.get('[aria-label="Buka Tata Surya"]').trigger('click')
   expect(w.get('[data-action="pin"]').text()).toContain('Kelas IPA')
   await w.get('[data-action="pin"]').trigger('click')
   await w.get('.pin-form select').setValue('b')
@@ -153,4 +175,26 @@ it('explains that a room is required on campus and never offers drafts for pinni
   await w.get('.catalog-row button').trigger('click')
   expect(w.find('[data-action="pin"]').exists()).toBe(false)
   expect(w.text()).toContain('Masuk ruang untuk menyematkan modul')
+})
+
+it('filters by status tab and search, and offers Tugaskan only for published modules', async () => {
+  const all = [draft, { ...draft, id: 'p', title: 'Bilangan', published: true }]
+  vi.spyOn(moduleApi, 'list').mockImplementation(async (_org, query) => ({
+    items: query?.archived ? [] : all.filter(m => (!query?.status || m.published === (query.status === 'published')) && m.title.toLowerCase().includes(query?.search ?? '')),
+    counts: { all: 2, published: 1, draft: 1, archived: 0 },
+  }))
+  const w = mount(ModuleManager, { props: { orgId: 'o' } })
+  await flushPromises()
+  expect(w.findAll('[role=tab]').map((t) => t.text())).toEqual(['Semua 2', 'Terbit 1', 'Draf 1', 'Arsip 0'])
+  expect(w.find('[aria-label="Tugaskan Tata Surya"]').exists()).toBe(false)
+  await w.get('[aria-label="Tugaskan Bilangan"]').trigger('click')
+  expect(w.emitted('assign')).toEqual([['p']])
+  await w.findAll('[role=tab]')[2]!.trigger('click')
+  await flushPromises()
+  expect(w.findAll('.catalog-row')).toHaveLength(1)
+  expect(w.get('.catalog-row').text()).toContain('Lanjutkan edit')
+  await w.findAll('[role=tab]')[0]!.trigger('click')
+  await w.get('input[type=search]').setValue('bil')
+  await flushPromises()
+  expect(w.findAll('.catalog-row').map((r) => r.text())).toEqual([expect.stringContaining('Bilangan')])
 })

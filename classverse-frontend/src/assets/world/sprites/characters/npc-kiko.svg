@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="38" height="40" viewBox="0 0 38 40" role="img" aria-label="Kiko, pemandu kampus">
-<path d="M4 22 C4 8 10 3 19 3 C28 3 34 8 34 22 C34 32 28 37 19 37 C10 37 4 32 4 22 Z" fill="#a16207" stroke="#1d2140" stroke-width="3"/>
-<circle cx="13" cy="15" r="5.5" fill="#ffffff" stroke="#1d2140" stroke-width="2"/>
-<circle cx="15" cy="15" r="2.5" fill="#1d2140"/>
-<circle cx="25" cy="15" r="5.5" fill="#ffffff" stroke="#1d2140" stroke-width="2"/>
-<circle cx="27" cy="15" r="2.5" fill="#1d2140"/>
-<polygon points="15,21 23,21 19,28" fill="#fb923c"/>
-</svg>

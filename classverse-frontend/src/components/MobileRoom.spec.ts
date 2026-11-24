@@ -74,6 +74,7 @@ function handle(welcome: WelcomeMsg, map: MapData): RoomHandle {
     voiceBroadcast: vi.fn<RoomHandle['voiceBroadcast']>(),
     kick: vi.fn<RoomHandle['kick']>(),
     moderate: vi.fn<RoomHandle['moderate']>(),
+    muteAll: vi.fn<RoomHandle['muteAll']>(),
     setLocked: vi.fn<RoomHandle['setLocked']>(),
     mutedIds: ref([]),
     allow: vi.fn<RoomHandle['allow']>(),

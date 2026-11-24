@@ -30,6 +30,8 @@ type busyRooms struct {
 
 func (busyRooms) Occupancy(uuid.UUID) (int, bool) { return 0, false }
 
+func (busyRooms) LiveRooms(uuid.UUID) []uuid.UUID { return nil }
+
 func (b *busyRooms) SetAllChat(_ uuid.UUID, on bool) { b.toggled = append(b.toggled, on) }
 
 func (b busyRooms) WhileEmpty(_ context.Context, _ uuid.UUID, fn func() error) error {

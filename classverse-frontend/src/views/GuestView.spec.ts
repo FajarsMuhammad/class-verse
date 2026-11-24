@@ -1,0 +1,42 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import GuestView from './GuestView.vue'
+
+const client = vi.hoisted(() => ({ preview: vi.fn<() => Promise<unknown>>(), request: vi.fn<() => Promise<unknown>>(), status: vi.fn<() => Promise<unknown>>(), clear: vi.fn<() => void>() }))
+vi.mock('@/api/guests', () => ({ guestClient: () => client }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { code: 'CODE' } }) }))
+vi.mock('@/components/GuestRoom.vue', () => ({ default: { template: '<div>Approved room</div>' } }))
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.clearAllMocks()
+  client.preview.mockResolvedValue({ org_name: 'School', room_name: 'Meeting' })
+  client.request.mockResolvedValue({ status: 'pending', token: 'guest' })
+  client.status.mockResolvedValue({ status: 'approved', token: 'renewed' })
+})
+afterEach(() => vi.useRealTimers())
+it('keeps pending guest out of room then enters only after host approval', async () => {
+  const w = mount(GuestView)
+  await flushPromises()
+  await w.get('input').setValue('Guest Name')
+  await w.get('form').trigger('submit')
+  await flushPromises()
+  expect(w.text()).toContain('Menunggu persetujuan')
+  expect(w.text()).not.toContain('Approved room')
+  expect(w.text()).not.toContain('Kelola')
+  await vi.advanceTimersByTimeAsync(5000)
+  await flushPromises()
+  expect(w.text()).toContain('Approved room')
+  w.unmount()
+  expect(client.clear).toHaveBeenCalled()
+})
+it('shows denied decision without mounting room', async () => {
+  client.request.mockResolvedValue({ status: 'denied', token: 'guest' })
+  const w = mount(GuestView)
+  await flushPromises()
+  await w.get('input').setValue('Guest Name')
+  await w.get('form').trigger('submit')
+  await flushPromises()
+  expect(w.text()).toContain('ditolak pengajar')
+  expect(w.text()).not.toContain('Approved room')
+  w.unmount()
+})

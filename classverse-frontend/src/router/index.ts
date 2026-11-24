@@ -19,6 +19,7 @@ declare module 'vue-router' {
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    { path: '/guest/:code', name: 'guest-meeting', component: () => import('../views/GuestView.vue') },
     {
       path: '/',
       name: 'home',
@@ -101,7 +102,7 @@ const router = createRouter({
 
 export async function authGuard(to: RouteLocationNormalized) {
   const auth = useAuthStore()
-  if (to.name === 'google-callback') return true
+  if (to.name === 'google-callback' || to.name === 'guest-meeting') return true
   await auth.restore()
   if (to.meta.requiresAuth && !auth.loggedIn) {
     return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }

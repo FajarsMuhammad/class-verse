@@ -26,7 +26,7 @@ type Resume struct {
 // SetDone marks a step done or not done for the caller. Steps are free to open in any order
 // (approved 2026-11-13), so no ordering check. Participants only touch steps of published modules.
 func (s *Service) SetDone(ctx context.Context, userID, orgID, moduleID, stepID uuid.UUID, done bool) error {
-	role, err := s.auth.Authorize(ctx, userID, orgID, org.RoleParticipant)
+	_, err := s.auth.Authorize(ctx, userID, orgID, org.RoleParticipant)
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,10 @@ func (s *Service) SetDone(ctx context.Context, userID, orgID, moduleID, stepID u
 		if _, err := s.lock(ctx, q, orgID, moduleID); err != nil {
 			return err
 		}
-		kind, err := q.ReadableStep(ctx, query.ReadableStepParams{OrgID: orgID, ModuleID: moduleID, ID: stepID, Staff: role.AtLeast(org.RoleTeacher)})
+		if err := q.PinModuleRevision(ctx, query.PinModuleRevisionParams{OrgID: orgID, ModuleID: moduleID, UserID: userID}); err != nil {
+			return fmt.Errorf("pin progress revision: %w", err)
+		}
+		kind, err := q.ReadableStep(ctx, query.ReadableStepParams{OrgID: orgID, ModuleID: moduleID, ID: stepID, UserID: userID})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}

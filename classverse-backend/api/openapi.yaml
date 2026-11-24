@@ -174,6 +174,7 @@ paths:
       operationId: listInvites
       description: Undangan aktif (belum kedaluwarsa, dicabut, atau habis), terbaru dulu.
       parameters:
+        - { name: class_id, in: query, schema: { type: string, format: uuid } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -255,6 +256,9 @@ paths:
         - { name: building, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: cursor, in: query, schema: { type: string } }
+        - { name: q, in: query, description: "Cari nama ruang, teks literal", schema: { type: string, maxLength: 100 } }
+        - { name: status, in: query, description: "Kosong = semua ruang aktif; live = sedang ada orang; archived = arsip (hanya pengajar)", schema: { type: string, enum: [live, archived] } }
+        - { name: counts, in: query, description: "true menambah hitungan tab (mengikuti filter gedung dan pencarian)", schema: { type: boolean } }
       responses:
         "200":
           description: Daftar ruang
@@ -343,6 +347,183 @@ paths:
               schema: { $ref: "#/components/schemas/VoiceToken" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/VoiceUnavailable" }
+
+  /api/rooms/{room_id}/guest-links:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listGuestLinks
+      description: Link tamu aktif ruang ini (G1). Guru dan admin sekolah ruang.
+      responses:
+        "200":
+          description: Link aktif, terbaru dulu (maks 20)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/GuestLink" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: createGuestLink
+      description: Buat link tamu untuk satu ruang (bukan kampus). Berlaku maks 24 jam, maks 40 tamu.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateGuestLinkRequest" }
+      responses:
+        "201":
+          description: Link dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestLink" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{room_id}/guest-links/{link_id}:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: link_id, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      operationId: revokeGuestLink
+      description: Cabut link; tamu yang sudah masuk lewat link ini langsung diputus.
+      responses:
+        "204": { description: Dicabut }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{room_id}/guest-requests:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listGuestRequests
+      description: Tamu yang menunggu persetujuan, terlama dulu (maks 50).
+      responses:
+        "200":
+          description: Antrean tamu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/GuestRequest" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{room_id}/guest-requests/{request_id}:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: request_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: decideGuestRequest
+      description: Izinkan atau tolak tamu. Permintaan yang sudah diputuskan menjawab 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, deny] }
+      responses:
+        "200":
+          description: Keputusan tersimpan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestRequest" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/guest/links/{code}:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    get:
+      operationId: previewGuestLink
+      security: []
+      description: Pratinjau link tamu tanpa akun. Dibatasi per IP.
+      responses:
+        "200":
+          description: Nama sekolah dan ruang
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestLinkPreview" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/guest/links/{code}/requests:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    post:
+      operationId: requestGuestAccess
+      security: []
+      description: >-
+        Minta masuk sebagai tamu dengan nama. Membuat identitas tamu (tanpa akun) dan mengembalikan token tamu
+        berumur pendek. Token ini hanya diterima endpoint /api/guest, WebSocket ruang tujuan, dan token suaranya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [display_name, request_key]
+              properties:
+                request_key: { type: string, format: uuid, description: "Secret UUID v4 retry key. Keep out of logs and URLs; same link/key resumes unchanged request." }
+                display_name: { type: string, minLength: 3, maxLength: 24 }
+      responses:
+        "201":
+          description: Permintaan dibuat, status pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestSession" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/guest/me:
+    get:
+      operationId: getGuestStatus
+      description: >-
+        Status permintaan tamu (token tamu). Selalu mengembalikan token tamu baru, jadi polling
+        sekaligus memperpanjang sesi selama link aktif.
+      responses:
+        "200":
+          description: Status tamu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GuestSession" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "410": { $ref: "#/components/responses/InviteExpired" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/guest/rooms/{room_id}/voice-token:
+    parameters:
+      - { name: room_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: createGuestVoiceToken
+      description: Sama dengan createVoiceToken, untuk token tamu di ruang tujuannya.
+      responses:
+        "200":
+          description: Token voice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VoiceToken" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: voice_pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "503": { $ref: "#/components/responses/VoiceUnavailable" }
 
   /api/reports:
@@ -519,7 +700,11 @@ paths:
       - $ref: "#/components/parameters/OrgID"
     get:
       operationId: listFiles
-      description: File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota.
+      description: File siap milik sekolah (terbaru dulu, 20 per halaman), posisi baca pemanggil, dan pemakaian kuota.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+        - { name: kind, in: query, schema: { type: string, enum: [pdf, audio] }, description: "Filter jenis sebelum pagination." }
       responses:
         "200":
           description: Daftar file
@@ -598,6 +783,10 @@ paths:
         - { name: shelf, in: query, schema: { $ref: "#/components/schemas/Shelf" } }
         - { name: q, in: query, description: "Cari judul/penulis, teks literal", schema: { type: string, maxLength: 100 } }
         - { name: drafts, in: query, schema: { type: boolean } }
+        - { name: format, in: query, schema: { type: string, enum: [buku, ebook, audio] } }
+        - { name: level, in: query, schema: { type: string, enum: [SD, SMP, SMA, Umum] } }
+        - { name: status, in: query, description: "draft hanya berlaku untuk pengajar/admin dengan drafts=true", schema: { type: string, enum: [published, draft] } }
+        - { name: counts, in: query, description: "Pengajar/admin: sertakan hitungan tab untuk filter non-status", schema: { type: boolean } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -705,6 +894,127 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/modules/{module_id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: module_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: publishModuleRevision
+      description: "Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftVersionInput" }
+      responses:
+        "200":
+          description: Immutable revision published
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Module" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/orgs/{org_id}/modules/{module_id}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: module_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listModuleRevisions
+      description: "Staff-only read-only revision metadata; no learner answer-key access."
+      responses:
+        "200":
+          description: Published revision history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ContentRevision" } }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/results:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: quiz_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listQuizResults
+      description: Pengajar/admin. Peserta yang sudah menyelesaikan kuis, nilai tertinggi (aturan Rapor), jumlah percobaan.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+      responses:
+        "200":
+          description: Hasil kuis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, display_name, best_score, attempts, last_finished_at]
+                      properties:
+                        user_id: { type: string, format: uuid }
+                        display_name: { type: string }
+                        best_score: { type: integer }
+                        attempts: { type: integer }
+                        last_finished_at: { type: string, format: date-time }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: quiz_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: publishQuizRevision
+      description: "Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftVersionInput" }
+      responses:
+        "200":
+          description: Immutable revision published
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quiz" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/orgs/{org_id}/quizzes/{quiz_id}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - name: quiz_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listQuizRevisions
+      description: "Staff-only read-only revision metadata; no learner answer-key access."
+      responses:
+        "200":
+          description: Published revision history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ContentRevision" } }
   /api/orgs/{org_id}/modules:
     parameters:
       - $ref: "#/components/parameters/OrgID"
@@ -712,11 +1022,19 @@ paths:
       operationId: listModules
       description: |
         Modul (jalur belajar) beserta langkah aktif berurutan. Peserta hanya melihat modul terbit; `drafts=true`
-        menyertakan draf untuk pengajar/admin. Arsip tidak pernah tampil. Maksimal 100 modul.
+        menyertakan draf untuk pengajar/admin. `archived=true` hanya untuk pengajar/admin, mengembalikan
+        daftar arsip terpisah (bukan gabungan dengan modul aktif). Maksimal 100 modul.
       parameters:
         - { name: building_key, in: query, schema: { type: string } }
         - { name: level, in: query, schema: { $ref: "#/components/schemas/Level" } }
         - { name: drafts, in: query, schema: { type: boolean } }
+        - { name: archived, in: query, schema: { type: boolean, default: false } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 }, description: "Lewati sejumlah baris; satu respons maksimal 100 item." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
+        - { name: module_id, in: query, schema: { type: string, format: uuid }, description: "Ambil satu modul untuk pin/detail tanpa memuat daftar." }
+        - { name: counts, in: query, schema: { type: boolean }, description: "Pengajar/admin: sertakan hitungan tab untuk filter non-status." }
       responses:
         "200":
           description: Daftar modul
@@ -905,6 +1223,11 @@ paths:
         - { name: building_key, in: query, schema: { type: string } }
         - { name: level, in: query, schema: { $ref: "#/components/schemas/Level" } }
         - { name: drafts, in: query, schema: { type: boolean } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 }, description: "Lewati sejumlah baris; satu respons maksimal 100 item." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
+        - { name: counts, in: query, schema: { type: boolean }, description: "Pengajar/admin: sertakan hitungan tab untuk filter non-status." }
       responses:
         "200":
           description: Daftar kuis
@@ -1196,6 +1519,11 @@ paths:
       - $ref: "#/components/parameters/OrgID"
     get:
       operationId: listAssignments
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+        - { name: search, in: query, schema: { type: string }, description: "Cari nama sebelum pagination." }
+        - { name: class_id, in: query, schema: { type: string, format: uuid }, description: "Kelas penerima tugas." }
       responses:
         "200":
           description: Own tasks for participants, all school tasks for staff
@@ -1203,9 +1531,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
+                  total: { type: integer, description: "Jumlah tugas yang cocok dengan filter" }
     post:
       operationId: issueAssignment
       requestBody:
@@ -1274,12 +1603,29 @@ paths:
       responses:
         "204": { description: Done or identical retry }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/management-summary:
+    get:
+      operationId: getManagementSummary
+      parameters:
+        - { $ref: '#/components/parameters/OrgID' }
+      responses:
+        '200':
+          description: School-wide counts for staff; class attention uses active academic year.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: integer }
+        default: { $ref: '#/components/responses/Error' }
   /api/orgs/{org_id}/academic-years:
     parameters:
       - $ref: "#/components/parameters/OrgID"
     get:
       operationId: listAcademicYears
       description: Pengajar/admin. Tahun ajaran sekolah, terbaru dulu; tepat satu aktif bila ada.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
       responses:
         "200":
           description: Daftar tahun ajaran
@@ -1287,9 +1633,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/AcademicYear" } }
+                  total: { type: integer }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1333,7 +1680,11 @@ paths:
       - $ref: "#/components/parameters/YearID"
     get:
       operationId: listClasses
-      description: Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa.
+      description: Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa, wali kelas, jumlah guru mapel dan peran pemanggil; kelas yang diajar pemanggil lebih dulu.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+        - { name: search, in: query, schema: { type: string }, description: "Cari nama sebelum pagination." }
       responses:
         "200":
           description: Daftar kelas
@@ -1341,15 +1692,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/SchoolClass" } }
+                  total: { type: integer }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createClass
-      description: Pengajar/admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu.
+      description: Admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu.
       requestBody:
         required: true
         content:
@@ -1371,7 +1723,12 @@ paths:
       - $ref: "#/components/parameters/YearID"
     get:
       operationId: listRoster
-      description: Pengajar/admin. Semua anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan).
+      description: Pengajar/admin. Satu halaman anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan).
+      parameters:
+        - { name: class_id, in: query, schema: { type: string }, description: "UUID kelas, atau `none` = belum punya kelas" }
+        - { name: q, in: query, schema: { type: string, maxLength: 80 }, description: Cari nama }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 50 } }
       responses:
         "200":
           description: Roster
@@ -1379,9 +1736,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, total]
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/RosterEntry" } }
+                  total: { type: integer, description: Jumlah sesuai filter }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1393,8 +1752,10 @@ paths:
     put:
       operationId: placeStudent
       description: |
-        Pengajar/admin. Menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
+        Admin menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
         ditutup, riwayat tetap). `class_id: null` mengeluarkan dari kelas. Hanya anggota berperan peserta.
+        Wali kelas hanya menambah siswa tanpa kelas ke kelasnya (409 `has_class` bila sudah punya kelas) dan
+        mengeluarkan siswa kelasnya; selain itu 403.
       requestBody:
         required: true
         content:
@@ -1409,13 +1770,216 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/orgs/{org_id}/academic-years/{year_id}/moves:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    post:
+      operationId: moveStudents
+      description: |
+        Pindah massal 1–50 peserta ke satu kelas (`class_id: null` = keluarkan), satu transaksi; hak sama dengan
+        placeStudent. Siswa yang gagal dilaporkan per item (`not_student`, `has_class`), sisanya tetap dipindah.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids, class_id]
+              properties:
+                user_ids: { type: array, minItems: 1, maxItems: 50, items: { type: string, format: uuid } }
+                class_id: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: Hasil per siswa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, error]
+                      properties:
+                        user_id: { type: string, format: uuid }
+                        error: { type: string, nullable: true, enum: [not_student, has_class, null] }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/copy:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    post:
+      operationId: copyYearClasses
+      description: |
+        Admin. Menyalin kelas aktif tahun sumber ke tahun ini; nama yang sudah ada dilewati dan dilaporkan.
+        `teachers: true` ikut menyalin wali kelas/guru mapel yang masih pengajar sekolah. Siswa tidak ikut.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_year_id]
+              properties:
+                from_year_id: { type: string, format: uuid }
+                teachers: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Hasil salin
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, skipped]
+                properties:
+                  created: { type: integer }
+                  skipped: { type: array, items: { type: string }, description: Nama kelas yang sudah ada }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/academic-years/{year_id}/promotions:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - $ref: "#/components/parameters/YearID"
+    post:
+      operationId: promoteStudents
+      description: |
+        Admin. Naik kelas: siswa aktif tiap kelas sumber (tahun `from_year_id`) ditempatkan ke kelas tujuan di tahun
+        ini sesuai pemetaan eksplisit. Siswa yang sudah punya kelas di tahun ini dilewati dan dilaporkan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_year_id, mappings]
+              properties:
+                from_year_id: { type: string, format: uuid }
+                mappings:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [from_class_id, to_class_id]
+                    properties:
+                      from_class_id: { type: string, format: uuid }
+                      to_class_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Hasil naik kelas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [moved, skipped]
+                properties:
+                  moved: { type: integer }
+                  skipped: { type: array, items: { $ref: "#/components/schemas/Person" } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/staff:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+    get:
+      operationId: listStaff
+      description: Pengajar/admin. Pengajar dan admin sekolah, calon wali kelas/guru mapel.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 }, description: "Ukuran halaman; default 20." }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 2147483647, default: 0 } }
+      responses:
+        "200":
+          description: Staf
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, display_name, role]
+                      properties:
+                        user_id: { type: string, format: uuid }
+                        display_name: { type: string }
+                        role: { type: string, enum: [teacher, admin] }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/classes/{class_id}/teachers:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: class_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listClassTeachers
+      description: Pengajar/admin. Wali kelas dan guru mapel aktif.
+      responses:
+        "200":
+          description: Pengajar kelas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ClassTeacher" } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/orgs/{org_id}/classes/{class_id}/teachers/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgID"
+      - { name: class_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: user_id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      operationId: setClassTeacher
+      description: |
+        Admin. Menjadikan pengajar/admin sekolah wali kelas (menggantikan wali lama) atau guru mapel dengan mapel
+        opsional. Satu peran per orang per kelas; riwayat tetap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [homeroom, subject] }
+                subject: { type: string, maxLength: 40, description: Hanya untuk guru mapel }
+      responses:
+        "204": { description: Disimpan }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: removeClassTeacher
+      description: Admin. Mengakhiri peran orang di kelas.
+      responses:
+        "204": { description: Dilepas }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/orgs/{org_id}/classes/{class_id}:
     parameters:
       - $ref: "#/components/parameters/OrgID"
       - { name: class_id, in: path, required: true, schema: { type: string, format: uuid } }
     put:
       operationId: renameClass
-      description: Pengajar/admin.
+      description: Admin.
       requestBody:
         required: true
         content:
@@ -1433,7 +1997,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: archiveClass
-      description: Pengajar/admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); riwayat tetap.
+      description: Admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); pengajar kelas dilepas; riwayat tetap.
       responses:
         "204": { description: Diarsipkan }
         "401": { $ref: "#/components/responses/Unauthenticated" }
@@ -1559,6 +2123,27 @@ components:
           schema: { $ref: "#/components/schemas/AccessTokenResponse" }
 
   schemas:
+    DraftVersionInput:
+      type: object
+      required: [expected_version]
+      properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
+    ContentRevision:
+      type: object
+      required: [id, revision, draft_version, published_at]
+      properties:
+        id: { type: string, format: uuid }
+        revision: { type: integer }
+        draft_version: { type: integer, format: int64 }
+        published_at: { type: string, format: date-time }
+    RichContent:
+      type: object
+      properties:
+        type: { type: string }
+        text: { type: string }
+        attrs: { type: object, additionalProperties: true }
+        marks: { type: array, items: { type: object, required: [type], properties: { type: { type: string }, attrs: { type: object, additionalProperties: true } } } }
+        content: { type: array, items: { $ref: "#/components/schemas/RichContent" } }
     Level:
       type: string
       enum: [SD, SMP, SMA, Umum]
@@ -1566,6 +2151,7 @@ components:
       type: object
       required: [building_key, level, title, description, published]
       properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         building_key: { type: string, description: "Kunci gedung di peta kampus" }
         level: { $ref: "#/components/schemas/Level" }
         title: { type: string, minLength: 1, maxLength: 120 }
@@ -1577,14 +2163,21 @@ components:
         - type: object
           required: [id, updated_at, steps]
           properties:
+            draft_version: { type: integer, format: int64 }
+            published_revision_id: { type: string, format: uuid, nullable: true }
             id: { type: string, format: uuid }
             updated_at: { type: string, format: date-time }
             steps: { type: array, items: { $ref: "#/components/schemas/ModuleStep" } }
     ModuleList:
       type: object
-      required: [items]
+      required: [items, total]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/Module" } }
+        total: { type: integer }
+        counts:
+          type: object
+          description: Hanya bila counts=true (pengajar/admin)
+          properties: { all: { type: integer }, published: { type: integer }, draft: { type: integer }, archived: { type: integer } }
     StepKind:
       type: string
       enum: [materi, berkas, video, kuis]
@@ -1592,6 +2185,8 @@ components:
       type: object
       required: [kind, title, minutes]
       properties:
+        rich_content: { $ref: "#/components/schemas/RichContent" }
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         kind: { $ref: "#/components/schemas/StepKind" }
         title: { type: string, minLength: 1, maxLength: 120 }
         body: { type: string, maxLength: 5000, description: "Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa." }
@@ -1603,6 +2198,7 @@ components:
       type: object
       required: [id, kind, title, body, file_id, file_kind, video_id, quiz_id, minutes, reader_position, done]
       properties:
+        rich_content: { $ref: "#/components/schemas/RichContent" }
         id: { type: string, format: uuid }
         kind: { $ref: "#/components/schemas/StepKind" }
         title: { type: string }
@@ -1629,6 +2225,7 @@ components:
       type: object
       required: [building_key, level, title, description, published]
       properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         building_key: { type: string, description: "Kunci gedung di peta kampus" }
         level: { $ref: "#/components/schemas/Level" }
         title: { type: string, minLength: 1, maxLength: 120 }
@@ -1639,6 +2236,8 @@ components:
       type: object
       required: [id, building_key, level, title, description, pass_score, published, updated_at, question_count, best_score, attempts]
       properties:
+        draft_version: { type: integer, format: int64 }
+        published_revision_id: { type: string, format: uuid, nullable: true }
         id: { type: string, format: uuid }
         building_key: { type: string }
         level: { $ref: "#/components/schemas/Level" }
@@ -1650,18 +2249,25 @@ components:
         question_count: { type: integer }
         best_score: { type: integer, nullable: true, description: "Nilai tertinggi pemanggil; null jika belum pernah selesai" }
         attempts: { type: integer, description: "Jumlah percobaan selesai milik pemanggil" }
+        module_titles: { type: array, items: { type: string }, description: "Pengajar/admin dengan drafts=true: maks 3 modul aktif yang memakai kuis ini" }
         questions: { type: array, items: { $ref: "#/components/schemas/QuizQuestion" }, description: "Hanya untuk pengajar/admin dengan drafts=true" }
     QuizList:
       type: object
-      required: [items]
+      required: [items, total]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/Quiz" } }
+        total: { type: integer }
+        counts:
+          type: object
+          description: Hanya bila counts=true (pengajar/admin)
+          properties: { all: { type: integer }, published: { type: integer }, draft: { type: integer }, empty: { type: integer, description: "Kuis tanpa soal" } }
     QuestionInput:
       type: object
       required: [prompt, options, answer]
       properties:
+        expected_version: { type: integer, format: int64, minimum: 1, description: "Required for existing resource writes; stale values return draft_conflict (409)" }
         prompt: { type: string, minLength: 1, maxLength: 500 }
-        options: { type: array, minItems: 4, maxItems: 4, items: { type: string, minLength: 1, maxLength: 200 } }
+        options: { type: array, minItems: 2, maxItems: 4, items: { type: string, minLength: 1, maxLength: 200 } }
         answer: { type: integer, minimum: 0, maximum: 3, description: "Indeks pilihan benar" }
         explanation: { type: string, maxLength: 500 }
     QuizQuestion:
@@ -1779,10 +2385,14 @@ components:
         cancelled: { type: boolean }
         done: { type: integer }
         total: { type: integer }
+        recipients: { type: integer, description: "Staf saja (0 untuk peserta): jumlah penerima beku" }
+        finished: { type: integer, description: "Staf saja: penerima yang menyelesaikan semua langkah" }
+        started: { type: integer, description: "Staf saja: penerima yang menyelesaikan minimal satu langkah" }
     AssignmentStep:
       type: object
       required: [id, kind, title, body, file_id, file_kind, video_id, quiz_id, minutes, done, unlocked]
       properties:
+        rich_content: { $ref: "#/components/schemas/RichContent" }
         id: { type: string, format: uuid }
         kind: { $ref: "#/components/schemas/StepKind" }
         title: { type: string }
@@ -1809,6 +2419,8 @@ components:
         id: { type: string, format: uuid }
         label: { type: string, example: "2026/2027" }
         active: { type: boolean }
+        class_count: { type: integer }
+        student_count: { type: integer, description: "Penempatan siswa aktif di tahun ini" }
     ClassInput:
       type: object
       required: [name]
@@ -1816,12 +2428,29 @@ components:
         name: { type: string, minLength: 1, maxLength: 40 }
     SchoolClass:
       type: object
-      required: [id, academic_year_id, name, students]
+      required: [id, academic_year_id, name, students, subject_teachers, homeroom, my_role]
       properties:
         id: { type: string, format: uuid }
         academic_year_id: { type: string, format: uuid }
         name: { type: string }
         students: { type: integer, description: "Jumlah siswa aktif" }
+        subject_teachers: { type: integer, description: "Jumlah guru mapel aktif" }
+        homeroom: { allOf: [{ $ref: "#/components/schemas/Person" }], nullable: true, description: "Null = belum ada wali kelas" }
+        my_role: { type: string, nullable: true, enum: [homeroom, subject, null], description: "Peran pemanggil di kelas ini" }
+    Person:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    ClassTeacher:
+      type: object
+      required: [user_id, display_name, role, subject]
+      properties:
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+        role: { type: string, enum: [homeroom, subject] }
+        subject: { type: string, nullable: true }
     RosterEntry:
       type: object
       required: [user_id, display_name, avatar_key, class_id]
@@ -1830,6 +2459,8 @@ components:
         display_name: { type: string }
         avatar_key: { type: string }
         class_id: { type: string, format: uuid, nullable: true, description: "Null = belum ditempatkan" }
+        steps_done: { type: integer, description: "Langkah tugas aktif tahun ini yang selesai" }
+        steps_total: { type: integer }
     Placement:
       type: object
       required: [class_name, year_label, started_at, ended_at]
@@ -1846,7 +2477,7 @@ components:
       required: [title, author, shelf, level, format, copies, cover, published]
       properties:
         title: { type: string, minLength: 1, maxLength: 200 }
-        author: { type: string, minLength: 1, maxLength: 120 }
+        author: { type: string, maxLength: 120, description: "Opsional; kosong berarti penulis tidak diketahui" }
         shelf: { $ref: "#/components/schemas/Shelf" }
         level: { type: string, enum: [SD, SMP, SMA, Umum] }
         format: { type: string, enum: [buku, ebook, audio] }
@@ -1898,6 +2529,13 @@ components:
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/Book" } }
         next_cursor: { type: string, nullable: true }
+        counts:
+          type: object
+          required: [all, published, draft]
+          properties:
+            all: { type: integer }
+            published: { type: integer }
+            draft: { type: integer }
     StartUploadRequest:
       type: object
       required: [id, name, size, kind, sha256]
@@ -1929,10 +2567,12 @@ components:
         uploaded_by: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
         position: { type: integer }
+        used_by: { type: array, items: { type: string }, description: "Maks 3 judul buku/modul/tugas aktif yang memakai file; tidak kosong berarti tidak bisa dihapus" }
     FileList:
       type: object
-      required: [items, used_bytes, quota_bytes]
+      required: [items, total, used_bytes, quota_bytes]
       properties:
+        total: { type: integer }
         items: { type: array, items: { $ref: "#/components/schemas/FileItem" } }
         used_bytes: { type: integer, format: int64 }
         quota_bytes: { type: integer, format: int64 }
@@ -2045,6 +2685,7 @@ components:
       type: object
       required: [role]
       properties:
+        class_id: { type: string, format: uuid, description: "Opsional, kelas aktif sekolah ini. Admin atau wali kelas aktif; role wajib participant." }
         role: { $ref: "#/components/schemas/InviteRole" }
         expires_in_days: { type: integer, minimum: 1, maximum: 7, default: 7 }
         max_uses: { type: integer, minimum: 1, maximum: 500, nullable: true }
@@ -2052,6 +2693,7 @@ components:
       type: object
       required: [id, code, link, role, max_uses, used_count, expires_at, created_by, created_at]
       properties:
+        class_id: { type: string, format: uuid }
         id: { type: string, format: uuid }
         code: { type: string, description: Bentuk tampilan ABCD-EFGH }
         link: { type: string }
@@ -2061,6 +2703,49 @@ components:
         expires_at: { type: string, format: date-time }
         created_by: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
+    GuestLink:
+      type: object
+      required: [id, code, link, max_guests, used_count, expires_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, description: Bentuk tampilan ABCD-EFGH }
+        link: { type: string, description: "URL frontend /guest/{code}" }
+        max_guests: { type: integer }
+        used_count: { type: integer }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    CreateGuestLinkRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        expires_in_hours: { type: integer, minimum: 1, maximum: 24, default: 2 }
+        max_guests: { type: integer, minimum: 1, maximum: 40, default: 40 }
+    GuestRequest:
+      type: object
+      required: [id, user_id, display_name, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        display_name: { type: string }
+        status: { type: string, enum: [pending, approved, denied] }
+        created_at: { type: string, format: date-time }
+    GuestLinkPreview:
+      type: object
+      required: [org_name, room_name]
+      properties:
+        org_name: { type: string }
+        room_name: { type: string }
+    GuestSession:
+      type: object
+      required: [token, status, display_name, room_id, room_name, map_key, org_name]
+      properties:
+        token: { type: string, description: Token tamu (15 menit), kirim sebagai Bearer }
+        status: { type: string, enum: [pending, approved, denied] }
+        display_name: { type: string }
+        room_id: { type: string, format: uuid }
+        room_name: { type: string }
+        map_key: { $ref: "#/components/schemas/RoomMap" }
+        org_name: { type: string }
     RoomMap:
       type: string
       enum: [classroom, garden, lab, baca, library, science, staff]
@@ -2103,6 +2788,14 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Room" }
         next_cursor: { type: string, nullable: true }
+        counts:
+          type: object
+          required: [all, live, archived]
+          description: "Hanya bila counts=true. archived selalu 0 untuk peserta."
+          properties:
+            all: { type: integer }
+            live: { type: integer }
+            archived: { type: integer }
     ReportStatus:
       type: string
       enum: [open, reviewed, dismissed]
@@ -2192,12 +2885,15 @@ components:
       type: object
       required: [org_name, role]
       properties:
+        class_name: { type: string }
+        year_label: { type: string }
         org_name: { type: string }
         role: { $ref: "#/components/schemas/InviteRole" }
     Membership:
       type: object
       required: [org_id, user_id, role, joined_at]
       properties:
+        placement_status: { type: string, enum: [placed, has_class, class_unavailable, not_student], description: "Hasil penempatan undangan kelas. Keanggotaan tetap berhasil; kelas lama tidak dipindah. Tidak ada untuk undangan sekolah." }
         org_id: { type: string, format: uuid }
         user_id: { type: string, format: uuid }
         role: { $ref: "#/components/schemas/Role" }

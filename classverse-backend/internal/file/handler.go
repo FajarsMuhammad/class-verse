@@ -75,6 +75,8 @@ func (h *Handler) limited(limit *ratelimit.Limiter, fn func(http.ResponseWriter,
 			return &httpx.Error{Status: http.StatusRequestedRangeNotSatisfiable, Code: "range_not_satisfiable", Message: "Rentang file tidak valid"}
 		case errors.Is(err, ErrInvalidUpload):
 			return httpx.ValidationFailed(map[string]string{"file": "File bukan PDF/MP3/M4A yang valid, atau ukuran/chunk/checksum tidak cocok"})
+		case errors.Is(err, ErrBadKind):
+			return httpx.ValidationFailed(map[string]string{"kind": "Jenis berkas tidak valid"})
 		case errors.Is(err, ErrInUse):
 			return &httpx.Error{Status: 409, Code: "file_in_use", Message: "File masih dipakai buku katalog atau langkah modul. Arsipkan dulu yang memakainya."}
 		case errors.Is(err, ErrState):
@@ -187,15 +189,25 @@ type Item struct {
 	UploadedBy  uuid.UUID `json:"uploaded_by"`
 	CreatedAt   time.Time `json:"created_at"`
 	Position    int32     `json:"position"`
+	UsedBy      []string  `json:"used_by"` // up to 3 active books/modules/tasks that keep the file
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
+	var pagination []int32
+	{
+		limit, offset, err := httpx.Pagination(r)
+		if err != nil {
+			return err
+		}
+		pagination = []int32{limit, offset}
+	}
+
 	user, _ := auth.UserID(r.Context())
 	orgID, err := org.PathUUID(r, "org_id")
 	if err != nil {
 		return err
 	}
-	rows, err := h.uploads.meta.List(r.Context(), user, orgID)
+	rows, err := h.uploads.meta.List(r.Context(), user, orgID, r.URL.Query().Get("kind"), pagination...)
 	if err != nil {
 		return err
 	}
@@ -204,10 +216,12 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	items := make([]Item, 0, len(rows))
+	total := int32(0)
 	for _, f := range rows {
-		items = append(items, Item{ID: f.ID, Name: f.Name, Kind: f.Kind, ContentType: f.ContentType.String, Size: f.SizeBytes, UploadedBy: f.UploadedBy, CreatedAt: f.CreatedAt.Time, Position: f.Position})
+		items = append(items, Item{ID: f.ID, Name: f.Name, Kind: f.Kind, ContentType: f.ContentType.String, Size: f.SizeBytes, UploadedBy: f.UploadedBy, CreatedAt: f.CreatedAt.Time, Position: f.Position, UsedBy: f.UsedBy})
+		total = f.TotalCount
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "used_bytes": usage.UsedBytes, "quota_bytes": usage.QuotaBytes})
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total, "used_bytes": usage.UsedBytes, "quota_bytes": usage.QuotaBytes})
 	return nil
 }
 

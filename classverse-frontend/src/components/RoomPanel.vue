@@ -1,13 +1,26 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import RemotePagination from './RemotePagination.vue'
+import { computed, onMounted, ref, useId, watch } from 'vue'
 import { errorMessage } from '@/api/client'
 import { roomApi } from '@/api/rooms'
 import type { Room } from '@/api/types'
 import { fetchMap, type Building } from '@/realtime/mapdata'
 import RoomForm from './RoomForm.vue'
+import StatusTabs from './StatusTabs.vue'
 
-const props = defineProps<{ orgId: string }>()
+// currentRoomId: the room the staff member is in now; "Kontrol" is offered only there (session tools act on the current room).
+const props = defineProps<{ orgId: string; currentRoomId?: string }>()
+const emit = defineEmits<{ control: [] }>()
+const id = useId()
 const rooms = ref<Room[]>([])
+const pageNumber = ref(1)
+const cursors = ref<(string | undefined)[]>([undefined])
+async function movePage(delta: number) {
+ if (delta > 0) cursors.value = [...cursors.value.slice(0, pageNumber.value), cursor.value ?? undefined]
+ pageNumber.value += delta
+ await loadPage()
+}
+async function loadPage() { await load(cursors.value[pageNumber.value - 1]) }
 const buildings = ref<Building[]>([])
 const cursor = ref<string | null>(null)
 const loading = ref(false)
@@ -17,13 +30,37 @@ const formOpen = ref(false)
 const editing = ref<Room>()
 const archiving = ref<string | null>(null)
 const busy = ref(false)
+const buildingFilter = ref('')
+const statusFilter = ref('all')
+const counts = ref({ all: 0, live: 0, archived: 0 })
+const statusTabs = computed(() => [
+  { key: 'all', label: 'Semua', count: counts.value.all },
+  { key: 'live', label: 'Live', count: counts.value.live },
+  { key: 'archived', label: 'Arsip', count: counts.value.archived },
+])
+const search = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch([buildingFilter, statusFilter], () => void load())
+watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => void load(), 250) })
+const buildingName = (key: string) => buildings.value.find((b) => b.key === key)?.name ?? key
+// One server page grouped by building, in campus map order.
+const groups = computed(() => {
+  const order = buildings.value.map((b) => b.key)
+  const keys = [...new Set(rooms.value.map((r) => r.building_key))].sort((a, b) => (order.indexOf(a) + 1 || 999) - (order.indexOf(b) + 1 || 999))
+  return keys.map((key) => ({ key, name: buildingName(key), rooms: rooms.value.filter((r) => r.building_key === key) }))
+})
 
 async function load(next?: string) {
+  if (!next) { pageNumber.value = 1; cursors.value = [undefined] }
   loading.value = true
   error.value = ''
   try {
-    const page = await roomApi.list(props.orgId, { cursor: next })
-    rooms.value = next ? [...rooms.value, ...page.items] : page.items
+    const page = await roomApi.list(props.orgId, {
+      cursor: next, building: buildingFilter.value, q: search.value, counts: true,
+      status: statusFilter.value === 'live' || statusFilter.value === 'archived' ? statusFilter.value : undefined,
+    })
+    if (page.counts) counts.value = page.counts
+    rooms.value = page.items
     cursor.value = page.next_cursor
   } catch (e) {
     error.value = errorMessage(e)
@@ -91,10 +128,15 @@ function schedule(iso: string) {
   <section aria-labelledby="rooms-title">
     <header class="toolbar">
       <h2 id="rooms-title">Ruang sekolah</h2>
-      <button class="btn-primary" :disabled="!buildings.length" @click="edit()">
-        + Buat ruang
-      </button>
+      <button class="btn-primary" :disabled="!buildings.length" @click="edit()">+ Ruang baru</button>
     </header>
+    <StatusTabs v-model="statusFilter" :items="statusTabs" label="Status ruang" :controls="`${id}-rooms`" />
+    <div class="filters">
+      <label>Gedung
+        <select v-model="buildingFilter"><option value="">Semua gedung</option><option v-for="b in buildings" :key="b.key" :value="b.key">{{ b.name }}</option></select>
+      </label>
+      <label>Cari ruang <input v-model="search" type="search" maxlength="100" placeholder="Cari ruang…" /></label>
+    </div>
     <p v-if="error" role="alert">
       {{ error }}
       <button class="btn-secondary" :disabled="loading" @click="load()">Coba lagi</button>
@@ -102,63 +144,44 @@ function schedule(iso: string) {
     <p role="status">{{ status }}</p>
     <p v-if="loading" role="status">Memuat ruang…</p>
     <p v-else-if="!rooms.length && !error">
-      Belum ada ruang. Pilih gedung dan peta untuk membuat ruang pertamamu.
+      {{ search || buildingFilter ? 'Ruang tidak ditemukan.' : statusFilter === 'live' ? 'Belum ada ruang yang sedang dipakai.' : statusFilter === 'archived' ? 'Belum ada ruang yang diarsipkan.' : 'Belum ada ruang. Pilih gedung dan peta untuk membuat ruang pertamamu.' }}
     </p>
-    <div class="cards">
-      <article v-for="room in rooms" :key="room.id" class="card">
+    <div :id="`${id}-rooms`">
+    <section v-for="group in groups" :key="group.key" class="group" :aria-label="group.name">
+      <h3 class="group-title">{{ group.name }}</h3>
+      <div class="cards">
+      <article v-for="room in group.rooms" :key="room.id" class="card">
         <div class="preview" :class="room.map_key" aria-hidden="true">
           <span v-for="n in room.map_key === 'garden' ? 3 : 8" :key="n"></span>
         </div>
         <div class="card-title">
-          <h3>{{ room.name }}</h3>
-          <span
-            class="badge"
-            :class="{ live: room.live, scheduled: !!room.scheduled_at && !room.live }"
-            >{{
-              room.live ? `Live · ${room.people}` : room.scheduled_at ? 'Terjadwal' : 'Siap'
-            }}</span
-          >
+          <h4>{{ room.name }}</h4>
+          <span class="badge" :class="{ live: room.live, scheduled: !!room.scheduled_at && !room.live }">{{
+            statusFilter === 'archived' ? 'Arsip' : room.live ? `Live · ${room.people}` : room.scheduled_at ? 'Terjadwal' : 'Siap' }}</span>
         </div>
-        <p>
-          {{ buildings.find((b) => b.key === room.building_key)?.name ?? room.building_key }} ·
-          kapasitas {{ room.capacity }}
-        </p>
+        <p>{{ buildingName(room.building_key) }} · kapasitas {{ room.capacity }}</p>
         <p v-if="room.scheduled_at">{{ schedule(room.scheduled_at) }}</p>
-        <RouterLink
-          class="btn-primary map-link"
-          :to="{ path: '/', query: { building: room.building_key } }"
-          >Lihat di peta</RouterLink
-        >
-        <div class="actions">
-          <button class="btn-secondary" :disabled="busy" @click="edit(room)">Ubah</button>
-          <button
-            v-if="room.scheduled_at"
-            class="btn-secondary"
-            :disabled="busy"
-            @click="openNow(room)"
-          >
-            Buka sekarang
-          </button>
-          <button class="btn-secondary" :disabled="busy" @click="archiving = room.id">
-            Arsipkan
-          </button>
+        <p v-if="statusFilter === 'archived'" class="muted">Diarsipkan. Ruang tidak tampil di peta.</p>
+        <div v-else class="actions">
+          <RouterLink class="btn-primary map-link" :to="{ path: '/', query: { building: room.building_key } }">Masuk<span class="sr"> {{ room.name }}</span></RouterLink>
+          <button v-if="room.live && room.id === currentRoomId" type="button" class="btn-secondary" @click="emit('control')">Kontrol<span class="sr"> {{ room.name }}</span></button>
+          <button class="btn-secondary" :disabled="busy" @click="edit(room)">Ubah<span class="sr"> {{ room.name }}</span></button>
+          <button v-if="room.scheduled_at" class="btn-secondary" :disabled="busy" @click="openNow(room)">Buka sekarang</button>
+          <button class="btn-secondary" :disabled="busy" @click="archiving = room.id">Arsipkan<span class="sr"> {{ room.name }}</span></button>
         </div>
         <div v-if="archiving === room.id" class="confirm">
-          <p>
-            Arsipkan {{ room.name }}? Ruang dengan peserta atau sesi terbuka tidak bisa diarsipkan.
-          </p>
+          <p>Arsipkan {{ room.name }}? Ruang dengan peserta atau sesi terbuka tidak bisa diarsipkan.</p>
           <button class="btn-secondary" :disabled="busy" @click="archiving = null">Batal</button>
           <button class="btn-primary" :disabled="busy" @click="archive(room)">Ya, arsipkan</button>
         </div>
       </article>
-      <button class="new-room" :disabled="!buildings.length" @click="edit()">
-        <strong>Ruang baru</strong><span>Pilih gedung dan peta ruang, siap dalam satu menit.</span
-        ><span>Buat ruang</span>
-      </button>
+      </div>
+    </section>
     </div>
-    <button v-if="cursor" class="btn-secondary more" :disabled="loading" @click="load(cursor)">
-      Muat ruang berikutnya
+    <button v-if="statusFilter !== 'archived'" class="new-room" :disabled="!buildings.length" @click="edit()">
+      <strong>Ruang baru</strong><span>Pilih gedung dan peta ruang, siap dalam satu menit.</span>
     </button>
+
     <RoomForm
       v-if="formOpen"
       :org-id="orgId"
@@ -167,6 +190,7 @@ function schedule(iso: string) {
       @close="formOpen = false"
       @saved="saved"
     />
+    <RemotePagination v-if="pageNumber > 1 || cursor" :page="pageNumber" :more="!!cursor" @move="movePage" />
   </section>
 </template>
 
@@ -182,6 +206,7 @@ function schedule(iso: string) {
 }
 h2,
 h3,
+h4,
 .new-room strong {
   font-family: var(--font-display);
   font-weight: var(--weight-semibold);
@@ -190,9 +215,9 @@ h3,
 h2 {
   font-size: var(--text-2xl);
 }
-h3,
+h4,
 .new-room strong {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
 }
 p {
   color: var(--color-ink-muted);
@@ -265,8 +290,9 @@ p {
   margin-top: var(--space-3);
 }
 .new-room {
-  min-height: 300px;
-  border: 1px dashed var(--color-border);
+  min-height: 120px;
+  width: 100%;
+  border: 1px dashed var(--kv-primary);
   border-radius: var(--radius-2xl);
   background: transparent;
   color: var(--color-ink);
@@ -283,13 +309,6 @@ p {
   max-width: 28ch;
   color: var(--color-ink-muted);
 }
-.new-room span:last-child {
-  background: var(--color-primary-soft);
-  color: var(--color-primary-strong);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  font-weight: var(--weight-bold);
-}
 .more {
   margin-top: var(--space-5);
 }
@@ -297,4 +316,11 @@ p {
   border-top: 1px solid var(--kv-line);
   margin-top: var(--space-3);
 }
+.filters { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0; }
+.filters label { display: grid; gap: var(--space-1); font-size: var(--text-sm); }
+.filters select, .filters input { min-height: var(--touch-min); padding: var(--space-2); border: 1px solid var(--kv-line); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-ink); font: inherit; }
+.group { margin-bottom: var(--space-5); }
+.group-title { margin: 0 0 var(--space-3); font-size: var(--text-md); }
+.card { border: 1px solid var(--kv-line); }
+.new-room { margin-top: var(--space-2); }
 </style>

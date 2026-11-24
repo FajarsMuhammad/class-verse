@@ -107,10 +107,54 @@ func (q *Queries) CompleteStep(ctx context.Context, arg CompleteStepParams) erro
 	return err
 }
 
+const countModules = `-- name: CountModules :one
+SELECT count(*) FILTER (WHERE m.archived_at IS NULL)::integer AS all_count,
+  count(*) FILTER (WHERE m.archived_at IS NULL AND m.published_at IS NOT NULL)::integer AS published_count,
+  count(*) FILTER (WHERE m.archived_at IS NULL AND m.published_at IS NULL)::integer AS draft_count,
+  count(*) FILTER (WHERE m.archived_at IS NOT NULL)::integer AS archived_count
+FROM modules m
+WHERE m.org_id = $1
+  AND ($2::text IS NULL OR m.building_key = $2)
+  AND ($3::text IS NULL OR m.level = $3)
+  AND ($4::text = '' OR position(lower($4) in lower(m.title)) > 0)
+`
+
+type CountModulesParams struct {
+	OrgID       uuid.UUID
+	BuildingKey pgtype.Text
+	Level       pgtype.Text
+	Search      string
+}
+
+type CountModulesRow struct {
+	AllCount       int32
+	PublishedCount int32
+	DraftCount     int32
+	ArchivedCount  int32
+}
+
+// Tab counts for the authoring list, with the list's non-status filters.
+func (q *Queries) CountModules(ctx context.Context, arg CountModulesParams) (CountModulesRow, error) {
+	row := q.db.QueryRow(ctx, countModules,
+		arg.OrgID,
+		arg.BuildingKey,
+		arg.Level,
+		arg.Search,
+	)
+	var i CountModulesRow
+	err := row.Scan(
+		&i.AllCount,
+		&i.PublishedCount,
+		&i.DraftCount,
+		&i.ArchivedCount,
+	)
+	return i, err
+}
+
 const createModule = `-- name: CreateModule :one
 INSERT INTO modules (id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)
-RETURNING id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at, archived_at
+RETURNING id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at, archived_at, draft_version, published_revision_id
 `
 
 type CreateModuleParams struct {
@@ -150,6 +194,8 @@ func (q *Queries) CreateModule(ctx context.Context, arg CreateModuleParams) (Mod
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.ArchivedAt,
+		&i.DraftVersion,
+		&i.PublishedRevisionID,
 	)
 	return i, err
 }
@@ -157,7 +203,7 @@ func (q *Queries) CreateModule(ctx context.Context, arg CreateModuleParams) (Mod
 const createStep = `-- name: CreateStep :one
 INSERT INTO module_steps (id, org_id, module_id, position, kind, title, body, file_id, video_id, quiz_id, minutes, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
-RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at, quiz_id
+RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at, quiz_id, rich_content
 `
 
 type CreateStepParams struct {
@@ -206,12 +252,13 @@ func (q *Queries) CreateStep(ctx context.Context, arg CreateStepParams) (ModuleS
 		&i.UpdatedAt,
 		&i.ArchivedAt,
 		&i.QuizID,
+		&i.RichContent,
 	)
 	return i, err
 }
 
 const getLinkableQuiz = `-- name: GetLinkableQuiz :one
-SELECT id FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL AND published_at IS NOT NULL
+SELECT id FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL AND published_at IS NOT NULL AND published_revision_id IS NOT NULL
 `
 
 type GetLinkableQuizParams struct {
@@ -228,7 +275,7 @@ func (q *Queries) GetLinkableQuiz(ctx context.Context, arg GetLinkableQuizParams
 }
 
 const listModuleSteps = `-- name: ListModuleSteps :many
-SELECT s.id, s.org_id, s.module_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.minutes, s.created_at, s.updated_at, s.archived_at, s.quiz_id, COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind,
+SELECT s.id, s.org_id, s.module_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.minutes, s.created_at, s.updated_at, s.archived_at, s.quiz_id, s.rich_content, COALESCE(p.position, 0)::integer AS reader_position, COALESCE(f.kind, '')::text AS file_kind,
   (d.step_id IS NOT NULL)::boolean AS done
 FROM module_steps s
 LEFT JOIN files f ON f.org_id = s.org_id AND f.id = s.file_id
@@ -276,6 +323,7 @@ func (q *Queries) ListModuleSteps(ctx context.Context, arg ListModuleStepsParams
 			&i.ModuleStep.UpdatedAt,
 			&i.ModuleStep.ArchivedAt,
 			&i.ModuleStep.QuizID,
+			&i.ModuleStep.RichContent,
 			&i.ReaderPosition,
 			&i.FileKind,
 			&i.Done,
@@ -291,49 +339,76 @@ func (q *Queries) ListModuleSteps(ctx context.Context, arg ListModuleStepsParams
 }
 
 const listModules = `-- name: ListModules :many
-SELECT id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at, archived_at FROM modules
-WHERE org_id = $1 AND archived_at IS NULL
-  AND ($2::boolean OR published_at IS NOT NULL)
-  AND ($3::text IS NULL OR building_key = $3)
-  AND ($4::text IS NULL OR level = $4)
-ORDER BY created_at, id
-LIMIT 100
+SELECT m.id, m.org_id, m.building_key, m.level, m.title, m.description, m.created_by, m.created_at, m.updated_at, m.published_at, m.archived_at, m.draft_version, m.published_revision_id, count(*) OVER() AS total_count FROM modules m
+LEFT JOIN module_revision_pins pin ON pin.org_id=m.org_id AND pin.module_id=m.id AND pin.user_id=$1
+LEFT JOIN module_revisions r ON r.id=COALESCE(pin.revision_id,m.published_revision_id)
+WHERE m.org_id = $2 AND (m.archived_at IS NOT NULL) = $3::boolean
+  AND ($4::boolean OR m.published_at IS NOT NULL)
+  AND ($5::text IS NULL OR CASE WHEN $4::boolean THEN m.building_key ELSE r.building_key END = $5)
+  AND ($6::text IS NULL OR CASE WHEN $4::boolean THEN m.level ELSE r.level END = $6)
+  AND ($7::uuid IS NULL OR m.id = $7)
+  AND ($8::text = '' OR position(lower($8) in lower(CASE WHEN $4::boolean THEN m.title ELSE r.title END)) > 0)
+  AND ($9::text = '' OR (m.published_at IS NOT NULL) = ($9 = 'published'))
+ORDER BY m.created_at, m.id
+LIMIT $11::integer OFFSET $10::integer
 `
 
 type ListModulesParams struct {
+	UserID        uuid.UUID
 	OrgID         uuid.UUID
+	Archived      bool
 	IncludeDrafts bool
 	BuildingKey   pgtype.Text
 	Level         pgtype.Text
+	ModuleID      uuid.NullUUID
+	Search        string
+	Status        string
+	ListOffset    int32
+	PageLimit     int32
 }
 
-// Staff may include drafts; archived modules never show.
-func (q *Queries) ListModules(ctx context.Context, arg ListModulesParams) ([]Module, error) {
+type ListModulesRow struct {
+	Module     Module
+	TotalCount int64
+}
+
+// Archived rows are a separate staff-only list, authorized by the service.
+func (q *Queries) ListModules(ctx context.Context, arg ListModulesParams) ([]ListModulesRow, error) {
 	rows, err := q.db.Query(ctx, listModules,
+		arg.UserID,
 		arg.OrgID,
+		arg.Archived,
 		arg.IncludeDrafts,
 		arg.BuildingKey,
 		arg.Level,
+		arg.ModuleID,
+		arg.Search,
+		arg.Status,
+		arg.ListOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Module{}
+	items := []ListModulesRow{}
 	for rows.Next() {
-		var i Module
+		var i ListModulesRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.OrgID,
-			&i.BuildingKey,
-			&i.Level,
-			&i.Title,
-			&i.Description,
-			&i.CreatedBy,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.PublishedAt,
-			&i.ArchivedAt,
+			&i.Module.ID,
+			&i.Module.OrgID,
+			&i.Module.BuildingKey,
+			&i.Module.Level,
+			&i.Module.Title,
+			&i.Module.Description,
+			&i.Module.CreatedBy,
+			&i.Module.CreatedAt,
+			&i.Module.UpdatedAt,
+			&i.Module.PublishedAt,
+			&i.Module.ArchivedAt,
+			&i.Module.DraftVersion,
+			&i.Module.PublishedRevisionID,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}
@@ -346,7 +421,7 @@ func (q *Queries) ListModules(ctx context.Context, arg ListModulesParams) ([]Mod
 }
 
 const lockModule = `-- name: LockModule :one
-SELECT id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at, archived_at FROM modules WHERE org_id = $1 AND id = $2 AND archived_at IS NULL FOR UPDATE
+SELECT id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at, archived_at, draft_version, published_revision_id FROM modules WHERE org_id = $1 AND id = $2 AND archived_at IS NULL FOR UPDATE
 `
 
 type LockModuleParams struct {
@@ -369,6 +444,8 @@ func (q *Queries) LockModule(ctx context.Context, arg LockModuleParams) (Module,
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.ArchivedAt,
+		&i.DraftVersion,
+		&i.PublishedRevisionID,
 	)
 	return i, err
 }
@@ -385,25 +462,25 @@ func (q *Queries) NextStepPosition(ctx context.Context, moduleID uuid.UUID) (int
 }
 
 const readableStep = `-- name: ReadableStep :one
-SELECT s.kind FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
-WHERE s.org_id = $1 AND s.module_id = $2 AND s.id = $3 AND s.archived_at IS NULL AND m.archived_at IS NULL
-  AND ($4::boolean OR m.published_at IS NOT NULL)
+SELECT s.kind FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id
+JOIN module_revision_pins p ON p.org_id=s.org_id AND p.module_id=s.module_id AND p.revision_id=s.revision_id AND p.user_id=$1
+WHERE s.org_id=$2 AND s.module_id=$3 AND s.id=$4
+ AND m.archived_at IS NULL AND m.published_at IS NOT NULL
 `
 
 type ReadableStepParams struct {
+	UserID   uuid.UUID
 	OrgID    uuid.UUID
 	ModuleID uuid.UUID
 	ID       uuid.UUID
-	Staff    bool
 }
 
-// A participant can complete only an active step of a published, non-archived module.
 func (q *Queries) ReadableStep(ctx context.Context, arg ReadableStepParams) (string, error) {
 	row := q.db.QueryRow(ctx, readableStep,
+		arg.UserID,
 		arg.OrgID,
 		arg.ModuleID,
 		arg.ID,
-		arg.Staff,
 	)
 	var kind string
 	err := row.Scan(&kind)
@@ -411,23 +488,17 @@ func (q *Queries) ReadableStep(ctx context.Context, arg ReadableStepParams) (str
 }
 
 const resumeModule = `-- name: ResumeModule :one
-SELECT m.id, m.building_key, m.title,
-  (SELECT count(*) FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS total,
-  (SELECT count(*) FROM module_steps x JOIN module_progress y ON y.org_id = x.org_id AND y.step_id = x.id
-     AND y.user_id = $1 WHERE x.module_id = m.id AND x.archived_at IS NULL)::integer AS done,
-  (SELECT x.title FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
-     AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = $1)
-     ORDER BY x.position, x.id LIMIT 1)::text AS next_title,
-  m.level
-FROM modules m
-JOIN module_steps s ON s.org_id = m.org_id AND s.module_id = m.id
-JOIN module_progress p ON p.org_id = s.org_id AND p.step_id = s.id AND p.user_id = $1
-WHERE m.org_id = $2 AND m.archived_at IS NULL AND m.published_at IS NOT NULL
-  AND EXISTS (SELECT 1 FROM module_steps x WHERE x.module_id = m.id AND x.archived_at IS NULL
-    AND NOT EXISTS (SELECT 1 FROM module_progress y WHERE y.org_id = x.org_id AND y.step_id = x.id AND y.user_id = $1))
-GROUP BY m.id
-ORDER BY max(p.completed_at) DESC, m.id
-LIMIT 1
+SELECT m.id,r.building_key,r.title,r.level,
+ (SELECT count(*)::integer FROM module_revision_steps x WHERE x.revision_id=r.id) AS total,
+ (SELECT count(*)::integer FROM module_revision_steps x JOIN module_progress y ON y.org_id=x.org_id AND y.step_id=x.id AND y.user_id=$1 WHERE x.revision_id=r.id) AS done,
+ (SELECT x.title FROM module_revision_steps x WHERE x.revision_id=r.id AND NOT EXISTS(SELECT 1 FROM module_progress y WHERE y.org_id=x.org_id AND y.step_id=x.id AND y.user_id=$1) ORDER BY x.position,x.id LIMIT 1)::text AS next_title
+FROM modules m JOIN module_revision_pins pin ON pin.org_id=m.org_id AND pin.module_id=m.id AND pin.user_id=$1
+JOIN module_revisions r ON r.org_id=pin.org_id AND r.module_id=pin.module_id AND r.id=pin.revision_id
+JOIN module_revision_steps s ON s.revision_id=r.id
+JOIN module_progress p ON p.org_id=s.org_id AND p.step_id=s.id AND p.user_id=$1
+WHERE m.org_id=$2 AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+AND EXISTS(SELECT 1 FROM module_revision_steps x WHERE x.revision_id=r.id AND NOT EXISTS(SELECT 1 FROM module_progress y WHERE y.org_id=x.org_id AND y.step_id=x.id AND y.user_id=$1))
+GROUP BY m.id,r.id ORDER BY max(p.completed_at) DESC,m.id LIMIT 1
 `
 
 type ResumeModuleParams struct {
@@ -439,13 +510,12 @@ type ResumeModuleRow struct {
 	ID          uuid.UUID
 	BuildingKey string
 	Title       string
+	Level       string
 	Total       int32
 	Done        int32
 	NextTitle   string
-	Level       string
 }
 
-// "Lanjutkan belajar": the published module the member touched last that still has an unfinished active step.
 func (q *Queries) ResumeModule(ctx context.Context, arg ResumeModuleParams) (ResumeModuleRow, error) {
 	row := q.db.QueryRow(ctx, resumeModule, arg.UserID, arg.OrgID)
 	var i ResumeModuleRow
@@ -453,10 +523,10 @@ func (q *Queries) ResumeModule(ctx context.Context, arg ResumeModuleParams) (Res
 		&i.ID,
 		&i.BuildingKey,
 		&i.Title,
+		&i.Level,
 		&i.Total,
 		&i.Done,
 		&i.NextTitle,
-		&i.Level,
 	)
 	return i, err
 }
@@ -492,9 +562,9 @@ func (q *Queries) UncompleteStep(ctx context.Context, arg UncompleteStepParams) 
 }
 
 const updateModule = `-- name: UpdateModule :one
-UPDATE modules SET building_key = $3, level = $4, title = $5, description = $6, published_at = $7, updated_at = $8
+UPDATE modules SET building_key = $3, level = $4, title = $5, description = $6, updated_at = $7
 WHERE org_id = $1 AND id = $2 AND archived_at IS NULL
-RETURNING id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at, archived_at
+RETURNING id, org_id, building_key, level, title, description, created_by, created_at, updated_at, published_at, archived_at, draft_version, published_revision_id
 `
 
 type UpdateModuleParams struct {
@@ -504,7 +574,6 @@ type UpdateModuleParams struct {
 	Level       string
 	Title       string
 	Description string
-	PublishedAt pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
 }
 
@@ -516,7 +585,6 @@ func (q *Queries) UpdateModule(ctx context.Context, arg UpdateModuleParams) (Mod
 		arg.Level,
 		arg.Title,
 		arg.Description,
-		arg.PublishedAt,
 		arg.UpdatedAt,
 	)
 	var i Module
@@ -532,6 +600,8 @@ func (q *Queries) UpdateModule(ctx context.Context, arg UpdateModuleParams) (Mod
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.ArchivedAt,
+		&i.DraftVersion,
+		&i.PublishedRevisionID,
 	)
 	return i, err
 }
@@ -539,7 +609,7 @@ func (q *Queries) UpdateModule(ctx context.Context, arg UpdateModuleParams) (Mod
 const updateStep = `-- name: UpdateStep :one
 UPDATE module_steps SET kind = $4, title = $5, body = $6, file_id = $7, video_id = $8, quiz_id = $9, minutes = $10, updated_at = $11
 WHERE org_id = $1 AND module_id = $2 AND id = $3 AND archived_at IS NULL
-RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at, quiz_id
+RETURNING id, org_id, module_id, position, kind, title, body, file_id, video_id, minutes, created_at, updated_at, archived_at, quiz_id, rich_content
 `
 
 type UpdateStepParams struct {
@@ -586,6 +656,7 @@ func (q *Queries) UpdateStep(ctx context.Context, arg UpdateStepParams) (ModuleS
 		&i.UpdatedAt,
 		&i.ArchivedAt,
 		&i.QuizID,
+		&i.RichContent,
 	)
 	return i, err
 }

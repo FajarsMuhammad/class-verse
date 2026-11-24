@@ -19,6 +19,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/org"
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
@@ -74,6 +75,8 @@ type Buildings interface {
 // Occupancy is the live state of rooms (implemented by realtime.Hub).
 type Occupancy interface {
 	Occupancy(roomID uuid.UUID) (people int, live bool)
+	// LiveRooms lists the rooms of one organization that currently have people in them.
+	LiveRooms(orgID uuid.UUID) []uuid.UUID
 	// Lock blocks travel into roomID while fn runs, so archive cannot race
 	// with an admission. fn runs only when the room is empty.
 	WhileEmpty(ctx context.Context, roomID uuid.UUID, fn func() error) error
@@ -113,10 +116,24 @@ type UpdateInput struct {
 	AllChat     *bool
 }
 
-// Page is one page of rooms.
+// Page is one page of rooms. Counts is set only when Filter.Counts is true.
 type Page struct {
 	Items      []Room
 	NextCursor string
+	Counts     *Counts
+}
+
+// Counts are the tab totals for the list's non-status filters.
+type Counts struct{ All, Live, Archived int }
+
+// Filter narrows List. Status is "" (all active), "live", or "archived" (staff only).
+type Filter struct {
+	Building string
+	Q        string // literal name search, up to 100 characters
+	Status   string
+	Limit    int
+	Cursor   string
+	Counts   bool
 }
 
 // Service implements room rules.
@@ -170,21 +187,50 @@ func (s *Service) Create(ctx context.Context, userID, orgID uuid.UUID, in Create
 }
 
 // List returns rooms visible to userID, newest first.
-func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, building string, limit int, cursor string) (Page, error) {
+func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, f Filter) (Page, error) {
 	role, err := s.auth.Authorize(ctx, userID, orgID, org.RoleParticipant)
 	if err != nil {
 		return Page{}, err
 	}
+	staff := role.AtLeast(org.RoleTeacher)
+	var v ValidationError
+	q := strings.TrimSpace(f.Q)
+	if utf8.RuneCountInString(q) > 100 {
+		v.add("q", "Pencarian maksimal 100 karakter")
+	}
+	switch f.Status {
+	case "", "live":
+	case "archived":
+		if !staff {
+			v.add("status", "Arsip hanya untuk pengajar")
+		}
+	default:
+		v.add("status", "Status tidak valid")
+	}
+	if v.Fields != nil {
+		return Page{}, &v
+	}
+	limit := f.Limit
 	if limit <= 0 {
 		limit = defaultLimit
 	}
 	limit = min(limit, maxLimit)
-	params := query.ListRoomsParams{OrgID: orgID, IncludeStaff: role.AtLeast(org.RoleTeacher), RowLimit: int32(limit + 1)} //nolint:gosec // bounded by maxLimit
-	if building != "" {
-		params.BuildingKey = pgtype.Text{String: building, Valid: true}
+	live := s.live.LiveRooms(orgID)
+	if live == nil {
+		live = []uuid.UUID{} // an empty array matches nothing; NULL would mean "no filter"
 	}
-	if cursor != "" {
-		at, id, err := decodeCursor(cursor)
+	params := query.ListRoomsParams{OrgID: orgID, IncludeStaff: staff, Archived: f.Status == "archived", RowLimit: int32(limit + 1)} //nolint:gosec // bounded by maxLimit
+	if f.Status == "live" {
+		params.OnlyIds = live
+	}
+	if f.Building != "" {
+		params.BuildingKey = pgtype.Text{String: f.Building, Valid: true}
+	}
+	if q != "" {
+		params.Pattern = db.Contains(q)
+	}
+	if f.Cursor != "" {
+		at, id, err := decodeCursor(f.Cursor)
 		if err != nil {
 			return Page{}, ErrInvalidCursor
 		}
@@ -203,6 +249,16 @@ func (s *Service) List(ctx context.Context, userID, orgID uuid.UUID, building st
 			break
 		}
 		page.Items = append(page.Items, s.withLive(toRoom(r)))
+	}
+	if f.Counts {
+		c, err := s.store.CountRooms(ctx, query.CountRoomsParams{OrgID: orgID, IncludeStaff: staff, BuildingKey: params.BuildingKey, Pattern: params.Pattern, LiveIds: live})
+		if err != nil {
+			return Page{}, fmt.Errorf("count rooms: %w", err)
+		}
+		page.Counts = &Counts{All: int(c.Total), Live: int(c.Live)}
+		if staff {
+			page.Counts.Archived = int(c.Archived)
+		}
 	}
 	return page, nil
 }
@@ -331,7 +387,7 @@ func timePtr(t pgtype.Timestamptz) *time.Time {
 	return &u
 }
 
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 
 func pgTimePtr(t *time.Time) pgtype.Timestamptz {
 	if t == nil {

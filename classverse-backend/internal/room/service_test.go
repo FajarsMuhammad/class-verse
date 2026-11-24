@@ -26,6 +26,7 @@ func (testBuildings) Building(key string) (bool, bool) {
 type emptyRooms struct{}
 
 func (emptyRooms) Occupancy(uuid.UUID) (int, bool)                                  { return 0, false }
+func (emptyRooms) LiveRooms(uuid.UUID) []uuid.UUID                                  { return nil }
 func (emptyRooms) SetAllChat(uuid.UUID, bool)                                       {}
 func (emptyRooms) WhileEmpty(_ context.Context, _ uuid.UUID, fn func() error) error { return fn() }
 
@@ -104,14 +105,31 @@ func TestRoomLifecycle(t *testing.T) {
 		t.Fatalf("open now=%+v err=%v", opened, err)
 	}
 	// Both rooms share the fake clock's created_at, so order between them is by random UUID.
-	page, err := svc.List(ctx, user.ID, school.ID, "kelas-a", 1, "")
+	page, err := svc.List(ctx, user.ID, school.ID, Filter{Building: "kelas-a", Limit: 1})
 	if err != nil || len(page.Items) != 1 || page.NextCursor == "" {
 		t.Fatalf("page=%+v err=%v", page, err)
 	}
-	next, err := svc.List(ctx, user.ID, school.ID, "kelas-a", 1, page.NextCursor)
+	next, err := svc.List(ctx, user.ID, school.ID, Filter{Building: "kelas-a", Limit: 1, Cursor: page.NextCursor})
 	if err != nil || len(next.Items) != 1 || next.Items[0].ID == page.Items[0].ID ||
 		(page.Items[0].ID != created.ID && next.Items[0].ID != created.ID) {
 		t.Fatalf("pages=%+v %+v err=%v", page, next, err)
+	}
+	// Search is literal: "%" must not match every room.
+	if found, err := svc.List(ctx, user.ID, school.ID, Filter{Q: "%"}); err != nil || len(found.Items) != 0 {
+		t.Fatalf("literal search=%+v err=%v", found, err)
+	}
+	if found, err := svc.List(ctx, user.ID, school.ID, Filter{Q: strings.ToLower(updated.Name)}); err != nil || len(found.Items) == 0 {
+		t.Fatalf("name search=%+v err=%v", found, err)
+	}
+	// Status tabs: counts follow the filters, archive is staff only, unknown status is rejected.
+	if c, err := svc.List(ctx, user.ID, school.ID, Filter{Counts: true}); err != nil || c.Counts == nil || c.Counts.All < 2 || c.Counts.Live != 0 || c.Counts.Archived != 0 {
+		t.Fatalf("counts=%+v err=%v", c.Counts, err)
+	}
+	if live, err := svc.List(ctx, user.ID, school.ID, Filter{Status: "live"}); err != nil || len(live.Items) != 0 {
+		t.Fatalf("live=%+v err=%v", live, err)
+	}
+	if _, err := svc.List(ctx, user.ID, school.ID, Filter{Status: "bogus"}); err == nil {
+		t.Fatal("unknown status accepted")
 	}
 	for _, input := range []CreateInput{
 		{Name: "Menara Sains", MapKey: "science", BuildingKey: "kelas-a"},
@@ -147,6 +165,9 @@ func TestRoomLifecycle(t *testing.T) {
 	}
 	if err := svc.Archive(ctx, user.ID, created.ID); err != nil {
 		t.Fatal(err)
+	}
+	if arch, err := svc.List(ctx, user.ID, school.ID, Filter{Status: "archived", Counts: true}); err != nil || len(arch.Items) != 1 || arch.Items[0].ID != created.ID || arch.Counts.Archived != 1 {
+		t.Fatalf("archived=%+v err=%v", arch, err)
 	}
 	if _, err := svc.Get(ctx, user.ID, created.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("archived error=%v", err)

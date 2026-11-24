@@ -13,6 +13,8 @@ import (
 
 type ctxKey struct{}
 
+type guestKey struct{}
+
 var errUnauthenticated = &httpx.Error{Status: http.StatusUnauthorized, Code: "unauthenticated", Message: "Sesi berakhir. Silakan masuk lagi."}
 
 // RequireUser rejects requests without a valid Bearer access token and stores
@@ -33,6 +35,33 @@ func RequireUser(tokens *Tokens, log *slog.Logger) func(http.Handler) http.Handl
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, id)))
 		})
 	}
+}
+
+// RequireGuest accepts only guest tokens and stores the guest's user id in
+// the request context (read it with GuestID). Account tokens are rejected.
+func RequireGuest(tokens *Tokens, log *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if !ok {
+				httpx.WriteError(w, r, log, errUnauthenticated)
+				return
+			}
+			id, err := tokens.VerifyGuest(strings.TrimSpace(raw))
+			if err != nil {
+				httpx.WriteError(w, r, log, errUnauthenticated)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), guestKey{}, id)))
+		})
+	}
+}
+
+// GuestID returns the guest user id set by RequireGuest.
+func GuestID(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(guestKey{}).(uuid.UUID)
+	return id, ok
 }
 
 // UserID returns the authenticated user id set by RequireUser.

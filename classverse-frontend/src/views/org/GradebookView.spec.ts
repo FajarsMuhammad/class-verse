@@ -38,6 +38,10 @@ it('staff loads active-year roster, pages and opens student details', async () =
   expect(gradebookApi.roster).toHaveBeenLastCalledWith('org', { year_id: 'y' }, 20)
   await w.get('button[aria-label="Lihat rapor Ani"]').trigger('click'); await flushPromises()
   expect(gradebookApi.student).toHaveBeenCalledWith('org', 'u', { year_id: 'y' })
+  expect(w.find('[aria-label="Kembali ke daftar rapor"]').exists()).toBe(true)
+  await w.get('[aria-label="Kembali ke daftar rapor"]').trigger('click')
+  expect(w.find('.student').exists()).toBe(false)
+  expect(w.find('table').exists()).toBe(true)
 })
 it('surfaces load errors with retry', async () => {
   vi.mocked(gradebookApi.me).mockRejectedValueOnce(new Error('x')).mockResolvedValue(report)

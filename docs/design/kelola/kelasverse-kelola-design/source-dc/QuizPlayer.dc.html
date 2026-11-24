@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Quiz siswa</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#4338CA}a:hover{color:#312E81}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; font-family: Nunito, system-ui, sans-serif; color: #1E1B3A; background: #EAF7EF; display: flex; flex-direction: column; padding: 20px 18px 24px; gap: 16px; overflow: hidden">
+
+<div style="display: flex; align-items: center; gap: 10px">
+<button aria-label="Keluar quiz" style="width: 44px; height: 44px; border-radius: 12px; border: none; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E1B3A" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg></button>
+<div style="flex: 1; height: 12px; border-radius: 999px; background: #FFFFFF; overflow: hidden"><div style="width: 20%; height: 100%; background: #4338CA; border-radius: 999px"></div></div>
+<span style="font-weight: 800; font-size: 14px">1/5</span>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="display: flex; align-items: center; gap: 6px; background: #FFFFFF; padding: 8px 12px; border-radius: 999px; font-weight: 800; font-size: 14px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E1B3A" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2 2"></path><path d="M9 2h6"></path></svg>0:24</span>
+<span style="background: #F59E0B; color: #1E1B3A; padding: 8px 12px; border-radius: 999px; font-weight: 800; font-size: 14px">{{xp}} XP</span>
+</div>
+
+<div style="background: #FFFFFF; border-radius: 22px; padding: 22px 20px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 0 #C9E9D5">
+<span style="font-size: 12px; font-weight: 800; color: #2F7D55; letter-spacing: 0.06em">FOTOSINTESIS · SOAL 1</span>
+<span style="font-size: 22px; font-weight: 800; line-height: 1.3">Di bagian sel mana fotosintesis terjadi?</span>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{options}}" as="opt" hint-placeholder-count="4">
+<button onClick="{{opt.pick}}" disabled="{{answered}}" style="font: inherit; min-height: 104px; border-radius: 18px; border: {{opt.border}}; background: {{opt.bg}}; color: #FFFFFF; opacity: {{opt.opacity}}; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 14px; text-align: left; box-shadow: 0 4px 0 rgba(0,0,0,0.18); cursor: pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"><path d="{{opt.d}}"></path></svg>
+<span style="font-size: 17px; font-weight: 800">{{opt.label}}</span>
+</button>
+</sc-for>
+</div>
+
+<sc-if value="{{answered}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="background: {{fbBg}}; border-radius: 20px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 18px; font-weight: 800; color: {{fbInk}}">{{fbTitle}}</span>
+<span style="font-size: 14px; line-height: 1.55">Kloroplas berisi klorofil yang menangkap cahaya. Mitokondria tempat respirasi, kebalikan dari fotosintesis.</span>
+</div>
+</sc-if>
+
+<div style="flex: 1"></div>
+
+<sc-if value="{{answered}}" hint-placeholder-val="{{ false }}">
+<button onClick="{{reset}}" style="font: inherit; font-weight: 800; font-size: 17px; height: 56px; border-radius: 16px; border: none; background: #4338CA; color: #FFFFFF; box-shadow: 0 4px 0 #2E2794">Lanjut (ulang demo)</button>
+</sc-if>
+<sc-if value="{{notAnswered}}" hint-placeholder-val="{{ true }}">
+<span style="text-align: center; font-size: 14px; font-weight: 700; color: #1F5A3C">Ketuk satu jawaban</span>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { picked: null };
+}
+renderVals() {
+var picked = this.state.picked;
+var answered = picked !== null;
+var correctId = 'b';
+var base = [
+{ id: 'a', label: 'Mitokondria', color: '#4338CA', d: 'M12 3l10 18H2z' },
+{ id: 'b', label: 'Kloroplas', color: '#2F7D55', d: 'M12 2l10 10-10 10L2 12z' },
+{ id: 'c', label: 'Ribosom', color: '#C2410C', d: 'M12 3a9 9 0 1 0 0.01 0z' },
+{ id: 'd', label: 'Inti sel', color: '#0E7490', d: 'M4 4h16v16H4z' }
+];
+var self = this;
+var options = base.map(function (o) {
+var isCorrect = o.id === correctId;
+var isPicked = o.id === picked;
+return {
+label: o.label,
+d: o.d,
+bg: o.color,
+border: answered && (isCorrect || isPicked) ? '4px solid #1E1B3A' : '4px solid transparent',
+opacity: answered && !isCorrect && !isPicked ? 0.4 : 1,
+pick: function () { if (self.state.picked === null) self.setState({ picked: o.id }); }
+};
+});
+var right = picked === correctId;
+return {
+options: options,
+answered: answered,
+notAnswered: !answered,
+xp: right ? 10 : 0,
+fbTitle: right ? 'Benar! +10 XP' : 'Belum tepat, jawabannya Kloroplas',
+fbBg: right ? '#FFFFFF' : '#FFF4DE',
+fbInk: right ? '#1F5A3C' : '#7A4A00',
+reset: function () { self.setState({ picked: null }); }
+};
+}
+}
+</script>
+</body>
+</html>

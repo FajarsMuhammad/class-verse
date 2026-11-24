@@ -64,10 +64,37 @@ func (r *room) command(c commandCmd) {
 		}
 		r.revokeVoice(m, nil)
 		r.sendStates()
+	case "mute_all", "unmute_all":
+		r.muteAll(m, c, reject)
 	case "kick", "allow", "mute", "unmute", "lock", "unlock":
 		r.moderate(m, c, reject)
 	default:
 		reject(CodeBadMessage, "Perintah tidak dikenal")
+	}
+}
+
+// muteAll mutes (or unmutes) every participant and guest currently in the room by
+// issuing the ordinary per-person command, so each change is audited on its own and
+// takes effect only after that audit row is committed. People who join later are not muted.
+func (r *room) muteAll(m *member, c commandCmd, reject func(code, message string)) {
+	if r.campus {
+		reject(CodeForbidden, "Moderasi hanya tersedia di ruang")
+		return
+	}
+	one, mute := "unmute", c.name == "mute_all"
+	if mute {
+		one = "mute"
+	}
+	n := 0
+	for id, t := range r.members {
+		if (t.p.Role != "participant" && t.p.Role != RoleGuest) || r.muted[id] == mute {
+			continue
+		}
+		n++
+		r.moderate(m, commandCmd{c: c.c, seq: c.seq, name: one, target: id}, func(string, string) {})
+	}
+	if n == 0 {
+		reject(CodeBadMessage, map[bool]string{true: "Semua peserta sudah dibisukan", false: "Tidak ada peserta yang dibisukan"}[mute])
 	}
 }
 
@@ -124,7 +151,7 @@ func (r *room) moderate(m *member, c commandCmd, reject func(code, message strin
 			reject(CodeNotFoundTarget, "Peserta tidak ada di ruang ini")
 			return
 		}
-		if t.p.Role != "participant" {
+		if t.p.Role != "participant" && t.p.Role != RoleGuest {
 			reject(CodeForbidden, "Pengajar dan admin tidak bisa dimoderasi")
 			return
 		}
@@ -212,6 +239,9 @@ func (r *room) moderated(c moderatedCmd) {
 func (r *room) state(id uuid.UUID) RoomStateMsg {
 	s := RoomStateMsg{Pin: r.pin, AllChatEnabled: r.allChat, Locked: r.locked, Muted: r.muted[id], VoiceBroadcast: r.broadcasters()}
 	if m := r.members[id]; m != nil {
+		if m.p.Role == RoleGuest {
+			s.Pin = nil
+		}
 		s.VoiceIdentity = m.voiceIdentity
 		s.VoiceChannel = m.voiceChannel
 	}

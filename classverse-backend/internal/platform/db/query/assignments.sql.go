@@ -58,7 +58,7 @@ func (q *Queries) AssignmentRoster(ctx context.Context, arg AssignmentRosterPara
 }
 
 const assignmentSteps = `-- name: AssignmentSteps :many
-SELECT s.id, s.org_id, s.assignment_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.quiz_id, s.minutes, f.kind AS file_kind,
+SELECT s.id, s.org_id, s.assignment_id, s.position, s.kind, s.title, s.body, s.file_id, s.video_id, s.quiz_id, s.minutes, s.rich_content, s.quiz_revision_id, f.kind AS file_kind,
  EXISTS(SELECT 1 FROM assignment_progress p WHERE p.org_id=s.org_id AND p.assignment_id=s.assignment_id AND p.step_id=s.id AND p.user_id=$1) AS done,
  NOT EXISTS(SELECT 1 FROM assignment_steps prev WHERE prev.assignment_id=s.assignment_id AND prev.position<s.position
    AND NOT EXISTS(SELECT 1 FROM assignment_progress p WHERE p.assignment_id=prev.assignment_id AND p.step_id=prev.id AND p.user_id=$1)) AS unlocked
@@ -73,20 +73,22 @@ type AssignmentStepsParams struct {
 }
 
 type AssignmentStepsRow struct {
-	ID           uuid.UUID
-	OrgID        uuid.UUID
-	AssignmentID uuid.UUID
-	Position     int32
-	Kind         string
-	Title        string
-	Body         string
-	FileID       uuid.NullUUID
-	VideoID      pgtype.Text
-	QuizID       uuid.NullUUID
-	Minutes      int32
-	FileKind     pgtype.Text
-	Done         bool
-	Unlocked     bool
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AssignmentID   uuid.UUID
+	Position       int32
+	Kind           string
+	Title          string
+	Body           string
+	FileID         uuid.NullUUID
+	VideoID        pgtype.Text
+	QuizID         uuid.NullUUID
+	Minutes        int32
+	RichContent    []byte
+	QuizRevisionID uuid.NullUUID
+	FileKind       pgtype.Text
+	Done           bool
+	Unlocked       bool
 }
 
 func (q *Queries) AssignmentSteps(ctx context.Context, arg AssignmentStepsParams) ([]AssignmentStepsRow, error) {
@@ -110,6 +112,8 @@ func (q *Queries) AssignmentSteps(ctx context.Context, arg AssignmentStepsParams
 			&i.VideoID,
 			&i.QuizID,
 			&i.Minutes,
+			&i.RichContent,
+			&i.QuizRevisionID,
 			&i.FileKind,
 			&i.Done,
 			&i.Unlocked,
@@ -165,10 +169,11 @@ func (q *Queries) CompleteAssignmentStep(ctx context.Context, arg CompleteAssign
 
 const createAssignment = `-- name: CreateAssignment :one
 INSERT INTO assignments(id,org_id,class_id,module_id,title,class_name,year_label,building_key,level,due_at,created_by,created_at)
-SELECT $1, c.org_id, c.id, m.id, m.title, c.name, y.label, m.building_key,m.level,
+SELECT $1, c.org_id, c.id, m.id, rev.title, c.name, y.label, rev.building_key,rev.level,
  $2::timestamptz,$3,$4
 FROM classes c JOIN academic_years y ON y.org_id=c.org_id AND y.id=c.academic_year_id
 JOIN modules m ON m.org_id=c.org_id AND m.id=$5
+JOIN module_revisions rev ON rev.org_id=m.org_id AND rev.module_id=m.id AND rev.id=m.published_revision_id
 WHERE c.org_id=$6 AND c.id=$7 AND c.archived_at IS NULL
  AND m.archived_at IS NULL AND m.published_at IS NOT NULL
 RETURNING id, org_id, class_id, module_id, title, class_name, year_label, building_key, level, due_at, created_by, created_at, cancelled_at
@@ -270,16 +275,29 @@ func (q *Queries) GetAssignmentClass(ctx context.Context, arg GetAssignmentClass
 const listAssignments = `-- name: ListAssignments :many
 SELECT a.id, a.org_id, a.class_id, a.module_id, a.title, a.class_name, a.year_label, a.building_key, a.level, a.due_at, a.created_by, a.created_at, a.cancelled_at,
  (SELECT count(*)::integer FROM assignment_steps s WHERE s.assignment_id=a.id) AS total,
- (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=$1) AS done
-FROM assignments a WHERE a.org_id=$2
- AND ($3::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=$1))
-ORDER BY a.created_at DESC,a.id
+ (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=$1) AS done,
+ count(*) OVER()::integer AS total_count,
+ -- Class aggregates are staff-only: participants never learn their peers' progress.
+ CASE WHEN $2::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id) ELSE 0 END::integer AS recipients,
+ CASE WHEN $2::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id
+   AND (SELECT count(*) FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=r.user_id)
+     >= (SELECT count(*) FROM assignment_steps s WHERE s.assignment_id=a.id)) ELSE 0 END::integer AS finished,
+ CASE WHEN $2::boolean THEN (SELECT count(DISTINCT p.user_id) FROM assignment_progress p WHERE p.assignment_id=a.id) ELSE 0 END::integer AS started
+FROM assignments a WHERE a.org_id=$3
+ AND ($2::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=$1))
+ AND ($4::text = '' OR strpos(lower(a.title), lower($4)) > 0)
+ AND ($5::uuid IS NULL OR a.class_id = $5)
+ORDER BY a.created_at DESC,a.id LIMIT $7::integer OFFSET $6::integer
 `
 
 type ListAssignmentsParams struct {
-	UserID uuid.UUID
-	OrgID  uuid.UUID
-	Staff  bool
+	UserID     uuid.UUID
+	Staff      bool
+	OrgID      uuid.UUID
+	Search     string
+	ClassID    uuid.NullUUID
+	PageOffset int32
+	PageLimit  pgtype.Int4
 }
 
 type ListAssignmentsRow struct {
@@ -298,10 +316,22 @@ type ListAssignmentsRow struct {
 	CancelledAt pgtype.Timestamptz
 	Total       int32
 	Done        int32
+	TotalCount  int32
+	Recipients  int32
+	Finished    int32
+	Started     int32
 }
 
 func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams) ([]ListAssignmentsRow, error) {
-	rows, err := q.db.Query(ctx, listAssignments, arg.UserID, arg.OrgID, arg.Staff)
+	rows, err := q.db.Query(ctx, listAssignments,
+		arg.UserID,
+		arg.Staff,
+		arg.OrgID,
+		arg.Search,
+		arg.ClassID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +355,10 @@ func (q *Queries) ListAssignments(ctx context.Context, arg ListAssignmentsParams
 			&i.CancelledAt,
 			&i.Total,
 			&i.Done,
+			&i.TotalCount,
+			&i.Recipients,
+			&i.Finished,
+			&i.Started,
 		); err != nil {
 			return nil, err
 		}
@@ -420,10 +454,11 @@ func (q *Queries) SnapshotAssignmentRecipients(ctx context.Context, arg Snapshot
 }
 
 const snapshotAssignmentSteps = `-- name: SnapshotAssignmentSteps :execrows
-INSERT INTO assignment_steps(id,org_id,assignment_id,position,kind,title,body,file_id,video_id,quiz_id,minutes)
+INSERT INTO assignment_steps(id,org_id,assignment_id,position,kind,title,body,file_id,video_id,quiz_id,minutes,rich_content,quiz_revision_id)
 SELECT gen_random_uuid(),s.org_id,$1,row_number() OVER(ORDER BY s.position,s.id)-1,
- s.kind,s.title,s.body,s.file_id,s.video_id,s.quiz_id,s.minutes
-FROM module_steps s WHERE s.org_id=$2 AND s.module_id=$3 AND s.archived_at IS NULL
+ s.kind,s.title,s.body,s.file_id,s.video_id,s.quiz_id,s.minutes,s.rich_content,s.quiz_revision_id
+FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id AND m.published_revision_id=s.revision_id
+WHERE s.org_id=$2 AND s.module_id=$3
 `
 
 type SnapshotAssignmentStepsParams struct {

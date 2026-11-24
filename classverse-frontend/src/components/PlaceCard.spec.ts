@@ -10,6 +10,7 @@ it('blocks staff-only actions for participants without inventing occupancy', () 
   const w = mount(PlaceCard, { props: { building, atDoor: false, teacher: false, disabled: false } })
   expect(w.text()).toContain('Khusus pengajar dan admin')
   expect(w.get('[data-testid="place-action"]').attributes('disabled')).toBeDefined()
+  expect(w.get('[data-testid="place-action"]').text()).toBe('Hanya untuk pengajar')
   expect(w.text()).not.toContain('0 orang')
 })
 

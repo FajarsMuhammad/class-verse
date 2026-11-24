@@ -56,6 +56,91 @@ func (ns NullChatScope) Value() (driver.Value, error) {
 	return string(ns.ChatScope), nil
 }
 
+type ClassTeacherRole string
+
+const (
+	ClassTeacherRoleHomeroom ClassTeacherRole = "homeroom"
+	ClassTeacherRoleSubject  ClassTeacherRole = "subject"
+)
+
+func (e *ClassTeacherRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ClassTeacherRole(s)
+	case string:
+		*e = ClassTeacherRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ClassTeacherRole: %T", src)
+	}
+	return nil
+}
+
+type NullClassTeacherRole struct {
+	ClassTeacherRole ClassTeacherRole
+	Valid            bool // Valid is true if ClassTeacherRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullClassTeacherRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.ClassTeacherRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ClassTeacherRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullClassTeacherRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ClassTeacherRole), nil
+}
+
+type GuestStatus string
+
+const (
+	GuestStatusPending  GuestStatus = "pending"
+	GuestStatusApproved GuestStatus = "approved"
+	GuestStatusDenied   GuestStatus = "denied"
+)
+
+func (e *GuestStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GuestStatus(s)
+	case string:
+		*e = GuestStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GuestStatus: %T", src)
+	}
+	return nil
+}
+
+type NullGuestStatus struct {
+	GuestStatus GuestStatus
+	Valid       bool // Valid is true if GuestStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGuestStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.GuestStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GuestStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGuestStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GuestStatus), nil
+}
+
 type ModAction string
 
 const (
@@ -227,17 +312,19 @@ type AssignmentRecipient struct {
 }
 
 type AssignmentStep struct {
-	ID           uuid.UUID
-	OrgID        uuid.UUID
-	AssignmentID uuid.UUID
-	Position     int32
-	Kind         string
-	Title        string
-	Body         string
-	FileID       uuid.NullUUID
-	VideoID      pgtype.Text
-	QuizID       uuid.NullUUID
-	Minutes      int32
+	ID             uuid.UUID
+	OrgID          uuid.UUID
+	AssignmentID   uuid.UUID
+	Position       int32
+	Kind           string
+	Title          string
+	Body           string
+	FileID         uuid.NullUUID
+	VideoID        pgtype.Text
+	QuizID         uuid.NullUUID
+	Minutes        int32
+	RichContent    []byte
+	QuizRevisionID uuid.NullUUID
 }
 
 type ChatMessage struct {
@@ -269,6 +356,18 @@ type ClassEnrollment struct {
 	StartedAt      pgtype.Timestamptz
 	EndedAt        pgtype.Timestamptz
 	CreatedBy      uuid.UUID
+}
+
+type ClassTeacher struct {
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	ClassID   uuid.UUID
+	UserID    uuid.UUID
+	Role      ClassTeacherRole
+	Subject   pgtype.Text
+	StartedAt pgtype.Timestamptz
+	EndedAt   pgtype.Timestamptz
+	CreatedBy uuid.UUID
 }
 
 type EmailOtp struct {
@@ -311,6 +410,41 @@ type FileUpload struct {
 	ExpiresAt      pgtype.Timestamptz
 }
 
+type GuestDecision struct {
+	ID        uuid.UUID
+	RoomID    uuid.UUID
+	LinkID    uuid.UUID
+	ActorID   uuid.UUID
+	TargetID  uuid.NullUUID
+	Action    string
+	CreatedAt pgtype.Timestamptz
+}
+
+type GuestLink struct {
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	RoomID    uuid.UUID
+	Code      string
+	MaxGuests int32
+	UsedCount int32
+	ExpiresAt pgtype.Timestamptz
+	RevokedAt pgtype.Timestamptz
+	CreatedBy uuid.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
+type GuestRequest struct {
+	ID         uuid.UUID
+	LinkID     uuid.UUID
+	RequestKey []byte
+	UserID     uuid.UUID
+	IsGuest    bool
+	Status     GuestStatus
+	DecidedBy  uuid.NullUUID
+	DecidedAt  pgtype.Timestamptz
+	CreatedAt  pgtype.Timestamptz
+}
+
 type Invite struct {
 	ID        uuid.UUID
 	OrgID     uuid.UUID
@@ -322,6 +456,7 @@ type Invite struct {
 	ExpiresAt pgtype.Timestamptz
 	RevokedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+	ClassID   uuid.NullUUID
 }
 
 type LibraryBook struct {
@@ -371,17 +506,19 @@ type ModerationAction struct {
 }
 
 type Module struct {
-	ID          uuid.UUID
-	OrgID       uuid.UUID
-	BuildingKey string
-	Level       string
-	Title       string
-	Description string
-	CreatedBy   uuid.UUID
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	PublishedAt pgtype.Timestamptz
-	ArchivedAt  pgtype.Timestamptz
+	ID                  uuid.UUID
+	OrgID               uuid.UUID
+	BuildingKey         string
+	Level               string
+	Title               string
+	Description         string
+	CreatedBy           uuid.UUID
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	PublishedAt         pgtype.Timestamptz
+	ArchivedAt          pgtype.Timestamptz
+	DraftVersion        int64
+	PublishedRevisionID uuid.NullUUID
 }
 
 type ModuleProgress struct {
@@ -391,21 +528,59 @@ type ModuleProgress struct {
 	CompletedAt pgtype.Timestamptz
 }
 
-type ModuleStep struct {
-	ID         uuid.UUID
+type ModuleRevision struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	ModuleID     uuid.UUID
+	Revision     int32
+	DraftVersion int64
+	BuildingKey  string
+	Level        string
+	Title        string
+	Description  string
+	PublishedAt  pgtype.Timestamptz
+}
+
+type ModuleRevisionPin struct {
 	OrgID      uuid.UUID
 	ModuleID   uuid.UUID
-	Position   int32
-	Kind       string
-	Title      string
-	Body       string
-	FileID     uuid.NullUUID
-	VideoID    pgtype.Text
-	Minutes    int32
-	CreatedAt  pgtype.Timestamptz
-	UpdatedAt  pgtype.Timestamptz
-	ArchivedAt pgtype.Timestamptz
-	QuizID     uuid.NullUUID
+	UserID     uuid.UUID
+	RevisionID uuid.UUID
+}
+
+type ModuleRevisionStep struct {
+	OrgID          uuid.UUID
+	ModuleID       uuid.UUID
+	RevisionID     uuid.UUID
+	ID             uuid.UUID
+	Position       int32
+	Kind           string
+	Title          string
+	Body           string
+	RichContent    []byte
+	FileID         uuid.NullUUID
+	VideoID        pgtype.Text
+	QuizID         uuid.NullUUID
+	QuizRevisionID uuid.NullUUID
+	Minutes        int32
+}
+
+type ModuleStep struct {
+	ID          uuid.UUID
+	OrgID       uuid.UUID
+	ModuleID    uuid.UUID
+	Position    int32
+	Kind        string
+	Title       string
+	Body        string
+	FileID      uuid.NullUUID
+	VideoID     pgtype.Text
+	Minutes     int32
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	ArchivedAt  pgtype.Timestamptz
+	QuizID      uuid.NullUUID
+	RichContent []byte
 }
 
 type Organization struct {
@@ -418,18 +593,20 @@ type Organization struct {
 }
 
 type Quiz struct {
-	ID          uuid.UUID
-	OrgID       uuid.UUID
-	BuildingKey string
-	Level       string
-	Title       string
-	Description string
-	PassScore   int16
-	CreatedBy   uuid.UUID
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	PublishedAt pgtype.Timestamptz
-	ArchivedAt  pgtype.Timestamptz
+	ID                  uuid.UUID
+	OrgID               uuid.UUID
+	BuildingKey         string
+	Level               string
+	Title               string
+	Description         string
+	PassScore           int16
+	CreatedBy           uuid.UUID
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	PublishedAt         pgtype.Timestamptz
+	ArchivedAt          pgtype.Timestamptz
+	DraftVersion        int64
+	PublishedRevisionID uuid.NullUUID
 }
 
 type QuizAttempt struct {
@@ -446,6 +623,9 @@ type QuizAttempt struct {
 	Score            pgtype.Int2
 	AssignmentID     uuid.NullUUID
 	AssignmentStepID uuid.NullUUID
+	QuizRevisionID   uuid.NullUUID
+	ModuleID         uuid.NullUUID
+	ModuleRevisionID uuid.NullUUID
 }
 
 type QuizQuestion struct {
@@ -459,6 +639,21 @@ type QuizQuestion struct {
 	Explanation string
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+}
+
+type QuizRevision struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	QuizID       uuid.UUID
+	Revision     int32
+	DraftVersion int64
+	BuildingKey  string
+	Level        string
+	Title        string
+	Description  string
+	PassScore    int16
+	Questions    []byte
+	PublishedAt  pgtype.Timestamptz
 }
 
 type ReaderPosition struct {
@@ -538,7 +733,7 @@ type SessionBan struct {
 
 type User struct {
 	ID              uuid.UUID
-	Email           string
+	Email           pgtype.Text
 	EmailVerifiedAt pgtype.Timestamptz
 	PasswordHash    pgtype.Text
 	GoogleSub       pgtype.Text
@@ -547,4 +742,5 @@ type User struct {
 	AvatarKey       string
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	IsGuest         bool
 }

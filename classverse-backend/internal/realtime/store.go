@@ -11,18 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db"
 	"github.com/FajarsMuhammad/class-verse/classverse-backend/internal/platform/db/query"
 )
 
 // Store admits users to rooms from the database.
 type Store struct {
-	q *query.Queries
+	q   *query.Queries
+	now func() time.Time
 }
 
 // NewStore wraps a pgx pool.
 func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{q: query.New(pool)}
+	return &Store{q: query.New(pool), now: time.Now}
 }
+
+// SetClock injects the admission clock before serving requests.
+func (s *Store) SetClock(now func() time.Time) { s.now = now }
 
 // Admit implements Admitter: the room must exist, not be archived, and the
 // user must be a member of its organization.
@@ -49,6 +54,28 @@ func (s *Store) Admit(ctx context.Context, roomID, userID uuid.UUID) (Admission,
 		if err != nil {
 			return Admission{}, fmt.Errorf("load learning pin: %w", err)
 		}
+	}
+	return adm, nil
+}
+
+// AdmitGuest admits an approved guest to the one room of their link (G1).
+// Any other room, or an inactive link, is ErrNoAccess.
+func (s *Store) AdmitGuest(ctx context.Context, roomID, guestID uuid.UUID) (Admission, error) {
+	row, err := s.q.GetGuestAdmission(ctx, query.GetGuestAdmissionParams{UserID: guestID, RoomID: roomID, Now: pgTime(s.now())})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Admission{}, ErrNoAccess
+	}
+	if err != nil {
+		return Admission{}, fmt.Errorf("get guest admission: %w", err)
+	}
+	adm := Admission{
+		RoomID: row.RoomID, OrgID: row.OrgID, MapKey: row.MapKey, Capacity: int(row.Capacity),
+		RoomName: row.RoomName, BuildingKey: row.BuildingKey.String, AllChat: row.AllChatEnabled,
+		GuestExpiresAt: row.ExpiresAt.Time, UserID: guestID, Name: row.DisplayName, Avatar: row.AvatarKey, Role: RoleGuest, Banned: row.Banned,
+	}
+	if row.ScheduledAt.Valid {
+		t := row.ScheduledAt.Time.UTC()
+		adm.ScheduledAt = &t
 	}
 	return adm, nil
 }
@@ -120,7 +147,7 @@ func (s *Store) CloseOpenSessions(ctx context.Context, at time.Time) error {
 	return nil
 }
 
-func pgTime(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t.UTC(), Valid: true} }
+func pgTime(t time.Time) pgtype.Timestamptz { return db.Time(t) }
 
 // Kick bans target from the open session of roomID and audits it atomically.
 // ok is false when nothing changed: no open session, or the actor/target

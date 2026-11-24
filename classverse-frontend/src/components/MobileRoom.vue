@@ -475,11 +475,4 @@ h2 {
   min-height: var(--touch-min);
   margin-top: var(--space-2);
 }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 </style>

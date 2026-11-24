@@ -14,8 +14,8 @@ const (
 	codeLen  = 8
 )
 
-// newCode returns a random invite code in stored form (no dash).
-func newCode() (string, error) {
+// NewCode returns a random invite code in stored form (no dash).
+func NewCode() (string, error) {
 	var b strings.Builder
 	size := big.NewInt(int64(len(alphabet)))
 	for range codeLen {
@@ -28,9 +28,9 @@ func newCode() (string, error) {
 	return b.String(), nil
 }
 
-// normalizeCode uppercases input and drops dashes and spaces. It reports
+// NormalizeCode uppercases input and drops dashes and spaces. It reports
 // false when the result cannot be a valid code.
-func normalizeCode(in string) (string, bool) {
+func NormalizeCode(in string) (string, bool) {
 	var b strings.Builder
 	for _, r := range strings.ToUpper(in) {
 		if r == '-' || r == ' ' {
@@ -45,8 +45,8 @@ func normalizeCode(in string) (string, bool) {
 	return s, len(s) == codeLen
 }
 
-// displayCode formats a stored code as ABCD-EFGH.
-func displayCode(code string) string {
+// DisplayCode formats a stored code as ABCD-EFGH.
+func DisplayCode(code string) string {
 	if len(code) != codeLen {
 		return code
 	}

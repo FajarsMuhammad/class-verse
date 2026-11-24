@@ -1,10 +1,12 @@
 package module
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -33,6 +35,8 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/orgs/{org_id}/modules", h.handle(h.list))
 	r.Post("/orgs/{org_id}/modules", h.handle(h.create))
+	r.Post("/orgs/{org_id}/modules/{module_id}/publish", h.handle(h.publish))
+	r.Get("/orgs/{org_id}/modules/{module_id}/revisions", h.handle(h.history))
 	r.Put("/orgs/{org_id}/modules/{module_id}", h.handle(h.update))
 	r.Delete("/orgs/{org_id}/modules/{module_id}", h.handle(h.archive))
 	r.Post("/orgs/{org_id}/modules/{module_id}/steps", h.handle(h.addStep))
@@ -65,6 +69,8 @@ func (h *Handler) handle(fn func(http.ResponseWriter, *http.Request) error) http
 			return nil
 		case errors.As(err, &verr):
 			return httpx.ValidationFailed(verr.Fields)
+		case errors.Is(err, ErrConflict):
+			return &httpx.Error{Status: 409, Code: "draft_conflict", Message: "Draf berubah di tab lain. Muat versi server atau salin perubahan lokal."}
 		case errors.Is(err, ErrNotFound):
 			return &httpx.Error{Status: http.StatusNotFound, Code: "not_found", Message: "Modul atau langkah tidak ditemukan"}
 		case errors.Is(err, ErrStepLimit):
@@ -84,33 +90,36 @@ func (h *Handler) handle(fn func(http.ResponseWriter, *http.Request) error) http
 
 // StepResponse is the public view of a step.
 type StepResponse struct {
-	ID             uuid.UUID  `json:"id"`
-	Kind           string     `json:"kind"`
-	Title          string     `json:"title"`
-	Body           string     `json:"body"`
-	FileID         *uuid.UUID `json:"file_id"`
-	FileKind       *string    `json:"file_kind"`
-	VideoID        *string    `json:"video_id"`
-	QuizID         *uuid.UUID `json:"quiz_id"`
-	Minutes        int32      `json:"minutes"`
-	ReaderPosition int32      `json:"reader_position"`
-	Done           bool       `json:"done"`
+	RichContent    json.RawMessage `json:"rich_content"`
+	ID             uuid.UUID       `json:"id"`
+	Kind           string          `json:"kind"`
+	Title          string          `json:"title"`
+	Body           string          `json:"body"`
+	FileID         *uuid.UUID      `json:"file_id"`
+	FileKind       *string         `json:"file_kind"`
+	VideoID        *string         `json:"video_id"`
+	QuizID         *uuid.UUID      `json:"quiz_id"`
+	Minutes        int32           `json:"minutes"`
+	ReaderPosition int32           `json:"reader_position"`
+	Done           bool            `json:"done"`
 }
 
 // Response is the public view of a module with its steps in order.
 type Response struct {
-	ID          uuid.UUID      `json:"id"`
-	BuildingKey string         `json:"building_key"`
-	Level       string         `json:"level"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	Published   bool           `json:"published"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	Steps       []StepResponse `json:"steps"`
+	DraftVersion        int64          `json:"draft_version"`
+	PublishedRevisionID *uuid.UUID     `json:"published_revision_id"`
+	ID                  uuid.UUID      `json:"id"`
+	BuildingKey         string         `json:"building_key"`
+	Level               string         `json:"level"`
+	Title               string         `json:"title"`
+	Description         string         `json:"description"`
+	Published           bool           `json:"published"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	Steps               []StepResponse `json:"steps"`
 }
 
 func toStep(s Step) StepResponse {
-	out := StepResponse{ID: s.ID, Kind: s.Kind, Title: s.Title, Body: s.Body, Minutes: s.Minutes, ReaderPosition: s.ReaderPosition, Done: s.Done}
+	out := StepResponse{RichContent: s.RichContent, ID: s.ID, Kind: s.Kind, Title: s.Title, Body: s.Body, Minutes: s.Minutes, ReaderPosition: s.ReaderPosition, Done: s.Done}
 	if s.FileID.Valid {
 		out.FileID = &s.FileID.UUID
 	}
@@ -132,27 +141,35 @@ func toModule(m Module) Response {
 		steps = append(steps, toStep(s))
 	}
 	return Response{
-		ID: m.ID, BuildingKey: m.BuildingKey, Level: m.Level, Title: m.Title, Description: m.Description,
+		DraftVersion: m.DraftVersion, PublishedRevisionID: func() *uuid.UUID {
+			if m.PublishedRevisionID.Valid {
+				return &m.PublishedRevisionID.UUID
+			}
+			return nil
+		}(), ID: m.ID, BuildingKey: m.BuildingKey, Level: m.Level, Title: m.Title, Description: m.Description,
 		Published: m.PublishedAt.Valid, UpdatedAt: m.UpdatedAt.Time, Steps: steps,
 	}
 }
 
 type moduleRequest struct {
-	BuildingKey string `json:"building_key"`
-	Level       string `json:"level"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Published   bool   `json:"published"`
+	ExpectedVersion int64  `json:"expected_version"`
+	BuildingKey     string `json:"building_key"`
+	Level           string `json:"level"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	Published       bool   `json:"published"`
 }
 
 type stepRequest struct {
-	Kind    string     `json:"kind"`
-	Title   string     `json:"title"`
-	Body    string     `json:"body"`
-	FileID  *uuid.UUID `json:"file_id"`
-	VideoID string     `json:"video_id"`
-	QuizID  *uuid.UUID `json:"quiz_id"`
-	Minutes int        `json:"minutes"`
+	ExpectedVersion int64           `json:"expected_version"`
+	RichContent     json.RawMessage `json:"rich_content"`
+	Kind            string          `json:"kind"`
+	Title           string          `json:"title"`
+	Body            string          `json:"body"`
+	FileID          *uuid.UUID      `json:"file_id"`
+	VideoID         string          `json:"video_id"`
+	QuizID          *uuid.UUID      `json:"quiz_id"`
+	Minutes         int             `json:"minutes"`
 }
 
 // ids reads path UUIDs in order; malformed IDs are treated as not found (org.PathUUID).
@@ -175,15 +192,56 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	q := r.URL.Query()
-	mods, err := h.svc.List(r.Context(), user, p[0], Filter{BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true"})
+	offset := int64(0)
+	if raw := q.Get("offset"); raw != "" {
+		parsed, parseErr := strconv.ParseInt(raw, 10, 32)
+		if parseErr != nil || parsed < 0 {
+			return httpx.ValidationFailed(map[string]string{"offset": "Offset tidak valid"})
+		}
+		offset = parsed
+	}
+	limit := int64(100)
+	if raw := q.Get("limit"); raw != "" {
+		parsed, parseErr := strconv.ParseInt(raw, 10, 32)
+		if parseErr != nil || parsed < 1 || parsed > 100 {
+			return httpx.ValidationFailed(map[string]string{"limit": "Limit harus 1–100"})
+		}
+		limit = parsed
+	}
+	if status := q.Get("status"); status != "" && status != "draft" && status != "published" {
+		return httpx.ValidationFailed(map[string]string{"status": "Status tidak valid"})
+	}
+	var moduleID uuid.NullUUID
+	if raw := q.Get("module_id"); raw != "" {
+		parsed, parseErr := uuid.Parse(raw)
+		if parseErr != nil {
+			return httpx.ValidationFailed(map[string]string{"module_id": "ID modul tidak valid"})
+		}
+		moduleID = uuid.NullUUID{UUID: parsed, Valid: true}
+	}
+	filter := Filter{ModuleID: moduleID, Limit: int32(limit), Search: q.Get("search"), Status: q.Get("status"), Offset: int32(offset), BuildingKey: q.Get("building_key"), Level: q.Get("level"), Drafts: q.Get("drafts") == "true", Archived: q.Get("archived") == "true"}
+	mods, err := h.svc.List(r.Context(), user, p[0], filter)
 	if err != nil {
 		return err
+	}
+	body := map[string]any{}
+	if q.Get("counts") == "true" {
+		c, err := h.svc.Counts(r.Context(), user, p[0], filter)
+		if err != nil {
+			return err
+		}
+		body["counts"] = map[string]int32{"all": c.AllCount, "published": c.PublishedCount, "draft": c.DraftCount, "archived": c.ArchivedCount}
 	}
 	items := make([]Response, 0, len(mods))
 	for _, m := range mods {
 		items = append(items, toModule(m))
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items})
+	total := int64(0)
+	if len(mods) > 0 {
+		total = mods[0].TotalCount
+	}
+	body["items"], body["total"] = items, total
+	httpx.JSON(w, http.StatusOK, body)
 	return nil
 }
 
@@ -213,6 +271,9 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) error {
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		return err
 	}
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
 	m, err := h.svc.Update(r.Context(), user, p[0], p[1], Input(req))
 	if err != nil {
 		return err
@@ -239,8 +300,11 @@ func (h *Handler) addStep(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var req stepRequest
-	if err := httpx.DecodeJSON(r, &req); err != nil {
+	if err := httpx.DecodeJSONLimit(r, &req, maxRichBytes+16*1024); err != nil {
 		return err
+	}
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
 	}
 	s, err := h.svc.AddStep(r.Context(), user, p[0], p[1], StepInput(req))
 	if err != nil {
@@ -256,8 +320,11 @@ func (h *Handler) updateStep(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var req stepRequest
-	if err := httpx.DecodeJSON(r, &req); err != nil {
+	if err := httpx.DecodeJSONLimit(r, &req, maxRichBytes+16*1024); err != nil {
 		return err
+	}
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
 	}
 	s, err := h.svc.UpdateStep(r.Context(), user, p[0], p[1], p[2], StepInput(req))
 	if err != nil {
@@ -272,7 +339,11 @@ func (h *Handler) archiveStep(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := h.svc.ArchiveStep(r.Context(), user, p[0], p[1], p[2]); err != nil {
+	version, err := strconv.ParseInt(r.URL.Query().Get("expected_version"), 10, 64)
+	if err != nil || version < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
+	if err := h.svc.ArchiveStep(r.Context(), user, p[0], p[1], p[2], version); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -285,12 +356,16 @@ func (h *Handler) reorder(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var req struct {
-		StepIDs []uuid.UUID `json:"step_ids"`
+		StepIDs         []uuid.UUID `json:"step_ids"`
+		ExpectedVersion int64       `json:"expected_version"`
 	}
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		return err
 	}
-	if err := h.svc.Reorder(r.Context(), user, p[0], p[1], req.StepIDs); err != nil {
+	if req.ExpectedVersion < 1 {
+		return httpx.ValidationFailed(map[string]string{"expected_version": "Versi draf wajib"})
+	}
+	if err := h.svc.Reorder(r.Context(), user, p[0], p[1], req.StepIDs, req.ExpectedVersion); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -337,5 +412,40 @@ func (h *Handler) resume(w http.ResponseWriter, r *http.Request) error {
 			Done: res.Done, Total: res.Total, NextTitle: res.NextTitle}
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"resume": out})
+	return nil
+}
+
+func (h *Handler) publish(w http.ResponseWriter, r *http.Request) error {
+	user, p, err := ids(r, "org_id", "module_id")
+	if err != nil {
+		return err
+	}
+	var req struct {
+		ExpectedVersion int64 `json:"expected_version"`
+	}
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		return err
+	}
+	m, err := h.svc.Publish(r.Context(), user, p[0], p[1], req.ExpectedVersion)
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, 200, toModule(Module{Module: m}))
+	return nil
+}
+func (h *Handler) history(w http.ResponseWriter, r *http.Request) error {
+	user, p, err := ids(r, "org_id", "module_id")
+	if err != nil {
+		return err
+	}
+	rows, err := h.svc.History(r.Context(), user, p[0], p[1])
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, map[string]any{"id": row.ID, "revision": row.Revision, "draft_version": row.DraftVersion, "published_at": row.PublishedAt.Time})
+	}
+	httpx.JSON(w, 200, map[string]any{"items": items})
 	return nil
 }

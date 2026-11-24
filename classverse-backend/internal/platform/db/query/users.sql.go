@@ -14,8 +14,8 @@ import (
 
 const createGoogleUser = `-- name: CreateGoogleUser :one
 INSERT INTO users (email, email_verified_at, google_sub, display_name)
-VALUES ($1, $2, $3, $4)
-RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at
+VALUES ($1::text, $2, $3, $4)
+RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest
 `
 
 type CreateGoogleUserParams struct {
@@ -44,14 +44,15 @@ func (q *Queries) CreateGoogleUser(ctx context.Context, arg CreateGoogleUserPara
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }
 
 const createTestUser = `-- name: CreateTestUser :one
 INSERT INTO users (email, email_verified_at, display_name, birth_date)
-VALUES ($1, now(), $2, $3)
-RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at
+VALUES ($1::text, now(), $2, $3)
+RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest
 `
 
 type CreateTestUserParams struct {
@@ -75,14 +76,15 @@ func (q *Queries) CreateTestUser(ctx context.Context, arg CreateTestUserParams) 
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, display_name, birth_date)
-VALUES ($1, $2, $3, $4)
-RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at
+VALUES ($1::text, $2, $3, $4)
+RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest
 `
 
 type CreateUserParams struct {
@@ -111,12 +113,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at FROM users
+SELECT id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest FROM users
 WHERE lower(email) = lower($1)
 `
 
@@ -134,12 +137,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }
 
 const getUserByGoogleSub = `-- name: GetUserByGoogleSub :one
-SELECT id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at FROM users
+SELECT id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest FROM users
 WHERE google_sub = $1
 `
 
@@ -157,13 +161,14 @@ func (q *Queries) GetUserByGoogleSub(ctx context.Context, googleSub pgtype.Text)
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at FROM users
-WHERE id = $1
+SELECT id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest FROM users
+WHERE id = $1 AND NOT is_guest
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -180,6 +185,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }
@@ -190,8 +196,8 @@ SET google_sub        = $1,
     password_hash     = CASE WHEN email_verified_at IS NULL THEN NULL ELSE password_hash END,
     email_verified_at = coalesce(email_verified_at, $2),
     updated_at        = $2
-WHERE id = $3
-RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at
+WHERE NOT is_guest AND id = $3
+RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest
 `
 
 type LinkGoogleAccountParams struct {
@@ -216,6 +222,7 @@ func (q *Queries) LinkGoogleAccount(ctx context.Context, arg LinkGoogleAccountPa
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }
@@ -223,7 +230,7 @@ func (q *Queries) LinkGoogleAccount(ctx context.Context, arg LinkGoogleAccountPa
 const markEmailVerified = `-- name: MarkEmailVerified :exec
 UPDATE users
 SET email_verified_at = $1, updated_at = $1
-WHERE id = $2
+WHERE NOT is_guest AND id = $2
 `
 
 type MarkEmailVerifiedParams struct {
@@ -242,7 +249,7 @@ SET password_hash = $1,
     display_name  = $2,
     birth_date    = $3,
     updated_at    = $4
-WHERE id = $5 AND email_verified_at IS NULL
+WHERE NOT is_guest AND id = $5 AND email_verified_at IS NULL
 `
 
 type UpdatePendingUserParams struct {
@@ -271,8 +278,8 @@ SET display_name = coalesce($1, display_name),
     birth_date   = coalesce($2, birth_date),
     avatar_key   = coalesce($3, avatar_key),
     updated_at   = $4
-WHERE id = $5
-RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at
+WHERE NOT is_guest AND id = $5
+RETURNING id, email, email_verified_at, password_hash, google_sub, display_name, birth_date, avatar_key, created_at, updated_at, is_guest
 `
 
 type UpdateProfileParams struct {
@@ -303,6 +310,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (U
 		&i.AvatarKey,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsGuest,
 	)
 	return i, err
 }

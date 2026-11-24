@@ -237,12 +237,4 @@ const label = computed(() =>
   font-weight: var(--weight-bold);
   box-shadow: var(--shadow-raise);
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 </style>

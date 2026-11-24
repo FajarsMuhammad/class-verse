@@ -7,6 +7,7 @@ Sumber kebenaran produk dan teknis:
 
 - `docs/spec.md` — scope MVP, user stories (US-xx), aturan keamanan, NFR.
 - `docs/design.md` — arsitektur, struktur package, protokol WebSocket, auth, skema SQL, API contract, ADR.
+- `docs/architecture.md` — pola kode BE/FE yang berlaku sekarang; acuan wajib untuk fitur baru.
 - `docs/visual.md` + `docs/screens/*.png` — arah visual, alur layar, spesifikasi komponen, aturan aksesibilitas.
   Lihat screenshot layar terkait sebelum mengerjakan UI.
 
@@ -156,3 +157,5 @@ Semua skill project ada di `.agents/skills/` (file asli, di-commit, dibaca juga 
 - Sebelum menulis kode untuk story baru, baca bagian terkait di `docs/` dan sebutkan rencana singkat.
 - Jika ada keputusan desain baru yang belum ada di `docs/design.md`, usulkan dulu, jangan langsung diterapkan.
 - Bahasa UI: Bahasa Indonesia. Identifier, komentar kode, dan pesan commit: English.
+- Endpoint API, field JSON, kode error, dan path/route frontend baru: English (mis. `/guest/{code}`). Route frontend lama
+  (`/masuk`, `/gabung`, dst.) tetap sampai ada migrasi terencana dengan redirect agar tautan lama tidak rusak.

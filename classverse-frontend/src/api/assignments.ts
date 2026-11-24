@@ -7,7 +7,7 @@ export type AssignmentInput = components['schemas']['AssignmentInput']
 const base = (org: string) => `/api/orgs/${encodeURIComponent(org)}/assignments`
 const one = (org: string, id: string) => `${base(org)}/${encodeURIComponent(id)}`
 export const assignmentApi = {
-  list: (org: string) => api<{ items: Assignment[] }>(base(org)),
+  list: (org: string, offset = 0, search = '', classID = '') => api<{ items: Assignment[]; total?: number }>(`${base(org)}?limit=20&offset=${offset}&search=${encodeURIComponent(search)}${classID ? `&class_id=${encodeURIComponent(classID)}` : ''}`),
   issue: (org: string, body: AssignmentInput) => api<{ id: string }>(base(org), { method: 'POST', body }),
   cancel: (org: string, id: string) => api<void>(one(org, id), { method: 'DELETE' }),
   steps: (org: string, id: string) => api<{ items: AssignmentStep[] }>(`${one(org, id)}/steps`),

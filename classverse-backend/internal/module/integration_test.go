@@ -161,7 +161,7 @@ func TestModules(t *testing.T) {
 		}
 		return strings.Join(titles, ",")
 	}
-	if got := order(); got != "8 planet,Bacaan,Matahari" {
+	if got := order(); got != "Matahari,Bacaan,8 planet" {
 		t.Fatalf("order: %s", got)
 	}
 
@@ -177,11 +177,11 @@ func TestModules(t *testing.T) {
 	if err := svc.ArchiveStep(ctx, admin, school.ID, draft.ID, reading); !errors.Is(err, module.ErrNotFound) {
 		t.Fatalf("archive step twice: %v", err)
 	}
-	if err := readable(student); !errors.Is(err, file.ErrNotFound) {
-		t.Fatalf("file of archived step still readable: %v", err)
+	if err := readable(student); err != nil {
+		t.Fatalf("published historical file lost: %v", err)
 	}
 	add(module.StepInput{Kind: "materi", Title: "Bumi", Body: "Rumah kita.", Minutes: 5})
-	if got := order(); got != "8 planet,Matahari,Bumi" {
+	if got := order(); got != "Matahari,Bacaan,8 planet" {
 		t.Fatalf("order after archive: %s", got)
 	}
 	// Updating an archived step or another school's module is not found.
@@ -203,6 +203,21 @@ func TestModules(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if strings.Contains(path, draft.ID.String()) && !strings.HasSuffix(path, "/done") {
+			var version int64
+			if err := pool.QueryRow(ctx, "SELECT draft_version FROM modules WHERE id=$1", draft.ID).Scan(&version); err != nil {
+				t.Fatal(err)
+			}
+			if method == "DELETE" && strings.Contains(path, "/steps/") {
+				path += fmt.Sprintf("?expected_version=%d", version)
+			}
+			var payload map[string]any
+			if json.Unmarshal([]byte(body), &payload) == nil {
+				payload["expected_version"] = version
+				raw, _ := json.Marshal(payload)
+				body = string(raw)
+			}
+		}
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
@@ -212,7 +227,7 @@ func TestModules(t *testing.T) {
 	base := fmt.Sprintf("/orgs/%s/modules", school.ID)
 	var got struct{ Items []module.Response }
 	w := call(student, "GET", base+"?building_key=sains", "")
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &got) != nil || len(got.Items) != 1 || got.Items[0].Steps[0].VideoID == nil {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &got) != nil || len(got.Items) != 1 || got.Items[0].Steps[2].VideoID == nil {
 		t.Fatalf("http list: %d %s", w.Code, w.Body.String())
 	}
 	w = call(admin, "POST", base+"/"+draft.ID.String()+"/steps", `{"kind":"video","title":"V","video_id":"https://vimeo.com/1","minutes":3}`)
@@ -265,6 +280,21 @@ func TestModules(t *testing.T) {
 	}
 	if got := list(admin, module.Filter{Drafts: true}); len(got) != 0 {
 		t.Fatalf("archived module listed: %+v", got)
+	}
+	if got := list(admin, module.Filter{Drafts: true, Archived: true}); len(got) != 1 || !got[0].ArchivedAt.Valid {
+		t.Fatalf("staff archive list: %+v", got)
+	}
+	if _, err := svc.List(ctx, student, school.ID, module.Filter{Archived: true}); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("participant archive list: %v", err)
+	}
+	if w := call(admin, "GET", base+"?offset=-1", ""); w.Code != 400 {
+		t.Fatalf("negative offset: %d", w.Code)
+	}
+	if got := list(admin, module.Filter{Archived: true, Search: "no-match-unique", Limit: 20}); len(got) != 0 {
+		t.Fatalf("archive search ignored: %+v", got)
+	}
+	if got := list(admin, module.Filter{Archived: true, Offset: 100}); len(got) != 0 {
+		t.Fatalf("archive offset ignored: %+v", got)
 	}
 	if w := call(admin, "GET", base+"?level=TK", ""); w.Code != 400 {
 		t.Fatalf("http bad level: %d", w.Code)

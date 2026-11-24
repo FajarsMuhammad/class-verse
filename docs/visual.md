@@ -198,6 +198,10 @@ Ukuran proporsional ala Gather. Token di `tokens.css`; komponen baru wajib memak
 - Gaya bersama penyusun berada di `src/styles/authoring.css`; gunakan ulang pola daftar → satu item →
   satu form. Jangan kembali ke kartu bersarang yang membuka semua isi sekaligus.
 
+### Content Studio (CS, 2026-11-18)
+
+Editor rich text memakai toolbar berlabel, status simpan live, konflik dengan aksi salin lokal/muat server, retry, dan pratinjau memakai renderer siswa. Kuis benar/salah memakai dua opsi; simulasi diberi label tidak disimpan. Tata letak HP tanpa overflow horizontal.
+
 ## Aturan aksesibilitas
 
 - Layar sentuh: semua yang bisa diketuk minimal 44×44 px. Mouse/trackpad: 36 px (lihat Kontrol ringkas), minimal 24 px.
@@ -243,8 +247,14 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   Peta tetap ter-mount, berdimensi nonzero, tersembunyi dan inert saat halaman dibuka: koneksi/posisi tidak
   direset dan tidak ada fokus keyboard pada peta tersembunyi. Draf chat tetap terjaga.
   **Stasiun dihapus untuk guru** karena alatnya sudah di menu. Kelola adalah menu induk dengan submenu kiri
-  ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Tugas, Ruang & undangan, Buku perpustakaan, Berkas,
-  dan Kontrol sesi saat berada di ruang. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
+  ringkas (bukan dropdown): Modul belajar, Kuis, Kelas, Siswa, Tugas, Ruang & undangan, Buku perpustakaan,
+  Berkas, Tahun ajaran (admin), dan Kontrol sesi saat berada di ruang. Detail Kelas → Siswa menyediakan **Undang
+  siswa ke kelas ini** untuk admin/wali aktif; memakai form undangan lama dalam permukaan datar. Penerima melihat
+  kelas/tahun sebelum gabung; konflik penempatan tetap ditampilkan bersama tautan Buka sekolah. Kelas = daftar per tahun ajaran → satu
+  kelas dengan tab Siswa/Pengajar/Pengaturan (Pengaturan hanya admin); baris kelas menampilkan wali kelas, jumlah
+  guru mapel, dan lencana peran pemanggil. Siswa = direktori per halaman 50 dari server dengan filter kelas termasuk
+  **Belum punya kelas**, centang → **Pindahkan ke kelas** (hasil per siswa). Tahun ajaran (admin) memuat **Siapkan
+  tahun ajaran**: salin struktur lalu naik kelas lewat pemetaan → pratinjau → konfirmasi. Item aktif memakai `aria-current="page"`; hanya alat terpilih yang
   dimuat. Lebar ≤1000 px submenu berbaris di atas konten. Modul belajar dibatasi `perpus` di Perpustakaan.
   Aksi **Sematkan ke [nama ruang]**
   berada pada detail modul terbit yang memiliki isi, bukan pemilih terpisah di atas daftar. Klik membuka
@@ -277,3 +287,33 @@ Mode gelap belum didesain. Tile art final, sprite sheet animasi, dan ikon gedung
   HP lewat halaman **Kelola sekolah** (`/kelola-ruang?bagian=ruang|modul|kelas|perpustakaan`).
 - Pustakawan non-guru belum menjadi peran sendiri; tambahkan peran khusus katalog bila sekolah memakai petugas
   perpustakaan yang tidak boleh melihat nilai.
+
+## G1 — Pertemuan tamu
+
+- Host membuka **Undang tamu** dalam kontrol pengajar ruang. Form ringkas masa berlaku/batas tamu,
+  daftar tautan dengan Salin/Cabut, serta antrean nama dengan Izinkan/Tolak. Status menunggu terlihat
+  pada judul kontrol. Daftar datar, garis 1 px `--kv-line`, kontrol `--touch-min`, feedback `role=status/alert`.
+- `/guest/{code}` menampilkan sekolah, ruang, form nama, dan tanggung jawab izin wali tanpa meminta
+  tanggal lahir. Sebelum disetujui tidak ada peta, peserta, chat, atau suara.
+- Setelah disetujui: header ruang/sekolah/nama dengan label **Tamu** dan **Tinggalkan pertemuan**.
+  Desktop memakai peta ruang + Chat dan kontrol suara. HP tetap daftar tempat + Chat, tanpa canvas/voice.
+  Tidak ada menu akun/Kelola/Rapor/Belajar, perpustakaan, atau pintu menuju ruang lain.
+- Badge **Tamu** di peserta dan pengirim chat; jumlah online hanya di Chat. Ditolak, dicabut,
+  kedaluwarsa, dan dikeluarkan menampilkan alasan nyata tanpa redirect ke login akun.
+- Bukti browser lokal: viewport 1440×1000 dan 390×844 tanpa overflow horizontal/page error.
+  Safari/iOS dan perangkat fisik belum diverifikasi.
+
+
+### Content Studio — referensi modul dan kuis
+
+Referensi: `docs/modul-quiz/Kelasverse — Pembuat Modul & Quiz.html` beserta empat screenshot di folder sama.
+Editor memakai tiga panel sejajar: outline bagian/soal, form konten, dan ringkasan pengaturan.
+Pada layar sempit panel ditumpuk; kontrol, fokus, dan warna tetap memakai token aplikasi.
+Pembuatan modul menyediakan struktur bacaan, praktikum, atau kosong. Struktur tetap draf yang perlu diisi guru.
+Pratinjau kuis memakai kartu pertanyaan dan empat pilihan berwarna, dua kolom termasuk HP.
+Tidak menambahkan XP, timer, impor dokumen/CSV otomatis, mode ujian/Arena, jenis soal baru, atau akses publik.
+Aturan revisi immutable, konflik draf, nilai lulus dan percobaan tidak berubah. Lampiran memakai File belajar yang sudah ada.
+
+Bukti lokal: unit frontend 237 tes lulus sebelum tambahan tes struktur modul; tes terfokus modul/kuis/player lulus setelahnya;
+lint/build lulus; browser `content-studio.mjs` lulus; `studio-design.mjs` memeriksa editor pada 1440×1000 dan 390×844,
+tanpa overflow halaman maupun runtime error. Skrip browser sementara berada di `/tmp/kv-e2e/` (belum CI).

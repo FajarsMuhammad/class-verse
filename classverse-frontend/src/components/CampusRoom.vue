@@ -13,6 +13,7 @@ import ProfileDialog from './ProfileDialog.vue'
 import logoUrl from '@/assets/avatars/round.svg'
 import DoorRooms from '@/components/DoorRooms.vue'
 import MapZoom from '@/components/MapZoom.vue'
+import { ZOOM_DEFAULT } from '@/game/mapZoom'
 import MapMinimap from '@/components/MapMinimap.vue'
 import PlaceCard from '@/components/PlaceCard.vue'
 import PlaceList from '@/components/PlaceList.vue'
@@ -27,7 +28,6 @@ import type { Building, Seat } from '@/realtime/mapdata'
 import ChatPanel from '@/components/ChatPanel.vue'
 import LibraryCatalog from '@/components/LibraryCatalog.vue'
 import RoomStations from '@/components/RoomStations.vue'
-import RoomTools from '@/components/RoomTools.vue'
 import SideMenu, { type SideItem } from '@/components/SideMenu.vue'
 import type { Shelf } from '@/api/types'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -100,13 +100,13 @@ async function logout() {
   await auth.logout()
   await router.push({ name: 'login' })
 }
-const selectedTool = ref('modules')
+const selectedTool = ref('overview')
 function openModules() {
   selectedTool.value = 'modules'
   sideItem.value = 'tools'
 }
 const nearDoor = ref<Building | null>(null)
-const zoom = ref(0.5)
+const zoom = ref(ZOOM_DEFAULT)
 const position = ref<{ x: number; y: number } | null>(null)
 const otherPositions = ref<{ x: number; y: number }[]>([])
 const campus = computed(() => !current.value || current.value.map_key === 'campus')
@@ -126,14 +126,12 @@ const icons = {
   quizzes: 'M12 3l9 5-9 5-9-5zM6 11v5l6 3 6-3v-5',
   classes: 'M8 11a3 3 0 100-6 3 3 0 000 6zM16 11a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 8 1 8 5',
   assignments: 'M9 4h6v3H9zM6 6h12v15H6zM9 12l2 2 4-4',
-  gradebook: 'M5 20V10M12 20V4M19 20v-7',
   rooms: 'M4 20V8l8-5 8 5v12M9 20v-6h6v6',
   files: 'M6 3h8l4 4v14H6zM14 3v4h4',
   moderation: 'M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z',
 } as const
 const toolItems = computed<SideItem[]>(() => org.isTeacher && !kicked.value ? [
   { key: 'tools', label: 'Kelola', icon: icons.classes, wide: true },
-  { key: 'gradebook', label: 'Rapor', icon: icons.gradebook, wide: true },
 ] : [])
 // Unread dot on Chat while its panel is closed (ChatState is not reactive; chatVersion tracks it).
 const seenChat = ref(0)
@@ -153,13 +151,13 @@ const sideItems = computed<SideItem[]>(() => [
   ...(contentRoom.value && (!org.isTeacher || library.value) ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value && !org.isTeacher, companion: true }] : []),
   ...toolItems.value,
 ])
-// The panel remembers being collapsed so the map stays wide; when open, content rooms start on their catalog.
-const SIDE_KEY = 'kv-side-collapsed'
-const sideItem = ref<string | null>(localStorage.getItem(SIDE_KEY) === '1' ? null : org.isTeacher ? 'map' : 'learn')
+// The panel always opens on entry; collapsing it is for this visit only. Content rooms start on their catalog.
+// Drop the old remembered-collapse flag so nobody stays stuck with a hidden panel.
+localStorage.removeItem('kv-side-collapsed')
+const sideItem = ref<string | null>(org.isTeacher ? 'map' : 'learn')
 const pageOpen = computed(() => org.isTeacher && !!sideItem.value &&
   !sideItems.value.find(item => item.key === sideItem.value)?.companion)
 watch(sideItem, (key) => {
-  localStorage.setItem(SIDE_KEY, key ? '0' : '1')
   if (key === 'chat') seenChat.value = chatCount.value
   if (key === 'learn') seenPin.value = pinKey.value
 })
@@ -405,7 +403,6 @@ onBeforeUnmount(() => {
           <TeacherTools v-if="org.active && auth.me" v-model="selectedTool" :org-id="org.active.id" :user-id="auth.me.id"
             :is-admin="org.active.role === 'admin'" :room="room" @pinned="sideItem = 'map'" />
         </template>
-        <template #gradebook><RoomTools v-if="org.active && auth.me" tool="gradebook" :org-id="org.active.id" :user-id="auth.me.id" :is-admin="org.active.role === 'admin'" /></template>
       </SideMenu>
       <div class="map-column" :class="{ 'map-hidden': pageOpen }" :inert="pageOpen">
       <div class="map-frame">
@@ -439,6 +436,7 @@ onBeforeUnmount(() => {
               sendMove,
               currentZone: () => chat.zone.key,
               speaking: () => voice?.speaking.value ?? new Set(),
+              counts: () => buildings,
               inset: () => inset,
               walkTarget: () => walkTarget,
               zoom: () => zoom,
@@ -637,7 +635,6 @@ h1 {
   border-radius: var(--radius-pill);
   font-weight: var(--weight-bold);
 }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .leave-link {
   align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1);
   min-height: 0; height: var(--control-sm); margin-bottom: var(--space-2); padding: 0 var(--space-3);

@@ -333,6 +333,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rooms/{room_id}/guest-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Link tamu aktif ruang ini (G1). Guru dan admin sekolah ruang. */
+        get: operations["listGuestLinks"];
+        put?: never;
+        /** @description Buat link tamu untuk satu ruang (bukan kampus). Berlaku maks 24 jam, maks 40 tamu. */
+        post: operations["createGuestLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/{room_id}/guest-links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Cabut link; tamu yang sudah masuk lewat link ini langsung diputus. */
+        delete: operations["revokeGuestLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/{room_id}/guest-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Tamu yang menunggu persetujuan, terlama dulu (maks 50). */
+        get: operations["listGuestRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rooms/{room_id}/guest-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Izinkan atau tolak tamu. Permintaan yang sudah diputuskan menjawab 404. */
+        post: operations["decideGuestRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/links/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        /** @description Pratinjau link tamu tanpa akun. Dibatasi per IP. */
+        get: operations["previewGuestLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/links/{code}/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Minta masuk sebagai tamu dengan nama. Membuat identitas tamu (tanpa akun) dan mengembalikan token tamu berumur pendek. Token ini hanya diterima endpoint /api/guest, WebSocket ruang tujuan, dan token suaranya. */
+        post: operations["requestGuestAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Status permintaan tamu (token tamu). Selalu mengembalikan token tamu baru, jadi polling sekaligus memperpanjang sesi selama link aktif. */
+        get: operations["getGuestStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guest/rooms/{room_id}/voice-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Sama dengan createVoiceToken, untuk token tamu di ruang tujuannya. */
+        post: operations["createGuestVoiceToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports": {
         parameters: {
             query?: never;
@@ -504,7 +659,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description File siap milik sekolah (maks 200, terbaru dulu), posisi baca pemanggil, dan pemakaian kuota. */
+        /** @description File siap milik sekolah (terbaru dulu, 20 per halaman), posisi baca pemanggil, dan pemakaian kuota. */
         get: operations["listFiles"];
         put?: never;
         post?: never;
@@ -683,6 +838,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/modules/{module_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only. */
+        post: operations["publishModuleRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/modules/{module_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Staff-only read-only revision metadata; no learner answer-key access. */
+        get: operations["listModuleRevisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Peserta yang sudah menyelesaikan kuis, nilai tertinggi (aturan Rapor), jumlah percobaan. */
+        get: operations["listQuizResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Staff only. Atomically publish expected draft. Same version retry returns same revision; stale version is draft_conflict. Module binds published quiz revisions only. */
+        post: operations["publishQuizRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/quizzes/{quiz_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Staff-only read-only revision metadata; no learner answer-key access. */
+        get: operations["listQuizRevisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/modules": {
         parameters: {
             query?: never;
@@ -694,7 +949,8 @@ export interface paths {
         };
         /**
          * @description Modul (jalur belajar) beserta langkah aktif berurutan. Peserta hanya melihat modul terbit; `drafts=true`
-         *     menyertakan draf untuk pengajar/admin. Arsip tidak pernah tampil. Maksimal 100 modul.
+         *     menyertakan draf untuk pengajar/admin. `archived=true` hanya untuk pengajar/admin, mengembalikan
+         *     daftar arsip terpisah (bukan gabungan dengan modul aktif). Maksimal 100 modul.
          */
         get: operations["listModules"];
         put?: never;
@@ -1208,6 +1464,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/management-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getManagementSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/orgs/{org_id}/academic-years": {
         parameters: {
             query?: never;
@@ -1258,10 +1530,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa. */
+        /** @description Pengajar/admin. Kelas aktif (bukan arsip) beserta jumlah siswa, wali kelas, jumlah guru mapel dan peran pemanggil; kelas yang diajar pemanggil lebih dulu. */
         get: operations["listClasses"];
         put?: never;
-        /** @description Pengajar/admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu. */
+        /** @description Admin. Nama 1–40 karakter, unik (tanpa beda huruf besar) di tahun itu. */
         post: operations["createClass"];
         delete?: never;
         options?: never;
@@ -1279,7 +1551,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description Pengajar/admin. Semua anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan). */
+        /** @description Pengajar/admin. Satu halaman anggota berperan peserta dengan kelasnya di tahun ini (null = belum ditempatkan). */
         get: operations["listRoster"];
         put?: never;
         post?: never;
@@ -1302,12 +1574,147 @@ export interface paths {
         };
         get?: never;
         /**
-         * @description Pengajar/admin. Menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
+         * @description Admin menempatkan atau memindahkan peserta ke kelas tahun ini dalam satu transaksi (penempatan lama
          *     ditutup, riwayat tetap). `class_id: null` mengeluarkan dari kelas. Hanya anggota berperan peserta.
+         *     Wali kelas hanya menambah siswa tanpa kelas ke kelasnya (409 `has_class` bila sudah punya kelas) dan
+         *     mengeluarkan siswa kelasnya; selain itu 403.
          */
         put: operations["placeStudent"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Pindah massal 1–50 peserta ke satu kelas (`class_id: null` = keluarkan), satu transaksi; hak sama dengan
+         *     placeStudent. Siswa yang gagal dilaporkan per item (`not_student`, `has_class`), sisanya tetap dipindah.
+         */
+        post: operations["moveStudents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Admin. Menyalin kelas aktif tahun sumber ke tahun ini; nama yang sudah ada dilewati dan dilaporkan.
+         *     `teachers: true` ikut menyalin wali kelas/guru mapel yang masih pengajar sekolah. Siswa tidak ikut.
+         */
+        post: operations["copyYearClasses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/academic-years/{year_id}/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Admin. Naik kelas: siswa aktif tiap kelas sumber (tahun `from_year_id`) ditempatkan ke kelas tujuan di tahun
+         *     ini sesuai pemetaan eksplisit. Siswa yang sudah punya kelas di tahun ini dilewati dan dilaporkan.
+         */
+        post: operations["promoteStudents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Pengajar dan admin sekolah, calon wali kelas/guru mapel. */
+        get: operations["listStaff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/classes/{class_id}/teachers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Pengajar/admin. Wali kelas dan guru mapel aktif. */
+        get: operations["listClassTeachers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/classes/{class_id}/teachers/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description Admin. Menjadikan pengajar/admin sekolah wali kelas (menggantikan wali lama) atau guru mapel dengan mapel
+         *     opsional. Satu peran per orang per kelas; riwayat tetap.
+         */
+        put: operations["setClassTeacher"];
+        post?: never;
+        /** @description Admin. Mengakhiri peran orang di kelas. */
+        delete: operations["removeClassTeacher"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1324,10 +1731,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description Pengajar/admin. */
+        /** @description Admin. */
         put: operations["renameClass"];
         post?: never;
-        /** @description Pengajar/admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); riwayat tetap. */
+        /** @description Admin. Hanya kelas tanpa siswa aktif (409 `class_not_empty`); pengajar kelas dilepas; riwayat tetap. */
         delete: operations["archiveClass"];
         options?: never;
         head?: never;
@@ -1358,9 +1765,44 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        DraftVersionInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version: number;
+        };
+        ContentRevision: {
+            /** Format: uuid */
+            id: string;
+            revision: number;
+            /** Format: int64 */
+            draft_version: number;
+            /** Format: date-time */
+            published_at: string;
+        };
+        RichContent: {
+            type?: string;
+            text?: string;
+            attrs?: {
+                [key: string]: unknown;
+            };
+            marks?: {
+                type: string;
+                attrs?: {
+                    [key: string]: unknown;
+                };
+            }[];
+            content?: components["schemas"]["RichContent"][];
+        };
         /** @enum {string} */
         Level: "SD" | "SMP" | "SMA" | "Umum";
         ModuleInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             /** @description Kunci gedung di peta kampus */
             building_key: string;
             level: components["schemas"]["Level"];
@@ -1369,6 +1811,10 @@ export interface components {
             published: boolean;
         };
         Module: components["schemas"]["ModuleInput"] & {
+            /** Format: int64 */
+            draft_version?: number;
+            /** Format: uuid */
+            published_revision_id?: string | null;
             /** Format: uuid */
             id: string;
             /** Format: date-time */
@@ -1377,10 +1823,24 @@ export interface components {
         };
         ModuleList: {
             items: components["schemas"]["Module"][];
+            total: number;
+            /** @description Hanya bila counts=true (pengajar/admin) */
+            counts?: {
+                all?: number;
+                published?: number;
+                draft?: number;
+                archived?: number;
+            };
         };
         /** @enum {string} */
         StepKind: "materi" | "berkas" | "video" | "kuis";
         StepInput: {
+            rich_content?: components["schemas"]["RichContent"];
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             kind: components["schemas"]["StepKind"];
             title: string;
             /** @description Teks materi (wajib untuk `materi`, catatan opsional lainnya). Ditampilkan sebagai teks biasa. */
@@ -1400,6 +1860,7 @@ export interface components {
             minutes: number;
         };
         ModuleStep: {
+            rich_content?: components["schemas"]["RichContent"];
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["StepKind"];
@@ -1436,6 +1897,11 @@ export interface components {
             next_title: string;
         };
         QuizInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             /** @description Kunci gedung di peta kampus */
             building_key: string;
             level: components["schemas"]["Level"];
@@ -1446,6 +1912,10 @@ export interface components {
             published: boolean;
         };
         Quiz: {
+            /** Format: int64 */
+            draft_version?: number;
+            /** Format: uuid */
+            published_revision_id?: string | null;
             /** Format: uuid */
             id: string;
             building_key: string;
@@ -1461,13 +1931,29 @@ export interface components {
             best_score: number | null;
             /** @description Jumlah percobaan selesai milik pemanggil */
             attempts: number;
+            /** @description Pengajar/admin dengan drafts=true: maks 3 modul aktif yang memakai kuis ini */
+            module_titles?: string[];
             /** @description Hanya untuk pengajar/admin dengan drafts=true */
             questions?: components["schemas"]["QuizQuestion"][];
         };
         QuizList: {
             items: components["schemas"]["Quiz"][];
+            total: number;
+            /** @description Hanya bila counts=true (pengajar/admin) */
+            counts?: {
+                all?: number;
+                published?: number;
+                draft?: number;
+                /** @description Kuis tanpa soal */
+                empty?: number;
+            };
         };
         QuestionInput: {
+            /**
+             * Format: int64
+             * @description Required for existing resource writes; stale values return draft_conflict (409)
+             */
+            expected_version?: number;
             prompt: string;
             options: string[];
             /** @description Indeks pilihan benar */
@@ -1588,8 +2074,15 @@ export interface components {
             cancelled: boolean;
             done: number;
             total: number;
+            /** @description Staf saja (0 untuk peserta): jumlah penerima beku */
+            recipients?: number;
+            /** @description Staf saja: penerima yang menyelesaikan semua langkah */
+            finished?: number;
+            /** @description Staf saja: penerima yang menyelesaikan minimal satu langkah */
+            started?: number;
         };
         AssignmentStep: {
+            rich_content?: components["schemas"]["RichContent"];
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["StepKind"];
@@ -1619,6 +2112,9 @@ export interface components {
             /** @example 2026/2027 */
             label: string;
             active: boolean;
+            class_count?: number;
+            /** @description Penempatan siswa aktif di tahun ini */
+            student_count?: number;
         };
         ClassInput: {
             name: string;
@@ -1631,6 +2127,28 @@ export interface components {
             name: string;
             /** @description Jumlah siswa aktif */
             students: number;
+            /** @description Jumlah guru mapel aktif */
+            subject_teachers: number;
+            /** @description Null = belum ada wali kelas */
+            homeroom: components["schemas"]["Person"] | null;
+            /**
+             * @description Peran pemanggil di kelas ini
+             * @enum {string|null}
+             */
+            my_role: "homeroom" | "subject" | null;
+        };
+        Person: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        ClassTeacher: {
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            /** @enum {string} */
+            role: "homeroom" | "subject";
+            subject: string | null;
         };
         RosterEntry: {
             /** Format: uuid */
@@ -1642,6 +2160,9 @@ export interface components {
              * @description Null = belum ditempatkan
              */
             class_id: string | null;
+            /** @description Langkah tugas aktif tahun ini yang selesai */
+            steps_done?: number;
+            steps_total?: number;
         };
         Placement: {
             class_name: string;
@@ -1658,6 +2179,7 @@ export interface components {
         Shelf: "dongeng" | "novel" | "komik" | "sains" | "matematika" | "sejarah" | "inggris" | "referensi";
         BookInput: {
             title: string;
+            /** @description Opsional; kosong berarti penulis tidak diketahui */
             author: string;
             shelf: components["schemas"]["Shelf"];
             /** @enum {string} */
@@ -1712,6 +2234,11 @@ export interface components {
         BookList: {
             items: components["schemas"]["Book"][];
             next_cursor: string | null;
+            counts?: {
+                all: number;
+                published: number;
+                draft: number;
+            };
         };
         StartUploadRequest: {
             /** Format: uuid */
@@ -1754,8 +2281,11 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             position: number;
+            /** @description Maks 3 judul buku/modul/tugas aktif yang memakai file; tidak kosong berarti tidak bisa dihapus */
+            used_by?: string[];
         };
         FileList: {
+            total: number;
             items: components["schemas"]["FileItem"][];
             /** Format: int64 */
             used_bytes: number;
@@ -1844,12 +2374,19 @@ export interface components {
             created_at: string;
         };
         CreateInviteRequest: {
+            /**
+             * Format: uuid
+             * @description Opsional, kelas aktif sekolah ini. Admin atau wali kelas aktif; role wajib participant.
+             */
+            class_id?: string;
             role: components["schemas"]["InviteRole"];
             /** @default 7 */
             expires_in_days: number;
             max_uses?: number | null;
         };
         Invite: {
+            /** Format: uuid */
+            class_id?: string;
             /** Format: uuid */
             id: string;
             /** @description Bentuk tampilan ABCD-EFGH */
@@ -1864,6 +2401,53 @@ export interface components {
             created_by: string;
             /** Format: date-time */
             created_at: string;
+        };
+        GuestLink: {
+            /** Format: uuid */
+            id: string;
+            /** @description Bentuk tampilan ABCD-EFGH */
+            code: string;
+            /** @description URL frontend /guest/{code} */
+            link: string;
+            max_guests: number;
+            used_count: number;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        CreateGuestLinkRequest: {
+            /** @default 2 */
+            expires_in_hours: number;
+            /** @default 40 */
+            max_guests: number;
+        };
+        GuestRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "denied";
+            /** Format: date-time */
+            created_at: string;
+        };
+        GuestLinkPreview: {
+            org_name: string;
+            room_name: string;
+        };
+        GuestSession: {
+            /** @description Token tamu (15 menit) */
+            token: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "denied";
+            display_name: string;
+            /** Format: uuid */
+            room_id: string;
+            room_name: string;
+            map_key: components["schemas"]["RoomMap"];
+            org_name: string;
         };
         /** @enum {string} */
         RoomMap: "classroom" | "garden" | "lab" | "baca" | "library" | "science" | "staff";
@@ -1903,6 +2487,12 @@ export interface components {
         RoomList: {
             items: components["schemas"]["Room"][];
             next_cursor: string | null;
+            /** @description Hanya bila counts=true. archived selalu 0 untuk peserta. */
+            counts?: {
+                all: number;
+                live: number;
+                archived: number;
+            };
         };
         /** @enum {string} */
         ReportStatus: "open" | "reviewed" | "dismissed";
@@ -1981,10 +2571,17 @@ export interface components {
             next_cursor: string | null;
         };
         InvitePreview: {
+            class_name?: string;
+            year_label?: string;
             org_name: string;
             role: components["schemas"]["InviteRole"];
         };
         Membership: {
+            /**
+             * @description Hasil penempatan undangan kelas. Keanggotaan tetap berhasil; kelas lama tidak dipindah. Tidak ada untuk undangan sekolah.
+             * @enum {string}
+             */
+            placement_status?: "placed" | "has_class" | "class_unavailable" | "not_student";
             /** Format: uuid */
             org_id: string;
             /** Format: uuid */
@@ -2391,6 +2988,7 @@ export interface operations {
     listInvites: {
         parameters: {
             query?: {
+                class_id?: string;
                 limit?: number;
                 cursor?: string;
             };
@@ -2532,6 +3130,12 @@ export interface operations {
                 building?: string;
                 limit?: number;
                 cursor?: string;
+                /** @description Cari nama ruang, teks literal */
+                q?: string;
+                /** @description Kosong = semua ruang aktif; live = sedang ada orang; archived = arsip (hanya pengajar) */
+                status?: "live" | "archived";
+                /** @description true menambah hitungan tab (mengikuti filter gedung dan pencarian) */
+                counts?: boolean;
             };
             header?: never;
             path: {
@@ -2686,6 +3290,269 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
             /** @description voice_pending; pemutusan admission sebelumnya belum terkonfirmasi */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            503: components["responses"]["VoiceUnavailable"];
+        };
+    };
+    listGuestLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Link aktif, terbaru dulu (maks 20) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GuestLink"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createGuestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGuestLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Link dibuat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestLink"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeGuestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dicabut */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listGuestRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Antrean tamu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GuestRequest"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    decideGuestRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approve" | "deny";
+                };
+            };
+        };
+        responses: {
+            /** @description Keputusan tersimpan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestRequest"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    previewGuestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nama sekolah dan ruang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestLinkPreview"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            410: components["responses"]["InviteExpired"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    requestGuestAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tidak peka huruf besar; `-` dan spasi diabaikan. */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Secret UUID v4 retry key. Keep out of logs and URLs; same link/key resumes unchanged request.
+                     */
+                    request_key: string;
+                    display_name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Permintaan dibuat, status pending */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestSession"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["NotFound"];
+            410: components["responses"]["InviteExpired"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getGuestStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status tamu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestSession"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            410: components["responses"]["InviteExpired"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    createGuestVoiceToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                room_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token voice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceToken"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            /** @description voice_pending */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2954,7 +3821,13 @@ export interface operations {
     };
     listFiles: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+                /** @description Filter jenis sebelum pagination. */
+                kind?: "pdf" | "audio";
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -3082,6 +3955,12 @@ export interface operations {
                 /** @description Cari judul/penulis, teks literal */
                 q?: string;
                 drafts?: boolean;
+                format?: "buku" | "ebook" | "audio";
+                level?: "SD" | "SMP" | "SMA" | "Umum";
+                /** @description draft hanya berlaku untuk pengajar/admin dengan drafts=true */
+                status?: "published" | "draft";
+                /** @description Pengajar/admin: sertakan hitungan tab untuk filter non-status */
+                counts?: boolean;
                 limit?: number;
                 cursor?: string;
             };
@@ -3274,12 +4153,172 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    publishModuleRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftVersionInput"];
+            };
+        };
+        responses: {
+            /** @description Immutable revision published */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Module"];
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listModuleRevisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                module_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published revision history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ContentRevision"][];
+                    };
+                };
+            };
+        };
+    };
+    listQuizResults: {
+        parameters: {
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hasil kuis */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            display_name: string;
+                            best_score: number;
+                            attempts: number;
+                            /** Format: date-time */
+                            last_finished_at: string;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    publishQuizRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftVersionInput"];
+            };
+        };
+        responses: {
+            /** @description Immutable revision published */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quiz"];
+                };
+            };
+            400: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listQuizRevisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published revision history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ContentRevision"][];
+                    };
+                };
+            };
+        };
+    };
     listModules: {
         parameters: {
             query?: {
                 building_key?: string;
                 level?: components["schemas"]["Level"];
                 drafts?: boolean;
+                archived?: boolean;
+                /** @description Lewati sejumlah baris; satu respons maksimal 100 item. */
+                offset?: number;
+                limit?: number;
+                search?: string;
+                status?: "draft" | "published";
+                /** @description Ambil satu modul untuk pin/detail tanpa memuat daftar. */
+                module_id?: string;
+                /** @description Pengajar/admin: sertakan hitungan tab untuk filter non-status. */
+                counts?: boolean;
             };
             header?: never;
             path: {
@@ -3587,6 +4626,13 @@ export interface operations {
                 building_key?: string;
                 level?: components["schemas"]["Level"];
                 drafts?: boolean;
+                /** @description Lewati sejumlah baris; satu respons maksimal 100 item. */
+                offset?: number;
+                limit?: number;
+                search?: string;
+                status?: "draft" | "published";
+                /** @description Pengajar/admin: sertakan hitungan tab untuk filter non-status. */
+                counts?: boolean;
             };
             header?: never;
             path: {
@@ -4035,7 +5081,15 @@ export interface operations {
     };
     listAssignments: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+                /** @description Cari nama sebelum pagination. */
+                search?: string;
+                /** @description Kelas penerima tugas. */
+                class_id?: string;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -4052,6 +5106,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["Assignment"][];
+                        /** @description Jumlah tugas yang cocok dengan filter */
+                        total: number;
                     };
                 };
             };
@@ -4180,9 +5236,38 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
-    listAcademicYears: {
+    getManagementSummary: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description School-wide counts for staff; class attention uses active academic year. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listAcademicYears: {
+        parameters: {
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -4199,6 +5284,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["AcademicYear"][];
+                        total: number;
                     };
                 };
             };
@@ -4266,7 +5352,13 @@ export interface operations {
     };
     listClasses: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+                /** @description Cari nama sebelum pagination. */
+                search?: string;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -4284,6 +5376,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["SchoolClass"][];
+                        total: number;
                     };
                 };
             };
@@ -4325,7 +5418,14 @@ export interface operations {
     };
     listRoster: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description UUID kelas, atau `none` = belum punya kelas */
+                class_id?: string;
+                /** @description Cari nama */
+                q?: string;
+                offset?: number;
+                limit?: number;
+            };
             header?: never;
             path: {
                 org_id: components["parameters"]["OrgID"];
@@ -4343,9 +5443,12 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["RosterEntry"][];
+                        /** @description Jumlah sesuai filter */
+                        total: number;
                     };
                 };
             };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
@@ -4372,6 +5475,258 @@ export interface operations {
         };
         responses: {
             /** @description Disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    moveStudents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    user_ids: string[];
+                    /** Format: uuid */
+                    class_id: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Hasil per siswa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            /** @enum {string|null} */
+                            error: "not_student" | "has_class" | null;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    copyYearClasses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    from_year_id: string;
+                    /** @default false */
+                    teachers?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Hasil salin */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                        /** @description Nama kelas yang sudah ada */
+                        skipped: string[];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    promoteStudents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                year_id: components["parameters"]["YearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    from_year_id: string;
+                    mappings: {
+                        /** Format: uuid */
+                        from_class_id: string;
+                        /** Format: uuid */
+                        to_class_id: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Hasil naik kelas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        moved: number;
+                        skipped: components["schemas"]["Person"][];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listStaff: {
+        parameters: {
+            query?: {
+                /** @description Ukuran halaman; default 20. */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Staf */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            display_name: string;
+                            /** @enum {string} */
+                            role: "teacher" | "admin";
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listClassTeachers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pengajar kelas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ClassTeacher"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setClassTeacher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "homeroom" | "subject";
+                    /** @description Hanya untuk guru mapel */
+                    subject?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Disimpan */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeClassTeacher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: components["parameters"]["OrgID"];
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dilepas */
             204: {
                 headers: {
                     [name: string]: unknown;

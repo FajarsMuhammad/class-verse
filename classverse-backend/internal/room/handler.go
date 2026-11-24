@@ -55,7 +55,10 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 			return httpx.ValidationFailed(map[string]string{"limit": "Limit 1–100"})
 		}
 	}
-	page, err := h.svc.List(r.Context(), userID, orgID, r.URL.Query().Get("building"), limit, r.URL.Query().Get("cursor"))
+	qs := r.URL.Query()
+	page, err := h.svc.List(r.Context(), userID, orgID, Filter{
+		Building: qs.Get("building"), Q: qs.Get("q"), Status: qs.Get("status"), Limit: limit, Cursor: qs.Get("cursor"), Counts: qs.Get("counts") == "true",
+	})
 	if err != nil {
 		return err
 	}
@@ -65,6 +68,13 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	}
 	if page.NextCursor != "" {
 		resp.NextCursor = &page.NextCursor
+	}
+	if page.Counts != nil {
+		resp.Counts = &struct {
+			All      int `json:"all"`
+			Archived int `json:"archived"`
+			Live     int `json:"live"`
+		}{page.Counts.All, page.Counts.Archived, page.Counts.Live}
 	}
 	httpx.JSON(w, http.StatusOK, resp)
 	return nil

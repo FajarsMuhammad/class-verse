@@ -1,12 +1,13 @@
 -- name: CreateInvite :one
-INSERT INTO invites (org_id, code, role, max_uses, created_by, expires_at, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO invites (org_id, code, role, max_uses, created_by, expires_at, created_at, class_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: ListActiveInvites :many
 -- Keyset pagination on (created_at, id) descending. Every filter includes org_id.
 SELECT * FROM invites
 WHERE org_id = sqlc.arg(org_id)
+  AND (sqlc.narg(class_id)::uuid IS NULL OR class_id = sqlc.narg(class_id))
   AND revoked_at IS NULL
   AND expires_at > sqlc.arg(now)
   AND (max_uses IS NULL OR used_count < max_uses)
@@ -25,9 +26,12 @@ SET revoked_at = coalesce(revoked_at, sqlc.arg(now))
 WHERE id = sqlc.arg(id) AND org_id = sqlc.arg(org_id);
 
 -- name: GetInvitePreview :one
-SELECT i.id, i.org_id, i.role, i.max_uses, i.used_count, i.expires_at, i.revoked_at, o.name AS org_name
+SELECT i.id, i.org_id, i.role, i.max_uses, i.used_count, i.expires_at, i.revoked_at, o.name AS org_name,
+ c.name AS class_name, y.label AS year_label
 FROM invites i
 JOIN organizations o ON o.id = i.org_id
+LEFT JOIN classes c ON c.org_id = i.org_id AND c.id = i.class_id
+LEFT JOIN academic_years y ON y.org_id = c.org_id AND y.id = c.academic_year_id
 WHERE i.code = $1;
 
 -- name: GetInviteByCodeForUpdate :one
@@ -39,3 +43,6 @@ FOR UPDATE;
 UPDATE invites
 SET used_count = used_count + 1
 WHERE id = $1;
+
+-- name: GetInviteMembership :one
+SELECT * FROM memberships WHERE org_id = $1 AND user_id = $2;

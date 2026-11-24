@@ -156,13 +156,13 @@ Setiap story punya ID agar bisa dirujuk di ticket, API spec, dan test. Story M1 
 
 Karena peserta SMA sebagian masih di bawah 18 tahun, aturan ini berlaku sejak M1 dan tidak bisa dimatikan oleh organisasi.
 
-1. **Ruang tertutup.** Semua ruang hanya bisa diakses anggota organisasi; tidak ada pencarian atau direktori publik.
+1. **Ruang tertutup.** Semua ruang hanya bisa diakses anggota organisasi, kecuali tamu pertemuan G1 yang disetujui host untuk satu ruang tujuan; tidak ada pencarian atau direktori publik.
 2. **Tidak ada DM tersembunyi.** Chat privat antar peserta tidak tersedia di MVP; semua percakapan terjadi di ruang yang dimoderasi pengajar.
 3. **Report.** Setiap peserta bisa melaporkan pesan atau pengguna; laporan masuk ke pengajar dan admin organisasi.
 4. **Filter chat.** Kata kasar dan pola data pribadi (nomor HP, alamat) disaring atau disamarkan.
 5. **Log moderasi.** Aksi mute, kick, dan report disimpan untuk audit admin; isi chat disimpan maksimal 30 hari.
 6. **Voice tidak direkam.** Audio hanya di-relay secara real-time, tidak disimpan di server.
-7. **Persetujuan.** Pengguna di bawah 18 tahun bergabung lewat undangan sekolah; sekolah bertanggung jawab memperoleh persetujuan orang tua/wali sesuai UU PDP Pasal 25. Mekanisme ini perlu dikonfirmasi dengan konsultan hukum sebelum peluncuran.
+7. **Persetujuan.** Pengguna di bawah 18 tahun bergabung lewat undangan sekolah; sekolah bertanggung jawab memperoleh persetujuan orang tua/wali sesuai UU PDP Pasal 25. Tamu pertemuan G1 tidak wajib mengisi usia; host/sekolah bertanggung jawab atas undangan tamu dan persetujuan yang diperlukan. Mekanisme ini perlu dikonfirmasi dengan konsultan hukum sebelum peluncuran.
 8. **Data minimal.** MVP awal menyimpan nama tampilan, email, tanggal lahir, role, dan keanggotaan organisasi.
    Perluasan fitur belajar menyimpan berkas sekolah, pinjaman, progres, jawaban/nilai, dan event poin sesuai scope
    MVP 2 di atas, termasuk kelas dan riwayat penempatan per tahun ajaran. Sumber nama lengkap serta kebijakan

@@ -1,0 +1,237 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 1180,
+      "title": "1 · Buat modul baru (template / upload / kosong)",
+      "w": 1440,
+      "x": 0,
+      "y": 0,
+      "page": "alur"
+    },
+    "ModulEditor.dc.html": {
+      "expand": "fill",
+      "h": 1240,
+      "title": "2 · Editor modul berbasis blok",
+      "w": 1440,
+      "x": 1520,
+      "y": 0,
+      "page": "alur"
+    },
+    "QuizBuilder.dc.html": {
+      "expand": "fill",
+      "h": 1240,
+      "title": "3 · Pembuat quiz",
+      "w": 1440,
+      "x": 0,
+      "y": 1480,
+      "page": "alur"
+    },
+    "QuizPlayer.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "4 · Pratinjau siswa (bisa dicoba)",
+      "w": 390,
+      "x": 1520,
+      "y": 1480,
+      "page": "alur"
+    },
+    "Kelola-Beranda.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1080,
+      "title": "01 · Beranda (baru)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Modul.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "02 · Modul belajar",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-ModulBaru.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "03 · Modul baru",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Kuis.dc.html": {
+      "x": 0,
+      "y": 1260,
+      "w": 1440,
+      "h": 940,
+      "title": "04 · Kuis",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Buku.dc.html": {
+      "x": 1520,
+      "y": 1260,
+      "w": 1440,
+      "h": 820,
+      "title": "05 · Buku perpustakaan",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Berkas.dc.html": {
+      "x": 3040,
+      "y": 1260,
+      "w": 1440,
+      "h": 860,
+      "title": "06 · Berkas",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Kelas.dc.html": {
+      "x": 0,
+      "y": 2380,
+      "w": 1440,
+      "h": 1080,
+      "title": "07 · Kelas",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Siswa.dc.html": {
+      "x": 1520,
+      "y": 2380,
+      "w": 1440,
+      "h": 860,
+      "title": "08 · Siswa",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Tugas.dc.html": {
+      "x": 3040,
+      "y": 2380,
+      "w": 1440,
+      "h": 1160,
+      "title": "09 · Tugas",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Ruang.dc.html": {
+      "x": 0,
+      "y": 3720,
+      "w": 1440,
+      "h": 1400,
+      "title": "10 · Ruang & undangan",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Sesi.dc.html": {
+      "x": 1520,
+      "y": 3720,
+      "w": 1440,
+      "h": 900,
+      "title": "11 · Kontrol sesi",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-Tahun.dc.html": {
+      "x": 3040,
+      "y": 3720,
+      "w": 1440,
+      "h": 820,
+      "title": "12 · Tahun ajaran",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    },
+    "Kelola-TambahBuku.dc.html": {
+      "x": 4560,
+      "y": 1260,
+      "w": 1440,
+      "h": 1240,
+      "title": "05b · Tambah buku (revamp, bisa dicoba)",
+      "expand": "fill",
+      "is_interactive": true,
+      "page": "kelola"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-11-18T08:00:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "t1": {
+      "kind": "title1",
+      "maxW": 2960,
+      "text": "Kelasverse · Alur guru: modul → quiz → siswa",
+      "w": 240,
+      "x": 0,
+      "y": -300,
+      "page": "alur"
+    },
+    "t2": {
+      "x": 0,
+      "y": -300,
+      "text": "Revisi menu Kelola: satu kerangka untuk semua menu",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "kelola"
+    },
+    "n-prinsip": {
+      "x": 4560,
+      "y": 0,
+      "w": 420,
+      "fill": "blue",
+      "page": "kelola",
+      "text": "Prinsip revisi\n\n1. Satu kerangka: judul + deskripsi + 1 aksi utama di kanan atas, lalu filter, lalu isi.\n2. Menu dikelompokkan: Konten belajar · Kelas & siswa · Ruang · Pengaturan.\n3. Status pakai chip warna + teks (Terbit, Draf, Live, Perlu perhatian).\n4. Hal yang menghambat siswa naik ke atas (banner + badge merah di menu).\n5. Daftar dulu, form di panel samping (Tugas, Kelas), bukan form di atas daftar.\n6. Aksi jarang (Ubah, Arsipkan) masuk menu titik tiga; aksi utama per baris tetap terlihat.\n7. Empty state selalu memberi langkah berikutnya."
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "ModulEditor.dc.html",
+    "QuizBuilder.dc.html",
+    "QuizPlayer.dc.html",
+    "Kelola-Beranda.dc.html",
+    "Kelola-Modul.dc.html",
+    "Kelola-ModulBaru.dc.html",
+    "Kelola-Kuis.dc.html",
+    "Kelola-Buku.dc.html",
+    "Kelola-TambahBuku.dc.html",
+    "Kelola-Berkas.dc.html",
+    "Kelola-Kelas.dc.html",
+    "Kelola-Siswa.dc.html",
+    "Kelola-Tugas.dc.html",
+    "Kelola-Ruang.dc.html",
+    "Kelola-Sesi.dc.html",
+    "Kelola-Tahun.dc.html"
+  ],
+  "pages": [
+    {
+      "id": "alur",
+      "name": "Alur modul & quiz"
+    },
+    {
+      "id": "kelola",
+      "name": "Revisi menu Kelola"
+    }
+  ],
+  "title": "Kelasverse — Pembuat Modul & Quiz"
+}

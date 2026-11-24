@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { hasMore } from '@/api/page'
+import RemotePagination from './RemotePagination.vue'
 import { computed, getCurrentInstance, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { roomLayout } from '@/game/roomLayout'
@@ -16,6 +18,9 @@ const selected = computed(() => stations.value.find((s) => s.id === props.statio
 const staff = computed(() => props.mapKey === 'staff')
 const showModules = ref(false)
 const modules = ref<Module[]>([])
+const pageNumber = ref(1)
+const more = ref(false)
+function move(delta: number) { pageNumber.value += delta; void load() }
 const loading = ref(false)
 const error = ref('')
 let generation = 0
@@ -25,8 +30,8 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const page = await moduleApi.list(props.orgId, { drafts: true })
-    if (mine === generation) modules.value = page.items
+    const page = await moduleApi.list(props.orgId, { drafts: true, limit: 20, offset: (pageNumber.value - 1) * 20 })
+    if (mine === generation) { modules.value = page.items; more.value = hasMore((pageNumber.value - 1) * 20, page) }
   } catch (err) {
     if (mine === generation) error.value = errorMessage(err)
   } finally {
@@ -70,6 +75,7 @@ const description = computed(() => {
         <strong>{{ m.title }}</strong><span>{{ m.published ? 'Terbit' : 'Draf' }}</span>
         <small>{{ m.level }} · {{ m.steps.length }} langkah</small>
       </component>
+      <RemotePagination :page="pageNumber" :more="more" :busy="loading" @move="move" />
     </section>
     <ModulePath v-if="!staff && showModules" :org-id="orgId" building-key="sains" building-name="Menara Sains" />
     <p class="note">{{ staff ? 'Modul, kuis, kelas, tugas, dan rapor ada di menu alat guru. Rekaman dan statistik kelas menyusul.' : 'Modul tersedia untuk semua stasiun. Pengelompokan modul per stasiun belum tersedia.' }}</p>

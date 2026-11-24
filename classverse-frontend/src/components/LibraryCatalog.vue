@@ -209,11 +209,4 @@ const shelfLabel = (key: string) => shelves.find((s) => s.key === key)?.label ??
   margin: 0;
   color: var(--color-ink-muted);
 }
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 </style>

@@ -36,6 +36,10 @@
   --kv-success: #10b981;
   --kv-danger-soft: #ffe4e6;
   --kv-danger-text: #be123c;
+  --kv-ok-soft: #eaf7ef; /* Terbit status chip */
+  --kv-ok-ink: #1f5a3c;
+  --kv-draft-soft: #fff4de; /* Draf chip, light warning banner */
+  --kv-draft-ink: #7a4a00;
   --kv-info-soft: #e7f0ff;
   --kv-info-text: #1d4ed8;
   --kv-star-soft: #fff6e0;

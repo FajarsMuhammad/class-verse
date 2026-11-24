@@ -14,9 +14,17 @@ const maxBodyBytes = 16 << 10
 // DecodeJSON reads a small JSON body into v. Unknown fields and malformed
 // JSON become a 400 validation_failed.
 func DecodeJSON(r *http.Request, v any) error {
-	dec := json.NewDecoder(io.LimitReader(r.Body, maxBodyBytes))
+	return DecodeJSONLimit(r, v, maxBodyBytes)
+}
+
+// DecodeJSONLimit bounds larger structured documents without widening unrelated endpoint limits.
+func DecodeJSONLimit(r *http.Request, v any, maxBytes int64) error {
+	dec := json.NewDecoder(io.LimitReader(r.Body, maxBytes+1))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
+		return &Error{Status: http.StatusBadRequest, Code: "validation_failed", Message: "Format permintaan tidak valid"}
+	}
+	if err := dec.Decode(new(any)); err != io.EOF {
 		return &Error{Status: http.StatusBadRequest, Code: "validation_failed", Message: "Format permintaan tidak valid"}
 	}
 	return nil

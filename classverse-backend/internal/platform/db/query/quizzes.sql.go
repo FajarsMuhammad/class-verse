@@ -31,36 +31,86 @@ func (q *Queries) ArchiveQuiz(ctx context.Context, arg ArchiveQuizParams) (int64
 }
 
 const completeQuizSteps = `-- name: CompleteQuizSteps :exec
-INSERT INTO module_progress (org_id, user_id, step_id, completed_at)
-SELECT s.org_id, $1, s.id, $2
-FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
-WHERE s.org_id = $3 AND s.quiz_id = $4 AND s.archived_at IS NULL
-  AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+INSERT INTO module_progress(org_id,user_id,step_id,completed_at)
+SELECT s.org_id,$1,s.id,$2
+FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id
+JOIN module_revision_pins p ON p.org_id=s.org_id AND p.module_id=s.module_id AND p.revision_id=s.revision_id AND p.user_id=$1
+WHERE s.org_id=$3 AND s.quiz_id=$4 AND s.quiz_revision_id=$5::uuid
+ AND ($6::uuid IS NULL OR s.revision_id=$6::uuid)
+ AND m.archived_at IS NULL AND m.published_at IS NOT NULL
 ON CONFLICT DO NOTHING
 `
 
 type CompleteQuizStepsParams struct {
-	UserID      uuid.UUID
-	CompletedAt pgtype.Timestamptz
-	OrgID       uuid.UUID
-	QuizID      uuid.NullUUID
+	UserID           uuid.UUID
+	CompletedAt      pgtype.Timestamptz
+	OrgID            uuid.UUID
+	QuizID           uuid.NullUUID
+	QuizRevisionID   uuid.NullUUID
+	ModuleRevisionID uuid.NullUUID
 }
 
-// Passing a quiz completes every active step pointing at it in published modules. Idempotent.
+// Complete only steps bound to this attempt's revision, never unrelated shared drafts.
 func (q *Queries) CompleteQuizSteps(ctx context.Context, arg CompleteQuizStepsParams) error {
 	_, err := q.db.Exec(ctx, completeQuizSteps,
 		arg.UserID,
 		arg.CompletedAt,
 		arg.OrgID,
 		arg.QuizID,
+		arg.QuizRevisionID,
+		arg.ModuleRevisionID,
 	)
 	return err
 }
 
+const countQuizzes = `-- name: CountQuizzes :one
+SELECT count(*)::integer AS all_count,
+  count(*) FILTER (WHERE z.published_at IS NOT NULL)::integer AS published_count,
+  count(*) FILTER (WHERE z.published_at IS NULL)::integer AS draft_count,
+  count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM quiz_questions q WHERE q.quiz_id = z.id))::integer AS empty_count
+FROM quizzes z
+WHERE z.org_id = $1 AND z.archived_at IS NULL
+  AND ($2::text IS NULL OR z.building_key = $2)
+  AND ($3::text IS NULL OR z.level = $3)
+  AND ($4::text = '' OR position(lower($4) in lower(z.title)) > 0)
+`
+
+type CountQuizzesParams struct {
+	OrgID       uuid.UUID
+	BuildingKey pgtype.Text
+	Level       pgtype.Text
+	Search      string
+}
+
+type CountQuizzesRow struct {
+	AllCount       int32
+	PublishedCount int32
+	DraftCount     int32
+	EmptyCount     int32
+}
+
+// Tab counts and the "0 soal" warning for the authoring list, with the list's non-status filters.
+func (q *Queries) CountQuizzes(ctx context.Context, arg CountQuizzesParams) (CountQuizzesRow, error) {
+	row := q.db.QueryRow(ctx, countQuizzes,
+		arg.OrgID,
+		arg.BuildingKey,
+		arg.Level,
+		arg.Search,
+	)
+	var i CountQuizzesRow
+	err := row.Scan(
+		&i.AllCount,
+		&i.PublishedCount,
+		&i.DraftCount,
+		&i.EmptyCount,
+	)
+	return i, err
+}
+
 const createAttempt = `-- name: CreateAttempt :one
-INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, assignment_id, assignment_step_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid, $10::uuid)
-RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id
+INSERT INTO quiz_attempts (id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, assignment_id, assignment_step_id,quiz_revision_id,module_id,module_revision_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid, $10::uuid,$11::uuid,$12::uuid,$13::uuid)
+RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id, quiz_revision_id, module_id, module_revision_id
 `
 
 type CreateAttemptParams struct {
@@ -74,6 +124,9 @@ type CreateAttemptParams struct {
 	StartedAt        pgtype.Timestamptz
 	AssignmentID     uuid.NullUUID
 	AssignmentStepID uuid.NullUUID
+	QuizRevisionID   uuid.NullUUID
+	ModuleID         uuid.NullUUID
+	ModuleRevisionID uuid.NullUUID
 }
 
 func (q *Queries) CreateAttempt(ctx context.Context, arg CreateAttemptParams) (QuizAttempt, error) {
@@ -88,6 +141,9 @@ func (q *Queries) CreateAttempt(ctx context.Context, arg CreateAttemptParams) (Q
 		arg.StartedAt,
 		arg.AssignmentID,
 		arg.AssignmentStepID,
+		arg.QuizRevisionID,
+		arg.ModuleID,
+		arg.ModuleRevisionID,
 	)
 	var i QuizAttempt
 	err := row.Scan(
@@ -104,6 +160,9 @@ func (q *Queries) CreateAttempt(ctx context.Context, arg CreateAttemptParams) (Q
 		&i.Score,
 		&i.AssignmentID,
 		&i.AssignmentStepID,
+		&i.QuizRevisionID,
+		&i.ModuleID,
+		&i.ModuleRevisionID,
 	)
 	return i, err
 }
@@ -157,7 +216,7 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 const createQuiz = `-- name: CreateQuiz :one
 INSERT INTO quizzes (id, org_id, building_key, level, title, description, pass_score, created_by, created_at, updated_at, published_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10)
-RETURNING id, org_id, building_key, level, title, description, pass_score, created_by, created_at, updated_at, published_at, archived_at
+RETURNING id, org_id, building_key, level, title, description, pass_score, created_by, created_at, updated_at, published_at, archived_at, draft_version, published_revision_id
 `
 
 type CreateQuizParams struct {
@@ -200,6 +259,8 @@ func (q *Queries) CreateQuiz(ctx context.Context, arg CreateQuizParams) (Quiz, e
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.ArchivedAt,
+		&i.DraftVersion,
+		&i.PublishedRevisionID,
 	)
 	return i, err
 }
@@ -224,7 +285,7 @@ func (q *Queries) DeleteQuestion(ctx context.Context, arg DeleteQuestionParams) 
 
 const finishAttempt = `-- name: FinishAttempt :one
 UPDATE quiz_attempts SET finished_at = $2, correct = $3, score = $4 WHERE id = $1 AND finished_at IS NULL
-RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id
+RETURNING id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id, quiz_revision_id, module_id, module_revision_id
 `
 
 type FinishAttemptParams struct {
@@ -256,6 +317,9 @@ func (q *Queries) FinishAttempt(ctx context.Context, arg FinishAttemptParams) (Q
 		&i.Score,
 		&i.AssignmentID,
 		&i.AssignmentStepID,
+		&i.QuizRevisionID,
+		&i.ModuleID,
+		&i.ModuleRevisionID,
 	)
 	return i, err
 }
@@ -296,43 +360,58 @@ func (q *Queries) ListQuizQuestions(ctx context.Context, quizID uuid.UUID) ([]Qu
 }
 
 const listQuizzes = `-- name: ListQuizzes :many
-SELECT z.id, z.org_id, z.building_key, z.level, z.title, z.description, z.pass_score, z.created_by, z.created_at, z.updated_at, z.published_at, z.archived_at,
+SELECT z.id, z.org_id, z.building_key, z.level, z.title, z.description, z.pass_score, z.created_by, z.created_at, z.updated_at, z.published_at, z.archived_at, z.draft_version, z.published_revision_id, count(*) OVER() AS total_count,
   (SELECT count(*) FROM quiz_questions q WHERE q.quiz_id = z.id)::integer AS question_count,
   -- -1 when the caller has no finished attempt yet.
   COALESCE((SELECT max(a.score) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = $1), -1)::smallint AS best_score,
-  (SELECT count(*) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = $1 AND a.finished_at IS NOT NULL)::integer AS attempts
-FROM quizzes z
-WHERE z.org_id = $2 AND z.archived_at IS NULL
-  AND ($3::boolean OR z.published_at IS NOT NULL)
-  AND ($4::text IS NULL OR z.building_key = $4)
-  AND ($5::text IS NULL OR z.level = $5)
+  (SELECT count(*) FROM quiz_attempts a WHERE a.quiz_id = z.id AND a.user_id = $1 AND a.finished_at IS NOT NULL)::integer AS attempts,
+  -- Active modules with a kuis step on this quiz (staff authoring only).
+  CASE WHEN $2::boolean THEN ARRAY(SELECT DISTINCT m.title FROM module_steps s JOIN modules m ON m.org_id = s.org_id AND m.id = s.module_id
+    WHERE s.org_id = z.org_id AND s.quiz_id = z.id AND s.archived_at IS NULL AND m.archived_at IS NULL ORDER BY m.title LIMIT 3) ELSE '{}' END::text[] AS module_titles
+FROM quizzes z LEFT JOIN quiz_revisions r ON r.org_id=z.org_id AND r.quiz_id=z.id AND r.id=z.published_revision_id
+WHERE z.org_id = $3 AND z.archived_at IS NULL
+  AND ($2::boolean OR z.published_at IS NOT NULL)
+  AND ($4::text IS NULL OR CASE WHEN $2::boolean THEN z.building_key ELSE r.building_key END = $4)
+  AND ($5::text IS NULL OR CASE WHEN $2::boolean THEN z.level ELSE r.level END = $5)
+  AND ($6::text = '' OR position(lower($6) in lower(CASE WHEN $2::boolean THEN z.title ELSE r.title END)) > 0)
+  AND ($7::text = '' OR (z.published_at IS NOT NULL) = ($7 = 'published'))
 ORDER BY z.created_at, z.id
-LIMIT 100
+LIMIT $9::integer OFFSET $8::integer
 `
 
 type ListQuizzesParams struct {
 	UserID        uuid.UUID
-	OrgID         uuid.UUID
 	IncludeDrafts bool
+	OrgID         uuid.UUID
 	BuildingKey   pgtype.Text
 	Level         pgtype.Text
+	Search        string
+	Status        string
+	ListOffset    int32
+	PageLimit     int32
 }
 
 type ListQuizzesRow struct {
 	Quiz          Quiz
+	TotalCount    int64
 	QuestionCount int32
 	BestScore     int16
 	Attempts      int32
+	ModuleTitles  []string
 }
 
 // Staff may include drafts; archived quizzes never show. best_score is the caller's highest finished score.
 func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]ListQuizzesRow, error) {
 	rows, err := q.db.Query(ctx, listQuizzes,
 		arg.UserID,
-		arg.OrgID,
 		arg.IncludeDrafts,
+		arg.OrgID,
 		arg.BuildingKey,
 		arg.Level,
+		arg.Search,
+		arg.Status,
+		arg.ListOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
@@ -354,9 +433,13 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Lis
 			&i.Quiz.UpdatedAt,
 			&i.Quiz.PublishedAt,
 			&i.Quiz.ArchivedAt,
+			&i.Quiz.DraftVersion,
+			&i.Quiz.PublishedRevisionID,
+			&i.TotalCount,
 			&i.QuestionCount,
 			&i.BestScore,
 			&i.Attempts,
+			&i.ModuleTitles,
 		); err != nil {
 			return nil, err
 		}
@@ -369,7 +452,7 @@ func (q *Queries) ListQuizzes(ctx context.Context, arg ListQuizzesParams) ([]Lis
 }
 
 const lockAttempt = `-- name: LockAttempt :one
-SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id FROM quiz_attempts WHERE org_id = $1 AND quiz_id = $2 AND id = $3 AND user_id = $4 FOR UPDATE
+SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id, quiz_revision_id, module_id, module_revision_id FROM quiz_attempts WHERE org_id = $1 AND quiz_id = $2 AND id = $3 AND user_id = $4 FOR UPDATE
 `
 
 type LockAttemptParams struct {
@@ -402,12 +485,15 @@ func (q *Queries) LockAttempt(ctx context.Context, arg LockAttemptParams) (QuizA
 		&i.Score,
 		&i.AssignmentID,
 		&i.AssignmentStepID,
+		&i.QuizRevisionID,
+		&i.ModuleID,
+		&i.ModuleRevisionID,
 	)
 	return i, err
 }
 
 const lockQuiz = `-- name: LockQuiz :one
-SELECT id, org_id, building_key, level, title, description, pass_score, created_by, created_at, updated_at, published_at, archived_at FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL FOR UPDATE
+SELECT id, org_id, building_key, level, title, description, pass_score, created_by, created_at, updated_at, published_at, archived_at, draft_version, published_revision_id FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL FOR UPDATE
 `
 
 type LockQuizParams struct {
@@ -431,6 +517,8 @@ func (q *Queries) LockQuiz(ctx context.Context, arg LockQuizParams) (Quiz, error
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.ArchivedAt,
+		&i.DraftVersion,
+		&i.PublishedRevisionID,
 	)
 	return i, err
 }
@@ -447,18 +535,25 @@ func (q *Queries) NextQuestionPosition(ctx context.Context, quizID uuid.UUID) (i
 }
 
 const openAttempt = `-- name: OpenAttempt :one
-SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 AND finished_at IS NULL
+SELECT id, org_id, quiz_id, user_id, questions, answers, pass_score, started_at, finished_at, correct, score, assignment_id, assignment_step_id, quiz_revision_id, module_id, module_revision_id FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2 AND finished_at IS NULL
  AND assignment_step_id IS NOT DISTINCT FROM $3::uuid
+ AND module_revision_id IS NOT DISTINCT FROM $4::uuid
 `
 
 type OpenAttemptParams struct {
 	QuizID           uuid.UUID
 	UserID           uuid.UUID
 	AssignmentStepID uuid.NullUUID
+	ModuleRevisionID uuid.NullUUID
 }
 
 func (q *Queries) OpenAttempt(ctx context.Context, arg OpenAttemptParams) (QuizAttempt, error) {
-	row := q.db.QueryRow(ctx, openAttempt, arg.QuizID, arg.UserID, arg.AssignmentStepID)
+	row := q.db.QueryRow(ctx, openAttempt,
+		arg.QuizID,
+		arg.UserID,
+		arg.AssignmentStepID,
+		arg.ModuleRevisionID,
+	)
 	var i QuizAttempt
 	err := row.Scan(
 		&i.ID,
@@ -474,8 +569,38 @@ func (q *Queries) OpenAttempt(ctx context.Context, arg OpenAttemptParams) (QuizA
 		&i.Score,
 		&i.AssignmentID,
 		&i.AssignmentStepID,
+		&i.QuizRevisionID,
+		&i.ModuleID,
+		&i.ModuleRevisionID,
 	)
 	return i, err
+}
+
+const pinQuizModules = `-- name: PinQuizModules :exec
+INSERT INTO module_revision_pins(org_id,module_id,user_id,revision_id)
+SELECT m.org_id,m.id,$1,m.published_revision_id FROM modules m
+JOIN module_revision_steps s ON s.org_id=m.org_id AND s.revision_id=m.published_revision_id
+WHERE m.org_id=$2 AND m.archived_at IS NULL AND m.published_at IS NOT NULL
+ AND s.quiz_id=$3 AND s.quiz_revision_id=$4
+ON CONFLICT DO NOTHING
+`
+
+type PinQuizModulesParams struct {
+	UserID         uuid.UUID
+	OrgID          uuid.UUID
+	QuizID         uuid.NullUUID
+	QuizRevisionID uuid.NullUUID
+}
+
+// Standalone pass is learning activity: pin unpinned learners to current revisions bound to this quiz revision.
+func (q *Queries) PinQuizModules(ctx context.Context, arg PinQuizModulesParams) error {
+	_, err := q.db.Exec(ctx, pinQuizModules,
+		arg.UserID,
+		arg.OrgID,
+		arg.QuizID,
+		arg.QuizRevisionID,
+	)
+	return err
 }
 
 const questionIDs = `-- name: QuestionIDs :many
@@ -500,6 +625,82 @@ func (q *Queries) QuestionIDs(ctx context.Context, arg QuestionIDsParams) ([]uui
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const quizExists = `-- name: QuizExists :one
+SELECT EXISTS(SELECT 1 FROM quizzes WHERE org_id = $1 AND id = $2 AND archived_at IS NULL)::boolean
+`
+
+type QuizExistsParams struct {
+	OrgID uuid.UUID
+	ID    uuid.UUID
+}
+
+func (q *Queries) QuizExists(ctx context.Context, arg QuizExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, quizExists, arg.OrgID, arg.ID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const quizResults = `-- name: QuizResults :many
+SELECT a.user_id, u.display_name, max(a.score)::smallint AS best_score, count(*)::integer AS attempts,
+  max(a.finished_at)::timestamptz AS last_finished_at, count(*) OVER()::integer AS total_count
+FROM quiz_attempts a JOIN users u ON u.id = a.user_id
+JOIN memberships m ON m.org_id = a.org_id AND m.user_id = a.user_id AND m.role = 'participant'
+WHERE a.org_id = $1 AND a.quiz_id = $2 AND a.finished_at IS NOT NULL
+GROUP BY a.user_id, u.display_name
+ORDER BY lower(u.display_name), a.user_id
+LIMIT $4::integer OFFSET $3::integer
+`
+
+type QuizResultsParams struct {
+	OrgID      uuid.UUID
+	QuizID     uuid.UUID
+	PageOffset int32
+	PageLimit  int32
+}
+
+type QuizResultsRow struct {
+	UserID         uuid.UUID
+	DisplayName    string
+	BestScore      int16
+	Attempts       int32
+	LastFinishedAt pgtype.Timestamptz
+	TotalCount     int32
+}
+
+// One page of participants with a finished attempt: best score (Rapor rule), tries and last finish.
+func (q *Queries) QuizResults(ctx context.Context, arg QuizResultsParams) ([]QuizResultsRow, error) {
+	rows, err := q.db.Query(ctx, quizResults,
+		arg.OrgID,
+		arg.QuizID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []QuizResultsRow{}
+	for rows.Next() {
+		var i QuizResultsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.DisplayName,
+			&i.BestScore,
+			&i.Attempts,
+			&i.LastFinishedAt,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -583,7 +784,7 @@ func (q *Queries) UpdateQuestion(ctx context.Context, arg UpdateQuestionParams) 
 const updateQuiz = `-- name: UpdateQuiz :one
 UPDATE quizzes SET building_key = $3, level = $4, title = $5, description = $6, pass_score = $7, published_at = $8, updated_at = $9
 WHERE org_id = $1 AND id = $2 AND archived_at IS NULL
-RETURNING id, org_id, building_key, level, title, description, pass_score, created_by, created_at, updated_at, published_at, archived_at
+RETURNING id, org_id, building_key, level, title, description, pass_score, created_by, created_at, updated_at, published_at, archived_at, draft_version, published_revision_id
 `
 
 type UpdateQuizParams struct {
@@ -624,6 +825,8 @@ func (q *Queries) UpdateQuiz(ctx context.Context, arg UpdateQuizParams) (Quiz, e
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.ArchivedAt,
+		&i.DraftVersion,
+		&i.PublishedRevisionID,
 	)
 	return i, err
 }

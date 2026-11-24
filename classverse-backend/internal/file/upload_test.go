@@ -122,7 +122,7 @@ func TestResumableUpload(t *testing.T) {
 	if err := meta.SavePosition(ctx, uuid.New(), school.ID, s.ID, 1); !errors.Is(err, org.ErrNotMember) {
 		t.Fatalf("outsider position: %v", err)
 	}
-	list, err := meta.List(ctx, user.ID, school.ID)
+	list, err := meta.List(ctx, user.ID, school.ID, "")
 	if err != nil || len(list) != 1 || list[0].Position != 2 {
 		t.Fatalf("list %+v %v", list, err)
 	}

@@ -1,7 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, expect, it, vi } from 'vitest'
 import LibraryManager from './LibraryManager.vue'
-import { ApiError } from '@/api/client'
 import { fileApi } from '@/api/files'
 import { libraryApi } from '@/api/library'
 import type { Book } from '@/api/types'
@@ -16,68 +15,45 @@ afterEach(() => vi.restoreAllMocks())
 
 function setup() {
   const list = vi.spyOn(libraryApi, 'list').mockResolvedValue({ items: [draft], next_cursor: null })
-  vi.spyOn(fileApi, 'list').mockResolvedValue({
-    used_bytes: 0, quota_bytes: 1,
+  const files = vi.spyOn(fileApi, 'list').mockResolvedValue({
+    used_bytes: 0, quota_bytes: 1, total: 2,
     items: [
       { id: 'pdf1', name: 'tata.pdf', kind: 'pdf', content_type: 'application/pdf', size: 1, uploaded_by: 'u', created_at: '', position: 0 },
       { id: 'mp3', name: 'lagu.mp3', kind: 'audio', content_type: 'audio/mpeg', size: 1, uploaded_by: 'u', created_at: '', position: 0 },
     ],
   })
-  return { wrapper: mount(LibraryManager, { props: { orgId: 'o' } }), list }
+  return { wrapper: mount(LibraryManager, { props: { orgId: 'o', userId: 'u' } }), list, files }
 }
 
-it('lists drafts for staff and offers only matching files for e-books', async () => {
+it('lists drafts for staff and opens the Tambah buku page in place of the catalog', async () => {
   const { wrapper, list } = setup()
   await flushPromises()
-  expect(list).toHaveBeenCalledWith('o', { drafts: true, cursor: null })
+  expect(list).toHaveBeenCalledWith('o', expect.objectContaining({ drafts: true, cursor: null, counts: true }))
   expect(wrapper.text()).toContain('Draf')
-
   await wrapper.get('.head button').trigger('click')
   await flushPromises()
-  await wrapper.get('select[id$="-f"]').setValue('ebook')
-  const options = wrapper.get('select[id$="-file"]').findAll('option').map((o) => o.text())
-  expect(options).toEqual(['Pilih file', 'tata.pdf'])
-})
-
-it('creates a published e-book without copies and shows field errors from the server', async () => {
-  const { wrapper } = setup()
-  await flushPromises()
-  const create = vi.spyOn(libraryApi, 'create')
-    .mockRejectedValueOnce(new ApiError(400, { code: 'validation_failed', message: 'x', fields: { title: 'Judul 1–200 karakter' } }))
-    .mockResolvedValueOnce({ ...draft, id: 'b2', title: 'Tata Surya', format: 'ebook', published: true })
-  await wrapper.get('.head button').trigger('click')
-  await flushPromises()
-  await wrapper.get('select[id$="-f"]').setValue('ebook')
-  await wrapper.get('select[id$="-file"]').setValue('pdf1')
-  await wrapper.get('input[type=checkbox]').setValue(true)
-  await wrapper.get('form').trigger('submit')
-  await flushPromises()
-  expect(wrapper.get('.field-error').text()).toBe('Judul 1–200 karakter')
-  expect(wrapper.get('input[id$="-t"]').attributes('aria-invalid')).toBe('true')
-
-  await wrapper.get('input[id$="-t"]').setValue('Tata Surya')
-  await wrapper.get('input[id$="-a"]').setValue('Tim')
-  await wrapper.get('form').trigger('submit')
-  await flushPromises()
-  expect(create).toHaveBeenLastCalledWith('o', expect.objectContaining({ title: 'Tata Surya', format: 'ebook', file_id: 'pdf1', copies: 0, published: true }))
-  expect(wrapper.find('form').exists()).toBe(false)
-  expect(wrapper.get('[role=status]').text()).toBe('Tata Surya terbit.')
+  expect(wrapper.find('.book-form').exists()).toBe(true)
+  expect(wrapper.find('.toolbar').exists()).toBe(false)
+  await wrapper.findAll('button').find(b => b.text() === 'Batal')!.trigger('click')
+  expect(wrapper.find('.toolbar').exists()).toBe(true)
 })
 
 it('edits and archives after confirmation', async () => {
   const { wrapper, list } = setup()
   await flushPromises()
   const update = vi.spyOn(libraryApi, 'update').mockResolvedValue({ ...draft, published: true })
-  await wrapper.findAll('article button')[0]!.trigger('click')
+  const button = (text: string) => wrapper.findAll('article button').find(b => b.text().startsWith(text))!
+  await button('Ubah').trigger('click')
   await flushPromises()
   expect((wrapper.get('input[id$="-t"]').element as HTMLInputElement).value).toBe('Atlas')
-  await wrapper.get('form').trigger('submit')
+  await wrapper.findAll('button').find(b => b.text() === 'Simpan sebagai draf')!.trigger('click')
   await flushPromises()
-  expect(update).toHaveBeenCalledWith('o', 'b1', expect.objectContaining({ file_id: null, copies: 2 }))
+  expect(update).toHaveBeenCalledWith('o', 'b1', expect.objectContaining({ file_id: null, copies: 2, published: false }))
+  expect(wrapper.find('.book-form').exists()).toBe(false)
 
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   const archive = vi.spyOn(libraryApi, 'archive').mockResolvedValue()
-  await wrapper.findAll('article button')[1]!.trigger('click')
+  await button('Arsipkan').trigger('click')
   await flushPromises()
   expect(archive).toHaveBeenCalledWith('o', 'b1')
   expect(list).toHaveBeenCalledTimes(3)
@@ -85,8 +61,20 @@ it('edits and archives after confirmation', async () => {
 
 it('previews an e-book in the reader', async () => {
   vi.spyOn(libraryApi, 'list').mockResolvedValue({ items: [{ ...draft, format: 'ebook', file_id: 'pdf1', copies: 0 }], next_cursor: null })
-  const wrapper = mount(LibraryManager, { props: { orgId: 'o' }, global: { stubs: { FileReader: { props: ['file'], template: '<div class="reader">{{ file.id }}</div>' } } } })
+  const wrapper = mount(LibraryManager, { props: { orgId: 'o', userId: 'u' }, global: { stubs: { FileReader: { props: ['file'], template: '<div class="reader">{{ file.id }}</div>' } } } })
   await flushPromises()
   await wrapper.get('article button.btn-primary').trigger('click')
   expect(wrapper.get('.reader').text()).toBe('pdf1')
+})
+
+it('publishes a draft from its card and sends catalog filters to the server', async () => {
+  const { wrapper, list } = setup()
+  await flushPromises()
+  const update = vi.spyOn(libraryApi, 'update').mockResolvedValue({ ...draft, published: true })
+  await wrapper.findAll('article button').find(b => b.text().startsWith('Terbitkan'))!.trigger('click')
+  await flushPromises()
+  expect(update).toHaveBeenCalledWith('o', draft.id, expect.objectContaining({ published: true }))
+  await wrapper.get('.toolbar select').setValue('ebook')
+  await flushPromises()
+  expect(list).toHaveBeenLastCalledWith('o', expect.objectContaining({ format: 'ebook', counts: true }))
 })

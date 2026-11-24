@@ -211,3 +211,41 @@ func TestStoreRecordActionScoped(t *testing.T) {
 		t.Fatalf("audit rows = %d %v", n, err)
 	}
 }
+
+func TestMuteAllMutesEachParticipantAndAuditsEach(t *testing.T) {
+	mod := &fakeModerator{banned: map[uuid.UUID]bool{}}
+	r := newModRoom(t, mod)
+	teacher, a, b := r.testJoin(t, "Guru"), r.testJoin(t, "A"), r.testJoin(t, "B")
+	r.members[teacher.userID].p.Role = "teacher"
+	drain(teacher)
+	drain(a)
+	drain(b)
+
+	r.handle(commandCmd{c: a, seq: 1, name: "mute_all"})
+	if got := errorsOf(t, a); len(got) != 1 || got[0] != CodeForbidden {
+		t.Fatalf("participant mute_all errors = %v", got)
+	}
+	r.handle(commandCmd{c: teacher, seq: 2, name: "mute_all"})
+	r.settle(t) // one audited result per participant
+	r.settle(t)
+	if !r.muted[a.userID] || !r.muted[b.userID] || r.muted[teacher.userID] {
+		t.Fatalf("muted = %v", r.muted)
+	}
+	if mod.actions != 2 {
+		t.Fatalf("audited actions = %d, want one per participant", mod.actions)
+	}
+	if s := lastState(t, b); !s.Muted {
+		t.Fatalf("state = %+v", s)
+	}
+	// Nothing left to mute: a clear rejection, not a silent no-op.
+	r.handle(commandCmd{c: teacher, seq: 3, name: "mute_all"})
+	if got := errorsOf(t, teacher); len(got) != 1 || got[0] != CodeBadMessage {
+		t.Fatalf("repeat errors = %v", got)
+	}
+	r.handle(commandCmd{c: teacher, seq: 4, name: "unmute_all"})
+	r.settle(t)
+	r.settle(t)
+	if r.muted[a.userID] || r.muted[b.userID] || mod.actions != 4 {
+		t.Fatalf("after unmute_all: muted=%v actions=%d", r.muted, mod.actions)
+	}
+}

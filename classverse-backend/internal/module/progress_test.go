@@ -58,7 +58,7 @@ func TestProgress(t *testing.T) {
 	svc := module.NewService(pool, orgs, buildings{"sains": false, "angka": false}, clock)
 	path := func(title string, building string, published bool, n int) (uuid.UUID, []uuid.UUID) {
 		t.Helper()
-		m, err := svc.Create(ctx, admin, school.ID, module.Input{BuildingKey: building, Level: "SD", Title: title, Published: published})
+		m, err := svc.Create(ctx, admin, school.ID, module.Input{BuildingKey: building, Level: "SD", Title: title})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,6 +69,11 @@ func TestProgress(t *testing.T) {
 				t.Fatal(err)
 			}
 			steps[i] = st.ID
+		}
+		if published {
+			if _, err := svc.Publish(ctx, admin, school.ID, m.ID, int64(n+1)); err != nil {
+				t.Fatal(err)
+			}
 		}
 		return m.ID, steps
 	}
@@ -154,7 +159,7 @@ func TestProgress(t *testing.T) {
 	if err := svc.SetDone(ctx, student, school.ID, draft, ds[0], true); !errors.Is(err, module.ErrNotFound) {
 		t.Fatalf("draft step: %v", err)
 	}
-	if err := svc.SetDone(ctx, admin, school.ID, draft, ds[0], true); err != nil {
+	if err := svc.SetDone(ctx, admin, school.ID, draft, ds[0], true); !errors.Is(err, module.ErrNotFound) {
 		t.Fatalf("staff tries a draft: %v", err)
 	}
 	if err := svc.SetDone(ctx, student, school.ID, math, ss[1], true); !errors.Is(err, module.ErrNotFound) {
@@ -167,15 +172,15 @@ func TestProgress(t *testing.T) {
 		t.Fatalf("cross-org: %v", err)
 	}
 
-	// Archiving the remaining unfinished steps completes the module for resume purposes.
+	// Archiving draft steps cannot remove steps from ongoing pinned revision.
 	if err := svc.ArchiveStep(ctx, admin, school.ID, solar, ss[1]); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.SetDone(ctx, student, school.ID, solar, ss[1], true); !errors.Is(err, module.ErrNotFound) {
+	if err := svc.SetDone(ctx, student, school.ID, solar, ss[1], true); err != nil {
 		t.Fatalf("archived step: %v", err)
 	}
-	if r, _ := svc.ResumeFor(ctx, student, school.ID); r == nil || r.Total != 2 || r.Done != 1 || r.NextTitle != "Tata Surya 3" {
-		t.Fatalf("resume ignores archived step: %+v", r)
+	if r, _ := svc.ResumeFor(ctx, student, school.ID); r == nil || r.Total != 3 || r.Done != 2 || r.NextTitle != "Tata Surya 3" {
+		t.Fatalf("resume retains published step: %+v", r)
 	}
 	if err := svc.SetDone(ctx, student, school.ID, solar, ss[2], true); err != nil {
 		t.Fatal(err)

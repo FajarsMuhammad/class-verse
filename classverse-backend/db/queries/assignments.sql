@@ -6,19 +6,21 @@ SELECT * FROM assignments WHERE org_id=$1 AND id=$2 FOR UPDATE;
 
 -- name: CreateAssignment :one
 INSERT INTO assignments(id,org_id,class_id,module_id,title,class_name,year_label,building_key,level,due_at,created_by,created_at)
-SELECT sqlc.arg(id), c.org_id, c.id, m.id, m.title, c.name, y.label, m.building_key,m.level,
+SELECT sqlc.arg(id), c.org_id, c.id, m.id, rev.title, c.name, y.label, rev.building_key,rev.level,
  sqlc.narg(due_at)::timestamptz,sqlc.arg(created_by),sqlc.arg(created_at)
 FROM classes c JOIN academic_years y ON y.org_id=c.org_id AND y.id=c.academic_year_id
 JOIN modules m ON m.org_id=c.org_id AND m.id=sqlc.arg(module_id)
+JOIN module_revisions rev ON rev.org_id=m.org_id AND rev.module_id=m.id AND rev.id=m.published_revision_id
 WHERE c.org_id=sqlc.arg(org_id) AND c.id=sqlc.arg(class_id) AND c.archived_at IS NULL
  AND m.archived_at IS NULL AND m.published_at IS NOT NULL
 RETURNING *;
 
 -- name: SnapshotAssignmentSteps :execrows
-INSERT INTO assignment_steps(id,org_id,assignment_id,position,kind,title,body,file_id,video_id,quiz_id,minutes)
+INSERT INTO assignment_steps(id,org_id,assignment_id,position,kind,title,body,file_id,video_id,quiz_id,minutes,rich_content,quiz_revision_id)
 SELECT gen_random_uuid(),s.org_id,sqlc.arg(assignment_id),row_number() OVER(ORDER BY s.position,s.id)-1,
- s.kind,s.title,s.body,s.file_id,s.video_id,s.quiz_id,s.minutes
-FROM module_steps s WHERE s.org_id=sqlc.arg(org_id) AND s.module_id=sqlc.arg(module_id) AND s.archived_at IS NULL;
+ s.kind,s.title,s.body,s.file_id,s.video_id,s.quiz_id,s.minutes,s.rich_content,s.quiz_revision_id
+FROM module_revision_steps s JOIN modules m ON m.org_id=s.org_id AND m.id=s.module_id AND m.published_revision_id=s.revision_id
+WHERE s.org_id=sqlc.arg(org_id) AND s.module_id=sqlc.arg(module_id);
 
 -- name: SnapshotAssignmentRecipients :execrows
 INSERT INTO assignment_recipients(org_id,assignment_id,user_id)
@@ -29,10 +31,19 @@ WHERE e.org_id=sqlc.arg(org_id) AND e.class_id=sqlc.arg(class_id) AND e.ended_at
 -- name: ListAssignments :many
 SELECT a.*,
  (SELECT count(*)::integer FROM assignment_steps s WHERE s.assignment_id=a.id) AS total,
- (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=sqlc.arg(user_id)) AS done
+ (SELECT count(*)::integer FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=sqlc.arg(user_id)) AS done,
+ count(*) OVER()::integer AS total_count,
+ -- Class aggregates are staff-only: participants never learn their peers' progress.
+ CASE WHEN sqlc.arg(staff)::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id) ELSE 0 END::integer AS recipients,
+ CASE WHEN sqlc.arg(staff)::boolean THEN (SELECT count(*) FROM assignment_recipients r WHERE r.assignment_id=a.id
+   AND (SELECT count(*) FROM assignment_progress p WHERE p.assignment_id=a.id AND p.user_id=r.user_id)
+     >= (SELECT count(*) FROM assignment_steps s WHERE s.assignment_id=a.id)) ELSE 0 END::integer AS finished,
+ CASE WHEN sqlc.arg(staff)::boolean THEN (SELECT count(DISTINCT p.user_id) FROM assignment_progress p WHERE p.assignment_id=a.id) ELSE 0 END::integer AS started
 FROM assignments a WHERE a.org_id=sqlc.arg(org_id)
  AND (sqlc.arg(staff)::boolean OR EXISTS(SELECT 1 FROM assignment_recipients r WHERE r.org_id=a.org_id AND r.assignment_id=a.id AND r.user_id=sqlc.arg(user_id)))
-ORDER BY a.created_at DESC,a.id;
+ AND (sqlc.arg(search)::text = '' OR strpos(lower(a.title), lower(sqlc.arg(search))) > 0)
+ AND (sqlc.narg(class_id)::uuid IS NULL OR a.class_id = sqlc.narg(class_id))
+ORDER BY a.created_at DESC,a.id LIMIT sqlc.narg(page_limit)::integer OFFSET sqlc.arg(page_offset)::integer;
 
 -- name: OwnAssignmentRecipient :one
 SELECT * FROM assignment_recipients WHERE org_id=$1 AND assignment_id=$2 AND user_id=$3;
