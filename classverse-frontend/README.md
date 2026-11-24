@@ -41,4 +41,5 @@ sedangkan Vite dapat menghasilkan URL data SVG percent-encoded.
 | `npm run lint` | oxlint + ESLint |
 | `npm run format` | Prettier |
 | `npm run build` | Type-check + build produksi ke `dist/` |
+| `npm run e2e` | Uji browser peta kampus (`e2e/campus.mjs`): login, minimap, kartu gedung, masuk ruang, kursi, keluar. Butuh backend + Mailpit + `npm run dev` berjalan dan Chrome di `/usr/bin/google-chrome` (atau `CHROME=`). Membuat akun/sekolah `@e2e.test` baru tiap run |
 | `npm run api` | Generate `src/api/schema.d.ts` dari `../classverse-backend/api/openapi.yaml` (jangan diedit manual) |

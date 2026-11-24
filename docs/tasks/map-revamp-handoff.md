@@ -39,8 +39,7 @@ Berkas utama (semua di `classverse-frontend/src/`):
    penanda misi "!". Aturan proyek melarang data/kontrol palsu. Kalau mau dibuat, butuh keputusan produk + migration + API.
 4. Gaya avatar belum membedakan peran (hijab, guru, topi) seperti prototipe karena data avatar hanya menyimpan kulit/rambut/baju.
 5. Goyang pohon memakai rotasi kecil di pangkal batang (Phaser 3 tidak punya skew; tipe `Image` tidak mengekspos `skewX`).
-6. Skrip e2e lama yang rusak karena selektor menu berubah sejak redesain Kelola (bukan karena peta):
-   `workspace-exit`, `revamp-travel`, `seat-walk`, `minimap-card` di `/tmp/kv-e2e`. `map-input` dan `worldclick` lulus.
+6. ~~Skrip e2e lama rusak~~ diganti `classverse-frontend/e2e/campus.mjs` (`npm run e2e`), di repo, seed sendiri lewat API.
 
 ## Cara melanjutkan setelah restart laptop
 
