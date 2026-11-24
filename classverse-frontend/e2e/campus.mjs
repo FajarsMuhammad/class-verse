@@ -97,6 +97,18 @@ try {
     await page.waitForSelector('[data-panel="map"]', { visible: true })
   })
 
+  await step('profile saves an accessory with its own colour', async () => {
+    await page.locator('[aria-label="Akun dan navigasi"]').click()
+    await page.locator('.account-menu button ::-p-text(Profil)').click()
+    await page.locator('input[name="avatar-accessory"][value="1"]').click()
+    await page.locator('input[name="avatar-accessory-color"][value="4"]').click()
+    await page.locator('dialog form button[type=submit]').click()
+    await page.waitForSelector('dialog[open]', { hidden: true })
+    // The saved key shows up in the Peta panel avatar (it reads world.selfAvatar from the server echo).
+    const preview = await page.$eval('[data-panel="map"] img', (img) => atob(img.src.split(',')[1]))
+    assert.match(preview, /#e8a0b4/, 'hijab drawn in the chosen accessory colour')
+  })
+
   await step('minimap shows the player and the place card opens from the building list', async () => {
     await page.waitForSelector('svg.minimap circle.player')
     await page.locator('details.places button ::-p-text(Gedung Kelas)').click()
@@ -135,6 +147,8 @@ try {
   console.log(`all passed (school ${org.slug})`)
 } catch (e) {
   console.error('FAILED:', e.message)
+  const page = (await browser.pages()).at(-1)
+  if (page) console.error('page text:', (await page.evaluate(() => document.querySelector('dialog[open]')?.innerText ?? document.body.innerText.slice(0, 400))).replace(/\s+/g, ' ').slice(0, 600))
   if (errors.length) console.error('page errors:', errors)
   process.exitCode = 1
 } finally {

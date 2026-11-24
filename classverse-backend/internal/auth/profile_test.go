@@ -33,12 +33,14 @@ func TestProfileNameRules(t *testing.T) {
 }
 
 func TestComposedAvatarAllowlist(t *testing.T) {
-	for _, key := range []string{"look-0-0-0", "look-5-4-9", "look-2-3-7"} {
+	for _, key := range []string{"look-0-0-0", "look-5-4-9", "look-2-3-7", "look-0-0-0-1-0", "look-5-4-9-3-7", "look-2-3-7-2-4"} {
 		if !validAvatar(key) {
 			t.Errorf("valid palette key rejected: %s", key)
 		}
 	}
-	for _, key := range []string{"look-6-0-0", "look-0-5-0", "look-0-0-10", "look-01-0-0", "look--1-0-0", "look-0-0-0-extra", "look-<script>-0-0"} {
+	for _, key := range []string{"look-6-0-0", "look-0-5-0", "look-0-0-10", "look-01-0-0", "look--1-0-0", "look-0-0-0-extra", "look-<script>-0-0",
+		// accessory 0 is the 3-part key; accessory 4+, colour 8+, or a missing colour are not allowed
+		"look-0-0-0-0-0", "look-0-0-0-4-0", "look-0-0-0-1-8", "look-0-0-0-1", "look-0-0-0-1-0-1", "look-0-0-0-1x0", "look-6-0-0-1-0"} {
 		if validAvatar(key) {
 			t.Errorf("invalid palette key accepted: %s", key)
 		}

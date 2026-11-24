@@ -2349,7 +2349,7 @@ export interface components {
             display_name?: string;
             /** Format: date */
             birth_date?: string;
-            /** @description Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid. */
+            /** @description Avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>, optional -<accessory 1..3>-<accessory colour 0..7> (1 hijab, 2 topi, 3 kacamata). Legacy keys remain valid. */
             avatar_key?: string;
         };
         CreateOrgRequest: {

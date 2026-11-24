@@ -77,10 +77,17 @@ func NormalizeDisplayName(name string) (string, string) {
 // prohibitedName uses the project's whole-word list shared with chat.
 func prohibitedName(name string) bool { return moderation.ContainsProfanity(name) }
 
+// validAvatar allows look-<skin 0..5>-<hair 0..4>-<shirt 0..9>, optionally followed by
+// -<accessory 1..3>-<accessory colour 0..7> (1 hijab, 2 cap, 3 glasses). No accessory is the 3-part form only,
+// so one look has one key. The digit ranges mirror palette.json in the frontend.
 func validAvatar(key string) bool {
 	if strings.HasPrefix(key, "look-") {
-		return len(key) == 10 && key[6] == '-' && key[8] == '-' &&
-			key[5] >= '0' && key[5] <= '5' && key[7] >= '0' && key[7] <= '4' && key[9] >= '0' && key[9] <= '9'
+		digit := func(i int, hi byte) bool { return key[i] >= '0' && key[i] <= hi }
+		base := len(key) >= 10 && key[6] == '-' && key[8] == '-' && digit(5, '5') && digit(7, '4') && digit(9, '9')
+		if len(key) == 10 {
+			return base
+		}
+		return base && len(key) == 14 && key[10] == '-' && key[12] == '-' && key[11] >= '1' && key[11] <= '3' && digit(13, '7')
 	}
 	if key == "default" {
 		return true

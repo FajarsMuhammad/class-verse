@@ -1,25 +1,16 @@
-# Revamp peta — usulan E, F, G (menunggu keputusan)
+# Revamp peta — E (selesai), F dan G (menunggu keputusan)
 
 Status: **usulan, belum ada kode.** Ketiganya butuh keputusan produk dulu: `CLAUDE.md` meminta keputusan desain baru
 diusulkan sebelum diterapkan, dan `docs/tasks/mvp2-learning-plan.md` (B2) melarang angka XP/misi sebelum formula
 disepakati. Setiap bagian ditutup dengan pertanyaan yang perlu dijawab.
 
-## E — Gaya avatar seperti prototipe (hijab, topi, kacamata)
+## E — Aksesori avatar (selesai)
 
-**Sekarang:** `users.avatar_key` (text) menyimpan `look-<kulit 0..5>-<rambut 0..4>-<baju 0..9>`. Validasi ada di
-`internal/auth/validate.go` dan `src/game/avatars.ts`; gambarnya dari `src/game/avatarPaint.ts`.
-
-**Usulan termurah:** tambah satu digit aksesori ke key: `look-<kulit>-<rambut>-<baju>-<aksesori>`, misalnya
-0 = tanpa, 1 = hijab, 2 = topi, 3 = kacamata. Key 3 digit lama tetap valid (= tanpa aksesori).
-- **Tanpa migration**: kolomnya text. Perubahan ada di validasi BE+FE, pelukis avatar, pemilih di `ProfileDialog`,
-  OpenAPI (deskripsi `avatar_key`), dan test.
-- Aksesori **dipilih sendiri oleh pengguna**, bukan otomatis dari peran. Peran disimpan per sekolah
-  (`memberships.role`), sedangkan avatar per pengguna, jadi "baju guru otomatis" akan salah untuk orang yang guru di
-  satu sekolah dan peserta di sekolah lain. Pembeda guru tetap lewat warna label nama, seperti sekarang.
-
-**Keputusan yang dibutuhkan:**
-1. Daftar aksesori apa saja (hijab, topi, kacamata, lainnya)? Warna hijab ikut warna baju atau dipilih terpisah?
-2. Setuju aksesori dipilih pengguna, bukan dari peran?
+Disetujui: aksesori dipilih pengguna (bukan dari peran), dengan warna sendiri.
+`avatar_key` = `look-<kulit 0..5>-<rambut 0..4>-<baju 0..9>[-<aksesori 1..3>-<warna 0..7>]`, 1 hijab, 2 topi,
+3 kacamata; tanpa aksesori tetap key 3 bagian (key lama tidak berubah). Kolom text, tanpa migration.
+Warna aksesori ada di `palette.json` (`accessory`, 8 warna). Hijab menutup rambut, jadi pilihan warna rambut
+disembunyikan saat hijab dipakai. Validasi server `internal/auth/validate.go`, OpenAPI `UpdateMeRequest.avatar_key`.
 
 ## F — HUD level/XP/koin/runtun, Misi harian, penanda "!"
 

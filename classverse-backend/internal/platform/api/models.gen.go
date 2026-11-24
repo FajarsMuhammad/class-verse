@@ -1702,7 +1702,7 @@ type StudentGradebook struct {
 
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
-	// AvatarKey Idle avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>. Legacy keys remain valid.
+	// AvatarKey Avatar palette: look-<skin 0..5>-<hair 0..4>-<shirt 0..9>, optional -<accessory 1..3>-<accessory colour 0..7> (1 hijab, 2 topi, 3 kacamata). Legacy keys remain valid.
 	AvatarKey *string             `json:"avatar_key,omitempty"`
 	BirthDate *openapi_types.Date `json:"birth_date,omitempty"`
 

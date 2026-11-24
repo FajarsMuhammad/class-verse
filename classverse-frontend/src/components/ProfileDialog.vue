@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useTemplateRef } from 'vue'
 import { ApiError } from '@/api/client'
-import { avatarLook, avatarPalette, avatarURL } from '@/game/avatars'
+import { avatarAccessories, avatarLook, avatarPalette, avatarURL, lookKey } from '@/game/avatars'
 import { useAuthStore } from '@/stores/auth'
 
 const emit = defineEmits<{ close: []; saved: [] }>()
@@ -13,13 +13,19 @@ const initialLook = avatarLook(originalAvatar)
 const skin = ref(initialLook.skin)
 const hair = ref(initialLook.hair)
 const shirt = ref(initialLook.shirt)
+const accessory = ref(initialLook.accessory)
+const accessoryColor = ref(initialLook.accessoryColor)
 const avatarChanged = ref(false)
-const avatar = computed(() => avatarChanged.value ? `look-${skin.value}-${hair.value}-${shirt.value}` : originalAvatar)
-const paletteGroups = [
+const avatar = computed(() => avatarChanged.value
+  ? lookKey({ skin: skin.value, hair: hair.value, shirt: shirt.value, accessory: accessory.value, accessoryColor: accessoryColor.value })
+  : originalAvatar)
+const paletteGroups = computed(() => [
   { key: 'skin', label: 'Warna kulit', colors: avatarPalette.skin, value: skin },
-  { key: 'hair', label: 'Warna rambut', colors: avatarPalette.hair, value: hair },
+  // A hijab covers the hair, so its colour choice is hidden while one is worn.
+  ...(accessory.value === 1 ? [] : [{ key: 'hair', label: 'Warna rambut', colors: avatarPalette.hair, value: hair }]),
   { key: 'shirt', label: 'Warna pakaian', colors: avatarPalette.shirt, value: shirt },
-]
+  ...(accessory.value ? [{ key: 'accessory-color', label: 'Warna aksesori', colors: avatarPalette.accessory, value: accessoryColor }] : []),
+])
 const busy = ref(false)
 const error = ref('')
 const fields = ref<Record<string, string>>({})
@@ -92,6 +98,15 @@ async function save() {
       />
       <p id="name-help" class="help">3–24 karakter. Gunakan nama yang sopan.</p>
       <p id="name-error" class="error">{{ fields.display_name }}</p>
+      <fieldset :disabled="busy" @change="avatarChanged = true">
+        <legend>Aksesori</legend>
+        <div class="choices">
+          <label v-for="item in avatarAccessories" :key="item.id" class="choice" :class="{ selected: accessory === item.id }">
+            <input v-model="accessory" type="radio" name="avatar-accessory" :value="item.id" />
+            <span>{{ item.label }}</span>
+          </label>
+        </div>
+      </fieldset>
       <fieldset v-for="group in paletteGroups" :key="group.key" :disabled="busy" @change="avatarChanged = true">
         <legend>{{ group.label }}</legend>
         <div class="choices colors">
@@ -104,7 +119,7 @@ async function save() {
           </label>
         </div>
       </fieldset>
-      <p class="help">Kulit, rambut, dan pakaian bisa dipilih terpisah.</p>
+      <p class="help">Kulit, rambut, pakaian, dan aksesori bisa dipilih terpisah.</p>
       <p class="error">{{ fields.avatar_key }}</p>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
       <footer>
