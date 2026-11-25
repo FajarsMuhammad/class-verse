@@ -9,22 +9,20 @@ const places: Building[] = [
   { ...base, key: 'ruang-guru', name: 'Ruang Guru', description: 'Pengajar', staffOnly: true },
 ]
 
-it('is a collapsible section that remembers being closed', async () => {
-  localStorage.removeItem('kv-places-open')
+it('stays closed until asked, so the map keeps its space', async () => {
   const w = mount(PlaceList, { props: { places, counts: [] } })
-  const details = w.get('details').element as HTMLDetailsElement
-  expect(details.open).toBe(true)
-  expect(w.get('summary').text()).toContain('Gedung (2)')
-  details.open = false
-  await w.get('details').trigger('toggle')
-  expect(localStorage.getItem('kv-places-open')).toBe('0')
-  expect((mount(PlaceList, { props: { places, counts: [] } }).get('details').element as HTMLDetailsElement).open).toBe(false)
-  localStorage.removeItem('kv-places-open')
+  expect(w.find('.sheet').exists()).toBe(false)
+  expect(w.get('.trigger').attributes('aria-expanded')).toBe('false')
+  await w.get('.trigger').trigger('click')
+  expect(w.get('.sheet').isVisible()).toBe(true)
+  await w.get('.places').trigger('keydown.esc')
+  expect(w.find('.sheet').exists()).toBe(false)
 })
 
-it('lists every place with live counts, marks the selection and emits the key', async () => {
+it('lists every place with live counts, marks the selection, emits the key and closes', async () => {
   const w = mount(PlaceList, { props: { places, selected: 'sains', counts: [{ building_key: 'sains', people: 3, live_rooms: 1 }] } })
-  const rows = w.findAll('button')
+  await w.get('.trigger').trigger('click')
+  const rows = w.findAll('.sheet button')
   expect(rows).toHaveLength(2)
   expect(rows[0]!.text()).toContain('3 orang · 1 live')
   expect(rows[0]!.attributes('aria-pressed')).toBe('true')
@@ -32,4 +30,5 @@ it('lists every place with live counts, marks the selection and emits the key', 
   expect(rows[1]!.text()).not.toContain('orang')
   await rows[1]!.trigger('click')
   expect(w.emitted('select')).toEqual([['ruang-guru']])
+  expect(w.find('.sheet').exists()).toBe(false)
 })

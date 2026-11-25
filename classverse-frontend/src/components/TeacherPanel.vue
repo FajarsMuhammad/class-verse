@@ -6,7 +6,7 @@ import { errorMessage } from '@/api/client'
 import { roomApi } from '@/api/rooms'
 import type { RoomHandle } from '@/realtime/useRoom'
 
-// Teacher controls of a classroom/garden, shared by the map and mode HP.
+// Teacher controls of a classroom/garden, shared by the map panel and the Kelola page.
 // floating: shown in the map toolbar, where the participant list opens as a popover.
 // page: Kelola → Kontrol sesi, where each action is a card with one line of explanation (handoff §3.11).
 const props = defineProps<{ room: RoomHandle; floating?: boolean; page?: boolean }>()

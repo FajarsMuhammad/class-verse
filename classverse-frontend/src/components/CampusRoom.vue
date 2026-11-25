@@ -32,25 +32,18 @@ import SideMenu, { type SideItem } from '@/components/SideMenu.vue'
 import type { Shelf } from '@/api/types'
 import ReportDialog from '@/components/ReportDialog.vue'
 import type { ChatLine } from '@/realtime/chat'
-import MobileRoom from '@/components/MobileRoom.vue'
 import TeacherTools from '@/components/TeacherTools.vue'
 import VoiceBar from '@/components/VoiceBar.vue'
 import { useRoom } from '@/realtime/useRoom'
 import { doorExit } from '@/realtime/doorExit'
 import { useVoice } from '@/realtime/useVoice'
 
-// Phaser is loaded only when the map is shown (never in mode HP).
+// Phaser loads with the map; the map is the only view, on phones too (the rail and panels stack on narrow screens).
 const GameCanvas = defineAsyncComponent(() => import('@/components/GameCanvas.vue'))
-// Mode HP (design slice 8, M8-01): phones get lists instead of the map. Decided
-// once per room start; the connection mode cannot change afterwards.
-const listMode =
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(pointer: coarse) and (max-width: 767px)').matches
 
 const props = defineProps<{ roomId: string; schoolName: string }>()
 const room = useRoom()
-// Voice is web only for now (mode HP voice is deferred with the phone polish).
-const voice = listMode ? null : useVoice(room)
+const voice = useVoice(room)
 const {
   status,
   map,
@@ -151,10 +144,12 @@ const sideItems = computed<SideItem[]>(() => [
   ...(contentRoom.value && (!org.isTeacher || library.value) ? [{ key: 'catalog', label: library.value ? 'Katalog' : 'Stasiun', icon: library.value ? icons.catalog : icons.station, wide: library.value && !org.isTeacher, companion: true }] : []),
   ...toolItems.value,
 ])
-// The panel always opens on entry; collapsing it is for this visit only. Content rooms start on their catalog.
+// On a wide screen the panel opens on entry; collapsing it is for this visit only. On a narrow screen the panel
+// covers the map, so entry starts on the map itself. Content rooms start on their catalog.
 // Drop the old remembered-collapse flag so nobody stays stuck with a hidden panel.
 localStorage.removeItem('kv-side-collapsed')
-const sideItem = ref<string | null>(org.isTeacher ? 'map' : 'learn')
+const narrow = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches
+const sideItem = ref<string | null>(narrow ? null : org.isTeacher ? 'map' : 'learn')
 const pageOpen = computed(() => org.isTeacher && !!sideItem.value &&
   !sideItems.value.find(item => item.key === sideItem.value)?.companion)
 watch(sideItem, (key) => {
@@ -317,8 +312,7 @@ const statusText = computed(
 )
 
 onMounted(() => {
-  void start(props.roomId, 'campus', listMode ? 'list' : 'map')
-  if (listMode) return
+  void start(props.roomId, 'campus')
   timer = setInterval(() => {
     const exit = map.value?.exit
     const selfAtDoor = world.self
@@ -356,14 +350,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <MobileRoom
-    v-if="listMode"
-    :room="room"
-    :room-id="roomId"
-    :school-name="schoolName"
-    :status-text="statusText"
-  />
-  <section v-else class="workspace" aria-labelledby="map-title">
+  <section class="workspace" aria-labelledby="map-title">
     <div class="layout" :class="{ 'menu-open': !!sideItem, 'page-open': pageOpen }">
       <SideMenu v-model:active="sideItem" class="side" :full-page="org.isTeacher" :items="sideItems" :label="org.isTeacher ? 'Menu ruang dan alat guru' : 'Menu ruang'">
         <template #identity>
@@ -383,8 +370,6 @@ onBeforeUnmount(() => {
             :avatar="world.selfAvatar" :teacher="org.isTeacher" :campus="campus" :room-name="current?.room_name"
             :zone-name="chat.zone.name" :seats="map?.seats ?? []" :self="position" :others="otherPositions"
             :seats-disabled="status !== 'open' || traveling || leaving || kicked" @walk="walkToSeat" />
-          <PlaceList v-if="campus && map" :places="map.buildings" :selected="panelBuilding?.key" :counts="buildings"
-            @select="selectBuilding" />
         </template>
         <template #chat>
           <p class="panel-note">{{ campus ? schoolName : current?.room_name }} · {{ chat.zone.name || 'Area umum' }}</p>
@@ -451,6 +436,8 @@ onBeforeUnmount(() => {
           />
         </div>
         <p v-else class="loading">{{ error || 'Memuat peta sekolah…' }}</p>
+        <PlaceList v-if="campus && map" class="map-places" :places="map.buildings" :selected="panelBuilding?.key"
+          :counts="buildings" @select="selectBuilding" />
         <MapZoom v-if="campus && map" v-model="zoom" class="map-zoom" />
         <MapMinimap v-if="campus && map" :map="map" :position="position" class="map-minimap" />
         <PlaceCard v-if="campus && panelBuilding && panelBuilding.key !== dismissedPlace && !roomsOpen"
@@ -580,6 +567,13 @@ onBeforeUnmount(() => {
   z-index: 2;
   bottom: var(--space-3);
   right: var(--space-3);
+}
+/* Building picker over the map: keyboard and screen-reader access to a canvas, without taking panel space. */
+.map-places {
+  position: absolute;
+  z-index: 3;
+  bottom: var(--space-3);
+  left: var(--space-3);
 }
 .map-bottom {
   bottom: var(--space-3);
@@ -753,9 +747,15 @@ li span {
 }
 @media (max-width: 900px) {
   .quiet-chip { white-space: normal; min-width: 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-lg); }
-  /* Narrow screens: rail across the top, the open panel above the map. */
-  .layout { flex-direction: column; min-height: 400px; }
-  .layout.menu-open .side { max-height: 55%; }
-  .layout.page-open .side { max-height: none; flex: 1; }
+  /* Narrow screens: the building picker and the zoom share the bottom row with the emote bar, which stays centred. */
+  .map-places { bottom: calc(var(--space-3) + var(--touch-min) + var(--space-2)); }
+  .map-zoom { bottom: calc(var(--space-3) + var(--touch-min) + var(--space-2)); }
+  /* Narrow screens: the rail sits across the top and an open panel covers the map, so the map keeps full height
+     while it is visible. The rail stays reachable, so one tap switches back to the map. */
+  .layout { flex-direction: column; }
+  .side { position: absolute; inset: 0; z-index: 4; }
+  .layout:not(.menu-open) .side { position: static; }
+  .layout.menu-open .side { background: var(--color-bg); }
+  .map-column { flex: 1; min-height: 0; }
 }
 </style>

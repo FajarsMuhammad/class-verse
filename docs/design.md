@@ -130,14 +130,14 @@ Server adalah sumber kebenaran: client mengirim posisi yang diinginkan, server m
 
 | `t` | Payload | Aturan server |
 | --- | --- | --- |
-| `auth` | `token`, `mode?` (`map`/`list`) | Validasi JWT dan membership organisasi; `list` = mode HP (slice 8) |
+| `auth` | `token`, `mode?` (`map`/`list`) | Validasi JWT dan membership organisasi; `list` warisan mode HP (slice 8, tidak dipakai klien web) |
 | `move` | `x`, `y`, `dir` | Maks 15 pesan/detik; ditolak jika menembus collision atau melebihi kecepatan maksimum |
 | `chat` | `text`, `scope` (`near` / `zone` / `room`) | Maks 3 pesan/detik; difilter; `room` ditolak jika chat semua ruangan dimatikan |
 | `emote` | `kind` (`wave`, `hand`, `quiz`, `cheer`) | Maks 1/detik; ditolak saat dibisukan; hanya koneksi aktif |
 | `cmd` | `name` (`broadcast`, `gather`, `mute`, `mute_all`, `unmute_all`, `kick`, `lock`, `voice_broadcast`, `voice_broadcast_off`), `target?` | Hanya role pengajar/admin |
 | `ping` | `ts` | Dibalas `pong` untuk mengukur latency |
-| `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali mode HP); koneksi dipindah tanpa reconnect |
-| `seat` | `zone` | Mode HP saja, di kelas/taman; maks 1/detik (slice 8) |
+| `travel` | `room_id` | Hanya ke ruang yang boleh dimasuki dan saat avatar berada di pintu gedung (kecuali koneksi `list` warisan); koneksi dipindah tanpa reconnect |
+| `seat` | `zone` | Koneksi `list` warisan saja, di kelas/taman; maks 1/detik (slice 8, tidak dipakai klien web) |
 
 **Server → client**
 
@@ -305,8 +305,8 @@ Polling status memperbarui token selama grant aktif. Admission diperiksa setiap 
 sekaligus mencabut voice. Kick memakai ban sesi yang sama dengan anggota.
 
 Frontend `/guest/{code}` berada di luar guard akun, dengan shell ruang minimal tanpa data belajar,
-menu sekolah, atau navigasi antar-ruang. Desktop memiliki peta/chat/voice; HP tetap daftar tempat/chat,
-tanpa peta, movement, atau voice. Route lama belum dimigrasi.
+menu sekolah, atau navigasi antar-ruang. Peta, chat dan voice tersedia di semua lebar layar; pada layar
+sempit peta mengisi bagian atas dan chat di bawahnya. Route lama belum dimigrasi.
 
 Migration `00019` mengubah email nullable tanpa mengubah data anggota. Rollback menolak berjalan
 bila identitas tamu sudah ada: penghapusan/export/retensi data memerlukan persetujuan terpisah.
@@ -737,31 +737,27 @@ Pertanyaan terbuka akibat ADR-010, perlu diputuskan sebelum slice yang membutuhk
 - Kick, allow, mute, unmute, lock and unlock take effect only after their audit row commits; a failed write
   changes nothing and answers `unavailable`.
 
-## Slice 8 — Mode HP (M8-01…M8-06 approved)
+## Slice 8 — Mode HP (dicabut: HP memakai peta)
 
-- *Detection.* Mode HP is automatic when `matchMedia('(pointer: coarse) and (max-width: 767px)')` matches at room
-  start; no manual toggle. Phaser is not loaded. Tablets keep the map (best effort).
-- *Protocol.* `auth {token, mode?}` with `mode` `map` (default) or `list`; any other value closes 4401. Fixed per
-  connection, survives travel; reconnect re-declares. `move` from a list connection → `move_rejected` with the
-  official position.
-- *Travel.* List connections skip the door/exit proximity check (exception to slice 5 *Akses masuk*). Membership,
-  Ruang Guru, schedule, capacity, lock, ban and travel serialization still apply. Arrival at spawn, return to the
-  origin building door as before. Accepted risk: a desktop client can forge `list` to skip walking; the door is
-  presence UX, not access control.
-- *Seat.* Client → server `seat {zone}` (list mode, interior maps only, 1 per second → `rate_limited`). Server
-  places the avatar on a walkable tile inside the zone (zone centres are tables, so not the literal centre; spread
-  like spawn); `zone: ""` returns to the spawn ("Area umum"). Unknown zone → `bad_message`; campus or map
-  connection → `forbidden`. Zone/snapshot follow on the next tick; gather still moves everyone to spawn. Map parsing
-  rejects zones without a walkable tile.
-- *Client-side counts.* Zone counts, tablemates and "Di dekatmu" (within the map's proximity radius) are computed from welcome/snapshot
-  positions; building counts reuse `buildings`, room rows reuse the rooms list (`people`, `live`).
-- *Teacher.* Phone keeps the announcement tab and the teacher panel (collapsible).
+Mode HP (daftar tempat tanpa peta, `MobileRoom`) **dihapus pada revamp tugas/modul**: HP sekarang memakai peta
+yang sama dengan desktop, karena interaksi peta sudah berbasis ketukan (ketuk gedung = pilih, ketuk dua kali =
+jalan, seret = geser) dan beban render peta sudah diturunkan (tekstur 1x, lihat `docs/tasks/realtime-capacity.md`).
+
+- *Tata letak sempit (≤ 900 px).* Rail menu di atas; membuka panel menutupi peta, menutupnya mengembalikan peta
+  setinggi layar. Masuk ke ruang dimulai pada peta (panel tertutup). Kamera berhenti di zoom 0.3, jadi kampus
+  digeser, bukan dikecilkan sampai gedung tak terbaca.
+- *Yang masih berlaku dari slice ini:* protokol `auth {token, mode?}` dengan `mode` `map`/`list` dan perintah
+  `seat {zone}` tetap ada di server dan tetap diuji, tetapi **tidak dipakai klien web**. Klien selalu mengirim
+  `map`. Keduanya dipertahankan agar klien lama tidak rusak; hapus hanya lewat keputusan terpisah.
+- *Akibat.* Masuk ruang di HP kini wajib berjalan ke pintu (tidak ada lagi pengecualian proximity), dan memilih
+  kursi memakai pemilih kursi + jalan kaki, sama dengan desktop. Voice di HP memakai jalur yang sama dengan
+  desktop; dukungan perangkat belum diuji luas.
 
 ## Slice 9 — Voice (self-hosted MVP; implemented, awaiting review)
 
 The user approved server-enforced zone audio without distance attenuation, confirmed eviction with visible pending/failure handling, and self-hosted LiveKit. `docs/spec.md` records the requirements.
 
-- *Where.* Classroom/garden only; campus and mode HP stay text-only. Each actor incarnation has a random epoch.
+- *Where.* Classroom/garden only; the campus stays text-only. Each actor incarnation has a random epoch.
   Zone room names are `<room UUID>:<epoch>:zone:<zone key>` (outside zones: `general`); broadcast room is
   `<room UUID>:<epoch>:broadcast`. A new incarnation never reuses the audio rooms of a crashed process.
 - *Channels.* Full volume within a zone. Room-scoped signed grants enforce isolation in LiveKit. Browser connects

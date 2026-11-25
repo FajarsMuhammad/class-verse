@@ -6,6 +6,8 @@ export const ZOOM_MIN = 0.7
 export const ZOOM_MAX = 2
 export const ZOOM_DEFAULT = 1
 // Absolute camera limits. Scenery is baked at ART_SCALE 1 (GPU memory, see campusPaint.ts), so past ~1.2 it blurs.
+// The floor matters on phones: fitting the whole campus there would shrink a building to about 50 px, so the
+// camera stops at 0.3 and the map pans instead.
 const CAMERA_MIN = 0.3
 const CAMERA_MAX = 1.2
 

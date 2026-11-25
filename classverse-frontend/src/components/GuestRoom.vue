@@ -9,18 +9,17 @@ import VoiceBar from './VoiceBar.vue'
 const GameCanvas = defineAsyncComponent(() => import('./GameCanvas.vue'))
 const props = defineProps<{ session: GuestSession; client: GuestClient }>()
 const emit = defineEmits<{ leave: [] }>()
-const listMode = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse) and (max-width: 767px)').matches
 const room = useRoom(props.client.getToken)
-const voice = listMode ? null : useVoice({ ...room, voiceToken: props.client.voiceToken })
+const voice = useVoice({ ...room, voiceToken: props.client.voiceToken })
 const { status, map, world, current, error, kicked, people, online, chat, chatVersion, chatError } = room
 const closed = computed(() => kicked.value || status.value === 'denied' || status.value === 'closed')
 const names = computed(() => people.value.map(p => `${p.name}${p.role === 'guest' ? ' · Tamu' : ''}`))
 const zone = computed(() => { void chatVersion.value; return chat.zone.key })
-onMounted(() => room.start(props.session.room_id, props.session.map_key, listMode ? 'list' : 'map'))
+onMounted(() => room.start(props.session.room_id, props.session.map_key))
 </script>
 
 <template>
-  <main class="guest-room" :class="{ mobile: listMode }">
+  <main class="guest-room">
     <header>
       <div><h1>{{ session.room_name }}</h1><p>{{ session.org_name }} · {{ session.display_name }} · Tamu</p></div>
       <button class="btn-secondary" @click="emit('leave')">Tinggalkan pertemuan</button>
@@ -32,21 +31,16 @@ onMounted(() => room.start(props.session.room_id, props.session.map_key, listMod
     <template v-else>
       <p v-if="error || status !== 'open'" role="status">{{ error || 'Menghubungkan ke pertemuan…' }}</p>
       <div class="meeting">
-        <section v-if="!listMode" class="map-area" aria-label="Peta ruang pertemuan">
-          <GameCanvas v-if="map && current" :key="current.room_id" label="Peta pertemuan. Gunakan WASD atau tombol panah untuk bergerak."
+        <section class="map-area" aria-label="Peta ruang pertemuan">
+          <GameCanvas v-if="map && current" :key="current.room_id" label="Peta pertemuan. Ketuk dua kali tujuan untuk berjalan, atau gunakan WASD."
             :deps="{ map, world, sendMove: room.sendMove, currentZone: () => zone, speaking: () => voice?.speaking.value ?? new Set() }" />
-        </section>
-        <section v-else-if="map" class="zones" aria-label="Pilih tempat">
-          <button class="btn-secondary" :aria-pressed="!zone" :disabled="status !== 'open'" @click="room.seat('')">Area umum</button>
-          <button v-for="z in map.zones" :key="z.key" class="btn-secondary" :aria-pressed="zone === z.key" :disabled="status !== 'open'" @click="room.seat(z.key)">{{ z.name }}</button>
         </section>
         <ChatPanel :chat="chat" :version="chatVersion" :error="chatError" :disabled="status !== 'open'" :campus="false" guest :online="online" :people="names" @send="room.sendChat" />
       </div>
       <footer v-if="voice">
         <VoiceBar :voice="voice" :chat="chat" :version="chatVersion" :self-id="world.selfId" :teacher="false" :disabled="status !== 'open'" />
-        <span>Gerak dengan WASD atau tombol panah. Tamu hanya dapat mengikuti ruang ini.</span>
+        <span>Ketuk dua kali tujuan untuk berjalan, atau gunakan WASD. Tamu hanya dapat mengikuti ruang ini.</span>
       </footer>
-      <p v-else class="mobile-note">Mode HP: chat dan pilih tempat. Suara tersedia di desktop.</p>
     </template>
   </main>
 </template>
@@ -59,10 +53,7 @@ p { margin: var(--space-2) 0; color: var(--kv-text-muted); }
 .meeting { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); gap: var(--space-4); }
 .map-area { min-height: 0; }
 footer { display: flex; align-items: center; gap: var(--space-3); }
-footer span, .mobile-note { font-size: var(--text-sm); color: var(--kv-text-muted); }
-.zones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.mobile .meeting { display: flex; flex-direction: column; }
-.mobile header { align-items: start; flex-wrap: wrap; }
-.mobile .meeting :deep(.chat-panel) { flex: 1; min-height: 0; }
-@media (max-width: 767px) { .meeting { grid-template-columns: 1fr; overflow: auto; } .map-area { min-height: 40vh; } footer { flex-wrap: wrap; } }
+footer span { font-size: var(--text-sm); color: var(--kv-text-muted); }
+/* Narrow screens: the map keeps most of the height and chat sits under it. */
+@media (max-width: 767px) { header { align-items: start; flex-wrap: wrap; } .meeting { grid-template-columns: 1fr; grid-template-rows: minmax(45dvh, 1fr) minmax(0, 1fr); } footer { flex-wrap: wrap; } }
 </style>

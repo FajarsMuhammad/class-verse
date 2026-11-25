@@ -33,7 +33,7 @@ const emit = defineEmits<{ walk: [seat: Seat] }>()
     <AssignmentPanel v-if="orgId" :key="orgId" :org-id="orgId" />
     <ResumeLearning v-if="orgId" :org-id="orgId" :refresh-key="progressKey" />
     <h3>{{ campus ? 'Jelajahi kampus' : 'Ruang belajar' }}</h3>
-    <p class="panel-note">{{ campus ? 'Klik dua kali gedung di peta atau pilih dari daftar Gedung untuk menuju pintunya.' : roomName }}</p>
+    <p class="panel-note">{{ campus ? 'Ketuk dua kali gedung di peta, atau pakai tombol Gedung di pojok peta, untuk menuju pintunya.' : roomName }}</p>
     <template v-if="!campus">
       <p class="panel-note">{{ zoneName || 'Area bersama' }}</p>
       <SeatPicker :seats="seats" :self="self" :others="others" :disabled="seatsDisabled"

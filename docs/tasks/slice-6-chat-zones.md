@@ -46,7 +46,7 @@ Aturan travel dan validasi pintu tetap; revisi layout belum termasuk implementas
 - `docs/design.md`: tabel pesan WS (`chat`, `zone`), *Proximity*, skema `chat_messages`, `rooms.all_chat_enabled`,
   catatan purge 30 hari, PATCH `/api/rooms/{room_id}` (chat semua ruangan).
 - `docs/visual.md`: chip zona, bubble chat, input chat, zona putus-putus Mangga / solid saat di dalam, radius Nila.
-- Screenshot: `03-ruang-kelas.png` (tab Meja 3 / Dekat / Semua, zona dan radius), `06-hp-di-ruang.png` (bubble, input).
+- Screenshot: `03-ruang-kelas.png` (tab Meja 3 / Dekat / Semua, zona dan radius).
 
 ## Hasil
 

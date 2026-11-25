@@ -10,8 +10,6 @@ const props = defineProps<{
   building: Building
   disabled: boolean
   atDoor: boolean
-  // listMode is mode HP: entering needs no walk to the door.
-  listMode?: boolean
 }>()
 const emit = defineEmits<{ travel: [roomId: string] }>()
 const rooms = ref<Room[]>([])
@@ -50,9 +48,7 @@ watch(
     <h2 id="door-title">{{ building.name }}</h2>
     <p role="status">
       {{
-        listMode
-          ? 'Pilih ruang untuk masuk.'
-          : atDoor
+        atDoor
           ? 'Kamu di dekat pintu. Pilih ruang untuk masuk.'
           : 'Jalan ke pintu gedung ini untuk masuk. Memilih gedung tidak memindahkan avatar.'
       }}

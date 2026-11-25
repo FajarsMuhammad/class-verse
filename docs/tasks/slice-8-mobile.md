@@ -4,7 +4,7 @@ Status: **reviewed; functional, phone layout polish deferred to the next MVP** (
 Branch: `slice-8-mobile`, based on `fix-travel-webgl-leak` (`cd4583f`, slice 7 + WebGL fix).
 
 References: docs/spec.md (M1 row: "mode HP — pilih zona lewat daftar + chat, tanpa movement"; NFR Perangkat),
-docs/visual.md (alur HP, `05-hp-peta-sekolah.png`, `06-hp-di-ruang.png`), docs/design.md (slice 5 door rule,
+docs/visual.md (alur HP; screenshot HP dihapus saat mode HP dicabut), docs/design.md (slice 5 door rule,
 slice 6 zones/near, slice 7 controls).
 
 ## Existing requirements

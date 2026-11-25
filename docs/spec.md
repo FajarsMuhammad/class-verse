@@ -180,7 +180,7 @@ Target ini dipakai sebagai acuan desain teknis di Fase 2 dan load test di Fase 6
 | Latency movement | p95 < 200 ms untuk user di Indonesia |
 | Update posisi | 10–15 tick/detik dari server |
 | Bandwidth peserta | < 50 kbps untuk movement + chat; voice ±30–50 kbps per pembicara yang terdengar |
-| Perangkat | Laptop RAM 4 GB, Chrome/Edge/Firefox terbaru; HP lewat browser (Chrome Android, Safari iOS) untuk mode HP; tablet best effort |
+| Perangkat | Laptop RAM 4 GB, Chrome/Edge/Firefox terbaru; HP lewat browser (Chrome Android, Safari iOS) dengan peta yang sama; tablet best effort |
 | Ketersediaan | 99% selama jam sekolah (07.00–17.00 WIB) |
 | Lokasi server | Jakarta atau Singapura |
 | Keamanan | HTTPS/WSS wajib, JWT berumur pendek + refresh token, rate limit di endpoint auth dan chat |
@@ -212,11 +212,11 @@ Pilot dianggap berhasil jika minimal 3 kelas memakai Kelasverse secara rutin sel
 
 - Pengajar pilot bersedia memakai alat terpisah (Google Slides, Drive) untuk materi sampai screen share tersedia.
 - Kapasitas 40 orang per ruang cukup untuk satu kelas SMA atau satu kelas kuliah reguler.
-- Sebagian besar peserta mengakses dari laptop; peserta dari HP memakai mode HP.
+- Sebagian besar peserta mengakses dari laptop; peserta dari HP memakai peta yang sama dengan sentuhan.
 
 **Pertanyaan terbuka:**
 
 - [x] Model bisnis: gratis untuk pilot, lalu langganan per organisasi (diputuskan).
 - [x] Chat "semua ruangan" default aktif (diputuskan).
-- [x] Mode HP (tampilan sederhana tanpa movement) masuk M1, karena banyak siswa hanya punya HP (diputuskan).
+- [x] ~~Mode HP (tampilan sederhana tanpa movement) masuk M1~~ **dicabut**: HP memakai peta yang sama dengan desktop (diputuskan saat revamp tugas/modul). Protokol `list`/`seat` tetap di server sebagai warisan.
 - [x] Aset visual (avatar, tile map): desain sendiri dengan bantuan Claude (style guide, konsep avatar, tile map) di Fase 2 (diputuskan).

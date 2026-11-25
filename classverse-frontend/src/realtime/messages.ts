@@ -11,13 +11,14 @@ export type EmoteKey = 'wave' | 'hand' | 'quiz' | 'cheer'
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
 // Client → server
-// mode 'list' is mode HP: no movement, travel without the door, seat (slice 8).
+// mode 'list' is the legacy phone mode: no movement, travel without the door, seat (slice 8). The web client
+// always sends 'map'; the server still accepts 'list' for older clients.
 export type ConnectionMode = 'map' | 'list'
 export interface AuthMsg {
   token: string
   mode?: ConnectionMode
 }
-// SeatMsg places a mode HP avatar in a zone; '' is the general area.
+// SeatMsg places a 'list' connection's avatar in a zone; '' is the general area. Unused by the web client.
 export interface SeatMsg {
   zone: string
 }

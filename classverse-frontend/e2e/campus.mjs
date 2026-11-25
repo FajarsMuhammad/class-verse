@@ -109,9 +109,10 @@ try {
     assert.match(preview, /#e8a0b4/, 'hijab drawn in the chosen accessory colour')
   })
 
-  await step('minimap shows the player and the place card opens from the building list', async () => {
+  await step('minimap shows the player and the place card opens from the building picker', async () => {
     await page.waitForSelector('svg.minimap circle.player')
-    await page.locator('details.places button ::-p-text(Gedung Kelas)').click()
+    await page.locator('.map-places .trigger').click()
+    await page.locator('.map-places .sheet button ::-p-text(Gedung Kelas)').click()
     await page.waitForSelector('[data-testid="place-action"]')
     const card = await page.$eval('.place-card h2', (h) => h.textContent)
     assert.equal(card, 'Gedung Kelas')

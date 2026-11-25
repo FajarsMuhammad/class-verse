@@ -26,7 +26,7 @@ Login → (pilih organisasi) → Peta sekolah → jalan ke pintu gedung → pili
                                    ↑                                                   │
                                    └──────────── keluar ruang (kembali ke pintu gedung) ┘
 Pengajar/admin juga punya: Peta sekolah ⇄ Kelola ruang
-HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
+HP: sama dengan desktop (peta + rail menu di atas); panel menutupi peta saat dibuka
 ```
 
 | Layar | Screenshot | Isi utama |
@@ -35,20 +35,17 @@ HP: Peta sekolah (daftar gedung) → Ruang (daftar zona + chat), tanpa movement
 | Peta sekolah (desktop) | `02-peta-sekolah.png` | Peta 2D dengan gedung, alun-alun spawn, avatar lain; panel daftar gedung |
 | Ruang kelas (desktop) | `03-ruang-kelas.png` | Peta kelas: papan tulis, 5 meja sebagai zona, radius proximity; toolbar pengajar; panel chat bertab |
 | Kelola ruang (pengajar) | `04-kelola-ruang.png` | Kartu ruang per gedung dengan status live/terjadwal, buat ruang, undang anggota |
-| HP: peta sekolah | `05-hp-peta-sekolah.png` | "Di dekatmu", daftar gedung yang bisa dibuka, input chat dekat |
-| HP: di ruang | `06-hp-di-ruang.png` | Broadcast pengajar, pilih zona, teman semeja, chat zona, mic |
 
 ## Revisi layout setelah slice 6 (disetujui)
 
 - Desktop: workspace selebar viewport dengan margin ringkas; peta mengisi area kiri dan chat tetap di kanan
   (320–360 px). Tinggi mengikuti viewport, daftar pesan scroll sendiri. Overview peta tetap, tanpa kamera follow.
-- Daftar **Gedung** ada di panel Peta (guru) / Belajar (peserta) saat di peta sekolah: tiap gedung + deskripsi +
-  jumlah orang/live. Ini jalan keyboard & pembaca layar (peta = canvas). Memilih membuka kartu tempat yang sama
-  dengan klik peta (pojok kanan atas), tanpa teleport. Tidak ada tombol/dropdown "Daftar gedung" terpisah.
-  Bagian **Gedung (n)** menempel di bawah panel (sticky), bisa diciutkan; status buka/tutup diingat
-  (`kv-places-open`). Daftar bergulir sendiri (maks 40vh).
+- Pemilih **Gedung** adalah tombol kecil di pojok kiri bawah peta (bukan lagi daftar di panel samping). Menekannya
+  membuka daftar gedung + deskripsi + jumlah orang/live; memilih menutup daftar dan membuka kartu tempat yang sama
+  dengan klik peta (pojok kanan atas), tanpa teleport. Ini jalan keyboard & pembaca layar (peta = canvas); Esc
+  menutup dan fokus kembali ke tombol.
 - Dekat pintu: kartu nama gedung + **Pilih ruang**. Pemilihan ruang tidak menutup chat.
-- Layar sempit: pilihan tampilan **Peta / Chat**; mode HP tanpa movement tetap slice 8.
+- Layar sempit (≤ 900 px): rail menu di atas, panel menutupi peta saat dibuka; peta memakai seluruh tinggi saat panel tertutup.
 
 ## Revisi layout setelah slice 9 (disetujui)
 

@@ -53,7 +53,7 @@ export interface RoomHandle {
   rejoin: () => void
   sendMove: (m: MoveMsg) => void
   sendEmote: (key: EmoteKey) => boolean
-  // seat picks a zone in mode HP ('' = general area).
+  // seat picks a zone on a legacy 'list' connection ('' = general area); unused by the web client.
   seat: (zone: string) => void
   start: (roomId: string, mapKey: string, mode?: ConnectionMode) => Promise<void>
 }
